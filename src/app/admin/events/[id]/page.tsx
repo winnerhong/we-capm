@@ -52,6 +52,23 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
         </dl>
       </div>
 
+      <div className="flex gap-3">
+        <Link
+          href={`/admin/events/${event.id}/missions`}
+          className="flex-1 rounded-lg border bg-white p-4 text-center hover:border-violet-500"
+        >
+          <div className="text-2xl">🎯</div>
+          <div className="mt-1 font-semibold">미션 관리</div>
+        </Link>
+        <Link
+          href={`/admin/events/${event.id}/submissions`}
+          className="flex-1 rounded-lg border bg-white p-4 text-center hover:border-violet-500"
+        >
+          <div className="text-2xl">✅</div>
+          <div className="mt-1 font-semibold">승인 대기함</div>
+        </Link>
+      </div>
+
       <div className="rounded-lg border bg-white p-6">
         <h2 className="mb-4 font-semibold">입장 QR</h2>
         <div className="flex items-start gap-6">

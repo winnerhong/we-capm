@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 
+export const dynamic = "force-dynamic";
+
 export default async function Home() {
   const supabase = await createClient();
   const {
@@ -50,11 +52,21 @@ export default async function Home() {
             <p className="text-xs text-neutral-500">안녕하세요</p>
             <h1 className="text-xl font-bold">{profile?.name ?? "참가자"}님</h1>
           </div>
-          {profile && (profile.role === "ADMIN" || profile.role === "STAFF") && (
-            <Link href="/admin" className="rounded-lg border px-3 py-1.5 text-sm hover:bg-neutral-50">
-              관리자
-            </Link>
-          )}
+          <div className="flex gap-2">
+            {profile && (profile.role === "ADMIN" || profile.role === "STAFF") && (
+              <Link href="/admin" className="rounded-lg border px-3 py-1.5 text-sm hover:bg-neutral-50">
+                관리자
+              </Link>
+            )}
+            <form action="/api/auth/logout" method="post">
+              <button
+                type="submit"
+                className="rounded-lg border px-3 py-1.5 text-sm text-neutral-600 hover:bg-neutral-50"
+              >
+                로그아웃
+              </button>
+            </form>
+          </div>
         </header>
 
         <section className="space-y-2">

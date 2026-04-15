@@ -2,6 +2,8 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import type { Database } from "./database.types";
 
+const DEFAULT_PROFILE_NAME = "참가자";
+
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
 
@@ -30,9 +32,12 @@ export async function updateSession(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
-  const isAuthRoute = pathname.startsWith("/login") || pathname.startsWith("/auth");
+  const isApiRoute = pathname.startsWith("/api");
+  const isAuthFlow = pathname === "/login" || pathname === "/login/verify";
+  const isOnboarding = pathname === "/login/name";
   const isAdminRoute = pathname.startsWith("/admin");
-  const isProtectedRoute = isAdminRoute || pathname.startsWith("/me") || pathname.startsWith("/event");
+  const isProtectedRoute =
+    isAdminRoute || pathname.startsWith("/me") || pathname.startsWith("/event");
 
   if (!user && isProtectedRoute) {
     const url = request.nextUrl.clone();
@@ -41,20 +46,27 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  if (user && isAuthRoute) {
+  if (user && isAuthFlow) {
     const url = request.nextUrl.clone();
     url.pathname = "/";
     return NextResponse.redirect(url);
   }
 
-  if (isAdminRoute && user) {
+  if (user && !isApiRoute && !isOnboarding) {
     const { data: profile } = await supabase
       .from("profiles")
-      .select("role")
+      .select("name, role")
       .eq("id", user.id)
       .single();
 
-    if (!profile || (profile.role !== "ADMIN" && profile.role !== "STAFF")) {
+    if (profile && profile.name === DEFAULT_PROFILE_NAME) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/login/name";
+      if (pathname !== "/") url.searchParams.set("next", pathname);
+      return NextResponse.redirect(url);
+    }
+
+    if (isAdminRoute && (!profile || (profile.role !== "ADMIN" && profile.role !== "STAFF"))) {
       const url = request.nextUrl.clone();
       url.pathname = "/";
       return NextResponse.redirect(url);
