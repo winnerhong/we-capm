@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { checkAndAwardRewards } from "@/lib/rewards";
 
 export async function approveSubmissionAction(eventId: string, submissionId: string) {
   const supabase = await createClient();
@@ -44,10 +45,13 @@ export async function approveSubmissionAction(eventId: string, submissionId: str
     .eq("id", submissionId);
   if (updErr) throw new Error(updErr.message);
 
+  const newScore = participant.total_score + mission.points;
   await supabase
     .from("participants")
-    .update({ total_score: participant.total_score + mission.points })
+    .update({ total_score: newScore })
     .eq("id", sub.participant_id);
+
+  await checkAndAwardRewards(supabase, eventId, sub.participant_id, sub.mission_id, newScore);
 
   revalidatePath(`/admin/events/${eventId}/submissions`);
 }

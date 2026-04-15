@@ -100,6 +100,14 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
           <div className="mt-1 font-semibold">참가자</div>
           <div className="text-xs text-neutral-500">{participantCount ?? 0}명</div>
         </Link>
+        <Link
+          href={`/admin/events/${event.id}/rewards`}
+          className="rounded-lg border bg-white p-4 text-center hover:border-violet-500"
+        >
+          <div className="text-2xl">🎁</div>
+          <div className="mt-1 font-semibold">보상</div>
+          <div className="text-xs text-neutral-500">관리</div>
+        </Link>
       </div>
 
       <div className="rounded-lg border bg-white p-6">

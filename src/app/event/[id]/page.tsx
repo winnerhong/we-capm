@@ -86,6 +86,15 @@ export default async function EventHomePage({ params }: { params: Promise<{ id: 
               </div>
             </Link>
           )}
+
+          <Link
+            href={`/event/${id}/rewards`}
+            className="rounded-lg border bg-white p-4 text-center hover:border-violet-500"
+          >
+            <div className="text-3xl">🎁</div>
+            <div className="mt-1 font-semibold">보상함</div>
+            <div className="text-xs text-neutral-500">획득한 보상</div>
+          </Link>
         </div>
       </div>
     </main>

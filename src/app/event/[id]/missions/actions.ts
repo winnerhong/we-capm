@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { checkAndAwardRewards } from "@/lib/rewards";
 
 export async function submitQuizAction(eventId: string, missionId: string, formData: FormData) {
   const supabase = await createClient();
@@ -48,10 +49,12 @@ export async function submitQuizAction(eventId: string, missionId: string, formD
   if (subError) throw new Error(subError.message);
 
   if (shouldAutoApprove && isCorrect) {
+    const newScore = participant.total_score + mission.points;
     await supabase
       .from("participants")
-      .update({ total_score: participant.total_score + mission.points })
+      .update({ total_score: newScore })
       .eq("id", participant.id);
+    await checkAndAwardRewards(supabase, eventId, participant.id, missionId, newScore);
   }
 
   revalidatePath(`/event/${eventId}/missions`);
@@ -101,10 +104,12 @@ export async function submitPhotoAction(
   if (subError) throw new Error(subError.message);
 
   if (auto) {
+    const newScore = participant.total_score + mission.points;
     await supabase
       .from("participants")
-      .update({ total_score: participant.total_score + mission.points })
+      .update({ total_score: newScore })
       .eq("id", participant.id);
+    await checkAndAwardRewards(supabase, eventId, participant.id, missionId, newScore);
   }
 
   revalidatePath(`/event/${eventId}/missions`);
