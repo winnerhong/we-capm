@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { checkAndAwardRewards } from "@/lib/rewards";
+import { haversineMeters } from "@/lib/geo";
 
 export async function submitQuizAction(eventId: string, missionId: string, formData: FormData) {
   const supabase = await createClient();
@@ -60,6 +61,71 @@ export async function submitQuizAction(eventId: string, missionId: string, formD
   revalidatePath(`/event/${eventId}/missions`);
   revalidatePath(`/event/${eventId}`);
   redirect(`/event/${eventId}/missions?result=${isCorrect ? "correct" : shouldAutoApprove ? "submitted" : "pending"}`);
+}
+
+export async function submitLocationAction(
+  eventId: string,
+  missionId: string,
+  lat: number,
+  lng: number,
+  accuracy: number
+) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("unauthorized");
+
+  const { data: mission } = await supabase
+    .from("missions")
+    .select("id, points, config, event_id")
+    .eq("id", missionId)
+    .single();
+  if (!mission) throw new Error("미션 없음");
+
+  const cfg = (mission.config ?? {}) as { lat?: number; lng?: number; radius?: number };
+  if (!cfg.lat || !cfg.lng) throw new Error("미션 좌표 설정 오류");
+
+  const distance = haversineMeters(lat, lng, cfg.lat, cfg.lng);
+  const radius = cfg.radius ?? 50;
+
+  if (distance > radius) {
+    return {
+      ok: false,
+      distance: Math.round(distance),
+      radius,
+      message: `${Math.round(distance - radius)}미터 더 가까이 가주세요`,
+    };
+  }
+
+  const { data: participant } = await supabase
+    .from("participants")
+    .select("id, total_score")
+    .eq("event_id", eventId)
+    .eq("user_id", user.id)
+    .single();
+  if (!participant) throw new Error("참가자 아님");
+
+  const { error } = await supabase.from("submissions").insert({
+    mission_id: missionId,
+    participant_id: participant.id,
+    location_lat: lat,
+    location_lng: lng,
+    location_accuracy: accuracy,
+    status: "AUTO_APPROVED",
+    review_method: "AUTO",
+    reviewed_at: new Date().toISOString(),
+    earned_points: mission.points,
+  });
+  if (error) throw new Error(error.message);
+
+  const newScore = participant.total_score + mission.points;
+  await supabase.from("participants").update({ total_score: newScore }).eq("id", participant.id);
+  await checkAndAwardRewards(supabase, eventId, participant.id, missionId, newScore);
+
+  revalidatePath(`/event/${eventId}/missions`);
+  revalidatePath(`/event/${eventId}`);
+  return { ok: true, distance: Math.round(distance), radius };
 }
 
 export async function submitPhotoAction(

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { checkAndAwardRewards } from "@/lib/rewards";
+import { notify } from "@/lib/notifications";
 
 export async function approveSubmissionAction(eventId: string, submissionId: string) {
   const supabase = await createClient();
@@ -53,6 +54,26 @@ export async function approveSubmissionAction(eventId: string, submissionId: str
 
   await checkAndAwardRewards(supabase, eventId, sub.participant_id, sub.mission_id, newScore);
 
+  const { data: pRow } = await supabase
+    .from("participants")
+    .select("user_id")
+    .eq("id", sub.participant_id)
+    .single();
+  const { data: mRow } = await supabase
+    .from("missions")
+    .select("title")
+    .eq("id", sub.mission_id)
+    .single();
+  if (pRow && mRow) {
+    await notify(
+      supabase,
+      pRow.user_id,
+      "MISSION_APPROVED",
+      `🎉 ${mRow.title} 통과!`,
+      `+${mission.points}점 획득`
+    );
+  }
+
   revalidatePath(`/admin/events/${eventId}/submissions`);
 }
 
@@ -78,6 +99,27 @@ export async function rejectSubmissionAction(
     })
     .eq("id", submissionId);
   if (error) throw new Error(error.message);
+
+  const { data: subRow } = await supabase
+    .from("submissions")
+    .select("participant_id, mission_id")
+    .eq("id", submissionId)
+    .single();
+  if (subRow) {
+    const [{ data: pRow }, { data: mRow }] = await Promise.all([
+      supabase.from("participants").select("user_id").eq("id", subRow.participant_id).single(),
+      supabase.from("missions").select("title").eq("id", subRow.mission_id).single(),
+    ]);
+    if (pRow && mRow) {
+      await notify(
+        supabase,
+        pRow.user_id,
+        "MISSION_REJECTED",
+        `😢 ${mRow.title} 반려`,
+        reason ? `사유: ${reason}` : "다시 시도해보세요"
+      );
+    }
+  }
 
   revalidatePath(`/admin/events/${eventId}/submissions`);
 }

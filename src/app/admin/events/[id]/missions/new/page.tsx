@@ -9,9 +9,9 @@ import type { TemplateType } from "@/lib/supabase/database.types";
 const TEMPLATES: { value: TemplateType; label: string; description: string }[] = [
   { value: "PHOTO", label: "📸 사진 미션", description: "지정된 장면을 촬영해 인증" },
   { value: "QUIZ", label: "✍️ 퀴즈", description: "질문에 정답 입력 (자동 채점 가능)" },
-  { value: "LOCATION", label: "📍 위치 미션", description: "특정 장소 방문 GPS 인증 (MVP 이후)" },
-  { value: "VIDEO", label: "🎥 영상 미션", description: "짧은 영상 촬영 (MVP 이후)" },
-  { value: "TIMEATTACK", label: "🏃 타임어택", description: "제한시간 내 수행 (MVP 이후)" },
+  { value: "LOCATION", label: "📍 위치 미션", description: "특정 장소 방문 GPS 자동 인증" },
+  { value: "VIDEO", label: "🎥 영상 미션", description: "짧은 영상 촬영 (추후)" },
+  { value: "TIMEATTACK", label: "🏃 타임어택", description: "제한시간 내 수행 (추후)" },
 ];
 
 export default function NewMissionPage({ params }: { params: Promise<{ id: string }> }) {
@@ -34,7 +34,7 @@ export default function NewMissionPage({ params }: { params: Promise<{ id: strin
         <label className="text-sm font-medium">미션 종류</label>
         <div className="grid grid-cols-1 gap-2">
           {TEMPLATES.map((t) => {
-            const disabled = t.value !== "PHOTO" && t.value !== "QUIZ";
+            const disabled = t.value === "VIDEO" || t.value === "TIMEATTACK";
             return (
               <button
                 key={t.value}
@@ -96,6 +96,25 @@ export default function NewMissionPage({ params }: { params: Promise<{ id: strin
                 <option value="OBJECTIVE">객관식</option>
               </select>
             </div>
+          </>
+        )}
+
+        {template === "LOCATION" && (
+          <>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="위도 (lat)" name="loc_lat" type="number" required placeholder="37.5665" />
+              <Field label="경도 (lng)" name="loc_lng" type="number" required placeholder="126.9780" />
+            </div>
+            <Field
+              label="반경 (미터)"
+              name="loc_radius"
+              type="number"
+              required
+              defaultValue="50"
+            />
+            <p className="text-xs">
+              📍 구글 지도에서 장소를 우클릭하면 좌표가 나옵니다. 반경은 50m 이상 권장.
+            </p>
           </>
         )}
 

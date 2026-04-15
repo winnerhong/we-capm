@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
+import { notify } from "@/lib/notifications";
 
 type DBClient = SupabaseClient<Database>;
 
@@ -61,5 +62,25 @@ export async function checkAndAwardRewards(
       participant_id: participantId,
       status: "EARNED",
     });
+
+    const { data: participantRow } = await supabase
+      .from("participants")
+      .select("user_id")
+      .eq("id", participantId)
+      .single();
+    const { data: rewardRow } = await supabase
+      .from("rewards")
+      .select("name")
+      .eq("id", reward.id)
+      .single();
+    if (participantRow && rewardRow) {
+      await notify(
+        supabase,
+        participantRow.user_id,
+        "REWARD_EARNED",
+        "🎁 보상 획득",
+        `${rewardRow.name}을(를) 획득했어요!`
+      );
+    }
   }
 }

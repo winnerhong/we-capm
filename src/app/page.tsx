@@ -30,6 +30,12 @@ export default async function Home() {
 
   const { data: profile } = await supabase.from("profiles").select("name, role").eq("id", user.id).single();
 
+  const { count: unreadCount } = await supabase
+    .from("notifications")
+    .select("*", { count: "exact", head: true })
+    .eq("user_id", user.id)
+    .eq("is_read", false);
+
   const { data: parts } = await supabase
     .from("participants")
     .select("event_id")
@@ -53,6 +59,17 @@ export default async function Home() {
             <h1 className="text-xl font-bold">{profile?.name ?? "참가자"}님</h1>
           </div>
           <div className="flex gap-2">
+            <Link
+              href="/notifications"
+              className="relative rounded-lg border px-3 py-1.5 text-sm hover:bg-neutral-50"
+            >
+              🔔
+              {unreadCount !== null && unreadCount > 0 && (
+                <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                  {unreadCount > 9 ? "9+" : unreadCount}
+                </span>
+              )}
+            </Link>
             {profile && (profile.role === "ADMIN" || profile.role === "STAFF") && (
               <Link href="/admin" className="rounded-lg border px-3 py-1.5 text-sm hover:bg-neutral-50">
                 관리자

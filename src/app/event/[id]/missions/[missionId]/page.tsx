@@ -3,6 +3,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { QuizForm } from "./quiz-form";
 import { PhotoForm } from "./photo-form";
+import { LocationForm } from "./location-form";
 
 export const dynamic = "force-dynamic";
 
@@ -87,6 +88,8 @@ export default async function MissionSubmitPage({
             participantId={participant.id}
             config={mission.config as { minPhotos?: number; maxPhotos?: number }}
           />
+        ) : mission.template_type === "LOCATION" ? (
+          <LocationForm eventId={eventId} missionId={missionId} />
         ) : (
           <div className="rounded-lg border bg-white p-6 text-center text-sm text-neutral-500">
             이 미션 유형은 아직 지원되지 않습니다

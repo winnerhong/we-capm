@@ -31,6 +31,12 @@ export async function createMissionAction(eventId: string, formData: FormData) {
       minPhotos: Number(formData.get("photo_min") ?? 1),
       maxPhotos: Number(formData.get("photo_max") ?? 3),
     };
+  } else if (template_type === "LOCATION") {
+    const lat = Number(formData.get("loc_lat") ?? 0);
+    const lng = Number(formData.get("loc_lng") ?? 0);
+    const radius = Number(formData.get("loc_radius") ?? 50);
+    if (!lat || !lng) throw new Error("위도/경도를 입력해주세요");
+    config = { lat, lng, radius };
   } else if (template_type === "TIMEATTACK") {
     config = { timeLimitSec: Number(formData.get("time_limit") ?? 60) };
   }
