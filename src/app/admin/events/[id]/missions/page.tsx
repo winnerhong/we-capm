@@ -68,6 +68,12 @@ export default async function MissionsPage({ params }: { params: Promise<{ id: s
                 )}
               </div>
               <div className="flex gap-2">
+                <Link
+                  href={`/admin/events/${id}/missions/${m.id}`}
+                  className="rounded border px-2 py-1 text-xs hover:bg-neutral-50"
+                >
+                  편집
+                </Link>
                 <form
                   action={async () => {
                     "use server";

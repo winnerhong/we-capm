@@ -4,6 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import { updateEventStatusAction, deleteEventAction } from "../actions";
 import type { EventStatus } from "@/lib/supabase/database.types";
 
+export const dynamic = "force-dynamic";
+
 const NEXT_STATUS: Partial<Record<EventStatus, { label: string; target: EventStatus }>> = {
   DRAFT: { label: "행사 시작 (ACTIVE로 전환)", target: "ACTIVE" },
   ACTIVE: { label: "행사 종료 (ENDED로 전환)", target: "ENDED" },
@@ -17,6 +19,21 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
   const { data: event } = await supabase.from("events").select("*").eq("id", id).single();
   if (!event) notFound();
 
+  const [{ count: participantCount }, { count: missionCount }, { count: pendingCount }] =
+    await Promise.all([
+      supabase.from("participants").select("*", { count: "exact", head: true }).eq("event_id", id),
+      supabase
+        .from("missions")
+        .select("*", { count: "exact", head: true })
+        .eq("event_id", id)
+        .eq("is_active", true),
+      supabase
+        .from("submissions")
+        .select("missions!inner(event_id)", { count: "exact", head: true })
+        .eq("missions.event_id", id)
+        .eq("status", "PENDING"),
+    ]);
+
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://we-capm.vercel.app";
   const joinUrl = `${appUrl}/join/${event.join_code}`;
 
@@ -27,6 +44,12 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
       <div className="flex items-center justify-between">
         <Link href="/admin/events" className="text-sm text-neutral-500 hover:underline">
           ← 행사 목록
+        </Link>
+        <Link
+          href={`/admin/events/${id}/edit`}
+          className="rounded-lg border px-3 py-1 text-sm hover:bg-neutral-50"
+        >
+          편집
         </Link>
       </div>
 
@@ -52,21 +75,28 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
         </dl>
       </div>
 
-      <div className="flex gap-3">
+      <div className="grid grid-cols-3 gap-3">
         <Link
           href={`/admin/events/${event.id}/missions`}
-          className="flex-1 rounded-lg border bg-white p-4 text-center hover:border-violet-500"
+          className="rounded-lg border bg-white p-4 text-center hover:border-violet-500"
         >
           <div className="text-2xl">🎯</div>
-          <div className="mt-1 font-semibold">미션 관리</div>
+          <div className="mt-1 font-semibold">미션</div>
+          <div className="text-xs text-neutral-500">{missionCount ?? 0}개</div>
         </Link>
         <Link
           href={`/admin/events/${event.id}/submissions`}
-          className="flex-1 rounded-lg border bg-white p-4 text-center hover:border-violet-500"
+          className="rounded-lg border bg-white p-4 text-center hover:border-violet-500"
         >
           <div className="text-2xl">✅</div>
-          <div className="mt-1 font-semibold">승인 대기함</div>
+          <div className="mt-1 font-semibold">대기함</div>
+          <div className="text-xs text-yellow-600">{pendingCount ?? 0}건 대기</div>
         </Link>
+        <div className="rounded-lg border bg-white p-4 text-center">
+          <div className="text-2xl">👥</div>
+          <div className="mt-1 font-semibold">참가자</div>
+          <div className="text-xs text-neutral-500">{participantCount ?? 0}명</div>
+        </div>
       </div>
 
       <div className="rounded-lg border bg-white p-6">

@@ -45,6 +45,45 @@ export async function createEventAction(formData: FormData) {
   redirect(`/admin/events/${data.id}`);
 }
 
+export async function updateEventAction(eventId: string, formData: FormData) {
+  const supabase = await createClient();
+
+  const name = String(formData.get("name") ?? "").trim();
+  const type = (formData.get("type") ?? "FAMILY") as EventType;
+  const start_at = String(formData.get("start_at") ?? "");
+  const end_at = String(formData.get("end_at") ?? "");
+  const location = String(formData.get("location") ?? "").trim();
+  const participation_type = (formData.get("participation_type") ?? "BOTH") as ParticipationType;
+  const max_team_size = Number(formData.get("max_team_size") ?? 6);
+  const show_leaderboard = formData.get("show_leaderboard") === "on";
+  const show_other_scores = formData.get("show_other_scores") === "on";
+
+  if (!name || !start_at || !end_at || !location) {
+    throw new Error("필수 항목이 비어있습니다");
+  }
+
+  const { error } = await supabase
+    .from("events")
+    .update({
+      name,
+      type,
+      start_at: new Date(start_at).toISOString(),
+      end_at: new Date(end_at).toISOString(),
+      location,
+      participation_type,
+      max_team_size,
+      show_leaderboard,
+      show_other_scores,
+    })
+    .eq("id", eventId);
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath(`/admin/events/${eventId}`);
+  revalidatePath(`/admin/events/${eventId}/edit`);
+  redirect(`/admin/events/${eventId}`);
+}
+
 export async function updateEventStatusAction(eventId: string, status: EventStatus) {
   const supabase = await createClient();
   const { error } = await supabase.from("events").update({ status }).eq("id", eventId);

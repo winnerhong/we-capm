@@ -66,6 +66,33 @@ export async function createMissionAction(eventId: string, formData: FormData) {
   redirect(`/admin/events/${eventId}/missions`);
 }
 
+export async function updateMissionAction(
+  eventId: string,
+  missionId: string,
+  formData: FormData
+) {
+  const supabase = await createClient();
+
+  const title = String(formData.get("title") ?? "").trim();
+  const description = String(formData.get("description") ?? "").trim();
+  const points = Number(formData.get("points") ?? 0);
+  const auto_approve = formData.get("auto_approve") === "on";
+
+  if (!title || !description || points < 0) {
+    throw new Error("필수 항목이 비어있거나 점수가 음수입니다");
+  }
+
+  const { error } = await supabase
+    .from("missions")
+    .update({ title, description, points, auto_approve })
+    .eq("id", missionId);
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath(`/admin/events/${eventId}/missions`);
+  redirect(`/admin/events/${eventId}/missions`);
+}
+
 export async function deleteMissionAction(eventId: string, missionId: string) {
   const supabase = await createClient();
   const { error } = await supabase.from("missions").delete().eq("id", missionId);
