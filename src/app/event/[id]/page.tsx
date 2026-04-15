@@ -53,6 +53,16 @@ export default async function EventHomePage({ params }: { params: Promise<{ id: 
           )}
         </header>
 
+        {(event.status === "ENDED" || event.status === "CONFIRMED") && (
+          <Link
+            href={`/event/${id}/result`}
+            className="block rounded-lg bg-gradient-to-r from-violet-600 to-purple-700 p-5 text-center text-white"
+          >
+            <div className="text-sm opacity-80">🏆 행사가 종료되었어요</div>
+            <div className="mt-1 font-bold">최종 결과 보기 →</div>
+          </Link>
+        )}
+
         <div className="grid grid-cols-2 gap-3">
           <Link
             href={`/event/${id}/missions`}

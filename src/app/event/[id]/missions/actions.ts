@@ -131,7 +131,8 @@ export async function submitLocationAction(
 export async function submitPhotoAction(
   eventId: string,
   missionId: string,
-  photoUrls: string[]
+  photoUrls: string[],
+  photoHashes: string[] = []
 ) {
   const supabase = await createClient();
   const {
@@ -140,6 +141,22 @@ export async function submitPhotoAction(
   if (!user) throw new Error("unauthorized");
 
   if (!photoUrls.length) throw new Error("사진을 업로드해주세요");
+
+  if (photoHashes.length > 0) {
+    const { data: existing } = await supabase
+      .from("submissions")
+      .select("photo_hashes, missions!inner(event_id)")
+      .eq("missions.event_id", eventId)
+      .not("photo_hashes", "eq", "{}");
+
+    const allExistingHashes = new Set(
+      (existing ?? []).flatMap((s: { photo_hashes: string[] }) => s.photo_hashes ?? [])
+    );
+    const duplicate = photoHashes.find((h) => allExistingHashes.has(h));
+    if (duplicate) {
+      return { ok: false, message: "동일한 사진이 이미 제출되어 있습니다" };
+    }
+  }
 
   const { data: mission } = await supabase
     .from("missions")
@@ -162,6 +179,7 @@ export async function submitPhotoAction(
     mission_id: missionId,
     participant_id: participant.id,
     photo_urls: photoUrls,
+    photo_hashes: photoHashes,
     status: auto ? "AUTO_APPROVED" : "PENDING",
     review_method: auto ? "AUTO" : null,
     reviewed_at: auto ? new Date().toISOString() : null,
@@ -180,4 +198,5 @@ export async function submitPhotoAction(
 
   revalidatePath(`/event/${eventId}/missions`);
   revalidatePath(`/event/${eventId}`);
+  return { ok: true };
 }

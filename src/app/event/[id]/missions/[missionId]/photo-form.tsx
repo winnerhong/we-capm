@@ -41,10 +41,19 @@ export function PhotoForm({ eventId, missionId, participantId, config }: Props) 
       try {
         const supabase = createClient();
         const urls: string[] = [];
+        const hashes: string[] = [];
         const submissionFolderId = crypto.randomUUID();
 
         for (let i = 0; i < files.length; i++) {
           const file = files[i];
+
+          const buf = await file.arrayBuffer();
+          const digest = await crypto.subtle.digest("SHA-256", buf);
+          const hash = Array.from(new Uint8Array(digest))
+            .map((b) => b.toString(16).padStart(2, "0"))
+            .join("");
+          hashes.push(hash);
+
           const ext = file.name.split(".").pop() ?? "jpg";
           const path = `${eventId}/${participantId}/${submissionFolderId}/${i}.${ext}`;
 
@@ -57,7 +66,11 @@ export function PhotoForm({ eventId, missionId, participantId, config }: Props) 
           setProgress(Math.round(((i + 1) / files.length) * 100));
         }
 
-        await submitPhotoAction(eventId, missionId, urls);
+        const result = await submitPhotoAction(eventId, missionId, urls, hashes);
+        if (result && !result.ok) {
+          setError(result.message ?? "중복 사진이 감지되었습니다");
+          return;
+        }
         router.push(`/event/${eventId}/missions?result=pending`);
       } catch (e) {
         setError(e instanceof Error ? e.message : "업로드 실패");
