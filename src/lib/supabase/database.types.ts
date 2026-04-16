@@ -488,6 +488,14 @@ export interface Database {
         Args: { event_uuid: string };
         Returns: boolean;
       };
+      event_has_registrations: {
+        Args: { p_event_id: string };
+        Returns: boolean;
+      };
+      check_phone_registration: {
+        Args: { p_join_code: string; p_phone: string };
+        Returns: Json;
+      };
     };
     Enums: {
       user_role: UserRole;

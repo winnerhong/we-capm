@@ -25,12 +25,10 @@ export default async function JoinPage({ params }: { params: Promise<{ code: str
     );
   }
 
-  const { count: regCount } = await supabase
-    .from("event_registrations")
-    .select("*", { count: "exact", head: true })
-    .eq("event_id", event.id);
-
-  const hasRegistrations = (regCount ?? 0) > 0;
+  const { data: hasRegs } = await supabase.rpc("event_has_registrations", {
+    p_event_id: event.id,
+  });
+  const hasRegistrations = hasRegs === true;
 
   if (hasRegistrations) {
     return (
