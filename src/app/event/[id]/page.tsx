@@ -28,7 +28,7 @@ export default async function EventHomePage({ params }: { params: Promise<{ id: 
   if (!event) notFound();
 
   return (
-    <main className="min-h-dvh bg-neutral-50 p-4">
+    <main className="min-h-dvh bg-neutral-50 p-4 pb-20">
       <div className="mx-auto max-w-lg space-y-4">
         <Link href="/" className="text-sm hover:underline">
           ← 내 행사

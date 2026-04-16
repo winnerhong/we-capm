@@ -496,6 +496,10 @@ export interface Database {
         Args: { p_join_code: string; p_phone: string };
         Returns: Json;
       };
+      find_user_by_phone: {
+        Args: { p_phone: string };
+        Returns: Json;
+      };
     };
     Enums: {
       user_role: UserRole;
