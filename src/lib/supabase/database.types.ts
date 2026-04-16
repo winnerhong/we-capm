@@ -434,7 +434,28 @@ export interface Database {
       };
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      get_home_data: {
+        Args: Record<string, never>;
+        Returns: Json;
+      };
+      get_event_home: {
+        Args: { p_event_id: string };
+        Returns: Json;
+      };
+      is_admin: {
+        Args: Record<string, never>;
+        Returns: boolean;
+      };
+      is_event_staff: {
+        Args: { event_uuid: string };
+        Returns: boolean;
+      };
+      is_event_participant: {
+        Args: { event_uuid: string };
+        Returns: boolean;
+      };
+    };
     Enums: {
       user_role: UserRole;
       event_status: EventStatus;

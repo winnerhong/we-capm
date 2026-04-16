@@ -4,6 +4,15 @@ import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
+interface EventHome {
+  event: {
+    id: string; name: string; status: string; location: string;
+    start_at: string; end_at: string; participation_type: string; show_leaderboard: boolean;
+  } | null;
+  participant: { id: string; total_score: number; team_id: string | null } | null;
+  missionCount: number;
+}
+
 export default async function EventHomePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await createClient();
@@ -13,34 +22,15 @@ export default async function EventHomePage({ params }: { params: Promise<{ id: 
   } = await supabase.auth.getUser();
   if (!user) redirect(`/login?next=/event/${id}`);
 
-  const [eventRes, participantRes, missionCountRes] = await Promise.all([
-    supabase
-      .from("events")
-      .select("id, name, status, location, start_at, end_at, participation_type, show_leaderboard")
-      .eq("id", id)
-      .single(),
-    supabase
-      .from("participants")
-      .select("id, total_score, team_id")
-      .eq("event_id", id)
-      .eq("user_id", user.id)
-      .maybeSingle(),
-    supabase
-      .from("missions")
-      .select("*", { count: "exact", head: true })
-      .eq("event_id", id)
-      .eq("is_active", true),
-  ]);
-
-  const event = eventRes.data;
-  const participant = participantRes.data;
-  const missionCount = missionCountRes.count;
+  const { data } = await supabase.rpc("get_event_home", { p_event_id: id });
+  const d = (data as unknown as EventHome) ?? {} as EventHome;
+  const { event, participant, missionCount } = d;
   if (!event) notFound();
 
   return (
     <main className="min-h-dvh bg-neutral-50 p-4">
       <div className="mx-auto max-w-lg space-y-4">
-        <Link href="/" className="text-sm text-neutral-500 hover:underline">
+        <Link href="/" className="text-sm hover:underline">
           ← 내 행사
         </Link>
 
@@ -74,7 +64,7 @@ export default async function EventHomePage({ params }: { params: Promise<{ id: 
           >
             <div className="text-3xl">🎯</div>
             <div className="mt-1 font-semibold">미션</div>
-            <div className="text-xs text-neutral-500">{missionCount ?? 0}개 진행 가능</div>
+            <div className="text-xs">{missionCount ?? 0}개 진행 가능</div>
           </Link>
 
           {event.show_leaderboard && (
@@ -84,7 +74,7 @@ export default async function EventHomePage({ params }: { params: Promise<{ id: 
             >
               <div className="text-3xl">🏆</div>
               <div className="mt-1 font-semibold">순위</div>
-              <div className="text-xs text-neutral-500">리더보드</div>
+              <div className="text-xs">리더보드</div>
             </Link>
           )}
 
@@ -95,7 +85,7 @@ export default async function EventHomePage({ params }: { params: Promise<{ id: 
             >
               <div className="text-3xl">🤝</div>
               <div className="mt-1 font-semibold">팀</div>
-              <div className="text-xs text-neutral-500">
+              <div className="text-xs">
                 {participant?.team_id ? "우리팀 보기" : "팀 만들기/합류"}
               </div>
             </Link>
@@ -107,7 +97,7 @@ export default async function EventHomePage({ params }: { params: Promise<{ id: 
           >
             <div className="text-3xl">🎁</div>
             <div className="mt-1 font-semibold">보상함</div>
-            <div className="text-xs text-neutral-500">획득한 보상</div>
+            <div className="text-xs">획득한 보상</div>
           </Link>
         </div>
       </div>
