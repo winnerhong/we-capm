@@ -5,6 +5,7 @@ import { QuizForm } from "./quiz-form";
 import { PhotoForm } from "./photo-form";
 import { LocationForm } from "./location-form";
 import { TimeattackForm } from "./timeattack-form";
+import { VideoForm } from "./video-form";
 
 export const dynamic = "force-dynamic";
 
@@ -91,6 +92,13 @@ export default async function MissionSubmitPage({
           />
         ) : mission.template_type === "LOCATION" ? (
           <LocationForm eventId={eventId} missionId={missionId} />
+        ) : mission.template_type === "VIDEO" ? (
+          <VideoForm
+            eventId={eventId}
+            missionId={missionId}
+            participantId={participant.id}
+            maxDurationSec={(mission.config as { maxDurationSec?: number }).maxDurationSec ?? 30}
+          />
         ) : mission.template_type === "TIMEATTACK" ? (
           <TimeattackForm
             eventId={eventId}

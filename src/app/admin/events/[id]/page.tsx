@@ -124,6 +124,32 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
           <div className="mt-1 font-semibold">스태프</div>
           <div className="text-xs text-neutral-500">운영진 배정</div>
         </Link>
+        <Link
+          href={`/admin/events/${event.id}/stats`}
+          className="rounded-lg border bg-white p-4 text-center hover:border-violet-500"
+        >
+          <div className="text-2xl">📊</div>
+          <div className="mt-1 font-semibold">통계</div>
+          <div className="text-xs text-neutral-500">실시간 현황</div>
+        </Link>
+        <Link
+          href={`/admin/events/${event.id}/claim`}
+          className="rounded-lg border bg-white p-4 text-center hover:border-violet-500"
+        >
+          <div className="text-2xl">🎫</div>
+          <div className="mt-1 font-semibold">수령 처리</div>
+          <div className="text-xs text-neutral-500">보상 수령 확인</div>
+        </Link>
+      </div>
+
+      <div className="flex gap-2">
+        <a
+          href={`/admin/events/${event.id}/export`}
+          download
+          className="flex-1 rounded-lg border bg-white p-3 text-center text-sm hover:border-violet-500"
+        >
+          📊 결과 CSV 다운로드
+        </a>
       </div>
 
       <div className="rounded-lg border bg-white p-6">

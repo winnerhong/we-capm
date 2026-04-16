@@ -86,6 +86,10 @@ export async function submitLocationAction(
   const cfg = (mission.config ?? {}) as { lat?: number; lng?: number; radius?: number };
   if (!cfg.lat || !cfg.lng) throw new Error("미션 좌표 설정 오류");
 
+  if (accuracy < 5) {
+    return { ok: false, distance: 0, radius: 0, message: "GPS 정확도가 비정상입니다 (조작 의심)" };
+  }
+
   const distance = haversineMeters(lat, lng, cfg.lat, cfg.lng);
   const radius = cfg.radius ?? 50;
 
@@ -126,6 +130,39 @@ export async function submitLocationAction(
   revalidatePath(`/event/${eventId}/missions`);
   revalidatePath(`/event/${eventId}`);
   return { ok: true, distance: Math.round(distance), radius };
+}
+
+export async function submitVideoAction(
+  eventId: string,
+  missionId: string,
+  videoPath: string
+) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("unauthorized");
+
+  const { data: mission } = await supabase.from("missions").select("id, points, auto_approve").eq("id", missionId).single();
+  if (!mission) throw new Error("미션 없음");
+
+  const { data: participant } = await supabase.from("participants").select("id, total_score").eq("event_id", eventId).eq("user_id", user.id).single();
+  if (!participant) throw new Error("참가자 아님");
+
+  const auto = mission.auto_approve;
+  const { error } = await supabase.from("submissions").insert({
+    mission_id: missionId, participant_id: participant.id, video_url: videoPath,
+    status: auto ? "AUTO_APPROVED" : "PENDING", review_method: auto ? "AUTO" : null,
+    reviewed_at: auto ? new Date().toISOString() : null, earned_points: auto ? mission.points : null,
+  });
+  if (error) throw new Error(error.message);
+
+  if (auto) {
+    const newScore = participant.total_score + mission.points;
+    await supabase.from("participants").update({ total_score: newScore }).eq("id", participant.id);
+    await checkAndAwardRewards(supabase, eventId, participant.id, missionId, newScore);
+  }
+
+  revalidatePath(`/event/${eventId}/missions`);
+  return { ok: true };
 }
 
 export async function submitTimeattackAction(
