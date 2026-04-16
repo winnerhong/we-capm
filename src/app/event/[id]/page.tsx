@@ -13,25 +13,29 @@ export default async function EventHomePage({ params }: { params: Promise<{ id: 
   } = await supabase.auth.getUser();
   if (!user) redirect(`/login?next=/event/${id}`);
 
-  const { data: event } = await supabase
-    .from("events")
-    .select("id, name, status, location, start_at, end_at, participation_type, show_leaderboard")
-    .eq("id", id)
-    .single();
+  const [eventRes, participantRes, missionCountRes] = await Promise.all([
+    supabase
+      .from("events")
+      .select("id, name, status, location, start_at, end_at, participation_type, show_leaderboard")
+      .eq("id", id)
+      .single(),
+    supabase
+      .from("participants")
+      .select("id, total_score, team_id")
+      .eq("event_id", id)
+      .eq("user_id", user.id)
+      .maybeSingle(),
+    supabase
+      .from("missions")
+      .select("*", { count: "exact", head: true })
+      .eq("event_id", id)
+      .eq("is_active", true),
+  ]);
+
+  const event = eventRes.data;
+  const participant = participantRes.data;
+  const missionCount = missionCountRes.count;
   if (!event) notFound();
-
-  const { data: participant } = await supabase
-    .from("participants")
-    .select("id, total_score, team_id")
-    .eq("event_id", id)
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  const { count: missionCount } = await supabase
-    .from("missions")
-    .select("*", { count: "exact", head: true })
-    .eq("event_id", id)
-    .eq("is_active", true);
 
   return (
     <main className="min-h-dvh bg-neutral-50 p-4">

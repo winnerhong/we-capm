@@ -26,10 +26,6 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
   const { pathname } = request.nextUrl;
 
   const isApiRoute = pathname.startsWith("/api");
@@ -38,6 +34,14 @@ export async function updateSession(request: NextRequest) {
   const isAdminRoute = pathname.startsWith("/admin");
   const isProtectedRoute =
     isAdminRoute || pathname.startsWith("/me") || pathname.startsWith("/event");
+
+  if (isApiRoute) {
+    return response;
+  }
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   if (!user && isProtectedRoute) {
     const url = request.nextUrl.clone();
@@ -52,7 +56,9 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  if (user && !isApiRoute && !isOnboarding) {
+  const needsProfileCheck = user && !isOnboarding && (isAdminRoute || pathname === "/" || pathname.startsWith("/event") || pathname.startsWith("/me"));
+
+  if (needsProfileCheck && user) {
     const { data: profile } = await supabase
       .from("profiles")
       .select("name, role")

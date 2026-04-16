@@ -28,21 +28,24 @@ export default async function Home() {
     );
   }
 
-  const { data: profile } = await supabase.from("profiles").select("name, role").eq("id", user.id).single();
+  const [profileRes, unreadRes, partsRes] = await Promise.all([
+    supabase.from("profiles").select("name, role").eq("id", user.id).single(),
+    supabase
+      .from("notifications")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .eq("is_read", false),
+    supabase
+      .from("participants")
+      .select("event_id")
+      .eq("user_id", user.id)
+      .order("joined_at", { ascending: false }),
+  ]);
 
-  const { count: unreadCount } = await supabase
-    .from("notifications")
-    .select("*", { count: "exact", head: true })
-    .eq("user_id", user.id)
-    .eq("is_read", false);
+  const profile = profileRes.data;
+  const unreadCount = unreadRes.count;
+  const eventIds = (partsRes.data ?? []).map((p) => p.event_id);
 
-  const { data: parts } = await supabase
-    .from("participants")
-    .select("event_id")
-    .eq("user_id", user.id)
-    .order("joined_at", { ascending: false });
-
-  const eventIds = (parts ?? []).map((p) => p.event_id);
   const { data: myEvents } = eventIds.length
     ? await supabase
         .from("events")
