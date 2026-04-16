@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { PhoneEntry } from "./phone-entry";
+
+export const dynamic = "force-dynamic";
 
 export default async function JoinPage({ params }: { params: Promise<{ code: string }> }) {
   const { code } = await params;
@@ -17,9 +19,27 @@ export default async function JoinPage({ params }: { params: Promise<{ code: str
       <main className="flex min-h-dvh items-center justify-center p-6">
         <div className="w-full max-w-sm space-y-2 text-center">
           <h1 className="text-xl font-bold">유효하지 않은 입장 코드</h1>
-          <p className="text-sm text-neutral-600">QR 코드를 다시 확인해주세요</p>
+          <p className="text-sm">QR 코드를 다시 확인해주세요</p>
         </div>
       </main>
+    );
+  }
+
+  const { count: regCount } = await supabase
+    .from("event_registrations")
+    .select("*", { count: "exact", head: true })
+    .eq("event_id", event.id);
+
+  const hasRegistrations = (regCount ?? 0) > 0;
+
+  if (hasRegistrations) {
+    return (
+      <PhoneEntry
+        eventId={event.id}
+        eventName={event.name}
+        location={event.location}
+        joinCode={code}
+      />
     );
   }
 
@@ -28,7 +48,7 @@ export default async function JoinPage({ params }: { params: Promise<{ code: str
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect(`/login?next=${encodeURIComponent(`/join/${code}`)}`);
+    redirect(`/login?next=/join/${code}`);
   }
 
   const { data: existing } = await supabase
@@ -42,34 +62,19 @@ export default async function JoinPage({ params }: { params: Promise<{ code: str
     redirect(`/event/${event.id}`);
   }
 
-  const defaultParticipationType = event.participation_type === "TEAM" ? "TEAM" : "INDIVIDUAL";
+  const { error } = await supabase.from("participants").insert({
+    user_id: user.id,
+    event_id: event.id,
+    participation_type: event.participation_type === "TEAM" ? "TEAM" : "INDIVIDUAL",
+  });
 
-  return (
-    <main className="flex min-h-dvh items-center justify-center p-6">
-      <div className="w-full max-w-sm space-y-6">
-        <div className="space-y-2 text-center">
-          <p className="text-sm text-neutral-500">행사 입장</p>
-          <h1 className="text-2xl font-bold">{event.name}</h1>
-          <p className="text-sm text-neutral-600">📍 {event.location}</p>
-          <p className="text-sm text-neutral-600">
-            🗓 {new Date(event.start_at).toLocaleString("ko-KR")}
-          </p>
-        </div>
+  if (error && !error.message.includes("duplicate")) {
+    return (
+      <main className="flex min-h-dvh items-center justify-center p-6">
+        <p className="text-sm text-red-600">{error.message}</p>
+      </main>
+    );
+  }
 
-        <form action={`/join/${code}/confirm`} method="post" className="space-y-3">
-          <input type="hidden" name="participation_type" value={defaultParticipationType} />
-          <button
-            type="submit"
-            className="w-full rounded-lg bg-violet-600 py-3 font-semibold text-white hover:bg-violet-700"
-          >
-            입장하기
-          </button>
-        </form>
-
-        <Link href="/" className="block text-center text-sm text-neutral-500 hover:underline">
-          홈으로
-        </Link>
-      </div>
-    </main>
-  );
+  redirect(`/event/${event.id}`);
 }

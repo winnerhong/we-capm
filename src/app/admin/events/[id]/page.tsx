@@ -75,7 +75,7 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
         </dl>
       </div>
 
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
         <Link
           href={`/admin/events/${event.id}/missions`}
           className="rounded-lg border bg-white p-4 text-center hover:border-violet-500"
@@ -107,6 +107,14 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
           <div className="text-2xl">🎁</div>
           <div className="mt-1 font-semibold">보상</div>
           <div className="text-xs text-neutral-500">관리</div>
+        </Link>
+        <Link
+          href={`/admin/events/${event.id}/registrations`}
+          className="rounded-lg border bg-white p-4 text-center hover:border-violet-500"
+        >
+          <div className="text-2xl">📋</div>
+          <div className="mt-1 font-semibold">사전 등록</div>
+          <div className="text-xs text-neutral-500">명단 관리</div>
         </Link>
       </div>
 

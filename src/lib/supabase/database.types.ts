@@ -120,6 +120,39 @@ export interface Database {
         };
         Relationships: [];
       };
+      event_registrations: {
+        Row: {
+          id: string;
+          event_id: string;
+          phone: string;
+          name: string;
+          status: string;
+          entered_at: string | null;
+          registered_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          event_id: string;
+          phone: string;
+          name: string;
+          status?: string;
+          entered_at?: string | null;
+          registered_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          event_id?: string;
+          phone?: string;
+          name?: string;
+          status?: string;
+          entered_at?: string | null;
+          registered_by?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       event_staff: {
         Row: { id: string; event_id: string; user_id: string; added_at: string };
         Insert: { id?: string; event_id: string; user_id: string; added_at?: string };
