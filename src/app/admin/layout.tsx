@@ -1,15 +1,12 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { getCurrentUser, getCurrentProfile } from "@/lib/supabase/current-user";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
   if (!user) redirect("/login?next=/admin");
 
-  const { data: profile } = await supabase.from("profiles").select("name, role").eq("id", user.id).single();
+  const profile = await getCurrentProfile();
 
   if (!profile || (profile.role !== "ADMIN" && profile.role !== "STAFF")) {
     redirect("/");

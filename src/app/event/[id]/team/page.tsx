@@ -14,11 +14,13 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
   } = await supabase.auth.getUser();
   if (!user) redirect(`/login?next=/event/${id}/team`);
 
-  const { data: event } = await supabase
-    .from("events")
-    .select("id, name, participation_type, max_team_size")
-    .eq("id", id)
-    .single();
+  const [eventRes, participantRes] = await Promise.all([
+    supabase.from("events").select("id, name, participation_type, max_team_size").eq("id", id).single(),
+    supabase.from("participants").select("id, team_id").eq("event_id", id).eq("user_id", user.id).maybeSingle(),
+  ]);
+
+  const event = eventRes.data;
+  const participant = participantRes.data;
   if (!event) notFound();
 
   if (event.participation_type === "INDIVIDUAL") {
@@ -29,25 +31,15 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
     );
   }
 
-  const { data: participant } = await supabase
-    .from("participants")
-    .select("id, team_id")
-    .eq("event_id", id)
-    .eq("user_id", user.id)
-    .maybeSingle();
   if (!participant) redirect(`/event/${id}`);
 
   if (participant.team_id) {
-    const { data: team } = await supabase
-      .from("teams")
-      .select("id, name, team_code, leader_id, total_score")
-      .eq("id", participant.team_id)
-      .single();
-
-    const { data: members } = await supabase
-      .from("participants")
-      .select("id, user_id, total_score")
-      .eq("team_id", participant.team_id);
+    const [teamRes, membersRes] = await Promise.all([
+      supabase.from("teams").select("id, name, team_code, leader_id, total_score").eq("id", participant.team_id).single(),
+      supabase.from("participants").select("id, user_id, total_score").eq("team_id", participant.team_id),
+    ]);
+    const team = teamRes.data;
+    const members = membersRes.data;
 
     const userIds = (members ?? []).map((m) => m.user_id);
     const { data: profiles } = userIds.length
