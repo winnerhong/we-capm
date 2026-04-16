@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { deleteMissionAction, toggleMissionActiveAction } from "./actions";
+import { deleteMissionAction, toggleMissionActiveAction, duplicateMissionAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -74,6 +74,14 @@ export default async function MissionsPage({ params }: { params: Promise<{ id: s
                 >
                   편집
                 </Link>
+                <form
+                  action={async () => {
+                    "use server";
+                    await duplicateMissionAction(id, m.id);
+                  }}
+                >
+                  <button className="rounded border px-2 py-1 text-xs hover:bg-neutral-50">복제</button>
+                </form>
                 <form
                   action={async () => {
                     "use server";

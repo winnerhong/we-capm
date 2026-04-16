@@ -103,6 +103,66 @@ export async function updateEventStatusAction(eventId: string, status: EventStat
   revalidatePath("/admin/events");
 }
 
+export async function duplicateEventAction(sourceEventId: string) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("unauthorized");
+
+  const { data: source } = await supabase.from("events").select("*").eq("id", sourceEventId).single();
+  if (!source) throw new Error("원본 행사 없음");
+
+  const { data: newEvent, error: evErr } = await supabase
+    .from("events")
+    .insert({
+      name: `${source.name} (복사)`,
+      description: source.description,
+      type: source.type,
+      start_at: source.start_at,
+      end_at: source.end_at,
+      location: source.location,
+      location_lat: source.location_lat,
+      location_lng: source.location_lng,
+      join_code: generateJoinCode(),
+      participation_type: source.participation_type,
+      max_team_size: source.max_team_size,
+      max_team_count: source.max_team_count,
+      show_leaderboard: source.show_leaderboard,
+      show_other_scores: source.show_other_scores,
+      mission_reveal_mode: source.mission_reveal_mode,
+      result_publish_mode: source.result_publish_mode,
+      auto_end: source.auto_end,
+      created_by_user_id: user.id,
+    })
+    .select("id")
+    .single();
+  if (evErr || !newEvent) throw new Error(evErr?.message ?? "복사 실패");
+
+  const { data: missions } = await supabase
+    .from("missions")
+    .select("title, description, instruction, template_type, points, \"order\", auto_approve, config")
+    .eq("event_id", sourceEventId);
+  if (missions && missions.length > 0) {
+    await supabase.from("missions").insert(
+      missions.map((m) => ({ ...m, event_id: newEvent.id }))
+    );
+  }
+
+  const { data: rewards } = await supabase
+    .from("rewards")
+    .select("name, description, image_url, reward_type, config, quantity, applies_to")
+    .eq("event_id", sourceEventId);
+  if (rewards && rewards.length > 0) {
+    await supabase.from("rewards").insert(
+      rewards.map((r) => ({ ...r, event_id: newEvent.id }))
+    );
+  }
+
+  revalidatePath("/admin/events");
+  redirect(`/admin/events/${newEvent.id}`);
+}
+
 export async function deleteEventAction(eventId: string) {
   const supabase = await createClient();
   const { error } = await supabase.from("events").delete().eq("id", eventId);

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { updateEventStatusAction, deleteEventAction } from "../actions";
+import { updateEventStatusAction, deleteEventAction, duplicateEventAction } from "../actions";
 import type { EventStatus } from "@/lib/supabase/database.types";
 
 export const dynamic = "force-dynamic";
@@ -190,19 +190,34 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
             </button>
           </form>
         )}
-        <form
-          action={async () => {
-            "use server";
-            await deleteEventAction(event.id);
-          }}
-        >
-          <button
-            type="submit"
-            className="rounded-lg border border-red-300 px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+        <div className="flex gap-2">
+          <form
+            action={async () => {
+              "use server";
+              await duplicateEventAction(event.id);
+            }}
           >
-            행사 삭제
-          </button>
-        </form>
+            <button
+              type="submit"
+              className="rounded-lg border px-4 py-2 text-sm hover:bg-neutral-50"
+            >
+              행사 복제
+            </button>
+          </form>
+          <form
+            action={async () => {
+              "use server";
+              await deleteEventAction(event.id);
+            }}
+          >
+            <button
+              type="submit"
+              className="rounded-lg border border-red-300 px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+            >
+              행사 삭제
+            </button>
+          </form>
+        </div>
       </div>
     </div>
   );

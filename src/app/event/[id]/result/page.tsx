@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { ShareCard } from "./share-card";
 
 export const dynamic = "force-dynamic";
 
@@ -88,21 +89,15 @@ export default async function ResultPage({ params }: { params: Promise<{ id: str
           ← {event.name}
         </Link>
 
-        <div className="rounded-2xl bg-gradient-to-br from-violet-600 to-purple-700 p-6 text-center text-white">
-          <p className="text-sm opacity-80">최종 결과</p>
-          <div className="mt-2 text-5xl font-bold">
-            {rank === 1 ? "🥇" : rank === 2 ? "🥈" : rank === 3 ? "🥉" : `${rank}등`}
-          </div>
-          <p className="mt-1 text-sm opacity-90">
-            {totalParticipants}명 중 {rank}등
-          </p>
-          <div className="mt-4 text-3xl font-bold">{participant.total_score}점</div>
-        </div>
-
-        <section className="grid grid-cols-2 gap-3">
-          <Stat label="완료 미션" value={`${completedCount ?? 0}/${totalMissions ?? 0}`} />
-          <Stat label="획득 보상" value={`${claims?.length ?? 0}개`} />
-        </section>
+        <ShareCard
+          eventName={event.name}
+          rank={rank}
+          totalParticipants={totalParticipants}
+          score={participant.total_score}
+          completedMissions={completedCount ?? 0}
+          totalMissions={totalMissions ?? 0}
+          rewardCount={claims?.length ?? 0}
+        />
 
         {rewards && rewards.length > 0 && (
           <section>

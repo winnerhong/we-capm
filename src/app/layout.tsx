@@ -15,6 +15,8 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "캠프닉",
   description: "캠핑 + 피크닉 행사 운영",
+  manifest: "/manifest.json",
+  other: { "theme-color": "#7c3aed" },
 };
 
 export default function RootLayout({
@@ -28,7 +30,14 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
       style={{ colorScheme: "light" }}
     >
-      <body className="min-h-full flex flex-col bg-white text-neutral-900">{children}</body>
+      <body className="min-h-full flex flex-col bg-white text-neutral-900">
+        {children}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js')}`,
+          }}
+        />
+      </body>
     </html>
   );
 }

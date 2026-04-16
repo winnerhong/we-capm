@@ -101,6 +101,40 @@ export async function updateMissionAction(
   redirect(`/admin/events/${eventId}/missions`);
 }
 
+export async function duplicateMissionAction(eventId: string, missionId: string) {
+  const supabase = await createClient();
+
+  const { data: original } = await supabase
+    .from("missions")
+    .select("*")
+    .eq("id", missionId)
+    .single();
+  if (!original) throw new Error("미션 없음");
+
+  const { data: last } = await supabase
+    .from("missions")
+    .select("order")
+    .eq("event_id", eventId)
+    .order("order", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const { error } = await supabase.from("missions").insert({
+    event_id: eventId,
+    title: `${original.title} (복사)`,
+    description: original.description,
+    instruction: original.instruction,
+    template_type: original.template_type,
+    points: original.points,
+    order: (last?.order ?? 0) + 1,
+    auto_approve: original.auto_approve,
+    config: original.config,
+  });
+  if (error) throw new Error(error.message);
+
+  revalidatePath(`/admin/events/${eventId}/missions`);
+}
+
 export async function deleteMissionAction(eventId: string, missionId: string) {
   const supabase = await createClient();
   const { error } = await supabase.from("missions").delete().eq("id", missionId);
