@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { checkAndEndEvent } from "@/lib/event-lifecycle";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +23,7 @@ export default async function EventHomePage({ params }: { params: Promise<{ id: 
   } = await supabase.auth.getUser();
   if (!user) redirect(`/login?next=/event/${id}`);
 
+  await checkAndEndEvent(supabase, id);
   const { data } = await supabase.rpc("get_event_home", { p_event_id: id });
   const d = (data as unknown as EventHome) ?? {} as EventHome;
   const { event, participant, missionCount } = d;

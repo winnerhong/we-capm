@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { QuizForm } from "./quiz-form";
 import { PhotoForm } from "./photo-form";
 import { LocationForm } from "./location-form";
+import { TimeattackForm } from "./timeattack-form";
 
 export const dynamic = "force-dynamic";
 
@@ -90,6 +91,12 @@ export default async function MissionSubmitPage({
           />
         ) : mission.template_type === "LOCATION" ? (
           <LocationForm eventId={eventId} missionId={missionId} />
+        ) : mission.template_type === "TIMEATTACK" ? (
+          <TimeattackForm
+            eventId={eventId}
+            missionId={missionId}
+            timeLimitSec={(mission.config as { timeLimitSec?: number }).timeLimitSec ?? 60}
+          />
         ) : (
           <div className="rounded-lg border bg-white p-6 text-center text-sm text-neutral-500">
             이 미션 유형은 아직 지원되지 않습니다

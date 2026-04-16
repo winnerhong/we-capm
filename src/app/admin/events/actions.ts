@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { generateJoinCode } from "@/lib/codes";
 import type { EventStatus, EventType, ParticipationType } from "@/lib/supabase/database.types";
+import { confirmResults } from "@/lib/event-lifecycle";
 
 export async function createEventAction(formData: FormData) {
   const supabase = await createClient();
@@ -86,8 +87,18 @@ export async function updateEventAction(eventId: string, formData: FormData) {
 
 export async function updateEventStatusAction(eventId: string, status: EventStatus) {
   const supabase = await createClient();
-  const { error } = await supabase.from("events").update({ status }).eq("id", eventId);
-  if (error) throw new Error(error.message);
+
+  if (status === "CONFIRMED") {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) throw new Error("unauthorized");
+    await confirmResults(supabase, eventId, user.id);
+  } else {
+    const { error } = await supabase.from("events").update({ status }).eq("id", eventId);
+    if (error) throw new Error(error.message);
+  }
+
   revalidatePath(`/admin/events/${eventId}`);
   revalidatePath("/admin/events");
 }

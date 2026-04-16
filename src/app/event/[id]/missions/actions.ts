@@ -128,6 +128,56 @@ export async function submitLocationAction(
   return { ok: true, distance: Math.round(distance), radius };
 }
 
+export async function submitTimeattackAction(
+  eventId: string,
+  missionId: string,
+  elapsedSec: number,
+  evidence: string
+) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("unauthorized");
+
+  const { data: mission } = await supabase
+    .from("missions")
+    .select("id, points, config")
+    .eq("id", missionId)
+    .single();
+  if (!mission) throw new Error("미션 없음");
+
+  const cfg = (mission.config ?? {}) as { timeLimitSec?: number };
+  const limit = cfg.timeLimitSec ?? 60;
+
+  if (elapsedSec > limit) {
+    return { ok: false, message: "시간 초과" };
+  }
+
+  const { data: participant } = await supabase
+    .from("participants")
+    .select("id, total_score")
+    .eq("event_id", eventId)
+    .eq("user_id", user.id)
+    .single();
+  if (!participant) throw new Error("참가자 아님");
+
+  const now = new Date();
+  const startedAt = new Date(now.getTime() - elapsedSec * 1000);
+
+  const { error } = await supabase.from("submissions").insert({
+    mission_id: missionId,
+    participant_id: participant.id,
+    text_content: evidence || `${elapsedSec}초 완료`,
+    started_at: startedAt.toISOString(),
+    status: "PENDING",
+  });
+  if (error) throw new Error(error.message);
+
+  revalidatePath(`/event/${eventId}/missions`);
+  return { ok: true };
+}
+
 export async function submitPhotoAction(
   eventId: string,
   missionId: string,
