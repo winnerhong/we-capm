@@ -40,7 +40,7 @@ export function TeacherCsvUpload({ eventId }: { eventId: string }) {
       <h2 className="font-semibold">일괄 등록</h2>
       <input type="file" accept=".csv,.txt" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }} className="w-full text-sm" />
       <textarea value={csvText} onChange={(e) => setCsvText(e.target.value)}
-        placeholder={"이름,전화번호\n김선생,01012345678\n박선생,01056789012"}
+        placeholder={"담당반,이름,전화번호\n해바라기반,김선생,01012345678\n장미반,박선생,01056789012\n\n또는 2열:\n김선생,01012345678"}
         rows={4} className="w-full rounded-lg border px-3 py-2 font-mono text-xs" />
       {error && <p className="text-sm text-red-600">{error}</p>}
       {result && <p className="text-sm text-green-600">{result}</p>}

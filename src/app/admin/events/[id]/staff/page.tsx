@@ -25,15 +25,23 @@ export default async function StaffPage({ params }: { params: Promise<{ id: stri
 
   return (
     <div className="space-y-4">
-      <div>
+      <div className="flex items-center justify-between">
+        <div>
         <Link href={`/admin/events/${id}`} className="text-sm hover:underline">← {event.name}</Link>
         <h1 className="text-2xl font-bold">선생님 관리</h1>
         <p className="text-sm">등록: {total}명 | 입장: {entered}명</p>
+        </div>
+        {total > 0 && (
+          <a href={`/admin/events/${id}/staff/download`} download
+            className="rounded-lg border px-4 py-2 text-sm hover:bg-neutral-50">📥 엑셀 다운로드</a>
+        )}
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
         <form action={addTeacherAction.bind(null, id)} className="space-y-3 rounded-lg border bg-white p-4">
           <h2 className="font-semibold">수동 추가</h2>
+          <input name="class_name" type="text" placeholder="담당반 (예: 해바라기반)"
+            className="w-full rounded-lg border px-3 py-2" />
           <input name="name" type="text" required placeholder="이름 (예: 김선생)"
             className="w-full rounded-lg border px-3 py-2" />
           <input name="phone" type="tel" required placeholder="전화번호 (01012345678)"
@@ -50,6 +58,7 @@ export default async function StaffPage({ params }: { params: Promise<{ id: stri
             <thead className="bg-neutral-50 text-left text-xs">
               <tr>
                 <th className="px-4 py-2">#</th>
+                <th className="px-4 py-2">담당반</th>
                 <th className="px-4 py-2">이름</th>
                 <th className="px-4 py-2">전화번호</th>
                 <th className="px-4 py-2">상태</th>
@@ -58,10 +67,13 @@ export default async function StaffPage({ params }: { params: Promise<{ id: stri
             </thead>
             <tbody className="divide-y">
               {(teachers ?? []).map((t, i) => {
-                const displayName = t.name.replace("[선생님] ", "");
+                const match = t.name.match(/^\[선생님(?:\/(.+?))?\]\s*(.+)$/);
+                const classN = match?.[1] ?? "";
+                const displayName = match?.[2] ?? t.name;
                 return (
                   <tr key={t.id}>
                     <td className="px-4 py-2">{i + 1}</td>
+                    <td className="px-4 py-2">{classN}</td>
                     <td className="px-4 py-2 font-medium">{displayName}</td>
                     <td className="px-4 py-2 font-mono text-xs">{t.phone}</td>
                     <td className="px-4 py-2">
