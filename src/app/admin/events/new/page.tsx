@@ -1,5 +1,6 @@
 import { createEventAction } from "../actions";
 import { getAllSchools } from "@/lib/school-db";
+import { SchoolSelect } from "./school-select";
 
 export const dynamic = "force-dynamic";
 
@@ -11,21 +12,9 @@ export default async function NewEventPage() {
       <h1 className="text-2xl font-bold">새 행사 만들기</h1>
 
       <form action={createEventAction} className="space-y-4 rounded-lg border bg-white p-6">
-        <div>
-          <label className="mb-1 block text-sm font-medium">기관 선택</label>
-          <select
-            name="school_id"
-            className="w-full rounded-lg border px-3 py-2 text-base outline-none focus:ring-2 focus:ring-violet-500"
-          >
-            <option value="">직접 입력</option>
-            {schools.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name} ({s.district ?? ""})
-              </option>
-            ))}
-          </select>
-          <p className="mt-1 text-xs">기관 선택 시 아이디/비밀번호 자동 설정</p>
-        </div>
+        <SchoolSelect schools={schools.map((s) => ({
+          id: s.id, name: s.name, username: s.username, phone: s.phone ?? "", district: s.district ?? "",
+        }))} />
 
         <Field label="행사명" name="name" required placeholder="5월 가족 캠프닉" />
 
@@ -56,12 +45,9 @@ export default async function NewEventPage() {
         </div>
 
         <div className="border-t pt-4">
-          <p className="mb-2 text-sm font-semibold">행사 기관 로그인 계정</p>
-          <p className="mb-2 text-xs">기관 선택 시 자동 설정됩니다. 직접 입력도 가능.</p>
-          <Field label="기관 아이디" name="manager_id" placeholder="기관명 또는 직접 입력" />
-          <div className="mt-2">
-            <Field label="기관 비밀번호" name="manager_password" placeholder="1234" />
-          </div>
+          <p className="mb-2 text-sm font-semibold">기관 로그인 계정</p>
+          <p className="mb-2 text-xs">기관 선택 시 자동 설정. 직접 수정 가능.</p>
+          <Field label="기관 비밀번호" name="manager_password" placeholder="1234" />
         </div>
 
         <button type="submit"
