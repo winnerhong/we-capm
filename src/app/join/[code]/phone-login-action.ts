@@ -4,38 +4,55 @@ import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { formatKorean } from "@/lib/phone";
 
-interface CheckResult {
-  ok: boolean;
-  message?: string;
-  eventId?: string;
-  registrationId?: string;
-  name?: string;
-}
-
 export async function phoneLoginAction(joinCode: string, phoneDigits: string) {
   const supabase = await createClient();
 
   const phone = phoneDigits.startsWith("0") ? phoneDigits : `0${phoneDigits}`;
   const formatted = formatKorean(phone);
 
-  const { data } = await supabase.rpc("check_phone_registration", {
+  const { data: event } = await supabase
+    .from("events")
+    .select("id, name")
+    .eq("join_code", joinCode)
+    .single();
+
+  if (!event) return { ok: false, message: "행사를 찾을 수 없습니다" };
+
+  const { data: reg } = await supabase.rpc("check_phone_registration", {
     p_join_code: joinCode,
     p_phone: formatted,
   });
 
-  const result = data as unknown as CheckResult;
-  if (!result?.ok) {
-    return { ok: false, message: result?.message ?? "입장 실패" };
+  const result = reg as unknown as { ok: boolean; name?: string; registrationId?: string; eventId?: string };
+
+  let name = "참가자";
+
+  if (result?.ok) {
+    name = result.name ?? "참가자";
+  } else {
+    const { data: regByDigits } = await supabase
+      .from("event_registrations")
+      .select("id, name, phone")
+      .eq("event_id", event.id)
+      .like("phone", `%${phoneDigits.slice(-4)}`)
+      .limit(1);
+
+    if (regByDigits && regByDigits.length > 0) {
+      name = regByDigits[0].name;
+      await supabase
+        .from("event_registrations")
+        .update({ status: "ENTERED", entered_at: new Date().toISOString() })
+        .eq("id", regByDigits[0].id);
+    }
   }
 
   const cookieStore = await cookies();
   cookieStore.set(
     "campnic_participant",
     JSON.stringify({
-      eventId: result.eventId,
-      registrationId: result.registrationId,
+      eventId: event.id,
       phone: formatted,
-      name: result.name,
+      name,
     }),
     {
       httpOnly: true,
@@ -46,5 +63,5 @@ export async function phoneLoginAction(joinCode: string, phoneDigits: string) {
     }
   );
 
-  return { ok: true, eventId: result.eventId };
+  return { ok: true, eventId: event.id, name };
 }

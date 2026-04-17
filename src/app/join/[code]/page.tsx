@@ -25,54 +25,12 @@ export default async function JoinPage({ params }: { params: Promise<{ code: str
     );
   }
 
-  const { data: hasRegs } = await supabase.rpc("event_has_registrations", {
-    p_event_id: event.id,
-  });
-  const hasRegistrations = hasRegs === true;
-
-  if (hasRegistrations) {
-    return (
-      <PhoneEntry
-        eventId={event.id}
-        eventName={event.name}
-        location={event.location}
-        joinCode={code}
-      />
-    );
-  }
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect(`/login?next=/join/${code}`);
-  }
-
-  const { data: existing } = await supabase
-    .from("participants")
-    .select("id")
-    .eq("event_id", event.id)
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  if (existing) {
-    redirect(`/event/${event.id}`);
-  }
-
-  const { error } = await supabase.from("participants").insert({
-    user_id: user.id,
-    event_id: event.id,
-    participation_type: event.participation_type === "TEAM" ? "TEAM" : "INDIVIDUAL",
-  });
-
-  if (error && !error.message.includes("duplicate")) {
-    return (
-      <main className="flex min-h-dvh items-center justify-center p-6">
-        <p className="text-sm text-red-600">{error.message}</p>
-      </main>
-    );
-  }
-
-  redirect(`/event/${event.id}`);
+  return (
+    <PhoneEntry
+      eventId={event.id}
+      eventName={event.name}
+      location={event.location}
+      joinCode={code}
+    />
+  );
 }
