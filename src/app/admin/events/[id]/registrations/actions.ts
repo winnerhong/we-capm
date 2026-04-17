@@ -77,18 +77,37 @@ export async function uploadCsvAction(eventId: string, formData: FormData) {
 
   if (rows.length === 0) throw new Error("유효한 데이터가 없습니다");
 
-  const inserts = rows.map((r) => ({
+  const checkOnly = String(formData.get("check_only") ?? "") === "true";
+
+  const { data: existing } = await supabase
+    .from("event_registrations")
+    .select("phone")
+    .eq("event_id", eventId);
+
+  const existingPhones = new Set((existing ?? []).map((e) => e.phone));
+  const duplicates = rows.filter((r) => existingPhones.has(r.phone));
+  const newRows = rows.filter((r) => !existingPhones.has(r.phone));
+
+  if (checkOnly) {
+    return {
+      count: rows.length,
+      newCount: newRows.length,
+      duplicateCount: duplicates.length,
+      duplicateNames: duplicates.map((d) => d.name).slice(0, 10),
+    };
+  }
+
+  if (newRows.length === 0) throw new Error("모두 이미 등록된 번호입니다");
+
+  const inserts = newRows.map((r) => ({
     event_id: eventId,
     phone: r.phone,
     name: r.name,
   }));
 
-  const { error } = await supabase.from("event_registrations").upsert(inserts, {
-    onConflict: "event_id,phone",
-    ignoreDuplicates: true,
-  });
-
+  const { error } = await supabase.from("event_registrations").insert(inserts);
   if (error) throw new Error(error.message);
+
   revalidatePath(`/admin/events/${eventId}/registrations`);
-  return { count: rows.length };
+  return { count: rows.length, newCount: newRows.length, duplicateCount: duplicates.length };
 }
