@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { submitPhotoAction } from "../actions";
+import { compressImage } from "@/lib/image-compress";
 
 interface Props {
   eventId: string;
@@ -18,14 +19,14 @@ export function PhotoForm({ eventId, missionId, participantId, config }: Props) 
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
+  const [status, setStatus] = useState("");
 
   const minPhotos = config.minPhotos ?? 1;
   const maxPhotos = config.maxPhotos ?? 3;
 
   const handleFiles = (list: FileList | null) => {
     if (!list) return;
-    const selected = Array.from(list).slice(0, maxPhotos);
-    setFiles(selected);
+    setFiles(Array.from(list).slice(0, maxPhotos));
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -42,30 +43,30 @@ export function PhotoForm({ eventId, missionId, participantId, config }: Props) 
         const supabase = createClient();
         const urls: string[] = [];
         const hashes: string[] = [];
-        const submissionFolderId = crypto.randomUUID();
+        const folderId = crypto.randomUUID();
 
         for (let i = 0; i < files.length; i++) {
-          const file = files[i];
+          setStatus(`사진 ${i + 1}/${files.length} 압축 중...`);
+          const compressed = await compressImage(files[i]);
 
-          const buf = await file.arrayBuffer();
+          const buf = await compressed.arrayBuffer();
           const digest = await crypto.subtle.digest("SHA-256", buf);
-          const hash = Array.from(new Uint8Array(digest))
-            .map((b) => b.toString(16).padStart(2, "0"))
-            .join("");
+          const hash = Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
           hashes.push(hash);
 
-          const ext = file.name.split(".").pop() ?? "jpg";
-          const path = `${eventId}/${participantId}/${submissionFolderId}/${i}.${ext}`;
+          setStatus(`사진 ${i + 1}/${files.length} 업로드 중...`);
+          const path = `${eventId}/${participantId}/${folderId}/${i}.jpg`;
 
           const { error: upErr } = await supabase.storage
             .from("submission-photos")
-            .upload(path, file, { contentType: file.type });
+            .upload(path, compressed, { contentType: "image/jpeg" });
 
           if (upErr) throw upErr;
           urls.push(path);
           setProgress(Math.round(((i + 1) / files.length) * 100));
         }
 
+        setStatus("제출 중...");
         const result = await submitPhotoAction(eventId, missionId, urls, hashes);
         if (result && !result.ok) {
           setError(result.message ?? "중복 사진이 감지되었습니다");
@@ -74,6 +75,7 @@ export function PhotoForm({ eventId, missionId, participantId, config }: Props) 
         router.push(`/event/${eventId}/missions?result=pending`);
       } catch (e) {
         setError(e instanceof Error ? e.message : "업로드 실패");
+        setStatus("");
       }
     });
   };
@@ -84,17 +86,13 @@ export function PhotoForm({ eventId, missionId, participantId, config }: Props) 
         <label htmlFor="photos" className="mb-1 block text-sm font-medium">
           사진 선택 ({minPhotos}~{maxPhotos}장)
         </label>
-        <input
-          id="photos"
-          type="file"
-          accept="image/*"
-          multiple
-          capture="environment"
+        <input id="photos" type="file" accept="image/*" multiple capture="environment"
           onChange={(e) => handleFiles(e.target.files)}
-          className="w-full rounded-lg border px-3 py-2 text-sm"
-        />
+          className="w-full rounded-lg border px-3 py-2 text-sm" />
         {files.length > 0 && (
-          <p className="mt-2 text-xs text-neutral-500">{files.length}장 선택됨</p>
+          <p className="mt-2 text-xs">
+            {files.length}장 선택됨 · 업로드 시 자동 압축 (300KB 이하)
+          </p>
         )}
       </div>
 
@@ -102,29 +100,25 @@ export function PhotoForm({ eventId, missionId, participantId, config }: Props) 
         <div className="grid grid-cols-3 gap-2">
           {files.map((file, i) => (
             // eslint-disable-next-line @next/next/no-img-element
-            <img
-              key={i}
-              src={URL.createObjectURL(file)}
-              alt={`preview ${i}`}
-              className="aspect-square w-full rounded object-cover"
-            />
+            <img key={i} src={URL.createObjectURL(file)} alt={`preview ${i}`}
+              className="aspect-square w-full rounded object-cover" />
           ))}
         </div>
       )}
 
-      {pending && progress > 0 && (
-        <div className="h-2 overflow-hidden rounded bg-neutral-200">
-          <div className="h-full bg-violet-600 transition-all" style={{ width: `${progress}%` }} />
+      {pending && (
+        <div className="space-y-1">
+          <p className="text-xs text-violet-600">{status}</p>
+          <div className="h-2 overflow-hidden rounded bg-neutral-200">
+            <div className="h-full bg-violet-600 transition-all" style={{ width: `${progress}%` }} />
+          </div>
         </div>
       )}
 
       {error && <p className="text-sm text-red-600">{error}</p>}
 
-      <button
-        type="submit"
-        disabled={pending || files.length === 0}
-        className="w-full rounded-lg bg-violet-600 py-3 font-semibold text-white hover:bg-violet-700 disabled:opacity-50"
-      >
+      <button type="submit" disabled={pending || files.length === 0}
+        className="w-full rounded-lg bg-violet-600 py-3 font-semibold text-white hover:bg-violet-700 disabled:opacity-50">
         {pending ? "업로드 중..." : "제출"}
       </button>
     </form>
