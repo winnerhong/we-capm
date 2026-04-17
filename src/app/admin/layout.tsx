@@ -5,13 +5,17 @@ import { cookies } from "next/headers";
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const cookieStore = await cookies();
   const adminCookie = cookieStore.get("campnic_admin");
+  const managerCookie = cookieStore.get("campnic_manager");
 
-  if (!adminCookie?.value) redirect("/login");
+  if (!adminCookie?.value && !managerCookie?.value) redirect("/login");
 
   let adminName = "관리자";
   try {
-    const data = JSON.parse(adminCookie.value);
-    adminName = data.id ?? "관리자";
+    if (adminCookie?.value) {
+      adminName = JSON.parse(adminCookie.value).id ?? "관리자";
+    } else if (managerCookie?.value) {
+      adminName = JSON.parse(managerCookie.value).managerId ?? "기관";
+    }
   } catch {}
 
   return (
