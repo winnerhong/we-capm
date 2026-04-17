@@ -45,6 +45,12 @@ export default async function RegistrationsPage({
         >
           <h2 className="font-semibold">수동 추가</h2>
           <input
+            name="class_name"
+            type="text"
+            placeholder="반명 (예: 해바라기반)"
+            className="w-full rounded-lg border px-3 py-2"
+          />
+          <input
             name="name"
             type="text"
             required

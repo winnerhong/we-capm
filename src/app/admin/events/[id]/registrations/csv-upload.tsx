@@ -76,7 +76,7 @@ export function CsvUploadForm({ eventId }: { eventId: string }) {
 
       <textarea value={csvText}
         onChange={(e) => { setCsvText(e.target.value); setCheckResult(null); setResult(null); }}
-        placeholder={"이름,전화번호\n홍길동,01012345678\n김영희,01056789012"}
+        placeholder={"반명,이름,전화번호\n해바라기반,홍길동,01012345678\n장미반,김영희,01056789012\n\n또는 2열도 가능:\n홍길동,01012345678"}
         rows={5} className="w-full rounded-lg border px-3 py-2 font-mono text-xs" />
 
       {error && <p className="text-sm text-red-600">{error}</p>}

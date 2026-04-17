@@ -7,6 +7,7 @@ import { formatKorean } from "@/lib/phone";
 export async function addRegistrationAction(eventId: string, formData: FormData) {
   const supabase = await createClient();
 
+  const className = String(formData.get("class_name") ?? "").trim();
   const name = String(formData.get("name") ?? "").trim();
   const phoneRaw = String(formData.get("phone") ?? "").replace(/\D/g, "");
 
@@ -14,11 +15,12 @@ export async function addRegistrationAction(eventId: string, formData: FormData)
   if (!phoneRaw || phoneRaw.length < 10) throw new Error("올바른 전화번호를 입력해주세요");
 
   const phone = phoneRaw.startsWith("0") ? phoneRaw : `0${phoneRaw}`;
+  const displayName = className ? `[${className}] ${name}` : name;
 
   const { error } = await supabase.from("event_registrations").insert({
     event_id: eventId,
     phone: formatKorean(phone),
-    name,
+    name: displayName,
   });
 
   if (error) {
@@ -62,17 +64,30 @@ export async function uploadCsvAction(eventId: string, formData: FormData) {
   const lines = csvText
     .split("\n")
     .map((l) => l.trim())
-    .filter((l) => l && !l.startsWith("이름"));
+    .filter((l) => l && !l.startsWith("이름") && !l.startsWith("반명") && !l.startsWith("반"));
 
-  const rows: { name: string; phone: string }[] = [];
+  const rows: { name: string; phone: string; class_name: string }[] = [];
   for (const line of lines) {
     const parts = line.split(/[,\t]/).map((s) => s.trim());
-    if (parts.length < 2) continue;
-    const name = parts[0];
-    const phoneRaw = parts[1].replace(/\D/g, "");
+
+    let class_name = "";
+    let name = "";
+    let phoneRaw = "";
+
+    if (parts.length >= 3) {
+      // 3열: 반명, 이름, 전화번호
+      class_name = parts[0];
+      name = parts[1];
+      phoneRaw = parts[2].replace(/\D/g, "");
+    } else if (parts.length === 2) {
+      // 2열: 이름, 전화번호
+      name = parts[0];
+      phoneRaw = parts[1].replace(/\D/g, "");
+    } else continue;
+
     if (!name || phoneRaw.length < 10) continue;
     const phone = phoneRaw.startsWith("0") ? phoneRaw : `0${phoneRaw}`;
-    rows.push({ name, phone: formatKorean(phone) });
+    rows.push({ name, phone: formatKorean(phone), class_name });
   }
 
   if (rows.length === 0) throw new Error("유효한 데이터가 없습니다");
@@ -102,7 +117,7 @@ export async function uploadCsvAction(eventId: string, formData: FormData) {
   const inserts = newRows.map((r) => ({
     event_id: eventId,
     phone: r.phone,
-    name: r.name,
+    name: r.class_name ? `[${r.class_name}] ${r.name}` : r.name,
   }));
 
   const { error } = await supabase.from("event_registrations").insert(inserts);
