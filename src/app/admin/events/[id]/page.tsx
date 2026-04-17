@@ -154,30 +154,24 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
         </div>
       )}
 
-      {/* 더보기 */}
-      <details className="rounded-2xl border bg-white">
-        <summary className="cursor-pointer p-4 font-semibold">더보기</summary>
-        <div className="grid grid-cols-3 gap-3 p-4 pt-0 md:grid-cols-5">
-          {[
-            { href: `/admin/events/${id}/missions`, icon: "🎯", label: "미션" },
-            { href: `/admin/events/${id}/submissions`, icon: "✅", label: "승인" },
-            { href: `/admin/events/${id}/registrations`, icon: "📋", label: "명단" },
-            { href: `/admin/events/${id}/participants`, icon: "👥", label: "참가자" },
-            { href: `/admin/events/${id}/rewards`, icon: "🎁", label: "보상" },
-            { href: `/admin/events/${id}/staff`, icon: "👨‍💼", label: "스태프" },
-            { href: `/admin/events/${id}/stats`, icon: "📊", label: "통계" },
-            { href: `/admin/events/${id}/claim`, icon: "🎫", label: "수령" },
-            { href: `/admin/events/${id}/chat`, icon: "💬", label: "채팅" },
-            { href: `/admin/events/${id}/export`, icon: "📥", label: "CSV" },
-          ].map((item) => (
-            <Link key={item.href} href={item.href}
-              className="flex flex-col items-center gap-1 rounded-xl border bg-white p-3 hover:border-violet-500">
-              <span className="text-xl">{item.icon}</span>
-              <span className="text-xs">{item.label}</span>
-            </Link>
-          ))}
-        </div>
-      </details>
+      {/* 관리 메뉴 (중복 없이 정리) */}
+      <div className="grid grid-cols-4 gap-2 md:grid-cols-5">
+        {[
+          { href: `/admin/events/${id}/missions`, icon: "🎯", label: "미션" },
+          { href: `/admin/events/${id}/registrations`, icon: "📋", label: "명단" },
+          { href: `/admin/events/${id}/rewards`, icon: "🎁", label: "보상" },
+          { href: `/admin/events/${id}/stats`, icon: "📊", label: "통계" },
+          { href: `/admin/events/${id}/staff`, icon: "👨‍💼", label: "스태프" },
+          { href: `/admin/events/${id}/claim`, icon: "🎫", label: "수령" },
+          { href: `/admin/events/${id}/export`, icon: "📥", label: "CSV" },
+        ].map((item) => (
+          <Link key={item.href} href={item.href}
+            className="flex flex-col items-center gap-1 rounded-xl border bg-white p-3 hover:border-violet-500">
+            <span className="text-xl">{item.icon}</span>
+            <span className="text-[11px]">{item.label}</span>
+          </Link>
+        ))}
+      </div>
 
       {/* QR */}
       <div className="rounded-2xl border bg-white p-5">
