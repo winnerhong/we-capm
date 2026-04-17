@@ -161,7 +161,7 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
           { href: `/admin/events/${id}/registrations`, icon: "📋", label: "명단" },
           { href: `/admin/events/${id}/rewards`, icon: "🎁", label: "보상" },
           { href: `/admin/events/${id}/stats`, icon: "📊", label: "통계" },
-          { href: `/admin/events/${id}/staff`, icon: "👨‍💼", label: "스태프" },
+          { href: `/admin/events/${id}/staff`, icon: "👩‍🏫", label: "선생님" },
           { href: `/admin/events/${id}/claim`, icon: "🎫", label: "수령" },
           { href: `/admin/events/${id}/export`, icon: "📥", label: "CSV" },
         ].map((item) => (
