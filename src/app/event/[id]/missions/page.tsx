@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getParticipant } from "@/lib/participant-session";
 
 export const dynamic = "force-dynamic";
 
@@ -32,24 +33,14 @@ export default async function EventMissionsPage({
 }) {
   const { id } = await params;
   const { result } = await searchParams;
-  const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect(`/login?next=/event/${id}/missions`);
+  const p = await getParticipant(id);
+  if (!p) redirect(`/join/unknown`);
+
+  const supabase = await createClient();
 
   const { data: event } = await supabase.from("events").select("id, name").eq("id", id).single();
   if (!event) notFound();
-
-  const { data: participant } = await supabase
-    .from("participants")
-    .select("id, total_score")
-    .eq("event_id", id)
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  if (!participant) redirect(`/event/${id}`);
 
   const { data: missions } = await supabase
     .from("missions")
@@ -58,12 +49,7 @@ export default async function EventMissionsPage({
     .eq("is_active", true)
     .order("order", { ascending: true });
 
-  const { data: submissions } = await supabase
-    .from("submissions")
-    .select("id, mission_id, status, earned_points")
-    .eq("participant_id", participant.id);
-
-  const subsByMission = new Map(submissions?.map((s) => [s.mission_id, s]));
+  const subsByMission = new Map<string, { id: string; mission_id: string; status: string; earned_points: number | null }>();
 
   return (
     <main className="min-h-dvh bg-neutral-50 p-4">
@@ -74,8 +60,7 @@ export default async function EventMissionsPage({
           </Link>
           <h1 className="mt-1 text-xl font-bold">미션</h1>
           <div className="mt-3 rounded-lg bg-white/20 p-3">
-            <div className="text-xs opacity-80">내 점수</div>
-            <div className="text-2xl font-bold">{participant.total_score}점</div>
+            <div className="text-xs opacity-80">{p.name}님</div>
           </div>
         </header>
 
