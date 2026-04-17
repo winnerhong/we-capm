@@ -36,6 +36,12 @@ export default async function RegistrationsPage({
           <h1 className="text-2xl font-bold">참가자 등록</h1>
           <p className="text-sm">등록: {total}명 | 입장: {entered}명 | 미입장: {total - entered}명</p>
         </div>
+        {total > 0 && (
+          <a href={`/admin/events/${id}/registrations/download`} download
+            className="rounded-lg border px-4 py-2 text-sm hover:bg-neutral-50">
+            📥 엑셀 다운로드
+          </a>
+        )}
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
