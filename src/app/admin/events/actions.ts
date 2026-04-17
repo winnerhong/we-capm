@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { generateJoinCode } from "@/lib/codes";
 import type { EventStatus, EventType, ParticipationType } from "@/lib/supabase/database.types";
 import { confirmResults } from "@/lib/event-lifecycle";
+import { getAllSchools } from "@/lib/school-db";
 
 export async function createEventAction(formData: FormData) {
   const supabase = await createClient();
@@ -16,8 +17,18 @@ export async function createEventAction(formData: FormData) {
   const end_at = String(formData.get("end_at") ?? "");
   const location = String(formData.get("location") ?? "").trim();
   const participation_type = (formData.get("participation_type") ?? "BOTH") as ParticipationType;
-  const manager_id = String(formData.get("manager_id") ?? "").trim() || null;
-  const manager_password = String(formData.get("manager_password") ?? "").trim() || null;
+  let manager_id = String(formData.get("manager_id") ?? "").trim() || null;
+  let manager_password = String(formData.get("manager_password") ?? "").trim() || null;
+
+  const schoolId = String(formData.get("school_id") ?? "").trim();
+  if (schoolId) {
+    const schools = await getAllSchools();
+    const school = schools.find((s) => String(s.id) === schoolId);
+    if (school) {
+      if (!manager_id) manager_id = school.username;
+      if (!manager_password) manager_password = school.password;
+    }
+  }
 
   if (!name || !start_at || !end_at || !location) {
     throw new Error("필수 항목이 비어있습니다");
