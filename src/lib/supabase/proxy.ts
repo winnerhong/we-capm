@@ -35,7 +35,9 @@ export async function updateSession(request: NextRequest) {
   const isEventRoute = pathname.startsWith("/event");
   const isProtectedRoute = isAdminRoute || pathname.startsWith("/me");
 
-  if (isApiRoute) return response;
+  const isJoinRoute = pathname.startsWith("/join");
+
+  if (isApiRoute || isJoinRoute) return response;
 
   // campnic_participant 쿠키가 있으면 참가자로 인정 (event 라우트만)
   const participantCookie = request.cookies.get("campnic_participant");
