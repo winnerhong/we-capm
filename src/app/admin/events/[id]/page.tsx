@@ -158,12 +158,11 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
       <div className="grid grid-cols-4 gap-2 md:grid-cols-5">
         {[
           { href: `/admin/events/${id}/missions`, icon: "🎯", label: "미션" },
-          { href: `/admin/events/${id}/registrations`, icon: "📋", label: "명단" },
+          { href: `/admin/events/${id}/registrations`, icon: "📋", label: "참가자등록" },
           { href: `/admin/events/${id}/rewards`, icon: "🎁", label: "보상" },
           { href: `/admin/events/${id}/stats`, icon: "📊", label: "통계" },
-          { href: `/admin/events/${id}/staff`, icon: "👩‍🏫", label: "선생님" },
+          { href: `/admin/events/${id}/staff`, icon: "👩‍🏫", label: "선생님등록" },
           { href: `/admin/events/${id}/claim`, icon: "🎫", label: "수령" },
-          { href: `/admin/events/${id}/export`, icon: "📥", label: "CSV" },
         ].map((item) => (
           <Link key={item.href} href={item.href}
             className="flex flex-col items-center gap-1 rounded-xl border bg-white p-3 hover:border-violet-500">
