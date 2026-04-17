@@ -40,6 +40,14 @@ export default function NewEventPage() {
           </select>
         </div>
 
+        <div className="border-t pt-4">
+          <p className="mb-2 text-sm font-semibold">행사 기관 로그인 계정</p>
+          <Field label="기관 아이디" name="manager_id" required placeholder="gapyeong2026" />
+          <div className="mt-2">
+            <Field label="기관 비밀번호" name="manager_password" required placeholder="camp1234" />
+          </div>
+        </div>
+
         <button
           type="submit"
           className="w-full rounded-lg bg-violet-600 py-3 font-semibold text-white hover:bg-violet-700"

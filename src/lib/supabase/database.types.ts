@@ -69,8 +69,10 @@ export interface Database {
           mission_reveal_mode: MissionRevealMode;
           result_publish_mode: ResultPublishMode;
           auto_end: boolean;
-          created_by_user_id: string;
+          created_by_user_id: string | null;
           created_at: string;
+          manager_id: string | null;
+          manager_password: string | null;
         };
         Insert: {
           id?: string;
@@ -92,7 +94,9 @@ export interface Database {
           mission_reveal_mode?: MissionRevealMode;
           result_publish_mode?: ResultPublishMode;
           auto_end?: boolean;
-          created_by_user_id: string;
+          created_by_user_id?: string | null;
+          manager_id?: string | null;
+          manager_password?: string | null;
           created_at?: string;
         };
         Update: {

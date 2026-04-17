@@ -9,10 +9,6 @@ import { confirmResults } from "@/lib/event-lifecycle";
 
 export async function createEventAction(formData: FormData) {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("unauthorized");
 
   const name = String(formData.get("name") ?? "").trim();
   const type = (formData.get("type") ?? "FAMILY") as EventType;
@@ -20,6 +16,8 @@ export async function createEventAction(formData: FormData) {
   const end_at = String(formData.get("end_at") ?? "");
   const location = String(formData.get("location") ?? "").trim();
   const participation_type = (formData.get("participation_type") ?? "BOTH") as ParticipationType;
+  const manager_id = String(formData.get("manager_id") ?? "").trim() || null;
+  const manager_password = String(formData.get("manager_password") ?? "").trim() || null;
 
   if (!name || !start_at || !end_at || !location) {
     throw new Error("필수 항목이 비어있습니다");
@@ -35,7 +33,8 @@ export async function createEventAction(formData: FormData) {
       location,
       participation_type,
       join_code: generateJoinCode(),
-      created_by_user_id: user.id,
+      manager_id,
+      manager_password,
     })
     .select("id")
     .single();
