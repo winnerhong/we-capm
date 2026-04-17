@@ -120,6 +120,30 @@ export interface Database {
         };
         Relationships: [];
       };
+      chat_rooms: {
+        Row: { id: string; event_id: string; type: string; name: string | null; team_id: string | null; pinned_message_id: string | null; created_by: string | null; created_at: string };
+        Insert: { id?: string; event_id: string; type?: string; name?: string | null; team_id?: string | null; pinned_message_id?: string | null; created_by?: string | null; created_at?: string };
+        Update: { id?: string; event_id?: string; type?: string; name?: string | null; team_id?: string | null; pinned_message_id?: string | null; created_by?: string | null; created_at?: string };
+        Relationships: [];
+      };
+      chat_members: {
+        Row: { id: string; room_id: string; user_id: string | null; participant_name: string | null; participant_phone: string | null; role: string; last_read_at: string; is_muted: boolean; joined_at: string; left_at: string | null };
+        Insert: { id?: string; room_id: string; user_id?: string | null; participant_name?: string | null; participant_phone?: string | null; role?: string; last_read_at?: string; is_muted?: boolean; joined_at?: string; left_at?: string | null };
+        Update: { id?: string; room_id?: string; user_id?: string | null; participant_name?: string | null; participant_phone?: string | null; role?: string; last_read_at?: string; is_muted?: boolean; joined_at?: string; left_at?: string | null };
+        Relationships: [];
+      };
+      chat_messages: {
+        Row: { id: string; room_id: string; sender_id: string | null; sender_name: string; type: string; content: string | null; file_url: string | null; file_name: string | null; reply_to_id: string | null; is_deleted: boolean; edited_at: string | null; created_at: string; metadata: Json | null };
+        Insert: { id?: string; room_id: string; sender_id?: string | null; sender_name: string; type?: string; content?: string | null; file_url?: string | null; file_name?: string | null; reply_to_id?: string | null; is_deleted?: boolean; edited_at?: string | null; created_at?: string; metadata?: Json | null };
+        Update: { id?: string; room_id?: string; sender_id?: string | null; sender_name?: string; type?: string; content?: string | null; file_url?: string | null; file_name?: string | null; reply_to_id?: string | null; is_deleted?: boolean; edited_at?: string | null; created_at?: string; metadata?: Json | null };
+        Relationships: [];
+      };
+      chat_reactions: {
+        Row: { id: string; message_id: string; user_name: string; emoji: string; created_at: string };
+        Insert: { id?: string; message_id: string; user_name: string; emoji: string; created_at?: string };
+        Update: { id?: string; message_id?: string; user_name?: string; emoji?: string; created_at?: string };
+        Relationships: [];
+      };
       event_registrations: {
         Row: {
           id: string;
@@ -498,6 +522,10 @@ export interface Database {
       };
       find_user_by_phone: {
         Args: { p_phone: string };
+        Returns: Json;
+      };
+      chat_enter_by_name: {
+        Args: { p_event_id: string; p_name: string; p_phone_last4: string | null };
         Returns: Json;
       };
     };

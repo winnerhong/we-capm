@@ -21,9 +21,9 @@ async function EventTabBar({ paramsPromise }: { paramsPromise: Promise<{ id: str
   const tabs = [
     { href: `/event/${id}`, icon: "🏠", label: "홈" },
     { href: `/event/${id}/missions`, icon: "🎯", label: "미션" },
+    { href: `/event/${id}/chat`, icon: "💬", label: "채팅" },
     { href: `/event/${id}/leaderboard`, icon: "🏆", label: "순위" },
     { href: `/event/${id}/rewards`, icon: "🎁", label: "보상" },
-    { href: `/event/${id}/team`, icon: "🤝", label: "팀" },
   ];
 
   return (
