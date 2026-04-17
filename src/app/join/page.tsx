@@ -82,6 +82,10 @@ export default function DirectJoinPage() {
         >
           {pending ? "확인 중..." : "입장하기"}
         </button>
+
+        <a href="/login" className="block text-center text-xs text-neutral-400 hover:text-violet-600">
+          관리자 입장 →
+        </a>
       </form>
     </main>
   );
