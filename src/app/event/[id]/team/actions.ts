@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { generateTeamCode } from "@/lib/codes";
+import { createTeamChatRoom } from "@/app/admin/events/[id]/chat/actions";
 
 export async function createTeamAction(eventId: string, formData: FormData) {
   const supabase = await createClient();
@@ -41,6 +42,8 @@ export async function createTeamAction(eventId: string, formData: FormData) {
     .from("participants")
     .update({ team_id: team.id, participation_type: "TEAM" })
     .eq("id", participant.id);
+
+  await createTeamChatRoom(eventId, team.id, name);
 
   revalidatePath(`/event/${eventId}/team`);
 }
