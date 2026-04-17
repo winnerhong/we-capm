@@ -33,7 +33,6 @@ export async function updateSession(request: NextRequest) {
 
   // 관리자: campnic_admin 쿠키
   const adminCookie = request.cookies.get("campnic_admin");
-  const managerCookie = request.cookies.get("campnic_manager");
   if (isAdminRoute && (adminCookie?.value || managerCookie?.value)) return response;
 
   if (isAdminRoute && !adminCookie?.value && !managerCookie?.value) {
