@@ -27,6 +27,12 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
       supabase.from("event_registrations").select("*", { count: "exact", head: true }).eq("event_id", id),
     ]);
 
+  // 선생님 수 / 가족 수 / 보상 수
+  const { data: allRegsData } = await supabase.from("event_registrations").select("name").eq("event_id", id);
+  const teacherCount = (allRegsData ?? []).filter((r) => r.name.includes("선생님")).length;
+  const familyCount = (allRegsData ?? []).filter((r) => !r.name.includes("선생님")).length;
+  const { count: rewardCount } = await supabase.from("rewards").select("*", { count: "exact", head: true }).eq("event_id", id);
+
   const { data: topParticipants } = await supabase
     .from("participants").select("id, phone, total_score")
     .eq("event_id", id).order("total_score", { ascending: false }).limit(3);
@@ -41,8 +47,10 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
   // 체크리스트 (DRAFT)
   const checks = isDraft ? [
     { done: true, label: "행사 정보 입력", link: `/admin/events/${id}/edit` },
-    { done: (regCount ?? 0) > 0, label: `참가자 명단 등록 (${regCount ?? 0}명)`, link: `/admin/events/${id}/registrations` },
+    { done: teacherCount > 0, label: `참가 선생님 등록 (${teacherCount}명)`, link: `/admin/events/${id}/staff` },
+    { done: familyCount > 0, label: `참가 가족 등록 (${familyCount}명)`, link: `/admin/events/${id}/registrations` },
     { done: (missionCount ?? 0) > 0, label: `미션 만들기 (${missionCount ?? 0}개)`, link: `/admin/events/${id}/missions` },
+    { done: (rewardCount ?? 0) > 0, label: `보상 만들기 (${rewardCount ?? 0}개)`, link: `/admin/events/${id}/rewards` },
   ] : [];
 
   // 등록명단에서 이름 가져오기
