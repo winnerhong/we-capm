@@ -22,7 +22,7 @@ export async function GET(
   const participants = participantsRes.data ?? [];
   const missions = missionsRes.data ?? [];
 
-  const userIds = participants.map((p) => p.user_id);
+  const userIds = participants.map((p) => p.user_id).filter((id): id is string => id !== null);
   const { data: profiles } = userIds.length
     ? await supabase.from("profiles").select("id, name").in("id", userIds)
     : { data: [] };
@@ -41,7 +41,7 @@ export async function GET(
 
   const header = ["순위", "이름", "전화번호", "총점", "완료미션", ...missions.map((m) => m.title), "가입일"];
   const rows = participants.map((p, i) => {
-    const profile = profileMap.get(p.user_id);
+    const profile = p.user_id ? profileMap.get(p.user_id) : null;
     const name = profile?.name ?? "?";
     const phone = regByName.get(name) ?? "";
     const completedMissions = submissionsByParticipant.get(p.id);

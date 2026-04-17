@@ -220,30 +220,33 @@ export interface Database {
       participants: {
         Row: {
           id: string;
-          user_id: string;
+          user_id: string | null;
           event_id: string;
           participation_type: ParticipationType;
           team_id: string | null;
           total_score: number;
           joined_at: string;
+          phone: string | null;
         };
         Insert: {
           id?: string;
-          user_id: string;
+          user_id?: string | null;
           event_id: string;
           participation_type: ParticipationType;
           team_id?: string | null;
           total_score?: number;
           joined_at?: string;
+          phone?: string | null;
         };
         Update: {
           id?: string;
-          user_id?: string;
+          user_id?: string | null;
           event_id?: string;
           participation_type?: ParticipationType;
           team_id?: string | null;
           total_score?: number;
           joined_at?: string;
+          phone?: string | null;
         };
         Relationships: [];
       };

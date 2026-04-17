@@ -46,6 +46,23 @@ async function enterEvent(
       .eq("id", reg.id);
   }
 
+  const { data: existingP } = await supabase
+    .from("participants")
+    .select("id")
+    .eq("event_id", reg.event_id)
+    .eq("phone", reg.phone)
+    .maybeSingle();
+
+  let participantId = existingP?.id;
+  if (!participantId) {
+    const { data: newP } = await supabase
+      .from("participants")
+      .insert({ event_id: reg.event_id, phone: reg.phone, participation_type: "INDIVIDUAL" })
+      .select("id")
+      .single();
+    participantId = newP?.id;
+  }
+
   const cookieStore = await cookies();
   cookieStore.set(
     "campnic_participant",
@@ -54,6 +71,7 @@ async function enterEvent(
       phone: reg.phone,
       name: reg.name,
       registrationId: reg.id,
+      participantId,
     }),
     {
       httpOnly: true,

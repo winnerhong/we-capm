@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { getParticipant, getParticipantDb } from "@/lib/participant-session";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -28,10 +29,7 @@ export default async function EventRewardsPage({
   const { id } = await params;
   const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect(`/login?next=/event/${id}/rewards`);
+  // redirect removed(`/login?next=/event/${id}/rewards`);
 
   const { data: event } = await supabase.from("events").select("id, name").eq("id", id).single();
   if (!event) notFound();
@@ -40,7 +38,7 @@ export default async function EventRewardsPage({
     .from("participants")
     .select("id, total_score")
     .eq("event_id", id)
-    .eq("user_id", user.id)
+    .eq("phone", (await getParticipant(id))?.phone ?? "")
     .maybeSingle();
   if (!participant) redirect(`/event/${id}`);
 

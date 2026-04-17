@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { getParticipant, getParticipantDb } from "@/lib/participant-session";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -17,10 +18,7 @@ export default async function LeaderboardPage({
 
   const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect(`/login?next=/event/${id}/leaderboard`);
+  // redirect removed(`/login?next=/event/${id}/leaderboard`);
 
   const { data: event } = await supabase
     .from("events")
@@ -39,11 +37,11 @@ export default async function LeaderboardPage({
 
   const { data: participants } = await supabase
     .from("participants")
-    .select("id, user_id, total_score, team_id")
+    .select("id, user_id, total_score, team_id, phone")
     .eq("event_id", id)
     .order("total_score", { ascending: false });
 
-  const userIds = (participants ?? []).map((p) => p.user_id);
+  const userIds = (participants ?? []).map((p) => p.user_id).filter((id): id is string => id !== null);
   const { data: profiles } = userIds.length
     ? await supabase.from("profiles").select("id, name").in("id", userIds)
     : { data: [] };
@@ -55,7 +53,7 @@ export default async function LeaderboardPage({
     .eq("event_id", id)
     .order("total_score", { ascending: false });
 
-  const myParticipant = participants?.find((p) => p.user_id === user.id);
+  const session = await getParticipant(id); const myParticipant = participants?.find((p) => p.phone === session?.phone);
 
   return (
     <main className="min-h-dvh bg-neutral-50 p-4">
@@ -91,8 +89,8 @@ export default async function LeaderboardPage({
         {activeTab === "individual" ? (
           <ul className="space-y-2">
             {(participants ?? []).map((p, idx) => {
-              const profile = profileMap.get(p.user_id);
-              const isMe = p.user_id === user.id;
+              const profile = p.user_id ? profileMap.get(p.user_id) : null;
+              const isMe = p.phone === session?.phone;
               const medal = idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : null;
               return (
                 <li

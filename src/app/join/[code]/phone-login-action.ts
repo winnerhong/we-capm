@@ -46,6 +46,24 @@ export async function phoneLoginAction(joinCode: string, phoneDigits: string) {
     }
   }
 
+  // participant 자동 생성
+  const { data: existingP } = await supabase
+    .from("participants")
+    .select("id")
+    .eq("event_id", event.id)
+    .eq("phone", formatted)
+    .maybeSingle();
+
+  let participantId = existingP?.id;
+  if (!participantId) {
+    const { data: newP } = await supabase
+      .from("participants")
+      .insert({ event_id: event.id, phone: formatted, participation_type: "INDIVIDUAL" })
+      .select("id")
+      .single();
+    participantId = newP?.id;
+  }
+
   const cookieStore = await cookies();
   cookieStore.set(
     "campnic_participant",
@@ -53,6 +71,7 @@ export async function phoneLoginAction(joinCode: string, phoneDigits: string) {
       eventId: event.id,
       phone: formatted,
       name,
+      participantId,
     }),
     {
       httpOnly: true,

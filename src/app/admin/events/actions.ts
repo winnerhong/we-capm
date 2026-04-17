@@ -99,11 +99,7 @@ export async function updateEventStatusAction(eventId: string, status: EventStat
   const supabase = await createClient();
 
   if (status === "CONFIRMED") {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) throw new Error("unauthorized");
-    await confirmResults(supabase, eventId, user.id);
+    await confirmResults(supabase, eventId, "admin");
   } else {
     const { error } = await supabase.from("events").update({ status }).eq("id", eventId);
     if (error) throw new Error(error.message);
@@ -115,11 +111,6 @@ export async function updateEventStatusAction(eventId: string, status: EventStat
 
 export async function duplicateEventAction(sourceEventId: string) {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("unauthorized");
-
   const { data: source } = await supabase.from("events").select("*").eq("id", sourceEventId).single();
   if (!source) throw new Error("원본 행사 없음");
 
@@ -143,7 +134,7 @@ export async function duplicateEventAction(sourceEventId: string) {
       mission_reveal_mode: source.mission_reveal_mode,
       result_publish_mode: source.result_publish_mode,
       auto_end: source.auto_end,
-      created_by_user_id: user.id,
+      created_by_user_id: null,
     })
     .select("id")
     .single();

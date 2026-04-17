@@ -38,7 +38,7 @@ export default async function StatsPage({ params }: { params: Promise<{ id: stri
     .order("total_score", { ascending: false })
     .limit(5);
 
-  const userIds = (topParticipants ?? []).map((p) => p.user_id);
+  const userIds = (topParticipants ?? []).map((p) => p.user_id).filter((id): id is string => id !== null);
   const { data: profiles } = userIds.length
     ? await supabase.from("profiles").select("id, name").in("id", userIds)
     : { data: [] };
@@ -76,7 +76,7 @@ export default async function StatsPage({ params }: { params: Promise<{ id: stri
         <h2 className="mb-3 font-semibold">🏆 상위 5명</h2>
         <ol className="space-y-2">
           {(topParticipants ?? []).map((p, i) => {
-            const profile = profileMap.get(p.user_id);
+            const profile = p.user_id ? profileMap.get(p.user_id) : null;
             const medal = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `${i + 1}.`;
             return (
               <li key={p.id} className="flex items-center justify-between py-1">

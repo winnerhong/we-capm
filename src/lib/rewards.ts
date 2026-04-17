@@ -76,7 +76,7 @@ export async function checkAndAwardRewards(
     if (participantRow && rewardRow) {
       await notify(
         supabase,
-        participantRow.user_id,
+        participantRow.user_id ?? "",
         "REWARD_EARNED",
         "🎁 보상 획득",
         `${rewardRow.name}을(를) 획득했어요!`

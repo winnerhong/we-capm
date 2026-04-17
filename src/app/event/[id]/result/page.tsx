@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { getParticipant, getParticipantDb } from "@/lib/participant-session";
 import { createClient } from "@/lib/supabase/server";
 import { ShareCard } from "./share-card";
 
@@ -9,10 +10,7 @@ export default async function ResultPage({ params }: { params: Promise<{ id: str
   const { id } = await params;
   const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect(`/login?next=/event/${id}/result`);
+  // redirect removed(`/login?next=/event/${id}/result`);
 
   const { data: event } = await supabase
     .from("events")
@@ -38,7 +36,7 @@ export default async function ResultPage({ params }: { params: Promise<{ id: str
     .from("participants")
     .select("id, total_score, team_id")
     .eq("event_id", id)
-    .eq("user_id", user.id)
+    .eq("phone", (await getParticipant(id))?.phone ?? "")
     .maybeSingle();
   if (!participant) redirect(`/event/${id}`);
 

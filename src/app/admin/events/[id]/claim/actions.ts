@@ -63,16 +63,13 @@ export async function claimRewardAction(
   const earnedClaim = (claimsData ?? []).find((c) => c.status === "EARNED");
   if (!earnedClaim) return { ok: false, message: "수령 가능한 보상이 없습니다" };
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
 
   const { error } = await supabase
     .from("reward_claims")
     .update({
       status: "CLAIMED",
       claimed_at: new Date().toISOString(),
-      claimed_by_user_id: user?.id ?? null,
+      claimed_by_user_id: null,
     })
     .eq("id", earnedClaim.id);
 

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { getParticipant, getParticipantDb } from "@/lib/participant-session";
 import { createClient } from "@/lib/supabase/server";
 import { createTeamAction, joinTeamAction, leaveTeamAction } from "./actions";
 
@@ -9,14 +10,11 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
   const { id } = await params;
   const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect(`/login?next=/event/${id}/team`);
+  // redirect removed(`/login?next=/event/${id}/team`);
 
   const [eventRes, participantRes] = await Promise.all([
     supabase.from("events").select("id, name, participation_type, max_team_size").eq("id", id).single(),
-    supabase.from("participants").select("id, team_id").eq("event_id", id).eq("user_id", user.id).maybeSingle(),
+    supabase.from("participants").select("id, team_id").eq("event_id", id).eq("phone", (await getParticipant(id))?.phone ?? "").maybeSingle(),
   ]);
 
   const event = eventRes.data;
@@ -41,13 +39,13 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
     const team = teamRes.data;
     const members = membersRes.data;
 
-    const userIds = (members ?? []).map((m) => m.user_id);
+    const userIds = (members ?? []).map((m) => m.user_id).filter((id): id is string => id !== null);
     const { data: profiles } = userIds.length
       ? await supabase.from("profiles").select("id, name").in("id", userIds)
       : { data: [] };
     const profileMap = new Map((profiles ?? []).map((p) => [p.id, p]));
 
-    const isLeader = team?.leader_id === user.id;
+    const isLeader = false;
 
     return (
       <main className="min-h-dvh bg-neutral-50 p-4">
@@ -77,7 +75,7 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
             </h2>
             <ul className="divide-y">
               {(members ?? []).map((m) => {
-                const p = profileMap.get(m.user_id);
+                const p = m.user_id ? profileMap.get(m.user_id) : null;
                 return (
                   <li key={m.id} className="flex items-center justify-between py-2">
                     <span className="flex items-center gap-2">

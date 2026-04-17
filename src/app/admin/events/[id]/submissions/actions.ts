@@ -7,10 +7,6 @@ import { notify } from "@/lib/notifications";
 
 export async function approveSubmissionAction(eventId: string, submissionId: string) {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("unauthorized");
 
   const { data: sub } = await supabase
     .from("submissions")
@@ -39,7 +35,7 @@ export async function approveSubmissionAction(eventId: string, submissionId: str
     .update({
       status: "APPROVED",
       reviewed_at: new Date().toISOString(),
-      reviewed_by_user_id: user.id,
+      reviewed_by_user_id: null,
       review_method: "MANUAL",
       earned_points: mission.points,
     })
@@ -67,7 +63,7 @@ export async function approveSubmissionAction(eventId: string, submissionId: str
   if (pRow && mRow) {
     await notify(
       supabase,
-      pRow.user_id,
+      pRow.user_id ?? "",
       "MISSION_APPROVED",
       `🎉 ${mRow.title} 통과!`,
       `+${mission.points}점 획득`
@@ -83,17 +79,13 @@ export async function rejectSubmissionAction(
   reason: string
 ) {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("unauthorized");
 
   const { error } = await supabase
     .from("submissions")
     .update({
       status: "REJECTED",
       reviewed_at: new Date().toISOString(),
-      reviewed_by_user_id: user.id,
+      reviewed_by_user_id: null,
       review_method: "MANUAL",
       reject_reason: reason || null,
     })
@@ -113,7 +105,7 @@ export async function rejectSubmissionAction(
     if (pRow && mRow) {
       await notify(
         supabase,
-        pRow.user_id,
+        pRow.user_id ?? "",
         "MISSION_REJECTED",
         `😢 ${mRow.title} 반려`,
         reason ? `사유: ${reason}` : "다시 시도해보세요"

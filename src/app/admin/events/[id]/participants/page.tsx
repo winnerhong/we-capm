@@ -21,7 +21,7 @@ export default async function ParticipantsPage({
     .eq("event_id", id)
     .order("total_score", { ascending: false });
 
-  const userIds = (participants ?? []).map((p) => p.user_id);
+  const userIds = (participants ?? []).map((p) => p.user_id).filter((id): id is string => id !== null);
   const teamIds = Array.from(
     new Set((participants ?? []).map((p) => p.team_id).filter(Boolean) as string[])
   );
@@ -60,7 +60,7 @@ export default async function ParticipantsPage({
             </thead>
             <tbody className="divide-y">
               {participants.map((p, i) => {
-                const profile = profileMap.get(p.user_id);
+                const profile = p.user_id ? profileMap.get(p.user_id) : null;
                 const team = p.team_id ? teamMap.get(p.team_id) : null;
                 return (
                   <tr key={p.id}>

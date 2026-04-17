@@ -1,4 +1,5 @@
 import { notFound, redirect } from "next/navigation";
+import { getParticipant, getParticipantDb } from "@/lib/participant-session";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { QuizForm } from "./quiz-form";
@@ -17,10 +18,7 @@ export default async function MissionSubmitPage({
   const { id: eventId, missionId } = await params;
   const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect(`/login?next=/event/${eventId}/missions/${missionId}`);
+  // redirect removed(`/login?next=/event/${eventId}/missions/${missionId}`);
 
   const { data: mission } = await supabase
     .from("missions")
@@ -33,7 +31,7 @@ export default async function MissionSubmitPage({
     .from("participants")
     .select("id")
     .eq("event_id", eventId)
-    .eq("user_id", user.id)
+    .eq("phone", (await getParticipant(eventId))?.phone ?? "")
     .maybeSingle();
   if (!participant) redirect(`/event/${eventId}`);
 

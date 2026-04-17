@@ -49,7 +49,7 @@ export default async function SubmissionsPage({
     ? await supabase.from("participants").select("id, user_id").in("id", participantIds)
     : { data: [] };
 
-  const userIds = Array.from(new Set((participants ?? []).map((p) => p.user_id)));
+  const userIds = Array.from(new Set((participants ?? []).map((p) => p.user_id).filter((id): id is string => id !== null)));
   const { data: profiles } = userIds.length
     ? await supabase.from("profiles").select("id, name").in("id", userIds)
     : { data: [] };
@@ -92,7 +92,7 @@ export default async function SubmissionsPage({
           {filteredForEvent.map((s) => {
             const mission = missionMap.get(s.mission_id);
             const participant = participantMap.get(s.participant_id);
-            const profile = participant ? profileMap.get(participant.user_id) : null;
+            const profile = participant ? participant.user_id ? profileMap.get(participant.user_id) : null : null;
             return (
               <SubmissionCard
                 key={s.id}
