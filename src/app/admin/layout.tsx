@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
+import { WinnerTalkIcon } from "@/components/winner-talk-icon";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const cookieStore = await cookies();
@@ -35,6 +36,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
                 </Link>
                 <nav className="flex items-center gap-1 text-sm">
                   <Link href="/admin/events" className="rounded-lg px-3 py-1.5 hover:bg-neutral-100">📋 행사목록</Link>
+                  <Link href="/admin/chat" className="flex items-center gap-1 rounded-lg px-3 py-1.5 hover:bg-neutral-100">
+                    <WinnerTalkIcon size={16} />위너톡
+                  </Link>
                   <Link href="/admin/stats" className="rounded-lg px-3 py-1.5 hover:bg-neutral-100">📊 전체통계</Link>
                 </nav>
               </>

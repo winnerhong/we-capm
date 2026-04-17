@@ -64,36 +64,64 @@ export async function phoneLoginAction(joinCode: string, phoneDigits: string) {
     participantId = newP?.id;
   }
 
-  // 단톡방 자동 입장
+  // 채팅방 자동 입장: 전체방 + 공지방 + 학급방
   const displayName = name === "참가자" ? formatted : `${name} 가족`;
-  const { data: groupRoom } = await supabase
+
+  // 이 행사의 모든 채팅방 가져오기
+  const { data: allRooms } = await supabase
     .from("chat_rooms")
-    .select("id")
+    .select("id, name, type")
+    .eq("event_id", event.id);
+
+  // 등록명단에서 학급 정보 추출
+  const { data: regData } = await supabase
+    .from("event_registrations")
+    .select("name")
     .eq("event_id", event.id)
-    .eq("type", "GROUP")
+    .eq("phone", formatted)
     .maybeSingle();
 
-  if (groupRoom) {
+  const classMatch = regData?.name?.match(/^\[(.+?)\]/);
+  const myClass = classMatch ? classMatch[1] : null;
+
+  for (const room of allRooms ?? []) {
+    let shouldJoin = false;
+
+    if (room.type === "ANNOUNCEMENT") {
+      shouldJoin = true; // 공지방은 전원 입장
+    } else if (room.name === "💬 전체 단톡방") {
+      shouldJoin = true; // 전체 단톡방 전원 입장
+    } else if (myClass && room.name === `💬 ${myClass}`) {
+      shouldJoin = true; // 내 학급방 입장
+    }
+
+    if (!shouldJoin) continue;
+
     const { data: existingMember } = await supabase
       .from("chat_members")
       .select("id")
-      .eq("room_id", groupRoom.id)
+      .eq("room_id", room.id)
       .eq("participant_phone", formatted)
       .maybeSingle();
 
     if (!existingMember) {
       await supabase.from("chat_members").insert({
-        room_id: groupRoom.id,
+        room_id: room.id,
         participant_name: displayName,
         participant_phone: formatted,
       });
-      await supabase.from("chat_messages").insert({
-        room_id: groupRoom.id,
-        sender_name: "시스템",
-        type: "SYSTEM",
-        content: `${displayName}이 입장했습니다`,
-      });
     }
+  }
+
+  // 전체 단톡방에 입장 시스템 메시지
+  const groupRoom = (allRooms ?? []).find((r) => r.name === "💬 전체 단톡방");
+  if (groupRoom) {
+    await supabase.from("chat_messages").insert({
+      room_id: groupRoom.id,
+      sender_name: "시스템",
+      type: "SYSTEM",
+      content: `${displayName}님이 입장했습니다`,
+    });
   }
 
   const cookieStore = await cookies();
