@@ -17,14 +17,16 @@ export default async function RegistrationsPage({
   const { data: event } = await supabase.from("events").select("id, name").eq("id", id).single();
   if (!event) notFound();
 
-  const { data: registrations } = await supabase
+  const { data: allRegs } = await supabase
     .from("event_registrations")
     .select("id, phone, name, status, entered_at, created_at")
     .eq("event_id", id)
     .order("created_at", { ascending: true });
 
-  const entered = (registrations ?? []).filter((r) => r.status === "ENTERED").length;
-  const total = registrations?.length ?? 0;
+  // 선생님 제외 (학부모/참가자만)
+  const registrations = (allRegs ?? []).filter((r) => !r.name.includes("선생님"));
+  const entered = registrations.filter((r) => r.status === "ENTERED").length;
+  const total = registrations.length;
 
   return (
     <div className="space-y-4">
@@ -87,7 +89,8 @@ export default async function RegistrationsPage({
             <thead className="bg-neutral-50 text-left text-xs">
               <tr>
                 <th className="px-4 py-2">#</th>
-                <th className="px-4 py-2">이름</th>
+                <th className="px-4 py-2">반</th>
+                <th className="px-4 py-2">가족명</th>
                 <th className="px-4 py-2">전화번호</th>
                 <th className="px-4 py-2">상태</th>
                 <th className="px-4 py-2">입장 시각</th>
@@ -95,10 +98,15 @@ export default async function RegistrationsPage({
               </tr>
             </thead>
             <tbody className="divide-y">
-              {(registrations ?? []).map((r, i) => (
+              {registrations.map((r, i) => {
+                const match = r.name.match(/^\[(.+?)\]\s*(.+)$/);
+                const className = match?.[1] ?? "";
+                const realName = match?.[2] ?? r.name;
+                return (
                 <tr key={r.id}>
                   <td className="px-4 py-2">{i + 1}</td>
-                  <td className="px-4 py-2 font-medium">{r.name}</td>
+                  <td className="px-4 py-2 text-xs">{className}</td>
+                  <td className="px-4 py-2 font-medium">{realName} 가족</td>
                   <td className="px-4 py-2 font-mono text-xs">{r.phone}</td>
                   <td className="px-4 py-2">
                     <span
@@ -125,7 +133,8 @@ export default async function RegistrationsPage({
                     </form>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
