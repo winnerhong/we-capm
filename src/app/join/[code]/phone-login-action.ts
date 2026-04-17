@@ -64,6 +64,38 @@ export async function phoneLoginAction(joinCode: string, phoneDigits: string) {
     participantId = newP?.id;
   }
 
+  // 단톡방 자동 입장
+  const displayName = name === "참가자" ? formatted : `${name} 가족`;
+  const { data: groupRoom } = await supabase
+    .from("chat_rooms")
+    .select("id")
+    .eq("event_id", event.id)
+    .eq("type", "GROUP")
+    .maybeSingle();
+
+  if (groupRoom) {
+    const { data: existingMember } = await supabase
+      .from("chat_members")
+      .select("id")
+      .eq("room_id", groupRoom.id)
+      .eq("participant_phone", formatted)
+      .maybeSingle();
+
+    if (!existingMember) {
+      await supabase.from("chat_members").insert({
+        room_id: groupRoom.id,
+        participant_name: displayName,
+        participant_phone: formatted,
+      });
+      await supabase.from("chat_messages").insert({
+        room_id: groupRoom.id,
+        sender_name: "시스템",
+        type: "SYSTEM",
+        content: `${displayName}이 입장했습니다`,
+      });
+    }
+  }
+
   const cookieStore = await cookies();
   cookieStore.set(
     "campnic_participant",

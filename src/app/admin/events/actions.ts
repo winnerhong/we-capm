@@ -54,6 +54,13 @@ export async function createEventAction(formData: FormData) {
 
   if (error || !data) throw new Error(error?.message ?? "생성 실패");
 
+  // 단톡방 자동 생성
+  await supabase.from("chat_rooms").insert({
+    event_id: data.id,
+    type: "GROUP",
+    name: name,
+  });
+
   revalidatePath("/admin/events");
   redirect(`/admin/events/${data.id}`);
 }
