@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useTransition } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { WinnerTalkIcon } from "@/components/winner-talk-icon";
 
 interface Message {
   id: string;
@@ -100,9 +101,12 @@ export function ChatRoom({ eventId, roomId, roomName, roomType, myName, initialM
       {/* 헤더 */}
       <header className="flex items-center justify-between border-b px-4 py-3 bg-violet-600 text-white">
         <Link href={`/event/${eventId}`} className="text-lg">←</Link>
-        <div className="text-center">
-          <div className="font-bold">{roomName}</div>
-          {memberCount !== undefined && <div className="text-xs opacity-80">{memberCount}명 참여</div>}
+        <div className="flex items-center gap-2">
+          <WinnerTalkIcon size={24} className="brightness-200" />
+          <div className="text-center">
+            <div className="font-bold">{roomName}</div>
+            {memberCount !== undefined && <div className="text-xs opacity-80">{memberCount}명 참여</div>}
+          </div>
         </div>
         <div className="w-6" />
       </header>
