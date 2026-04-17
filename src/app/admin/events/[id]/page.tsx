@@ -127,7 +127,7 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
               className="flex flex-col items-center gap-2 rounded-xl border-2 bg-white p-4 hover:border-violet-500">
               <span className="text-3xl">💬</span><span className="font-semibold">채팅/공지</span>
             </Link>
-            <Link href={`/admin/events/${id}/registrations`}
+            <Link href={`/admin/events/${id}/entry-status`}
               className="flex flex-col items-center gap-2 rounded-xl border-2 bg-white p-4 hover:border-violet-500">
               <span className="text-3xl">📋</span><span className="font-semibold">입장 현황</span>
             </Link>
