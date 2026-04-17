@@ -45,7 +45,7 @@ export default async function ManagerDashboard({ params }: { params: Promise<{ e
   const isEnded = event.status === "ENDED" || event.status === "CONFIRMED";
 
   const checks = isDraft ? [
-    { done: true, label: "행사 정보 입력", link: `/manager/${id}/edit` },
+    { done: true, label: "행사 정보 입력", link: `/admin/events/${id}/edit` },
     { done: teacherCount > 0, label: `참가 선생님 등록 (${teacherCount}명)`, link: `/admin/events/${id}/staff` },
     { done: familyCount > 0, label: `참가 가족 등록 (${familyCount}명)`, link: `/admin/events/${id}/registrations` },
     { done: (missionCount ?? 0) > 0, label: `미션 만들기 (${missionCount ?? 0}개)`, link: `/admin/events/${id}/missions` },
