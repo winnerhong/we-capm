@@ -26,6 +26,7 @@ export function NewEventForm({ schools, externalEvents }: { schools: School[]; e
   const [location, setLocation] = useState("");
   const [managerPassword, setManagerPassword] = useState("");
   const [imported, setImported] = useState<ExtEvent | null>(null);
+  const [selectedSchoolId, setSelectedSchoolId] = useState<number | null>(null);
 
   const handleImport = (ev: ExtEvent) => {
     setImported(ev);
@@ -34,6 +35,8 @@ export function NewEventForm({ schools, externalEvents }: { schools: School[]; e
     setEndAt(toLocalInput(ev.end_time));
     setLocation(ev.location_name);
     setManagerPassword(ev.school_password);
+    const matched = schools.find((s) => s.name === ev.school_name || s.id === ev.school_id);
+    if (matched) setSelectedSchoolId(matched.id);
   };
 
   return (
@@ -47,25 +50,15 @@ export function NewEventForm({ schools, externalEvents }: { schools: School[]; e
       )}
 
       <form action={createEventAction} className="space-y-4 rounded-lg border bg-white p-6">
-        <SchoolSelect schools={schools} />
+        <input type="hidden" name="type" value="FAMILY" />
+
+        <SchoolSelect schools={schools} preSelectedId={selectedSchoolId} />
 
         <div>
           <label className="mb-1 block text-sm font-medium">행사명</label>
           <input name="name" value={name} onChange={(e) => setName(e.target.value)}
             required placeholder="5월 가족 캠프닉"
             className="w-full rounded-lg border px-3 py-2 outline-none focus:ring-2 focus:ring-violet-500" />
-        </div>
-
-        <div>
-          <label className="mb-1 block text-sm font-medium">행사 유형</label>
-          <select name="type" defaultValue="FAMILY"
-            className="w-full rounded-lg border px-3 py-2 outline-none focus:ring-2 focus:ring-violet-500">
-            <option value="FAMILY">가족</option>
-            <option value="CORPORATE">기업</option>
-            <option value="CLUB">동호회</option>
-            <option value="SCHOOL">학교</option>
-            <option value="ETC">기타</option>
-          </select>
         </div>
 
         <div>

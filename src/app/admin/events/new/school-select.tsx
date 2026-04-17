@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 interface School {
   id: number;
@@ -10,10 +10,17 @@ interface School {
   district: string;
 }
 
-export function SchoolSelect({ schools }: { schools: School[] }) {
+export function SchoolSelect({ schools, preSelectedId }: { schools: School[]; preSelectedId?: number | null }) {
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<School | null>(null);
   const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (preSelectedId) {
+      const found = schools.find((s) => s.id === preSelectedId);
+      if (found) setSelected(found);
+    }
+  }, [preSelectedId, schools]);
 
   const filtered = search
     ? schools.filter((s) =>
@@ -34,10 +41,8 @@ export function SchoolSelect({ schools }: { schools: School[] }) {
       <input type="hidden" name="school_id" value={selected?.id ?? ""} />
       <input type="hidden" name="manager_id" value={selected?.username ?? ""} />
 
-      <div
-        onClick={() => setOpen(!open)}
-        className="w-full cursor-pointer rounded-lg border px-3 py-2 text-base"
-      >
+      <div onClick={() => setOpen(!open)}
+        className="w-full cursor-pointer rounded-lg border px-3 py-2 text-base">
         {selected ? (
           <span>{selected.name} <span className="text-xs text-neutral-400">({selected.district})</span></span>
         ) : (
@@ -48,31 +53,17 @@ export function SchoolSelect({ schools }: { schools: School[] }) {
       {open && (
         <div className="absolute z-50 mt-1 w-full rounded-lg border bg-white shadow-lg">
           <div className="p-2">
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
+            <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
               placeholder="기관명, 지역구, 연락처 검색..."
               className="w-full rounded-lg border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-violet-500"
-              autoFocus
-            />
+              autoFocus />
           </div>
-
           <div className="max-h-60 overflow-y-auto">
-            <button
-              type="button"
-              onClick={() => handleSelect(null)}
-              className="w-full px-3 py-2 text-left text-sm hover:bg-violet-50"
-            >
-              직접 입력
-            </button>
+            <button type="button" onClick={() => handleSelect(null)}
+              className="w-full px-3 py-2 text-left text-sm hover:bg-violet-50">직접 입력</button>
             {filtered.map((s) => (
-              <button
-                key={s.id}
-                type="button"
-                onClick={() => handleSelect(s)}
-                className="w-full px-3 py-2 text-left text-sm hover:bg-violet-50 flex justify-between"
-              >
+              <button key={s.id} type="button" onClick={() => handleSelect(s)}
+                className="w-full px-3 py-2 text-left text-sm hover:bg-violet-50 flex justify-between">
                 <span>{s.name}</span>
                 <span className="text-xs text-neutral-400">{s.district}</span>
               </button>
