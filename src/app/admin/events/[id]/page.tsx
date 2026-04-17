@@ -166,10 +166,9 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
         </div>
       )}
 
-      {/* 관리 메뉴 (중복 없이 정리) */}
-      <div className="grid grid-cols-4 gap-2 md:grid-cols-5">
+      {/* 관리 메뉴 */}
+      <div className="grid grid-cols-2 gap-2">
         {[
-          { href: `/admin/events/${id}/rewards`, icon: "🎁", label: "보상" },
           { href: `/admin/events/${id}/stats`, icon: "📊", label: "통계" },
           { href: `/admin/events/${id}/claim`, icon: "🎫", label: "수령" },
         ].map((item) => (
