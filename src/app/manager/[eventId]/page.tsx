@@ -157,6 +157,7 @@ export default async function ManagerDashboard({ params }: { params: Promise<{ e
         {[
           { href: `/admin/events/${id}/stats`, icon: "📊", label: "통계" },
           { href: `/admin/events/${id}/claim`, icon: "🎫", label: "수령" },
+          { href: `/admin/events/${id}/chat`, icon: "💬", label: "채팅" },
         ].map((item) => (
           <Link key={item.href} href={item.href}
             className="flex flex-col items-center gap-1 rounded-xl border bg-white p-3 hover:border-violet-500">
