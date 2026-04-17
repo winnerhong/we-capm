@@ -6,10 +6,6 @@ import { formatKorean } from "@/lib/phone";
 
 export async function addRegistrationAction(eventId: string, formData: FormData) {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("unauthorized");
 
   const name = String(formData.get("name") ?? "").trim();
   const phoneRaw = String(formData.get("phone") ?? "").replace(/\D/g, "");
@@ -23,7 +19,6 @@ export async function addRegistrationAction(eventId: string, formData: FormData)
     event_id: eventId,
     phone: formatKorean(phone),
     name,
-    registered_by: user.id,
   });
 
   if (error) {
@@ -58,17 +53,8 @@ export async function updateRegistrationAction(
   revalidatePath(`/admin/events/${eventId}/registrations`);
 }
 
-interface CsvRow {
-  name: string;
-  phone: string;
-}
-
 export async function uploadCsvAction(eventId: string, formData: FormData) {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("unauthorized");
 
   const csvText = String(formData.get("csv") ?? "");
   if (!csvText.trim()) throw new Error("CSV 내용이 비어있습니다");
@@ -78,7 +64,7 @@ export async function uploadCsvAction(eventId: string, formData: FormData) {
     .map((l) => l.trim())
     .filter((l) => l && !l.startsWith("이름"));
 
-  const rows: CsvRow[] = [];
+  const rows: { name: string; phone: string }[] = [];
   for (const line of lines) {
     const parts = line.split(/[,\t]/).map((s) => s.trim());
     if (parts.length < 2) continue;
@@ -95,7 +81,6 @@ export async function uploadCsvAction(eventId: string, formData: FormData) {
     event_id: eventId,
     phone: r.phone,
     name: r.name,
-    registered_by: user.id,
   }));
 
   const { error } = await supabase.from("event_registrations").upsert(inserts, {
