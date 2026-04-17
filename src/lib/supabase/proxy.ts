@@ -12,40 +12,60 @@ export async function updateSession(request: NextRequest) {
   const isManagerRoute = pathname.startsWith("/manager/");
   const isEventRoute = pathname.startsWith("/event");
 
-  // API, 입장, 로그인, 매니저 로그인 → 무조건 통과
+  // 공개 라우트
   if (isApiRoute || isJoinRoute || isLoginRoute || isManagerLogin || pathname === "/offline") return response;
+  if (pathname.includes("/qr")) return response;
 
-  // 참가자: campnic_participant 쿠키
+  // 참가자
   const participantCookie = request.cookies.get("campnic_participant");
   if (isEventRoute && participantCookie?.value) return response;
 
-  // 매니저: campnic_manager 쿠키
+  // 매니저
   const managerCookie = request.cookies.get("campnic_manager");
   if (isManagerRoute && managerCookie?.value) return response;
   if (isManagerRoute && !managerCookie?.value) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/manager";
-    return NextResponse.redirect(url);
+    return NextResponse.redirect(new URL("/manager", request.url));
   }
 
-  // QR 이미지는 누구나 접근 가능
-  if (pathname.includes("/qr")) return response;
-
-  // 관리자: campnic_admin 쿠키
+  // 관리자
   const adminCookie = request.cookies.get("campnic_admin");
-  if (isAdminRoute && (adminCookie?.value || managerCookie?.value)) return response;
 
-  if (isAdminRoute && !adminCookie?.value && !managerCookie?.value) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/login";
-    return NextResponse.redirect(url);
+  if (isAdminRoute) {
+    // 슈퍼 관리자 → 모든 admin 접근 가능
+    if (adminCookie?.value) return response;
+
+    // 매니저 → 자기 행사만 접근 가능
+    if (managerCookie?.value) {
+      try {
+        const data = JSON.parse(managerCookie.value);
+        const managerEventId = data.eventId ?? "";
+
+        // 매니저 차단: 행사 목록, 전체 통계, 새 행사 생성
+        if (pathname === "/admin" || pathname === "/admin/events" || pathname === "/admin/stats" || pathname === "/admin/events/new") {
+          return NextResponse.redirect(new URL(`/manager/${managerEventId}`, request.url));
+        }
+
+        // 매니저: URL의 eventId와 쿠키의 eventId 비교
+        const urlMatch = pathname.match(/\/admin\/events\/([^/]+)/);
+        if (urlMatch) {
+          const urlEventId = urlMatch[1];
+          if (urlEventId !== managerEventId) {
+            return NextResponse.redirect(new URL(`/manager/${managerEventId}`, request.url));
+          }
+        }
+
+        return response;
+      } catch {
+        return NextResponse.redirect(new URL("/manager", request.url));
+      }
+    }
+
+    return NextResponse.redirect(new URL("/login", request.url));
   }
 
-  // 이벤트 페이지인데 쿠키 없음 → 입장
+  // 이벤트 페이지 쿠키 없음
   if (isEventRoute && !participantCookie?.value) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/join";
-    return NextResponse.redirect(url);
+    return NextResponse.redirect(new URL("/join", request.url));
   }
 
   return response;

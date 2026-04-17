@@ -2,7 +2,7 @@ import { RealtimeRefresh } from "@/components/realtime-refresh";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { updateEventStatusAction, duplicateEventAction, deleteEventAction } from "@/app/admin/events/actions";
+import { updateEventStatusAction } from "@/app/admin/events/actions";
 import type { EventStatus } from "@/lib/supabase/database.types";
 
 export const dynamic = "force-dynamic";

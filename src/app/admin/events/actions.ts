@@ -7,8 +7,10 @@ import { generateJoinCode } from "@/lib/codes";
 import type { EventStatus, EventType, ParticipationType } from "@/lib/supabase/database.types";
 import { confirmResults } from "@/lib/event-lifecycle";
 import { getAllSchools } from "@/lib/school-db";
+import { requireAdmin, requireAdminOrManager } from "@/lib/auth-guard";
 
 export async function createEventAction(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
 
   const name = String(formData.get("name") ?? "").trim();
@@ -96,6 +98,7 @@ export async function updateEventAction(eventId: string, formData: FormData) {
 }
 
 export async function updateEventStatusAction(eventId: string, status: EventStatus) {
+  await requireAdminOrManager(eventId);
   const supabase = await createClient();
 
   if (status === "CONFIRMED") {
@@ -110,6 +113,7 @@ export async function updateEventStatusAction(eventId: string, status: EventStat
 }
 
 export async function duplicateEventAction(sourceEventId: string) {
+  await requireAdmin();
   const supabase = await createClient();
   const { data: source } = await supabase.from("events").select("*").eq("id", sourceEventId).single();
   if (!source) throw new Error("원본 행사 없음");
@@ -165,6 +169,7 @@ export async function duplicateEventAction(sourceEventId: string) {
 }
 
 export async function deleteEventAction(eventId: string) {
+  await requireAdmin();
   const supabase = await createClient();
   const { error } = await supabase.from("events").delete().eq("id", eventId);
   if (error) throw new Error(error.message);
