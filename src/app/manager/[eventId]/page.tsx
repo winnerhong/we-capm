@@ -1,4 +1,5 @@
 import { RealtimeRefresh } from "@/components/realtime-refresh";
+import { WinnerTalkIcon } from "@/components/winner-talk-icon";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
@@ -154,17 +155,18 @@ export default async function ManagerDashboard({ params }: { params: Promise<{ e
       )}
 
       <div className="grid grid-cols-3 gap-2">
-        {[
-          { href: `/admin/events/${id}/stats`, icon: "📊", label: "통계" },
-          { href: `/admin/events/${id}/claim`, icon: "🎫", label: "수령" },
-          { href: `/admin/events/${id}/chat`, icon: "💬", label: "채팅" },
-        ].map((item) => (
-          <Link key={item.href} href={item.href}
-            className="flex flex-col items-center gap-1 rounded-xl border bg-white p-3 hover:border-violet-500">
-            <span className="text-xl">{item.icon}</span>
-            <span className="text-[11px]">{item.label}</span>
-          </Link>
-        ))}
+        <Link href={`/admin/events/${id}/stats`}
+          className="flex flex-col items-center gap-1 rounded-xl border bg-white p-3 hover:border-violet-500">
+          <span className="text-xl">📊</span><span className="text-[11px]">통계</span>
+        </Link>
+        <Link href={`/admin/events/${id}/claim`}
+          className="flex flex-col items-center gap-1 rounded-xl border bg-white p-3 hover:border-violet-500">
+          <span className="text-xl">🎫</span><span className="text-[11px]">수령</span>
+        </Link>
+        <Link href={`/admin/events/${id}/chat`}
+          className="flex flex-col items-center gap-1 rounded-xl border bg-white p-3 hover:border-violet-500">
+          <WinnerTalkIcon size={22} /><span className="text-[11px]">위너톡</span>
+        </Link>
       </div>
 
       <div className="rounded-2xl border bg-white p-5">
