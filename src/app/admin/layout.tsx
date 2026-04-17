@@ -1,39 +1,30 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getCurrentUser, getCurrentProfile } from "@/lib/supabase/current-user";
+import { cookies } from "next/headers";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  const user = await getCurrentUser();
-  if (!user) redirect("/login?next=/admin");
+  const cookieStore = await cookies();
+  const adminCookie = cookieStore.get("campnic_admin");
 
-  const profile = await getCurrentProfile();
+  if (!adminCookie?.value) redirect("/login");
 
-  if (!profile || (profile.role !== "ADMIN" && profile.role !== "STAFF")) {
-    redirect("/");
-  }
+  let adminName = "관리자";
+  try {
+    const data = JSON.parse(adminCookie.value);
+    adminName = data.id ?? "관리자";
+  } catch {}
 
   return (
     <div className="min-h-dvh bg-neutral-50">
       <header className="border-b bg-white">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-          <Link href="/admin" className="font-bold">
-            캠프닉 관리
-          </Link>
+          <Link href="/admin" className="font-bold">캠프닉 관리</Link>
           <nav className="flex items-center gap-4 text-sm">
-            <Link href="/admin/events" className="hover:underline">
-              행사
-            </Link>
-            <Link href="/" className="text-neutral-500 hover:underline">
-              참가자 모드
-            </Link>
-            <span className="text-neutral-500">{profile.name}</span>
-            <form action="/api/auth/logout" method="post">
-              <button
-                type="submit"
-                className="rounded-lg border px-2 py-1 text-xs text-neutral-600 hover:bg-neutral-50"
-              >
-                로그아웃
-              </button>
+            <Link href="/admin/events" className="hover:underline">행사</Link>
+            <Link href="/join" className="hover:underline">참가자 모드</Link>
+            <span>{adminName}</span>
+            <form action="/api/auth/admin-logout" method="post">
+              <button className="rounded-lg border px-2 py-1 text-xs hover:bg-neutral-50">로그아웃</button>
             </form>
           </nav>
         </div>

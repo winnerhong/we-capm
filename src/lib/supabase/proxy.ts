@@ -1,91 +1,38 @@
-import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import type { Database } from "./database.types";
-
-const DEFAULT_PROFILE_NAME = "참가자";
 
 export async function updateSession(request: NextRequest) {
-  let response = NextResponse.next({ request });
-
-  const supabase = createServerClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-          response = NextResponse.next({ request });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options)
-          );
-        },
-      },
-    }
-  );
-
+  const response = NextResponse.next({ request });
   const { pathname } = request.nextUrl;
 
   const isApiRoute = pathname.startsWith("/api");
-  const isAuthFlow = pathname === "/login" || pathname === "/login/verify";
-  const isOnboarding = pathname === "/login/name";
+  const isJoinRoute = pathname.startsWith("/join");
+  const isLoginRoute = pathname === "/login";
   const isAdminRoute = pathname.startsWith("/admin");
   const isEventRoute = pathname.startsWith("/event");
-  const isProtectedRoute = isAdminRoute || pathname.startsWith("/me");
 
-  const isJoinRoute = pathname.startsWith("/join");
+  // API, 입장, 로그인 → 무조건 통과
+  if (isApiRoute || isJoinRoute || isLoginRoute || pathname === "/offline") return response;
 
-  if (isApiRoute || isJoinRoute) return response;
-
-  // campnic_participant 쿠키가 있으면 참가자로 인정 (event 라우트만)
+  // 참가자: campnic_participant 쿠키
   const participantCookie = request.cookies.get("campnic_participant");
-  const hasParticipantSession = !!participantCookie?.value;
+  if (isEventRoute && participantCookie?.value) return response;
 
-  if (isEventRoute && hasParticipantSession) {
-    return response;
-  }
+  // 관리자: campnic_admin 쿠키
+  const adminCookie = request.cookies.get("campnic_admin");
+  if (isAdminRoute && adminCookie?.value) return response;
 
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  const user = session?.user ?? null;
-
-  if (!user && (isProtectedRoute || (isEventRoute && !hasParticipantSession))) {
+  // 관리자 페이지인데 쿠키 없음 → 로그인
+  if (isAdminRoute && !adminCookie?.value) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
-    url.searchParams.set("next", pathname);
     return NextResponse.redirect(url);
   }
 
-  if (user && isAuthFlow) {
+  // 이벤트 페이지인데 쿠키 없음 → 입장
+  if (isEventRoute && !participantCookie?.value) {
     const url = request.nextUrl.clone();
-    url.pathname = "/";
+    url.pathname = "/join";
     return NextResponse.redirect(url);
-  }
-
-  const needsProfileCheck = user && !isOnboarding && (isAdminRoute || pathname === "/" || isEventRoute || pathname.startsWith("/me"));
-
-  if (needsProfileCheck && user) {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("name, role")
-      .eq("id", user.id)
-      .single();
-
-    if (profile && profile.name === DEFAULT_PROFILE_NAME && !hasParticipantSession) {
-      const url = request.nextUrl.clone();
-      url.pathname = "/login/name";
-      if (pathname !== "/") url.searchParams.set("next", pathname);
-      return NextResponse.redirect(url);
-    }
-
-    if (isAdminRoute && (!profile || (profile.role !== "ADMIN" && profile.role !== "STAFF"))) {
-      const url = request.nextUrl.clone();
-      url.pathname = "/";
-      return NextResponse.redirect(url);
-    }
   }
 
   return response;

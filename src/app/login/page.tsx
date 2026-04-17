@@ -2,12 +2,12 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
-import { formatKorean, toE164Korean } from "@/lib/phone";
+import { adminLoginAction } from "./admin-login-action";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [phoneInput, setPhoneInput] = useState("");
+  const [id, setId] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -15,47 +15,47 @@ export default function LoginPage() {
     e.preventDefault();
     setError(null);
 
-    const e164 = toE164Korean(phoneInput);
-    if (!e164) {
-      setError("올바른 휴대폰 번호를 입력해주세요");
-      return;
-    }
-
     startTransition(async () => {
-      const supabase = createClient();
-      const { error: otpError } = await supabase.auth.signInWithOtp({
-        phone: e164,
-        options: { channel: "sms" },
-      });
-      if (otpError) {
-        setError(otpError.message);
+      const result = await adminLoginAction(id.trim(), password);
+      if (!result.ok) {
+        setError(result.message ?? "로그인 실패");
         return;
       }
-      const qs = new URLSearchParams({ phone: e164 });
-      router.push(`/login/verify?${qs.toString()}`);
+      router.push("/admin");
+      router.refresh();
     });
   };
 
   return (
     <main className="flex min-h-dvh items-center justify-center p-6">
       <form onSubmit={handleSubmit} className="w-full max-w-sm space-y-6">
-        <div className="space-y-2">
-          <h1 className="text-2xl font-bold">캠프닉 입장</h1>
-          <p className="text-sm text-neutral-600">전화번호로 빠르게 입장하세요</p>
+        <div className="space-y-2 text-center">
+          <h1 className="text-2xl font-bold">관리자 로그인</h1>
+          <p className="text-sm">행사 관리를 위한 관리자 전용</p>
         </div>
 
         <div className="space-y-2">
-          <label htmlFor="phone" className="text-sm font-medium">
-            휴대폰 번호
-          </label>
+          <label htmlFor="admin-id" className="text-sm font-medium">아이디</label>
           <input
-            id="phone"
-            type="tel"
-            inputMode="numeric"
-            autoComplete="tel"
-            placeholder="010-1234-5678"
-            value={phoneInput}
-            onChange={(e) => setPhoneInput(formatKorean(e.target.value))}
+            id="admin-id"
+            type="text"
+            value={id}
+            onChange={(e) => setId(e.target.value)}
+            placeholder="admin"
+            className="w-full rounded-lg border px-4 py-3 text-base outline-none focus:ring-2 focus:ring-violet-500"
+            autoFocus
+            required
+          />
+        </div>
+
+        <div className="space-y-2">
+          <label htmlFor="admin-pw" className="text-sm font-medium">비밀번호</label>
+          <input
+            id="admin-pw"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="••••••"
             className="w-full rounded-lg border px-4 py-3 text-base outline-none focus:ring-2 focus:ring-violet-500"
             required
           />
@@ -68,8 +68,12 @@ export default function LoginPage() {
           disabled={pending}
           className="w-full rounded-lg bg-violet-600 py-3 text-base font-semibold text-white hover:bg-violet-700 disabled:opacity-50"
         >
-          {pending ? "발송 중..." : "입장하기"}
+          {pending ? "로그인 중..." : "로그인"}
         </button>
+
+        <a href="/join" className="block text-center text-xs text-neutral-400 hover:text-violet-600">
+          ← 참가자 입장으로 돌아가기
+        </a>
       </form>
     </main>
   );
