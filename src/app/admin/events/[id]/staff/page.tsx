@@ -17,7 +17,7 @@ export default async function StaffPage({ params }: { params: Promise<{ id: stri
     .from("event_registrations")
     .select("id, phone, name, status, created_at")
     .eq("event_id", id)
-    .like("name", "[선생님]%")
+    .like("name", "%선생님%")
     .order("created_at", { ascending: true });
 
   const total = teachers?.length ?? 0;

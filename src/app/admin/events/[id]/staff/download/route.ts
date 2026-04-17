@@ -17,7 +17,7 @@ export async function GET(
     .from("event_registrations")
     .select("name, phone, status, entered_at, created_at")
     .eq("event_id", id)
-    .like("name", "[선생님%")
+    .like("name", "%선생님%")
     .order("created_at", { ascending: true });
 
   const header = ["NO", "담당반", "이름", "전화번호", "상태", "입장시각"];
