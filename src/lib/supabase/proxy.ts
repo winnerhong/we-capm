@@ -32,10 +32,16 @@ export async function updateSession(request: NextRequest) {
   const isAuthFlow = pathname === "/login" || pathname === "/login/verify";
   const isOnboarding = pathname === "/login/name";
   const isAdminRoute = pathname.startsWith("/admin");
-  const isProtectedRoute =
-    isAdminRoute || pathname.startsWith("/me") || pathname.startsWith("/event");
+  const isEventRoute = pathname.startsWith("/event");
+  const isProtectedRoute = isAdminRoute || pathname.startsWith("/me");
 
-  if (isApiRoute) {
+  if (isApiRoute) return response;
+
+  // campnic_participant 쿠키가 있으면 참가자로 인정 (event 라우트만)
+  const participantCookie = request.cookies.get("campnic_participant");
+  const hasParticipantSession = !!participantCookie?.value;
+
+  if (isEventRoute && hasParticipantSession) {
     return response;
   }
 
@@ -44,7 +50,7 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getSession();
   const user = session?.user ?? null;
 
-  if (!user && isProtectedRoute) {
+  if (!user && (isProtectedRoute || (isEventRoute && !hasParticipantSession))) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("next", pathname);
@@ -57,7 +63,7 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  const needsProfileCheck = user && !isOnboarding && (isAdminRoute || pathname === "/" || pathname.startsWith("/event") || pathname.startsWith("/me"));
+  const needsProfileCheck = user && !isOnboarding && (isAdminRoute || pathname === "/" || isEventRoute || pathname.startsWith("/me"));
 
   if (needsProfileCheck && user) {
     const { data: profile } = await supabase
@@ -66,7 +72,7 @@ export async function updateSession(request: NextRequest) {
       .eq("id", user.id)
       .single();
 
-    if (profile && profile.name === DEFAULT_PROFILE_NAME) {
+    if (profile && profile.name === DEFAULT_PROFILE_NAME && !hasParticipantSession) {
       const url = request.nextUrl.clone();
       url.pathname = "/login/name";
       if (pathname !== "/") url.searchParams.set("next", pathname);
