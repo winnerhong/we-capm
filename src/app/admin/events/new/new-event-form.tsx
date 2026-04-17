@@ -92,6 +92,11 @@ export function NewEventForm({ schools, externalEvents }: { schools: School[]; e
 
         <div className="border-t pt-4">
           <p className="mb-2 text-sm font-semibold">기관 로그인 계정</p>
+          {imported?.school_username && (
+            <div className="mb-2 rounded-lg bg-neutral-50 p-3 text-sm">
+              <span className="text-xs">아이디:</span> <strong>{imported.school_username}</strong>
+            </div>
+          )}
           <div>
             <label className="mb-1 block text-sm font-medium">기관 비밀번호</label>
             <input name="manager_password" value={managerPassword} onChange={(e) => setManagerPassword(e.target.value)}
