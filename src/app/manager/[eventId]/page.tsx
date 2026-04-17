@@ -1,3 +1,4 @@
+import { RealtimeRefresh } from "@/components/realtime-refresh";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
@@ -58,7 +59,7 @@ export default async function ManagerDashboard({ params }: { params: Promise<{ e
   const nameByPhone = new Map((regNames ?? []).map((r) => [r.phone, r.name]));
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6"><RealtimeRefresh table="submissions" /><RealtimeRefresh table="participants" /><RealtimeRefresh table="event_registrations" />
       <div className="flex items-center justify-between">
         <div />
         <div className="flex gap-2">

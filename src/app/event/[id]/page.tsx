@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getParticipant } from "@/lib/participant-session";
 import { checkAndEndEvent } from "@/lib/event-lifecycle";
+import { RealtimeRefresh } from "@/components/realtime-refresh";
 
 export const dynamic = "force-dynamic";
 
@@ -46,6 +47,9 @@ export default async function EventHomePage({ params }: { params: Promise<{ id: 
 
   return (
     <main className="min-h-dvh bg-neutral-50 p-4 pb-24">
+      <RealtimeRefresh table="submissions" />
+      <RealtimeRefresh table="participants" />
+      <RealtimeRefresh table="reward_claims" />
       <div className="mx-auto max-w-lg space-y-4">
 
         {/* 헤더 */}

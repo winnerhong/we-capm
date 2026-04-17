@@ -1,3 +1,4 @@
+import { RealtimeRefresh } from "@/components/realtime-refresh";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
@@ -52,7 +53,7 @@ export default async function EventMissionsPage({
   const subsByMission = new Map<string, { id: string; mission_id: string; status: string; earned_points: number | null }>();
 
   return (
-    <main className="min-h-dvh bg-neutral-50 p-4">
+    <main className="min-h-dvh bg-neutral-50 p-4"><RealtimeRefresh table="submissions" />
       <div className="mx-auto max-w-lg space-y-4">
         <header className="rounded-lg bg-violet-600 p-6 text-white">
           <Link href={`/event/${id}`} className="text-xs opacity-80 hover:underline">

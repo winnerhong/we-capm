@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getParticipant, getParticipantDb } from "@/lib/participant-session";
 import { createClient } from "@/lib/supabase/server";
+import { RealtimeRefresh } from "@/components/realtime-refresh";
 
 export const dynamic = "force-dynamic";
 
@@ -57,6 +58,7 @@ export default async function LeaderboardPage({
 
   return (
     <main className="min-h-dvh bg-neutral-50 p-4">
+      <RealtimeRefresh table="participants" />
       <div className="mx-auto max-w-lg space-y-4">
         <header className="flex items-center justify-between">
           <Link href={`/event/${id}`} className="text-sm text-neutral-500 hover:underline">

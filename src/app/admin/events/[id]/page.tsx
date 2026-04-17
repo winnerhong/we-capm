@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { updateEventStatusAction, deleteEventAction, duplicateEventAction } from "../actions";
 import type { EventStatus } from "@/lib/supabase/database.types";
+import { RealtimeRefresh } from "@/components/realtime-refresh";
 
 export const dynamic = "force-dynamic";
 
@@ -62,6 +63,9 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
 
   return (
     <div className="space-y-6">
+      <RealtimeRefresh table="submissions" />
+      <RealtimeRefresh table="participants" />
+      <RealtimeRefresh table="event_registrations" />
       <div className="flex items-center justify-between">
         <Link href="/admin/events" className="text-sm hover:underline">← 행사 목록</Link>
         <div className="flex gap-2">
