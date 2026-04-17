@@ -44,13 +44,13 @@ export default async function ManagerDashboard({ params }: { params: Promise<{ e
   const isActive = event.status === "ACTIVE";
   const isEnded = event.status === "ENDED" || event.status === "CONFIRMED";
 
-  const checks = isDraft ? [
+  const checks = [
     { done: true, label: "행사 정보 입력", link: `/admin/events/${id}/edit` },
     { done: teacherCount > 0, label: `참가 선생님 등록 (${teacherCount}명)`, link: `/admin/events/${id}/staff` },
     { done: familyCount > 0, label: `참가 가족 등록 (${familyCount}명)`, link: `/admin/events/${id}/registrations` },
     { done: (missionCount ?? 0) > 0, label: `미션 만들기 (${missionCount ?? 0}개)`, link: `/admin/events/${id}/missions` },
     { done: (rewardCount ?? 0) > 0, label: `보상 만들기 (${rewardCount ?? 0}개)`, link: `/admin/events/${id}/rewards` },
-  ] : [];
+  ];
 
   const phones = (topParticipants ?? []).map((p) => p.phone).filter(Boolean);
   const { data: regNames } = phones.length
@@ -93,9 +93,8 @@ export default async function ManagerDashboard({ params }: { params: Promise<{ e
         </div>
       </div>
 
-      {isDraft && (
-        <div className="rounded-2xl border-2 border-dashed border-violet-300 bg-violet-50 p-5">
-          <h2 className="mb-3 font-bold">📋 준비 체크리스트</h2>
+      <div className="rounded-2xl border-2 border-dashed border-violet-300 bg-violet-50 p-5">
+          <h2 className="mb-3 font-bold">📋 관리 메뉴</h2>
           <ul className="space-y-2">
             {checks.map((c) => (
               <li key={c.label}>
@@ -108,7 +107,6 @@ export default async function ManagerDashboard({ params }: { params: Promise<{ e
             ))}
           </ul>
         </div>
-      )}
 
       {isActive && (
         <>
