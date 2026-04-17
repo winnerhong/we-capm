@@ -1,9 +1,11 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { uploadCsvAction } from "./actions";
 
 export function CsvUploadForm({ eventId }: { eventId: string }) {
+  const router = useRouter();
   const [csvText, setCsvText] = useState("");
   const [pending, startTransition] = useTransition();
   const [result, setResult] = useState<string | null>(null);
@@ -25,8 +27,9 @@ export function CsvUploadForm({ eventId }: { eventId: string }) {
     startTransition(async () => {
       try {
         const res = await uploadCsvAction(eventId, formData);
-        setResult(`${res.count}명 등록 완료`);
+        setResult(`${res.count}명 등록 완료 (중복 자동 무시)`);
         setCsvText("");
+        router.refresh();
       } catch (err) {
         setError(err instanceof Error ? err.message : "업로드 실패");
       }
@@ -56,6 +59,8 @@ export function CsvUploadForm({ eventId }: { eventId: string }) {
         rows={5}
         className="w-full rounded-lg border px-3 py-2 font-mono text-xs"
       />
+
+      <p className="text-xs">중복 번호는 자동 무시됩니다. 추가 등록도 가능합니다.</p>
 
       {error && <p className="text-sm text-red-600">{error}</p>}
       {result && <p className="text-sm text-green-600">{result}</p>}
