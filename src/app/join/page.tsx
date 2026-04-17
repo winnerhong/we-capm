@@ -24,7 +24,7 @@ export default function DirectJoinPage() {
 
     startTransition(async () => {
       try {
-        const result = await directPhoneLoginAction(digits);
+        const result = await directPhoneLoginAction(digits) as { ok: boolean; message?: string; eventId?: string; name?: string };
         if (!result.ok) {
           setError(result.message ?? "입장 실패");
           return;
