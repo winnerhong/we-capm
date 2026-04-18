@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "rimraf .next && next dev -p 1000",
+    "dev": "rimraf C:/Temp/we-camp-next && next dev -p 1000",
     "dev:fast": "next dev -p 1000",
     "build": "next build --webpack",
     "start": "next start",
