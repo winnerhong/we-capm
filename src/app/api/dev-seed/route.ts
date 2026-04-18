@@ -53,7 +53,7 @@ export async function GET() {
 
   // 3. 참가자 (입장한 사람 12명)
   await supabase.from("reward_claims").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-  await supabase.from("submissions").delete().eq("event_id", EVENT_ID);
+  await supabase.from("submissions").delete().neq("id", "00000000-0000-0000-0000-000000000000");
   await supabase.from("participants").delete().eq("event_id", EVENT_ID);
 
   const enteredPhones = registrations.slice(0, 12); // 첫 12명 입장
@@ -79,11 +79,11 @@ export async function GET() {
   // 4. 미션 (5개)
   await supabase.from("missions").delete().eq("event_id", EVENT_ID);
   const missions = [
-    { title: "가족 사진 찍기", description: "가족 모두가 함께 찍은 사진을 올려주세요!", template_type: "PHOTO", points: 10, order: 1, auto_approve: false, instruction: "자연 배경에서 찍어주세요", config: {} },
-    { title: "보물찾기", description: "캠핑장에 숨겨진 보물 3개를 찾아보세요!", template_type: "PHOTO", points: 20, order: 2, auto_approve: false, instruction: "보물을 찾은 모습을 사진으로!", config: {} },
-    { title: "자연물 만들기", description: "주변의 자연물로 작품을 만들어보세요", template_type: "PHOTO", points: 15, order: 3, auto_approve: false, instruction: "나뭇잎, 돌, 꽃 등을 활용", config: {} },
-    { title: "캠프 요리 도전", description: "간식이나 요리를 만들어보세요!", template_type: "PHOTO", points: 25, order: 4, auto_approve: false, instruction: "만드는 과정과 완성작 모두 찍어주세요", config: {} },
-    { title: "OX 퀴즈", description: "자연에 대한 퀴즈를 풀어보세요!", template_type: "QUIZ", points: 5, order: 5, auto_approve: true, instruction: "", config: { quiz_question: "소나무는 활엽수이다?", quiz_answer: "X" } },
+    { title: "가족 사진 찍기", description: "가족 모두가 함께 찍은 사진을 올려주세요!", template_type: "PHOTO" as const, points: 10, order: 1, auto_approve: false, instruction: "자연 배경에서 찍어주세요", config: {} },
+    { title: "보물찾기", description: "캠핑장에 숨겨진 보물 3개를 찾아보세요!", template_type: "PHOTO" as const, points: 20, order: 2, auto_approve: false, instruction: "보물을 찾은 모습을 사진으로!", config: {} },
+    { title: "자연물 만들기", description: "주변의 자연물로 작품을 만들어보세요", template_type: "PHOTO" as const, points: 15, order: 3, auto_approve: false, instruction: "나뭇잎, 돌, 꽃 등을 활용", config: {} },
+    { title: "캠프 요리 도전", description: "간식이나 요리를 만들어보세요!", template_type: "PHOTO" as const, points: 25, order: 4, auto_approve: false, instruction: "만드는 과정과 완성작 모두 찍어주세요", config: {} },
+    { title: "OX 퀴즈", description: "자연에 대한 퀴즈를 풀어보세요!", template_type: "QUIZ" as const, points: 5, order: 5, auto_approve: true, instruction: "", config: { quiz_question: "소나무는 활엽수이다?", quiz_answer: "X" } },
   ];
   const { data: missionRows, error: mErr } = await supabase
     .from("missions")
@@ -135,12 +135,10 @@ export async function GET() {
       if (!participantId || !mission) continue;
 
       await supabase.from("submissions").insert({
-        event_id: EVENT_ID,
         mission_id: mission.id,
         participant_id: participantId,
-        status: s.status,
-        content: s.status === "REJECTED" ? "반려 사유: 사진이 흐려요" : "테스트 제출입니다",
-        photo_url: s.missionIdx < 4 ? `test/${s.phone}_m${s.missionIdx}.jpg` : null,
+        status: s.status as "APPROVED" | "PENDING" | "REJECTED",
+        text_content: s.status === "REJECTED" ? "반려 사유: 사진이 흐려요" : "테스트 제출입니다",
       });
 
       if (s.status === "APPROVED") {
@@ -160,11 +158,11 @@ export async function GET() {
   // 6. 보상 (5종류)
   await supabase.from("rewards").delete().eq("event_id", EVENT_ID);
   const rewardInserts = [
-    { event_id: EVENT_ID, name: "음료 쿠폰", description: "시원한 음료 1잔", reward_type: "POINT", config: { threshold: 30 }, quantity: 10 },
-    { event_id: EVENT_ID, name: "간식 세트", description: "맛있는 간식 세트", reward_type: "POINT", config: { threshold: 50 }, quantity: 5 },
-    { event_id: EVENT_ID, name: "금메달", description: "1~3등 금메달", reward_type: "RANK", config: { rankFrom: 1, rankTo: 3 } },
-    { event_id: EVENT_ID, name: "행운 상품권", description: "추첨으로 2명에게!", reward_type: "LOTTERY", config: { minScore: 10, winners: 2 } },
-    ...(missionRows ? [{ event_id: EVENT_ID, name: "요리왕 뱃지", description: "캠프 요리 미션 완료!", reward_type: "BADGE", config: { missionId: missionRows[3]?.id } }] : []),
+    { event_id: EVENT_ID, name: "음료 쿠폰", description: "시원한 음료 1잔", reward_type: "POINT" as const, config: { threshold: 30 }, quantity: 10 },
+    { event_id: EVENT_ID, name: "간식 세트", description: "맛있는 간식 세트", reward_type: "POINT" as const, config: { threshold: 50 }, quantity: 5 },
+    { event_id: EVENT_ID, name: "금메달", description: "1~3등 금메달", reward_type: "RANK" as const, config: { rankFrom: 1, rankTo: 3 } },
+    { event_id: EVENT_ID, name: "행운 상품권", description: "추첨으로 2명에게!", reward_type: "LOTTERY" as const, config: { minScore: 10, winners: 2 } },
+    ...(missionRows ? [{ event_id: EVENT_ID, name: "요리왕 뱃지", description: "캠프 요리 미션 완료!", reward_type: "BADGE" as const, config: { missionId: missionRows[3]?.id } }] : []),
   ];
   const { data: rewards, error: rwErr } = await supabase.from("rewards").insert(rewardInserts).select("id, name, reward_type, config");
   log.push(rwErr ? `❌ 보상: ${rwErr.message}` : `✅ 보상: ${rewards?.length}개`);

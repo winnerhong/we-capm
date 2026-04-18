@@ -112,21 +112,7 @@ export default async function EventHomePage({ params }: { params: Promise<{ id: 
           </div>
         )}
 
-        {/* 하단 메뉴 */}
-        <div className="grid grid-cols-4 gap-2">
-          <Link href={`/event/${id}/missions`} className="flex flex-col items-center gap-1 rounded-xl border bg-white p-3 hover:border-violet-500">
-            <span className="text-2xl">🎯</span><span className="text-xs">전체 미션</span>
-          </Link>
-          <Link href={`/event/${id}/chat`} className="flex flex-col items-center gap-1 rounded-xl border bg-white p-3 hover:border-violet-500">
-            <span className="text-2xl">💬</span><span className="text-xs">채팅</span>
-          </Link>
-          <Link href={`/event/${id}/leaderboard`} className="flex flex-col items-center gap-1 rounded-xl border bg-white p-3 hover:border-violet-500">
-            <span className="text-2xl">🏆</span><span className="text-xs">순위</span>
-          </Link>
-          <Link href={`/event/${id}/rewards`} className="flex flex-col items-center gap-1 rounded-xl border bg-white p-3 hover:border-violet-500">
-            <span className="text-2xl">🎁</span><span className="text-xs">보상</span>
-          </Link>
-        </div>
+        {/* 하단 탭바에서 접근 가능하므로 중복 메뉴 제거 */}
       </div>
     </main>
   );

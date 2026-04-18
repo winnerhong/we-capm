@@ -17,6 +17,14 @@ export type SubmissionStatus =
 export type ReviewMethod = "MANUAL" | "BULK" | "AUTO";
 export type RewardType = "POINT" | "RANK" | "BADGE" | "LOTTERY" | "INSTANT";
 export type ClaimStatus = "EARNED" | "CLAIMED";
+export type StampSlotType = "MANUAL" | "AUTO_MISSION" | "AUTO_ENTRY";
+export type CongestionStatus = "GREEN" | "YELLOW" | "RED";
+
+export interface StampTierConfig {
+  sprout: { label: string; emoji: string; goal_count: number; reward_id: string | null };
+  explorer: { label: string; emoji: string; goal_count: number; reward_id: string | null };
+  keeper: { label: string; emoji: string; goal_count: number; reward_id: string | null };
+}
 
 export interface Database {
   public: {
@@ -464,6 +472,30 @@ export interface Database {
         Row: { id: string; badge_id: string; participant_id: string; earned_at: string };
         Insert: { id?: string; badge_id: string; participant_id: string; earned_at?: string };
         Update: { id?: string; badge_id?: string; participant_id?: string; earned_at?: string };
+        Relationships: [];
+      };
+      stamp_boards: {
+        Row: { id: string; event_id: string; name: string; description: string | null; total_slots: number; tier_config: Json; icon: string | null; is_active: boolean; created_at: string };
+        Insert: { id?: string; event_id: string; name: string; description?: string | null; total_slots: number; tier_config?: Json; icon?: string | null; is_active?: boolean; created_at?: string };
+        Update: { id?: string; event_id?: string; name?: string; description?: string | null; total_slots?: number; tier_config?: Json; icon?: string | null; is_active?: boolean; created_at?: string };
+        Relationships: [];
+      };
+      stamp_slots: {
+        Row: { id: string; board_id: string; order: number; name: string; icon: string | null; description: string | null; location_hint: string | null; type: string; mission_id: string | null; congestion_status: string; staff_name: string | null; is_active: boolean; created_at: string };
+        Insert: { id?: string; board_id: string; order?: number; name: string; icon?: string | null; description?: string | null; location_hint?: string | null; type?: string; mission_id?: string | null; congestion_status?: string; staff_name?: string | null; is_active?: boolean; created_at?: string };
+        Update: { id?: string; board_id?: string; order?: number; name?: string; icon?: string | null; description?: string | null; location_hint?: string | null; type?: string; mission_id?: string | null; congestion_status?: string; staff_name?: string | null; is_active?: boolean; created_at?: string };
+        Relationships: [];
+      };
+      stamp_records: {
+        Row: { id: string; slot_id: string; participant_id: string; stamped_by: string | null; photo_url: string | null; stamped_at: string };
+        Insert: { id?: string; slot_id: string; participant_id: string; stamped_by?: string | null; photo_url?: string | null; stamped_at?: string };
+        Update: { id?: string; slot_id?: string; participant_id?: string; stamped_by?: string | null; photo_url?: string | null; stamped_at?: string };
+        Relationships: [];
+      };
+      stamp_albums: {
+        Row: { id: string; slot_id: string; participant_id: string; photo_url: string; caption: string | null; created_at: string };
+        Insert: { id?: string; slot_id: string; participant_id: string; photo_url: string; caption?: string | null; created_at?: string };
+        Update: { id?: string; slot_id?: string; participant_id?: string; photo_url?: string; caption?: string | null; created_at?: string };
         Relationships: [];
       };
       notifications: {

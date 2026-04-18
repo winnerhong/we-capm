@@ -34,8 +34,8 @@ async function EventTabBar({ paramsPromise }: { paramsPromise: Promise<{ id: str
         <Link href={`/event/${id}/leaderboard`} className="flex flex-1 flex-col items-center gap-0.5 py-2 text-xs hover:bg-neutral-50">
           <span className="text-lg">🏆</span><span>순위</span>
         </Link>
-        <Link href={`/event/${id}/rewards`} className="flex flex-1 flex-col items-center gap-0.5 py-2 text-xs hover:bg-neutral-50">
-          <span className="text-lg">🎁</span><span>보상</span>
+        <Link href={`/event/${id}/stamps`} className="flex flex-1 flex-col items-center gap-0.5 py-2 text-xs hover:bg-neutral-50">
+          <span className="text-lg">🎫</span><span>스탬프</span>
         </Link>
       </div>
     </nav>
