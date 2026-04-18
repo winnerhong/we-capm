@@ -10,6 +10,21 @@ const PORTALS = [
 
 export function DevNav() {
   const [open, setOpen] = useState(true);
+  const [seeding, setSeeding] = useState(false);
+
+  const handleSeed = async () => {
+    if (!confirm("테스트 데이터를 초기화하고 새로 넣을까요?")) return;
+    setSeeding(true);
+    try {
+      const res = await fetch("/api/dev-seed");
+      const data = await res.json();
+      alert(data.log?.join("\n") ?? "완료!");
+      window.location.reload();
+    } catch {
+      alert("시드 실패");
+    }
+    setSeeding(false);
+  };
 
   if (!open) {
     return (
@@ -21,15 +36,20 @@ export function DevNav() {
   }
 
   return (
-    <div className="sticky top-0 z-[9999] flex items-center gap-2 bg-neutral-900 px-3 py-1.5 text-xs text-white">
+    <div className="sticky top-0 z-[9999] flex items-center gap-2 bg-neutral-900 px-3 py-1.5 text-xs text-white overflow-x-auto">
       <span className="rounded bg-yellow-500 px-1.5 py-0.5 text-[10px] font-bold text-black">DEV</span>
       <div className="h-4 w-px bg-neutral-600" />
       {PORTALS.map((p) => (
         <a key={p.href} href={p.href}
-          className={`rounded px-2.5 py-1 font-semibold text-white transition-colors ${p.color}`}>
+          className={`whitespace-nowrap rounded px-2.5 py-1 font-semibold text-white transition-colors ${p.color}`}>
           {p.label}
         </a>
       ))}
+      <div className="h-4 w-px bg-neutral-600" />
+      <button onClick={handleSeed} disabled={seeding}
+        className="whitespace-nowrap rounded bg-orange-600 px-2.5 py-1 font-semibold hover:bg-orange-700 disabled:opacity-50">
+        {seeding ? "⏳ 시드 중..." : "🌱 테스트 데이터"}
+      </button>
       <button onClick={() => setOpen(false)}
         className="ml-auto rounded px-1.5 py-0.5 hover:bg-white/20 text-neutral-400">✕</button>
     </div>
