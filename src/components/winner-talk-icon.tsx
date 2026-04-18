@@ -17,7 +17,7 @@ export function WinnerTalkLogo({ className = "" }: { className?: string }) {
   return (
     <div className={`flex items-center gap-1.5 ${className}`}>
       <WinnerTalkIcon size={28} />
-      <span className="font-bold text-violet-600">위너톡</span>
+      <span className="font-bold text-violet-600">윙크톡</span>
     </div>
   );
 }

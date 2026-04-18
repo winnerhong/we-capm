@@ -63,15 +63,18 @@ export async function checkAndAwardRewards(
       status: "EARNED",
     });
 
-    const { data: participantRow } = await supabase
-      .from("participants")
-      .select("user_id")
-      .eq("id", participantId)
-      .single();
+    // 보상 이름 가져오기
     const { data: rewardRow } = await supabase
       .from("rewards")
       .select("name")
       .eq("id", reward.id)
+      .single();
+
+    // 알림
+    const { data: participantRow } = await supabase
+      .from("participants")
+      .select("user_id, phone")
+      .eq("id", participantId)
       .single();
     if (participantRow && rewardRow) {
       await notify(
@@ -81,6 +84,34 @@ export async function checkAndAwardRewards(
         "🎁 보상 획득",
         `${rewardRow.name}을(를) 획득했어요!`
       );
+
+      // 윙크톡 전체 단톡방에 축하 메시지
+      const { data: groupRoom } = await supabase
+        .from("chat_rooms")
+        .select("id")
+        .eq("event_id", eventId)
+        .eq("name", "💬 전체 단톡방")
+        .maybeSingle();
+
+      if (groupRoom) {
+        // 참가자 이름 가져오기
+        let displayName = participantRow.phone ?? "참가자";
+        if (participantRow.phone) {
+          const { data: reg } = await supabase
+            .from("event_registrations")
+            .select("name")
+            .eq("phone", participantRow.phone)
+            .maybeSingle();
+          if (reg) displayName = reg.name.replace(/^\[.+?\]\s*/, "");
+        }
+
+        await supabase.from("chat_messages").insert({
+          room_id: groupRoom.id,
+          sender_name: "시스템",
+          type: "SYSTEM",
+          content: `🎉 ${displayName}님이 [${rewardRow.name}] 보상을 획득했습니다!`,
+        });
+      }
     }
   }
 }

@@ -18,7 +18,7 @@ function getClient() {
 
 function buildOtpBody(code: string) {
   return [
-    `[캠프닉] 인증코드는 ${code} 입니다.`,
+    `[윙크] 인증코드는 ${code} 입니다.`,
     "3분 안에 입력해주세요.",
     "",
     `@${APP_DOMAIN} #${code}`,

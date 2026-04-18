@@ -57,7 +57,7 @@ export function NewEventForm({ schools, externalEvents }: { schools: School[]; e
         <div>
           <label className="mb-1 block text-sm font-medium">행사명</label>
           <input name="name" value={name} onChange={(e) => setName(e.target.value)}
-            required placeholder="5월 가족 캠프닉"
+            required placeholder="5월 가족 윙크"
             className="w-full rounded-lg border px-3 py-2 outline-none focus:ring-2 focus:ring-violet-500" />
         </div>
 

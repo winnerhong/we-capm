@@ -179,7 +179,7 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
         </Link>
         <Link href={`/admin/events/${id}/chat`}
           className="flex flex-col items-center gap-1 rounded-xl border bg-white p-3 hover:border-violet-500">
-          <WinnerTalkIcon size={22} /><span className="text-[11px]">위너톡</span>
+          <WinnerTalkIcon size={22} /><span className="text-[11px]">윙크톡</span>
         </Link>
       </div>
 

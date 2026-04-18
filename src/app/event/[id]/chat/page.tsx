@@ -98,7 +98,7 @@ export default async function ChatListPage({ params }: { params: Promise<{ id: s
         <Link href={`/event/${id}`} className="text-lg">←</Link>
         <div className="flex items-center gap-2">
           <WinnerTalkIcon size={24} className="brightness-200" />
-          <span className="font-bold">위너톡</span>
+          <span className="font-bold">윙크톡</span>
         </div>
         <div className="w-6" />
       </header>

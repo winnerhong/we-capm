@@ -88,7 +88,7 @@ export default async function AdminChatPage() {
     <div className="space-y-4">
       <div className="flex items-center gap-2">
         <WinnerTalkIcon size={28} />
-        <h1 className="text-xl font-bold">위너톡</h1>
+        <h1 className="text-xl font-bold">윙크톡</h1>
         <span className="text-sm text-neutral-400">{events.length}개 행사</span>
       </div>
 

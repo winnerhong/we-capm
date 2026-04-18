@@ -57,7 +57,7 @@ export default function DirectJoinPage() {
       <form onSubmit={handleSubmit} className="w-full max-w-sm space-y-6">
         <div className="space-y-2 text-center">
           <div className="text-4xl">🏕️</div>
-          <h1 className="text-2xl font-bold">캠프닉</h1>
+          <h1 className="text-2xl font-bold">윙크</h1>
           <p className="text-sm">휴대폰 번호만 입력하면 바로 입장!</p>
         </div>
 

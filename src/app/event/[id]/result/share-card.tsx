@@ -79,7 +79,7 @@ export function ShareCard({
             <div>보상 획득</div>
           </div>
         </div>
-        <p className="mt-6 text-xs opacity-60">캠프닉 CampNic</p>
+        <p className="mt-6 text-xs opacity-60">윙크 CampNic</p>
       </div>
 
       <button

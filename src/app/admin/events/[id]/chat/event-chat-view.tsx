@@ -164,7 +164,7 @@ export function EventChatView({ eventId, eventName, eventStartAt, eventEndAt, ro
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-1.5">
                 <WinnerTalkIcon size={20} />
-                <span className="font-bold text-sm">위너톡</span>
+                <span className="font-bold text-sm">윙크톡</span>
               </div>
               <button onClick={() => setShowCreateModal(true)}
                 className="rounded-lg bg-violet-600 px-2 py-1 text-xs font-semibold text-white hover:bg-violet-700">

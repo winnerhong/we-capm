@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { DevNav } from "@/components/dev-nav";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -13,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "캠프닉",
+  title: "윙크",
   description: "캠핑 + 피크닉 행사 운영",
   manifest: "/manifest.json",
   other: { "theme-color": "#7c3aed" },
@@ -31,6 +32,7 @@ export default function RootLayout({
       style={{ colorScheme: "light" }}
     >
       <body className="min-h-full flex flex-col bg-white text-neutral-900">
+        {process.env.NODE_ENV === "development" && <DevNav />}
         {children}
         <script
           dangerouslySetInnerHTML={{

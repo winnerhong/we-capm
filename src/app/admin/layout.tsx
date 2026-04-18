@@ -32,12 +32,12 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             {isAdmin ? (
               <>
                 <Link href="/admin" className="flex items-center gap-2 font-bold text-violet-600">
-                  <span className="text-xl">🏕️</span><span>캠프닉</span>
+                  <span className="text-xl">🏕️</span><span>윙크</span>
                 </Link>
                 <nav className="flex items-center gap-1 text-sm">
                   <Link href="/admin/events" className="rounded-lg px-3 py-1.5 hover:bg-neutral-100">📋 행사목록</Link>
                   <Link href="/admin/chat" className="flex items-center gap-1 rounded-lg px-3 py-1.5 hover:bg-neutral-100">
-                    <WinnerTalkIcon size={16} />위너톡
+                    <WinnerTalkIcon size={16} />윙크톡
                   </Link>
                   <Link href="/admin/stats" className="rounded-lg px-3 py-1.5 hover:bg-neutral-100">📊 전체통계</Link>
                 </nav>
