@@ -1,9 +1,53 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* 토리로 브랜드 컬러 팔레트 */
+  --color-forest: #2D5A3D;
+  --color-forest-light: #3A7A52;
+  --color-moss: #4A7C59;
+  --color-bark: #8B6F47;
+  --color-acorn: #C4956A;
+  --color-cream: #FFF8F0;
+  --color-warm-white: #FEFCF8;
+  --color-leaf: #A8C686;
+  --color-leaf-light: #D4E4BC;
+  --color-sky: #E8F0E4;
+  --color-charcoal: #2C2C2C;
+  --color-warm-gray: #6B6560;
+
+  --background: #FFF8F0;
+  --foreground: #2C2C2C;
   color-scheme: light only;
+}
+
+/* Tailwind v4: violet → forest green으로 오버라이드 */
+@theme {
+  --color-violet-50: #E8F0E4;
+  --color-violet-100: #D4E4BC;
+  --color-violet-200: #A8C686;
+  --color-violet-300: #8FBF6D;
+  --color-violet-400: #5B9973;
+  --color-violet-500: #3A7A52;
+  --color-violet-600: #2D5A3D;
+  --color-violet-700: #1F4229;
+  --color-violet-800: #163019;
+  --color-violet-900: #0F2115;
+  --color-violet-950: #081610;
+
+  /* purple도 forest 계열로 (그라데이션용) */
+  --color-purple-500: #4A7C59;
+  --color-purple-600: #3A7A52;
+  --color-purple-700: #2D5A3D;
+
+  /* 토리로 커스텀 컬러 */
+  --color-toriro-forest: #2D5A3D;
+  --color-toriro-moss: #4A7C59;
+  --color-toriro-acorn: #C4956A;
+  --color-toriro-bark: #8B6F47;
+  --color-toriro-leaf: #A8C686;
+  --color-toriro-leaf-light: #D4E4BC;
+  --color-toriro-cream: #FFF8F0;
+  --color-toriro-sky: #E8F0E4;
 }
 
 @theme inline {
@@ -20,30 +64,59 @@ html {
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #ffffff;
-    --foreground: #171717;
+    --background: #FFF8F0;
+    --foreground: #2C2C2C;
     color-scheme: light only;
   }
   body {
-    background: #ffffff !important;
-    color: #171717 !important;
+    background: #FFF8F0 !important;
+    color: #2C2C2C !important;
   }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: "Noto Sans KR", "Apple SD Gothic Neo", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: "Pretendard", "Noto Sans KR", "Apple SD Gothic Neo", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-feature-settings: "ss01", "ss02";
 }
 
+/* 토리로 기본 배경 — 따뜻한 크림톤 */
+.bg-neutral-50 {
+  background-color: #FFF8F0 !important;
+}
+
+/* 페이지 기본 스타일 */
 input,
 textarea,
 select {
   color: var(--foreground);
-  background-color: #ffffff;
+  background-color: #FEFCF8;
+  border-color: #D4E4BC;
 }
 
 input::placeholder,
 textarea::placeholder {
-  color: #9ca3af;
+  color: #A8A49F;
 }
+
+/* 부드러운 그림자 */
+.shadow-md, .shadow-lg, .shadow-sm {
+  box-shadow: 0 2px 12px rgba(45, 90, 61, 0.08) !important;
+}
+
+/* 카드에 자연스러운 테두리 */
+.rounded-2xl, .rounded-xl {
+  border-color: rgba(212, 228, 188, 0.6);
+}
+
+/* 토리로 브랜드 클래스 */
+.bg-forest { background-color: #2D5A3D; }
+.bg-cream { background-color: #FFF8F0; }
+.bg-sky-forest { background-color: #E8F0E4; }
+.bg-leaf-light { background-color: #D4E4BC; }
+.text-forest { color: #2D5A3D; }
+.text-acorn { color: #C4956A; }
+.text-bark { color: #8B6F47; }
+.text-warm-gray { color: #6B6560; }
+.border-leaf { border-color: #D4E4BC; }

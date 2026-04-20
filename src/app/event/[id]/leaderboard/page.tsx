@@ -57,33 +57,34 @@ export default async function LeaderboardPage({
   const session = await getParticipant(id); const myParticipant = participants?.find((p) => p.phone === session?.phone);
 
   return (
-    <main className="min-h-dvh bg-neutral-50 p-4">
+    <main className="min-h-dvh bg-neutral-50 pb-24">
       <RealtimeRefresh table="participants" />
-      <div className="mx-auto max-w-lg space-y-4">
-        <header className="flex items-center justify-between">
-          <Link href={`/event/${id}`} className="text-sm text-neutral-500 hover:underline">
-            ← {event.name}
-          </Link>
-          <h1 className="text-xl font-bold">순위</h1>
-        </header>
+      <div className="bg-gradient-to-br from-[#2D5A3D] via-[#3A7A52] to-[#4A7C59] px-4 pt-4 pb-6 text-white shadow-lg">
+        <Link href={`/event/${id}`} className="text-xs opacity-80 hover:underline">
+          ← {event.name}
+        </Link>
+        <h1 className="mt-1 text-xl font-bold">🏞️ 함께 걷는 숲</h1>
+        <p className="mt-1 text-xs opacity-90">숲에서 만난 친구들의 도토리 🌰</p>
+      </div>
 
+      <div className="mx-auto max-w-lg space-y-4 px-4 pt-4">
         {event.participation_type === "BOTH" && (
-          <div className="flex gap-1 rounded-lg bg-neutral-200 p-1 text-sm">
+          <div className="flex gap-1 rounded-xl bg-[#E8F0E4] p-1 text-sm">
             <Link
               href={`/event/${id}/leaderboard?tab=individual`}
-              className={`flex-1 rounded-md py-2 text-center ${
-                activeTab === "individual" ? "bg-white font-semibold" : "text-neutral-600"
+              className={`flex-1 rounded-lg py-2 text-center ${
+                activeTab === "individual" ? "bg-white font-semibold text-[#2D5A3D] shadow-sm" : "text-[#6B6560]"
               }`}
             >
-              개인
+              🐿️ 개인
             </Link>
             <Link
               href={`/event/${id}/leaderboard?tab=team`}
-              className={`flex-1 rounded-md py-2 text-center ${
-                activeTab === "team" ? "bg-white font-semibold" : "text-neutral-600"
+              className={`flex-1 rounded-lg py-2 text-center ${
+                activeTab === "team" ? "bg-white font-semibold text-[#2D5A3D] shadow-sm" : "text-[#6B6560]"
               }`}
             >
-              팀
+              🌲 팀
             </Link>
           </div>
         )}
@@ -97,22 +98,22 @@ export default async function LeaderboardPage({
               return (
                 <li
                   key={p.id}
-                  className={`flex items-center justify-between rounded-lg border bg-white p-4 ${
-                    isMe ? "border-violet-500 bg-violet-50" : ""
+                  className={`flex items-center justify-between rounded-2xl border bg-white p-4 ${
+                    isMe ? "border-violet-500 bg-[#E8F0E4]" : ""
                   }`}
                 >
                   <div className="flex items-center gap-3">
                     <span className="w-8 text-center text-lg">{medal ?? `${idx + 1}`}</span>
                     <span className="font-medium">{profile?.name ?? "?"}</span>
-                    {isMe && <span className="text-xs text-violet-600">(나)</span>}
+                    {isMe && <span className="text-xs font-semibold text-violet-600">(나)</span>}
                   </div>
-                  <span className="font-bold">{p.total_score}점</span>
+                  <span className="font-bold text-[#2D5A3D]">🌰 {p.total_score}</span>
                 </li>
               );
             })}
             {(!participants || participants.length === 0) && (
-              <div className="rounded-lg border bg-white p-12 text-center text-sm text-neutral-500">
-                참가자가 없습니다
+              <div className="rounded-2xl border bg-white p-12 text-center text-sm text-[#6B6560]">
+                아직 함께 걷는 친구가 없어요 🌱
               </div>
             )}
           </ul>
@@ -124,22 +125,22 @@ export default async function LeaderboardPage({
               return (
                 <li
                   key={t.id}
-                  className={`flex items-center justify-between rounded-lg border bg-white p-4 ${
-                    isMyTeam ? "border-violet-500 bg-violet-50" : ""
+                  className={`flex items-center justify-between rounded-2xl border bg-white p-4 ${
+                    isMyTeam ? "border-violet-500 bg-[#E8F0E4]" : ""
                   }`}
                 >
                   <div className="flex items-center gap-3">
                     <span className="w-8 text-center text-lg">{medal ?? `${idx + 1}`}</span>
                     <span className="font-medium">{t.name}</span>
-                    {isMyTeam && <span className="text-xs text-violet-600">(우리팀)</span>}
+                    {isMyTeam && <span className="text-xs font-semibold text-violet-600">(우리 숲)</span>}
                   </div>
-                  <span className="font-bold">{t.total_score}점</span>
+                  <span className="font-bold text-[#2D5A3D]">🌰 {t.total_score}</span>
                 </li>
               );
             })}
             {(!teams || teams.length === 0) && (
-              <div className="rounded-lg border bg-white p-12 text-center text-sm text-neutral-500">
-                팀이 없습니다
+              <div className="rounded-2xl border bg-white p-12 text-center text-sm text-[#6B6560]">
+                아직 이루어진 숲이 없어요 🌲
               </div>
             )}
           </ul>

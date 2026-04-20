@@ -83,7 +83,7 @@ export default function NewMissionPage({ params }: { params: Promise<{ id: strin
 
         {template === "QUIZ" && (
           <>
-            <Field label="질문" name="quiz_question" required placeholder="윙크의 첫 글자는?" />
+            <Field label="질문" name="quiz_question" required placeholder="토리로의 첫 글자는?" />
             <Field label="정답" name="quiz_answer" required placeholder="캠" />
             <div>
               <label className="mb-1 block text-sm font-medium">유형</label>

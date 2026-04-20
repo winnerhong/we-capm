@@ -5,7 +5,16 @@ import { NextRequest, NextResponse } from "next/server";
 const EVENT_ID = "aca98cdb-e727-4feb-a537-3b48375a5438";
 const TEST_PHONE = "010-1111-0001";
 
-// DEV 전용 - 프로덕션에서는 동작 안함
+function htmlRedirect(url: string, message: string) {
+  return new NextResponse(
+    `<html><head><meta http-equiv="refresh" content="0;url=${url}"></head>
+     <body style="font-family:sans-serif;text-align:center;padding:40px">
+       <p>${message}</p><p><a href="${url}">이동 중...</a></p>
+     </body></html>`,
+    { headers: { "Content-Type": "text/html; charset=utf-8" } }
+  );
+}
+
 export async function GET(request: NextRequest) {
   if (process.env.NODE_ENV === "production") {
     return NextResponse.json({ error: "Not available" }, { status: 403 });
@@ -30,21 +39,20 @@ export async function GET(request: NextRequest) {
     cookieStore.set("campnic_admin", JSON.stringify({
       id: "admin", role: "ADMIN", loginAt: new Date().toISOString(),
     }), cookieOpts);
-    return NextResponse.redirect(new URL("/admin", request.url));
+    return htmlRedirect("/admin", "👨‍💼 관리자로 로그인 중...");
   }
 
   if (role === "manager") {
     cookieStore.set("campnic_manager", JSON.stringify({
       eventId: EVENT_ID,
-      eventName: "테스트 윙크",
+      eventName: "테스트 토리로",
       managerId: "테스트기관",
       loginAt: new Date().toISOString(),
     }), cookieOpts);
-    return NextResponse.redirect(new URL(`/manager/${EVENT_ID}`, request.url));
+    return htmlRedirect(`/manager/${EVENT_ID}`, "🏢 기관으로 로그인 중...");
   }
 
   if (role === "participant") {
-    // DB에서 실제 참가자 ID 가져오기
     const supabase = await createClient();
     const { data: participant } = await supabase
       .from("participants")
@@ -68,7 +76,7 @@ export async function GET(request: NextRequest) {
       name,
       participantId: participant?.id ?? "dev-test",
     }), cookieOpts);
-    return NextResponse.redirect(new URL(`/event/${EVENT_ID}`, request.url));
+    return htmlRedirect(`/event/${EVENT_ID}`, "👨‍👩‍👧 이용자로 로그인 중...");
   }
 
   return NextResponse.json({ error: "role required: admin | manager | participant" }, { status: 400 });

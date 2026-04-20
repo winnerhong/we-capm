@@ -55,10 +55,11 @@ export default function DirectJoinPage() {
   return (
     <main className="flex min-h-dvh items-center justify-center p-6">
       <form onSubmit={handleSubmit} className="w-full max-w-sm space-y-6">
-        <div className="space-y-2 text-center">
-          <div className="text-4xl">🏕️</div>
-          <h1 className="text-2xl font-bold">윙크</h1>
-          <p className="text-sm">휴대폰 번호만 입력하면 바로 입장!</p>
+        <div className="space-y-3 text-center">
+          <div className="text-5xl">🌰</div>
+          <h1 className="text-3xl font-extrabold text-forest tracking-tight">토리로</h1>
+          <p className="text-xs text-acorn tracking-[0.4em] font-light">TORIRO</p>
+          <p className="text-sm text-warm-gray mt-4">오늘, 어디로 걸어볼까요?</p>
         </div>
 
         <input

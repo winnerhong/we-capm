@@ -51,32 +51,32 @@ export default async function MissionSubmitPage({
     existing.status === "EXPIRED";
 
   return (
-    <main className="min-h-dvh bg-neutral-50 p-4">
-      <div className="mx-auto max-w-lg space-y-4">
-        <div>
+    <main className="min-h-dvh bg-neutral-50 pb-24">
+      <div className="mx-auto max-w-lg space-y-4 px-4 pt-4">
+        <div className="rounded-2xl bg-gradient-to-br from-[#2D5A3D] via-[#3A7A52] to-[#4A7C59] p-5 text-white shadow-lg">
           <Link
             href={`/event/${eventId}/missions`}
-            className="text-sm text-neutral-500 hover:underline"
+            className="text-xs opacity-80 hover:underline"
           >
-            ← 미션 목록
+            ← 숲길 목록
           </Link>
-          <h1 className="mt-1 text-2xl font-bold">{mission.title}</h1>
-          <p className="mt-1 text-sm text-neutral-600">{mission.description}</p>
-          <p className="mt-2 text-sm font-semibold text-violet-600">{mission.points}점</p>
+          <h1 className="mt-2 text-2xl font-bold">🌿 {mission.title}</h1>
+          <p className="mt-1 text-sm opacity-90">{mission.description}</p>
+          <p className="mt-3 inline-block rounded-full bg-white/20 px-3 py-1 text-xs font-semibold">🌰 도토리 {mission.points}개</p>
         </div>
 
         {existing && existing.status === "REJECTED" && existing.reject_reason && (
-          <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700">
-            😢 반려됨: {existing.reject_reason}
+          <div className="rounded-xl bg-red-50 p-3 text-sm text-red-700">
+            🍂 다시 도전: {existing.reject_reason}
           </div>
         )}
 
         {!canSubmit ? (
-          <div className="rounded-lg border bg-white p-6 text-center">
-            <p className="text-sm text-neutral-600">
-              {existing?.status === "PENDING" && "⏳ 승인 대기 중"}
+          <div className="rounded-2xl border bg-white p-6 text-center">
+            <p className="text-sm text-[#6B6560]">
+              {existing?.status === "PENDING" && "🌰 지기가 확인 중이에요"}
               {(existing?.status === "APPROVED" || existing?.status === "AUTO_APPROVED") &&
-                "✅ 이미 완료한 미션입니다"}
+                "🐾 이미 걸어온 숲길이에요"}
             </p>
           </div>
         ) : mission.template_type === "QUIZ" ? (
@@ -104,8 +104,8 @@ export default async function MissionSubmitPage({
             timeLimitSec={(mission.config as { timeLimitSec?: number }).timeLimitSec ?? 60}
           />
         ) : (
-          <div className="rounded-lg border bg-white p-6 text-center text-sm text-neutral-500">
-            이 미션 유형은 아직 지원되지 않습니다
+          <div className="rounded-2xl border bg-white p-6 text-center text-sm text-[#6B6560]">
+            이 숲길은 아직 준비 중이에요 🌱
           </div>
         )}
       </div>

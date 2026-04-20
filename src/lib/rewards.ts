@@ -85,7 +85,7 @@ export async function checkAndAwardRewards(
         `${rewardRow.name}을(를) 획득했어요!`
       );
 
-      // 윙크톡 전체 단톡방에 축하 메시지
+      // 토리톡 전체 단톡방에 축하 메시지
       const { data: groupRoom } = await supabase
         .from("chat_rooms")
         .select("id")

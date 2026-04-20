@@ -31,9 +31,9 @@ export function StampQRModal({ participantId, eventId, participantName, stampCou
     <>
       <button
         onClick={() => { setShowQR(true); setTimestamp(Date.now()); }}
-        className="w-full rounded-2xl bg-violet-600 py-4 text-center font-bold text-white shadow-lg shadow-violet-200 hover:bg-violet-700 active:scale-[0.98] transition-all"
+        className="w-full rounded-2xl bg-violet-600 py-4 text-center font-bold text-white shadow-lg shadow-[#2D5A3D]/20 hover:bg-violet-700 active:scale-[0.98] transition-all"
       >
-        📱 도장 요청하기
+        🌰 도토리 받기
       </button>
 
       {showQR && (
@@ -46,11 +46,11 @@ export function StampQRModal({ participantId, eventId, participantName, stampCou
             onClick={(e) => e.stopPropagation()}
           >
             {/* Participant info */}
-            <div className="rounded-2xl bg-gradient-to-r from-violet-50 to-purple-50 p-4 mb-4">
-              <div className="text-sm text-violet-600 font-medium">{currentTier}</div>
-              <h3 className="text-xl font-bold text-violet-800">{participantName}</h3>
-              <div className="mt-1 text-sm text-violet-500">
-                도장 <span className="font-bold text-violet-700">{stampCount}</span>개 수집
+            <div className="rounded-2xl bg-gradient-to-r from-[#E8F0E4] to-[#D4E4BC] p-4 mb-4">
+              <div className="text-sm text-[#4A7C59] font-medium">{currentTier}</div>
+              <h3 className="text-xl font-bold text-[#2D5A3D]">🐿️ {participantName}</h3>
+              <div className="mt-1 text-sm text-[#4A7C59]">
+                도토리 <span className="font-bold text-[#2D5A3D]">{stampCount}</span>개 모음 🌰
               </div>
             </div>
 
@@ -59,17 +59,17 @@ export function StampQRModal({ participantId, eventId, participantName, stampCou
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={qrImageUrl}
-                alt="스탬프 QR 코드"
-                className="mx-auto h-52 w-52 rounded-2xl border-4 border-violet-100"
+                alt="도토리 QR 코드"
+                className="mx-auto h-52 w-52 rounded-2xl border-4 border-[#D4E4BC]"
               />
             </div>
 
-            <p className="text-xs text-neutral-500 mb-1">스태프에게 이 화면을 보여주세요</p>
-            <p className="text-[10px] text-neutral-300">30초마다 자동 갱신됩니다</p>
+            <p className="text-xs text-[#6B6560] mb-1">숲지기에게 이 화면을 보여주세요 🌲</p>
+            <p className="text-[10px] text-[#A8A49F]">30초마다 자동으로 바뀌어요</p>
 
             <button
               onClick={() => setShowQR(false)}
-              className="mt-5 w-full rounded-xl border-2 border-neutral-200 py-3 text-sm font-semibold text-neutral-600 hover:bg-neutral-50 transition-colors"
+              className="mt-5 w-full rounded-xl border-2 border-[#D4E4BC] py-3 text-sm font-semibold text-[#6B6560] hover:bg-[#E8F0E4] transition-colors"
             >
               닫기
             </button>

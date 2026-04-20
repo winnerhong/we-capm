@@ -21,11 +21,12 @@ export default async function ResultPage({ params }: { params: Promise<{ id: str
 
   if (event.status !== "ENDED" && event.status !== "CONFIRMED") {
     return (
-      <main className="flex min-h-dvh items-center justify-center p-6">
+      <main className="flex min-h-dvh items-center justify-center bg-neutral-50 p-6">
         <div className="space-y-2 text-center">
-          <p className="text-sm">행사가 아직 진행 중입니다</p>
+          <div className="text-4xl">🌱</div>
+          <p className="text-sm text-[#2C2C2C]">아직 숲길을 걷는 중이에요</p>
           <Link href={`/event/${id}`} className="text-sm text-violet-600 hover:underline">
-            행사 홈으로
+            행사 홈으로 돌아가기
           </Link>
         </div>
       </main>
@@ -81,9 +82,9 @@ export default async function ResultPage({ params }: { params: Promise<{ id: str
   const photoPaths = (photos ?? []).flatMap((s) => s.photo_urls).slice(0, 6);
 
   return (
-    <main className="min-h-dvh bg-neutral-50 p-4">
+    <main className="min-h-dvh bg-neutral-50 p-4 pb-24">
       <div className="mx-auto max-w-lg space-y-5">
-        <Link href={`/event/${id}`} className="text-sm hover:underline">
+        <Link href={`/event/${id}`} className="text-sm text-[#6B6560] hover:underline">
           ← {event.name}
         </Link>
 
@@ -99,10 +100,10 @@ export default async function ResultPage({ params }: { params: Promise<{ id: str
 
         {rewards && rewards.length > 0 && (
           <section>
-            <h2 className="mb-2 text-sm font-semibold">🎁 획득한 보상</h2>
-            <ul className="space-y-1 rounded-lg border bg-white p-4 text-sm">
+            <h2 className="mb-2 text-sm font-semibold text-[#2D5A3D]">🎁 받은 선물</h2>
+            <ul className="space-y-1 rounded-2xl border bg-white p-4 text-sm">
               {rewards.map((r) => (
-                <li key={r.id}>• {r.name}</li>
+                <li key={r.id}>🌿 {r.name}</li>
               ))}
             </ul>
           </section>
@@ -110,7 +111,7 @@ export default async function ResultPage({ params }: { params: Promise<{ id: str
 
         {photoPaths.length > 0 && (
           <section>
-            <h2 className="mb-2 text-sm font-semibold">📸 추억 모아보기</h2>
+            <h2 className="mb-2 text-sm font-semibold text-[#2D5A3D]">🏞️ 숲에서 만난 시간</h2>
             <div className="grid grid-cols-3 gap-2">
               {photoPaths.map((path) => (
                 <PhotoThumb key={path} path={path} />

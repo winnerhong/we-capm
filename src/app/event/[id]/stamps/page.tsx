@@ -76,9 +76,9 @@ export default async function EventStampsPage({ params }: { params: Promise<{ id
       <main className="min-h-dvh bg-neutral-50 p-4 pb-24">
         <div className="mx-auto max-w-lg">
           <div className="rounded-2xl border bg-white p-12 text-center">
-            <div className="text-5xl mb-4">🎫</div>
-            <h2 className="text-lg font-bold text-neutral-700">아직 스탬프 보드가 없습니다</h2>
-            <p className="mt-2 text-sm text-neutral-500">행사 관리자가 스탬프 랠리를 준비 중이에요</p>
+            <div className="text-5xl mb-4">🌱</div>
+            <h2 className="text-lg font-bold text-[#2D5A3D]">곧 새로운 길이 열려요</h2>
+            <p className="mt-2 text-sm text-[#6B6560]">숲지기가 스탬프 길을 준비하고 있어요</p>
           </div>
         </div>
       </main>
@@ -133,9 +133,9 @@ export default async function EventStampsPage({ params }: { params: Promise<{ id
       <RealtimeRefresh table="stamp_slots" />
 
       {/* Header */}
-      <div className="bg-gradient-to-br from-violet-600 via-purple-600 to-violet-700 px-4 pt-4 pb-6 text-white">
-        <h1 className="text-xl font-bold">🎫 {board.name}</h1>
-        {board.description && <p className="mt-1 text-sm opacity-80">{board.description}</p>}
+      <div className="bg-gradient-to-br from-[#2D5A3D] via-[#3A7A52] to-[#4A7C59] px-4 pt-4 pb-6 text-white shadow-lg">
+        <h1 className="text-xl font-bold">🏞️ {board.name}</h1>
+        {board.description && <p className="mt-1 text-sm opacity-90">{board.description}</p>}
 
         <div className="mt-4 flex items-center gap-3">
           {/* Current tier badge */}
@@ -145,26 +145,26 @@ export default async function EventStampsPage({ params }: { params: Promise<{ id
           <div className="flex-1">
             <div className="flex items-center gap-2">
               <span className="text-lg font-bold">
-                {currentTier ? currentTier.label : "도전 시작!"}
+                {currentTier ? currentTier.label : "오늘, 어디로 걸어볼까요?"}
               </span>
               <span className="rounded-full bg-white/20 px-2 py-0.5 text-xs">
-                {stampCount}/{totalSlots}
+                🌰 {stampCount}/{totalSlots}
               </span>
             </div>
             {/* Progress bar */}
             <div className="mt-2 h-3 overflow-hidden rounded-full bg-white/20">
               <div
-                className="h-full rounded-full bg-yellow-400 transition-all duration-700"
+                className="h-full rounded-full bg-[#C4956A] transition-all duration-700"
                 style={{ width: `${progress}%` }}
               />
             </div>
             {nextTier && (
-              <p className="mt-1 text-xs opacity-80">
-                다음 등급 {nextTier.emoji}{nextTier.label}까지 {nextTier.remaining}개 남음
+              <p className="mt-1 text-xs opacity-90">
+                다음 단계 {nextTier.emoji}{nextTier.label}까지 도토리 {nextTier.remaining}개
               </p>
             )}
             {!nextTier && stampCount > 0 && (
-              <p className="mt-1 text-xs opacity-80">모든 등급을 달성했어요!</p>
+              <p className="mt-1 text-xs opacity-90">숲 전체를 걸었어요! 🏞️</p>
             )}
           </div>
         </div>
@@ -179,18 +179,18 @@ export default async function EventStampsPage({ params }: { params: Promise<{ id
             return (
               <div
                 key={t.key}
-                className={`flex-1 rounded-xl border-2 p-3 text-center transition-all ${
+                className={`flex-1 rounded-2xl border-2 p-3 text-center transition-all ${
                   achieved
-                    ? "border-violet-400 bg-violet-50"
-                    : "border-neutral-200 bg-white opacity-60"
+                    ? "border-[#A8C686] bg-[#D4E4BC]"
+                    : "border-[#D4E4BC] bg-white opacity-60"
                 }`}
               >
                 <div className="text-2xl">{t.emoji}</div>
-                <div className={`text-xs font-bold mt-1 ${achieved ? "text-violet-700" : "text-neutral-400"}`}>
+                <div className={`text-xs font-bold mt-1 ${achieved ? "text-[#2D5A3D]" : "text-[#6B6560]"}`}>
                   {t.label}
                 </div>
-                <div className={`text-[10px] mt-0.5 ${achieved ? "text-violet-500" : "text-neutral-400"}`}>
-                  {achieved ? "달성!" : `${t.goal_count}개`}
+                <div className={`text-[10px] mt-0.5 ${achieved ? "text-[#4A7C59]" : "text-[#6B6560]"}`}>
+                  {achieved ? "도달!" : `🌰 ${t.goal_count}개`}
                 </div>
               </div>
             );
@@ -199,7 +199,7 @@ export default async function EventStampsPage({ params }: { params: Promise<{ id
 
         {/* Stamp grid */}
         <section>
-          <h2 className="mb-2 text-sm font-bold text-neutral-700">스탬프 현황</h2>
+          <h2 className="mb-2 text-sm font-bold text-[#2D5A3D]">🐾 걸어온 길</h2>
           <div className="grid grid-cols-2 gap-3">
             {(slots ?? []).map((slot) => {
               const stamped = stampedSlotIds.has(slot.id);
@@ -209,33 +209,33 @@ export default async function EventStampsPage({ params }: { params: Promise<{ id
                   key={slot.id}
                   className={`relative rounded-2xl border-2 p-4 transition-all ${
                     stamped
-                      ? "border-green-300 bg-green-50"
-                      : "border-neutral-200 bg-white"
+                      ? "border-[#A8C686] bg-[#D4E4BC]"
+                      : "border-[#D4E4BC] bg-[#FEFCF8]"
                   }`}
                 >
                   <div className="flex items-start justify-between">
-                    <div className="text-2xl">{slot.icon || "📍"}</div>
+                    <div className="text-2xl">{slot.icon || "🏞️"}</div>
                     <div className="flex items-center gap-1">
                       {!stamped && (
                         <span className="text-xs" title={CONGESTION_LABEL[congestion]}>
                           {CONGESTION_ICON[congestion]}
                         </span>
                       )}
-                      <span className={`text-lg ${stamped ? "text-green-500" : "text-neutral-300"}`}>
-                        {stamped ? "\u2705" : "\u25CB"}
+                      <span className={`text-lg ${stamped ? "text-[#2D5A3D]" : "text-[#A8A49F]"}`}>
+                        {stamped ? "🌰" : "\u25CB"}
                       </span>
                     </div>
                   </div>
                   <div className="mt-2">
-                    <div className={`font-semibold text-sm ${stamped ? "text-green-700" : "text-neutral-800"}`}>
+                    <div className={`font-semibold text-sm ${stamped ? "text-[#2D5A3D]" : "text-[#2C2C2C]"}`}>
                       {slot.name}
                     </div>
                     {slot.location_hint && (
-                      <p className="text-[11px] text-neutral-400 mt-0.5">{slot.location_hint}</p>
+                      <p className="text-[11px] text-[#6B6560] mt-0.5">{slot.location_hint}</p>
                     )}
                   </div>
                   {stamped && (
-                    <div className="absolute top-2 right-2 rounded-full bg-green-500 px-1.5 py-0.5 text-[9px] font-bold text-white">
+                    <div className="absolute top-2 right-2 rounded-full bg-[#2D5A3D] px-1.5 py-0.5 text-[9px] font-bold text-white">
                       완료
                     </div>
                   )}
@@ -248,20 +248,20 @@ export default async function EventStampsPage({ params }: { params: Promise<{ id
         {/* Recommended route */}
         {unstampedSlots.length > 0 && (
           <section>
-            <h2 className="mb-2 text-sm font-bold text-neutral-700">추천 코스</h2>
+            <h2 className="mb-2 text-sm font-bold text-[#2D5A3D]">🍃 추천 숲길</h2>
             <div className="rounded-2xl border bg-white p-4">
-              <p className="text-xs text-neutral-500 mb-3">혼잡도가 낮은 순서로 추천해드려요</p>
+              <p className="text-xs text-[#6B6560] mb-3">혼잡하지 않은 길부터 안내해드려요</p>
               <div className="space-y-2">
                 {unstampedSlots.slice(0, 4).map((slot, i) => {
                   const congestion = slot.congestion_status ?? "GREEN";
                   return (
-                    <div key={slot.id} className="flex items-center gap-3 rounded-lg bg-neutral-50 p-2.5">
-                      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-violet-100 text-xs font-bold text-violet-700">
+                    <div key={slot.id} className="flex items-center gap-3 rounded-xl bg-[#E8F0E4] p-2.5">
+                      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#2D5A3D] text-xs font-bold text-white">
                         {i + 1}
                       </span>
-                      <span className="text-sm">{slot.icon || "📍"}</span>
+                      <span className="text-sm">{slot.icon || "🏞️"}</span>
                       <span className="flex-1 text-sm font-medium">{slot.name}</span>
-                      <span className="flex items-center gap-1 text-xs text-neutral-500">
+                      <span className="flex items-center gap-1 text-xs text-[#6B6560]">
                         {CONGESTION_ICON[congestion]} {CONGESTION_LABEL[congestion]}
                       </span>
                     </div>
@@ -274,10 +274,10 @@ export default async function EventStampsPage({ params }: { params: Promise<{ id
 
         {/* All stamps collected */}
         {stampCount === totalSlots && totalSlots > 0 && (
-          <div className="rounded-2xl border-2 border-yellow-300 bg-gradient-to-r from-yellow-50 to-orange-50 p-6 text-center">
-            <div className="text-4xl mb-2">🎉</div>
-            <h3 className="text-lg font-bold text-yellow-800">모든 도장을 모았어요!</h3>
-            <p className="mt-1 text-sm text-yellow-700">스탬프 랠리를 완주했습니다</p>
+          <div className="rounded-2xl border-2 border-[#C4956A] bg-gradient-to-r from-[#FFF2D6] to-[#F5D9B5] p-6 text-center">
+            <div className="text-4xl mb-2">🏞️</div>
+            <h3 className="text-lg font-bold text-[#8B6F47]">숲 전체를 걸었어요!</h3>
+            <p className="mt-1 text-sm text-[#8B6F47]">모든 도토리를 모은 당신, 진짜 숲지킴이 🌳</p>
           </div>
         )}
       </div>

@@ -7,10 +7,10 @@ import { ClaimQRButton } from "./claim-qr";
 export const dynamic = "force-dynamic";
 
 const TYPE_ICON: Record<string, string> = {
-  POINT: "🏅", RANK: "🏆", BADGE: "🎖️", LOTTERY: "🎰", INSTANT: "⚡",
+  POINT: "🌰", RANK: "🏆", BADGE: "🎖️", LOTTERY: "🎰", INSTANT: "🍃",
 };
 const TYPE_LABEL: Record<string, string> = {
-  POINT: "점수 달성", RANK: "순위 보상", BADGE: "뱃지", LOTTERY: "추첨 당첨", INSTANT: "즉시 보상",
+  POINT: "도토리 모으기", RANK: "숲의 영광", BADGE: "기념 뱃지", LOTTERY: "추첨 당첨", INSTANT: "즉시 선물",
 };
 
 export default async function EventRewardsPage({ params }: { params: Promise<{ id: string }> }) {
@@ -63,20 +63,21 @@ export default async function EventRewardsPage({ params }: { params: Promise<{ i
       <RealtimeRefresh table="reward_claims" />
 
       {/* 헤더 */}
-      <div className="bg-gradient-to-r from-violet-600 to-purple-700 px-4 pt-4 pb-6 text-white">
-        <h1 className="text-xl font-bold">🎁 보상함</h1>
+      <div className="bg-gradient-to-br from-[#2D5A3D] via-[#3A7A52] to-[#4A7C59] px-4 pt-4 pb-6 text-white shadow-lg">
+        <h1 className="text-xl font-bold">🎁 숲의 선물함</h1>
+        <p className="mt-1 text-xs opacity-90">도토리를 모아 특별한 선물을 만나보세요</p>
         <div className="mt-3 flex gap-3">
           <div className="flex-1 rounded-xl bg-white/20 p-3 text-center">
-            <div className="text-2xl font-bold">{myScore}</div>
-            <div className="text-[11px] opacity-80">내 점수</div>
+            <div className="text-2xl font-bold">{myScore}<span className="ml-0.5 text-xs">🌰</span></div>
+            <div className="text-[11px] opacity-80">내 도토리</div>
           </div>
           <div className="flex-1 rounded-xl bg-white/20 p-3 text-center">
             <div className="text-2xl font-bold">{earnedClaims.length}</div>
-            <div className="text-[11px] opacity-80">수령 대기</div>
+            <div className="text-[11px] opacity-80">받을 선물</div>
           </div>
           <div className="flex-1 rounded-xl bg-white/20 p-3 text-center">
             <div className="text-2xl font-bold">{claimedClaims.length}</div>
-            <div className="text-[11px] opacity-80">수령 완료</div>
+            <div className="text-[11px] opacity-80">받은 선물</div>
           </div>
         </div>
       </div>
@@ -86,20 +87,20 @@ export default async function EventRewardsPage({ params }: { params: Promise<{ i
         {/* 수령 대기 보상 (강조) */}
         {earnedClaims.length > 0 && (
           <section>
-            <h2 className="mb-2 text-sm font-bold text-green-700">🔔 수령 대기 중</h2>
+            <h2 className="mb-2 text-sm font-bold text-[#2D5A3D]">🔔 받을 준비가 된 선물</h2>
             <div className="space-y-2">
               {earnedClaims.map((c) => {
                 const reward = rewardMap.get(c.reward_id);
                 if (!reward) return null;
                 return (
-                  <div key={c.id} className="rounded-2xl border-2 border-green-300 bg-green-50 p-4 animate-pulse-slow">
+                  <div key={c.id} className="rounded-2xl border-2 border-[#A8C686] bg-[#D4E4BC] p-4 animate-pulse-slow">
                     <div className="flex items-center gap-3">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-green-200 text-2xl">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-2xl">
                         {TYPE_ICON[reward.reward_type] ?? "🎁"}
                       </div>
                       <div className="flex-1">
-                        <div className="font-bold">{reward.name}</div>
-                        {reward.description && <p className="text-xs text-neutral-600">{reward.description}</p>}
+                        <div className="font-bold text-[#2D5A3D]">{reward.name}</div>
+                        {reward.description && <p className="text-xs text-[#6B6560]">{reward.description}</p>}
                         <ClaimQRButton claimId={c.id} rewardName={reward.name} />
                       </div>
                     </div>
@@ -113,23 +114,23 @@ export default async function EventRewardsPage({ params }: { params: Promise<{ i
         {/* 수령 완료 보상 */}
         {claimedClaims.length > 0 && (
           <section>
-            <h2 className="mb-2 text-sm font-bold">✅ 수령 완료</h2>
+            <h2 className="mb-2 text-sm font-bold text-[#2D5A3D]">🐾 받은 선물</h2>
             <div className="space-y-2">
               {claimedClaims.map((c) => {
                 const reward = rewardMap.get(c.reward_id);
                 if (!reward) return null;
                 return (
                   <div key={c.id} className="flex items-center gap-3 rounded-2xl border bg-white p-4 opacity-70">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-neutral-100 text-xl">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#E8F0E4] text-xl">
                       {TYPE_ICON[reward.reward_type] ?? "🎁"}
                     </div>
                     <div className="flex-1">
                       <div className="font-semibold">{reward.name}</div>
-                      <div className="text-[10px] text-neutral-400">
-                        {c.claimed_at ? new Date(c.claimed_at).toLocaleString("ko-KR") : ""} 수령
+                      <div className="text-[10px] text-[#6B6560]">
+                        {c.claimed_at ? new Date(c.claimed_at).toLocaleString("ko-KR") : ""} 받음
                       </div>
                     </div>
-                    <span className="rounded-full bg-neutral-200 px-2 py-0.5 text-[10px]">완료</span>
+                    <span className="rounded-full bg-[#E8F0E4] px-2 py-0.5 text-[10px] text-[#2D5A3D]">완료</span>
                   </div>
                 );
               })}
@@ -140,7 +141,7 @@ export default async function EventRewardsPage({ params }: { params: Promise<{ i
         {/* 목표 보상 (POINT 진행률) */}
         {pointRewards.length > 0 && (
           <section>
-            <h2 className="mb-2 text-sm font-bold">🎯 목표 보상</h2>
+            <h2 className="mb-2 text-sm font-bold text-[#2D5A3D]">🌰 도토리 모으기</h2>
             <div className="space-y-2">
               {pointRewards.map((r) => {
                 const cfg = (r.config ?? {}) as { threshold?: number };
@@ -148,19 +149,19 @@ export default async function EventRewardsPage({ params }: { params: Promise<{ i
                 const earned = earnedIds.has(r.id);
                 const progress = threshold > 0 ? Math.min(100, (myScore / threshold) * 100) : 0;
                 return (
-                  <div key={r.id} className={`rounded-2xl border p-4 ${earned ? "bg-green-50 border-green-200" : "bg-white"}`}>
+                  <div key={r.id} className={`rounded-2xl border p-4 ${earned ? "bg-[#D4E4BC] border-[#A8C686]" : "bg-white"}`}>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <span className="text-xl">{earned ? "✅" : "🏅"}</span>
+                        <span className="text-xl">{earned ? "🌳" : "🌱"}</span>
                         <span className="font-semibold">{r.name}</span>
                       </div>
-                      <span className={`text-xs font-bold ${earned ? "text-green-600" : "text-violet-600"}`}>
-                        {myScore} / {threshold}점
+                      <span className={`text-xs font-bold ${earned ? "text-[#2D5A3D]" : "text-violet-600"}`}>
+                        🌰 {myScore} / {threshold}
                       </span>
                     </div>
-                    {r.description && <p className="text-xs text-neutral-500 mt-1 ml-8">{r.description}</p>}
-                    <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-neutral-200">
-                      <div className={`h-full rounded-full transition-all duration-500 ${earned ? "bg-green-500" : "bg-violet-500"}`}
+                    {r.description && <p className="text-xs text-[#6B6560] mt-1 ml-8">{r.description}</p>}
+                    <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-[#E8F0E4]">
+                      <div className={`h-full rounded-full transition-all duration-500 ${earned ? "bg-[#4A7C59]" : "bg-violet-500"}`}
                         style={{ width: `${progress}%` }} />
                     </div>
                   </div>
@@ -173,13 +174,13 @@ export default async function EventRewardsPage({ params }: { params: Promise<{ i
         {/* 도전 가능한 보상 */}
         {otherRewards.length > 0 && (
           <section>
-            <h2 className="mb-2 text-sm font-bold">🎁 도전 가능한 보상</h2>
+            <h2 className="mb-2 text-sm font-bold text-[#2D5A3D]">🌿 만나볼 선물</h2>
             <div className="grid grid-cols-2 gap-2">
               {otherRewards.map((r) => (
                 <div key={r.id} className="rounded-2xl border bg-white p-3 text-center">
                   <div className="text-3xl mb-1">{TYPE_ICON[r.reward_type] ?? "🎁"}</div>
                   <div className="font-semibold text-sm">{r.name}</div>
-                  <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] text-neutral-500">
+                  <span className="rounded-full bg-[#E8F0E4] px-2 py-0.5 text-[10px] text-[#2D5A3D]">
                     {TYPE_LABEL[r.reward_type] ?? r.reward_type}
                   </span>
                 </div>
@@ -191,8 +192,8 @@ export default async function EventRewardsPage({ params }: { params: Promise<{ i
         {/* 보상 없음 */}
         {(allRewards ?? []).length === 0 && (
           <div className="rounded-2xl border bg-white p-12 text-center">
-            <div className="text-4xl mb-3">🎁</div>
-            <p className="text-neutral-500">아직 등록된 보상이 없습니다</p>
+            <div className="text-4xl mb-3">🌱</div>
+            <p className="text-[#6B6560]">곧 새로운 선물이 준비돼요</p>
           </div>
         )}
       </div>

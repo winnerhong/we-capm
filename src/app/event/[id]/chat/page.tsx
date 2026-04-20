@@ -93,43 +93,43 @@ export default async function ChatListPage({ params }: { params: Promise<{ id: s
     name.replace(/^\[기관\]\s*/, "").replace(/^\[선생님[^\]]*\]\s*/, "");
 
   return (
-    <main className="flex min-h-dvh flex-col bg-white pb-20">
-      <header className="flex items-center justify-between border-b px-4 py-3 bg-violet-600 text-white">
+    <main className="flex min-h-dvh flex-col bg-neutral-50 pb-20">
+      <header className="flex items-center justify-between px-4 py-3 bg-gradient-to-br from-[#2D5A3D] via-[#3A7A52] to-[#4A7C59] text-white shadow-lg">
         <Link href={`/event/${id}`} className="text-lg">←</Link>
         <div className="flex items-center gap-2">
           <WinnerTalkIcon size={24} className="brightness-200" />
-          <span className="font-bold">윙크톡</span>
+          <span className="font-bold">🐿️ 토리톡</span>
         </div>
         <div className="w-6" />
       </header>
 
       {rooms.length === 0 ? (
-        <div className="flex flex-1 items-center justify-center text-neutral-400 text-sm">
-          참여 중인 채팅방이 없습니다
+        <div className="flex flex-1 items-center justify-center text-[#6B6560] text-sm">
+          숲에서 나누는 이야기가 아직 없어요 🌱
         </div>
       ) : (
-        <div className="divide-y">
+        <div className="divide-y divide-[#D4E4BC] bg-white">
           {rooms.map((room) => (
             <Link key={room.id} href={`/event/${id}/chat/${room.id}`}
-              className="flex items-center gap-3 px-4 py-3 hover:bg-neutral-50 active:bg-neutral-100">
+              className="flex items-center gap-3 px-4 py-3 hover:bg-[#E8F0E4] active:bg-[#D4E4BC]">
               <div className={`flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full text-white text-lg
-                ${room.type === "ANNOUNCEMENT" ? "bg-yellow-500" : "bg-violet-500"}`}>
-                {room.type === "ANNOUNCEMENT" ? "📢" : "💬"}
+                ${room.type === "ANNOUNCEMENT" ? "bg-[#C4956A]" : "bg-[#4A7C59]"}`}>
+                {room.type === "ANNOUNCEMENT" ? "📢" : "🌿"}
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between">
                   <span className="font-semibold text-sm truncate">{room.name}</span>
-                  <span className="text-[10px] text-neutral-400 flex-shrink-0 ml-2">
+                  <span className="text-[10px] text-[#6B6560] flex-shrink-0 ml-2">
                     {formatTime(room.lastTime)}
                   </span>
                 </div>
                 <div className="flex items-center justify-between mt-0.5">
-                  <span className="text-xs text-neutral-500 truncate">
+                  <span className="text-xs text-[#6B6560] truncate">
                     {room.lastSender
                       ? `${cleanSender(room.lastSender)}: ${room.lastMessage}`
-                      : "메시지 없음"}
+                      : "아직 이야기가 없어요"}
                   </span>
-                  <span className="text-[10px] text-neutral-400 flex-shrink-0 ml-2">
+                  <span className="text-[10px] text-[#6B6560] flex-shrink-0 ml-2">
                     {room.memberCount}명
                   </span>
                 </div>

@@ -23,10 +23,13 @@ export default async function AdminHome() {
 
   return (
     <div className="space-y-6">
-      {/* 헤더 */}
-      <div className="rounded-2xl bg-gradient-to-r from-violet-600 to-purple-700 p-6 text-white">
-        <h1 className="text-2xl font-bold">윙크 대시보드</h1>
-        <p className="mt-1 text-sm opacity-80">행사 운영 현황을 한눈에 확인하세요</p>
+      {/* 헤더 — 토리로 포레스트 */}
+      <div className="rounded-2xl bg-gradient-to-br from-[#2D5A3D] via-[#3A7A52] to-[#4A7C59] p-6 text-white shadow-lg relative overflow-hidden">
+        <div className="relative z-10">
+          <p className="text-[11px] tracking-[0.4em] opacity-70 font-light">TORIRO</p>
+          <h1 className="text-2xl font-extrabold mt-1">토리로 대시보드 🌰</h1>
+          <p className="mt-2 text-sm opacity-80">오늘의 숲길을 한눈에 살펴보세요</p>
+        </div>
       </div>
 
       {/* 통계 카드 */}
@@ -55,7 +58,7 @@ export default async function AdminHome() {
         <Link href="/admin/chat"
           className="flex flex-col items-center gap-2 rounded-xl border bg-white p-4 hover:border-violet-500 hover:shadow-md transition-all">
           <WinnerTalkIcon size={28} />
-          <span className="text-sm font-semibold">윙크톡</span>
+          <span className="text-sm font-semibold">토리톡</span>
         </Link>
         <Link href="/admin/stats"
           className="flex flex-col items-center gap-2 rounded-xl border bg-white p-4 hover:border-violet-500 hover:shadow-md transition-all">

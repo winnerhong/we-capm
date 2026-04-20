@@ -33,13 +33,21 @@ export function EventListClient({ events }: { events: EventItem[] }) {
 
   return (
     <div className="space-y-4">
-      {/* 헤더 */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">행사 목록</h1>
-        <Link href="/admin/events/new"
-          className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700">
-          + 새 행사
-        </Link>
+      {/* 헤더 — 숲 그라데이션 */}
+      <div className="rounded-2xl bg-gradient-to-br from-[#2D5A3D] via-[#3A7A52] to-[#4A7C59] p-6 text-white shadow-sm">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold flex items-center gap-2">
+              <span>🌲</span>
+              <span>숲길 행사 목록</span>
+            </h1>
+            <p className="mt-1 text-sm text-white/80">도토리 탐험가들과 함께할 행사를 관리해요</p>
+          </div>
+          <Link href="/admin/events/new"
+            className="rounded-xl bg-white/95 px-4 py-2 text-sm font-semibold text-[#2D5A3D] hover:bg-white shadow-sm">
+            + 새 행사
+          </Link>
+        </div>
       </div>
 
       {/* 필터 + 검색 + 뷰 토글 */}
@@ -51,17 +59,17 @@ export function EventListClient({ events }: { events: EventItem[] }) {
           { key: "ENDED", label: `종료 ${counts.ENDED}` },
         ].map((f) => (
           <button key={f.key} onClick={() => setFilter(f.key)}
-            className={`rounded-full px-3 py-1 text-xs font-medium ${filter === f.key ? "bg-violet-600 text-white" : "bg-white border"}`}>
+            className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${filter === f.key ? "bg-[#2D5A3D] text-white" : "bg-white border border-[#D4E4BC] text-[#2C2C2C] hover:bg-[#E8F0E4]"}`}>
             {f.label}
           </button>
         ))}
         <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
-          placeholder="🔍 행사/기관 검색" className="ml-auto rounded-lg border px-3 py-1 text-sm outline-none w-48 focus:ring-2 focus:ring-violet-500" />
-        <div className="flex rounded-lg border overflow-hidden">
+          placeholder="🔍 행사/기관 탐색" className="ml-auto rounded-lg border border-[#D4E4BC] px-3 py-1 text-sm outline-none w-48 focus:ring-2 focus:ring-[#2D5A3D]" />
+        <div className="flex rounded-lg border border-[#D4E4BC] overflow-hidden">
           <button onClick={() => setView("card")}
-            className={`px-3 py-1 text-xs ${view === "card" ? "bg-violet-600 text-white" : "bg-white"}`}>카드</button>
+            className={`px-3 py-1 text-xs transition-colors ${view === "card" ? "bg-[#2D5A3D] text-white" : "bg-white text-[#2C2C2C]"}`}>카드</button>
           <button onClick={() => setView("list")}
-            className={`px-3 py-1 text-xs ${view === "list" ? "bg-violet-600 text-white" : "bg-white"}`}>리스트</button>
+            className={`px-3 py-1 text-xs transition-colors ${view === "list" ? "bg-[#2D5A3D] text-white" : "bg-white text-[#2C2C2C]"}`}>리스트</button>
         </div>
       </div>
 
@@ -73,26 +81,26 @@ export function EventListClient({ events }: { events: EventItem[] }) {
               const pct = e.regCount > 0 ? Math.round((e.participantCount / e.regCount) * 100) : 0;
               return (
                 <Link key={e.id} href={`/admin/events/${e.id}`}
-                  className={`rounded-xl border-l-4 border bg-white p-4 hover:shadow-md ${STATUS_BORDER[e.status] ?? "border-l-neutral-300"}`}>
+                  className={`rounded-2xl border-l-4 border border-[#D4E4BC] bg-white p-4 transition-shadow hover:shadow-md ${STATUS_BORDER[e.status] ?? "border-l-[#D4E4BC]"}`}>
                   <div className="flex items-start justify-between">
-                    <div className="font-bold">{e.name}</div>
+                    <div className="font-bold text-[#2C2C2C]">{e.name}</div>
                     <div className="flex items-center gap-1">
                       <span className={`h-2 w-2 rounded-full ${STATUS_DOT[e.status] ?? ""}`} />
-                      <span className="text-xs">{STATUS_LABEL[e.status] ?? e.status}</span>
+                      <span className="text-xs text-[#6B6560]">{STATUS_LABEL[e.status] ?? e.status}</span>
                     </div>
                   </div>
-                  <div className="mt-2 space-y-1 text-xs">
+                  <div className="mt-2 space-y-1 text-xs text-[#6B6560]">
                     <div>📍 {e.location}</div>
                     <div>🗓 {new Date(e.start_at).toLocaleDateString("ko-KR")} {new Date(e.start_at).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}</div>
                     {e.manager_id && <div>🏢 {e.manager_id}</div>}
                   </div>
                   <div className="mt-3 flex items-center justify-between text-xs">
-                    <span>참가 {e.participantCount}/{e.regCount}</span>
-                    {e.pendingCount > 0 && <span className="rounded-full bg-red-100 px-2 py-0.5 text-red-600">대기 {e.pendingCount}</span>}
+                    <span className="text-[#2C2C2C]">탐험가 {e.participantCount}/{e.regCount}</span>
+                    {e.pendingCount > 0 && <span className="rounded-full bg-red-50 px-2 py-0.5 text-red-600">대기 {e.pendingCount}</span>}
                   </div>
                   {e.regCount > 0 && (
-                    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-neutral-200">
-                      <div className="h-full bg-green-500" style={{ width: `${pct}%` }} />
+                    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#E8F0E4]">
+                      <div className="h-full bg-[#4A7C59]" style={{ width: `${pct}%` }} />
                     </div>
                   )}
                 </Link>
@@ -100,37 +108,40 @@ export function EventListClient({ events }: { events: EventItem[] }) {
             })}
           </div>
         ) : (
-          <div className="rounded-lg border bg-white p-12 text-center text-sm">검색 결과 없음</div>
+          <div className="rounded-2xl border border-[#D4E4BC] bg-white p-12 text-center text-sm text-[#6B6560]">
+            <div className="text-3xl mb-2">🐿️</div>
+            탐험할 행사를 찾지 못했어요
+          </div>
         )
       )}
 
       {/* 리스트뷰 */}
       {view === "list" && (
         filtered.length > 0 ? (
-          <div className="overflow-hidden rounded-xl border bg-white">
+          <div className="overflow-hidden rounded-2xl border border-[#D4E4BC] bg-white">
             <table className="w-full text-sm">
-              <thead className="bg-neutral-50 text-left text-xs">
+              <thead className="bg-[#E8F0E4] text-left text-xs text-[#2D5A3D]">
                 <tr>
                   <th className="px-4 py-2 w-8">상태</th>
                   <th className="px-4 py-2">행사명</th>
                   <th className="px-4 py-2">기관</th>
                   <th className="px-4 py-2">일시</th>
                   <th className="px-4 py-2">장소</th>
-                  <th className="px-4 py-2 text-right">참가</th>
+                  <th className="px-4 py-2 text-right">탐험가</th>
                   <th className="px-4 py-2 text-right">대기</th>
                 </tr>
               </thead>
-              <tbody className="divide-y">
+              <tbody className="divide-y divide-[#E8F0E4]">
                 {filtered.map((e) => (
-                  <tr key={e.id} className="hover:bg-neutral-50 cursor-pointer" onClick={() => window.location.href = `/admin/events/${e.id}`}>
+                  <tr key={e.id} className="cursor-pointer hover:bg-[#FFF8F0]" onClick={() => window.location.href = `/admin/events/${e.id}`}>
                     <td className="px-4 py-3"><span className={`inline-block h-2.5 w-2.5 rounded-full ${STATUS_DOT[e.status] ?? ""}`} /></td>
-                    <td className="px-4 py-3 font-medium">{e.name}</td>
-                    <td className="px-4 py-3 text-xs">{e.manager_id ?? "-"}</td>
-                    <td className="px-4 py-3 text-xs">{new Date(e.start_at).toLocaleDateString("ko-KR")}</td>
-                    <td className="px-4 py-3 text-xs">{e.location}</td>
-                    <td className="px-4 py-3 text-right text-xs">{e.participantCount}/{e.regCount}</td>
+                    <td className="px-4 py-3 font-medium text-[#2C2C2C]">{e.name}</td>
+                    <td className="px-4 py-3 text-xs text-[#6B6560]">{e.manager_id ?? "-"}</td>
+                    <td className="px-4 py-3 text-xs text-[#6B6560]">{new Date(e.start_at).toLocaleDateString("ko-KR")}</td>
+                    <td className="px-4 py-3 text-xs text-[#6B6560]">{e.location}</td>
+                    <td className="px-4 py-3 text-right text-xs text-[#2C2C2C]">{e.participantCount}/{e.regCount}</td>
                     <td className="px-4 py-3 text-right">
-                      {e.pendingCount > 0 ? <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs text-red-600">{e.pendingCount}</span> : <span className="text-xs">0</span>}
+                      {e.pendingCount > 0 ? <span className="rounded-full bg-red-50 px-2 py-0.5 text-xs text-red-600">{e.pendingCount}</span> : <span className="text-xs text-[#6B6560]">0</span>}
                     </td>
                   </tr>
                 ))}
@@ -138,7 +149,10 @@ export function EventListClient({ events }: { events: EventItem[] }) {
             </table>
           </div>
         ) : (
-          <div className="rounded-lg border bg-white p-12 text-center text-sm">검색 결과 없음</div>
+          <div className="rounded-2xl border border-[#D4E4BC] bg-white p-12 text-center text-sm text-[#6B6560]">
+            <div className="text-3xl mb-2">🐿️</div>
+            탐험할 행사를 찾지 못했어요
+          </div>
         )
       )}
     </div>

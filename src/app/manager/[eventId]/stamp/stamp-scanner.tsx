@@ -155,15 +155,20 @@ export function StampScanner({ eventId, eventName, boardId, boardName, slots, re
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">🎫 도장 찍기</h1>
-        <p className="text-sm text-neutral-500">{eventName} - {boardName}</p>
+      {/* Forest gradient header */}
+      <div className="rounded-2xl bg-gradient-to-br from-[#2D5A3D] via-[#3A7A52] to-[#4A7C59] p-6 text-white shadow-[0_10px_30px_-12px_rgba(45,90,61,0.4)]">
+        <div className="flex items-center gap-2 text-xs text-[#D4E4BC]">
+          <span aria-hidden>🌲</span>
+          <span>도장 찍어주기</span>
+        </div>
+        <h1 className="mt-1 text-2xl font-bold">🌰 도장 찍어주기</h1>
+        <p className="mt-1 text-sm text-[#D4E4BC]">{eventName} · {boardName}</p>
       </div>
 
-      {/* Phone search */}
-      <div className="rounded-2xl border-2 border-violet-200 bg-violet-50 p-5">
-        <label htmlFor="phone-search" className="block text-sm font-bold text-violet-800 mb-2">
-          참가자 전화번호 검색
+      {/* Phone search — leaf light background */}
+      <div className="rounded-2xl border-2 border-[#4A7C59]/30 bg-[#D4E4BC] p-5">
+        <label htmlFor="phone-search" className="mb-2 block text-sm font-bold text-[#2D5A3D]">
+          🔎 참가자 전화번호 검색
         </label>
         <div className="flex gap-2">
           <input
@@ -175,12 +180,12 @@ export function StampScanner({ eventId, eventName, boardId, boardName, slots, re
             onChange={(e) => setPhone(formatPhoneInput(e.target.value))}
             onKeyDown={(e) => e.key === "Enter" && handleSearch()}
             placeholder="010-0000-0000"
-            className="flex-1 rounded-xl border-2 border-violet-200 bg-white px-4 py-3 text-lg focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-200"
+            className="flex-1 rounded-xl border-2 border-[#4A7C59]/30 bg-white px-4 py-3 text-lg text-[#2C2C2C] focus:border-[#2D5A3D] focus:outline-none focus:ring-2 focus:ring-[#D4E4BC]"
           />
           <button
             onClick={handleSearch}
             disabled={isPending}
-            className="rounded-xl bg-violet-600 px-6 py-3 font-bold text-white hover:bg-violet-700 disabled:opacity-50 transition-colors"
+            className="rounded-xl bg-[#2D5A3D] px-6 py-3 font-bold text-white transition-colors hover:bg-[#3A7A52] disabled:opacity-50"
           >
             {isPending ? "..." : "검색"}
           </button>
@@ -189,31 +194,31 @@ export function StampScanner({ eventId, eventName, boardId, boardName, slots, re
 
       {/* Error / Success messages */}
       {error && (
-        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700" role="alert">
           {error}
         </div>
       )}
       {success && (
-        <div className="rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-700">
-          {success}
+        <div className="rounded-xl border border-[#4A7C59]/30 bg-[#E8F0E4] p-4 text-sm text-[#2D5A3D]" role="status">
+          🌰 {success}
         </div>
       )}
 
       {/* Found participant */}
       {foundParticipant && (
-        <div className="rounded-2xl border-2 border-violet-300 bg-white p-5 space-y-4">
+        <div className="space-y-4 rounded-2xl border-2 border-[#4A7C59]/30 bg-white p-5 shadow-sm">
           {/* Participant info header */}
           <div className="flex items-center gap-3">
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-100 text-2xl">
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#E8F0E4] text-2xl">
               {foundParticipant.currentTier?.emoji ?? "🌰"}
             </div>
             <div>
-              <h3 className="text-lg font-bold">{foundParticipant.name}</h3>
-              <p className="text-sm text-neutral-500">{foundParticipant.phone}</p>
+              <h3 className="text-lg font-bold text-[#2C2C2C]">{foundParticipant.name}</h3>
+              <p className="text-sm text-[#6B6560]">{foundParticipant.phone}</p>
             </div>
             <div className="ml-auto text-right">
-              <div className="text-2xl font-bold text-violet-700">{foundParticipant.stampCount}</div>
-              <div className="text-xs text-neutral-500">/{foundParticipant.slots.length} 도장</div>
+              <div className="text-2xl font-bold text-[#2D5A3D]">{foundParticipant.stampCount}</div>
+              <div className="text-xs text-[#6B6560]">/{foundParticipant.slots.length} 도토리</div>
             </div>
           </div>
 
@@ -226,13 +231,13 @@ export function StampScanner({ eventId, eventName, boardId, boardName, slots, re
                 disabled={slot.stamped || isPending}
                 className={`rounded-xl border-2 p-3 text-center transition-all ${
                   slot.stamped
-                    ? "border-green-200 bg-green-50 cursor-default"
-                    : "border-violet-200 bg-white hover:border-violet-400 hover:bg-violet-50 active:scale-95"
+                    ? "cursor-default border-[#4A7C59]/30 bg-[#E8F0E4]"
+                    : "border-[#E8F0E4] bg-white hover:border-[#4A7C59] hover:bg-[#E8F0E4] active:scale-95"
                 }`}
               >
-                <div className="text-xl">{slot.slotIcon || "📍"}</div>
-                <div className="text-xs font-medium mt-1 truncate">{slot.slotName}</div>
-                <div className={`text-lg mt-1 ${slot.stamped ? "text-green-500" : "text-neutral-300"}`}>
+                <div className="text-xl">{slot.slotIcon || "🍃"}</div>
+                <div className="mt-1 truncate text-xs font-medium text-[#2C2C2C]">{slot.slotName}</div>
+                <div className={`mt-1 text-lg ${slot.stamped ? "text-[#2D5A3D]" : "text-neutral-300"}`}>
                   {slot.stamped ? "\u2705" : "\u25CB"}
                 </div>
               </button>
@@ -243,28 +248,28 @@ export function StampScanner({ eventId, eventName, boardId, boardName, slots, re
 
       {/* Confirm dialog */}
       {confirmSlot && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-xs rounded-2xl bg-white p-6 text-center">
-            <div className="text-4xl mb-3">🎫</div>
-            <h3 className="text-lg font-bold">도장을 찍으시겠어요?</h3>
-            <p className="mt-2 text-sm text-neutral-600">
-              <span className="font-semibold text-violet-700">{foundParticipant?.name}</span>님의
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#2D5A3D]/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-xs rounded-2xl border border-[#E8F0E4] bg-white p-6 text-center shadow-[0_20px_60px_-12px_rgba(45,90,61,0.5)]">
+            <div className="mb-3 text-4xl" aria-hidden>🌰</div>
+            <h3 className="text-lg font-bold text-[#2C2C2C]">도토리를 드릴까요?</h3>
+            <p className="mt-2 text-sm text-[#6B6560]">
+              <span className="font-semibold text-[#2D5A3D]">{foundParticipant?.name}</span>님의
               <br />
-              <span className="font-semibold">{confirmSlot.slotName}</span> 스테이션
+              <span className="font-semibold">{confirmSlot.slotName}</span> 숲길 도장
             </p>
             <div className="mt-5 flex gap-2">
               <button
                 onClick={() => setConfirmSlot(null)}
-                className="flex-1 rounded-xl border-2 py-3 font-semibold text-neutral-600 hover:bg-neutral-50"
+                className="flex-1 rounded-xl border-2 border-[#E8F0E4] py-3 font-semibold text-[#6B6560] hover:bg-neutral-50"
               >
                 취소
               </button>
               <button
                 onClick={confirmStamp}
                 disabled={isPending}
-                className="flex-1 rounded-xl bg-violet-600 py-3 font-bold text-white hover:bg-violet-700 disabled:opacity-50"
+                className="flex-1 rounded-xl bg-[#2D5A3D] py-3 font-bold text-white hover:bg-[#3A7A52] disabled:opacity-50"
               >
-                {isPending ? "처리 중..." : "찍기!"}
+                {isPending ? "처리 중..." : "찍어주기!"}
               </button>
             </div>
           </div>
@@ -272,15 +277,15 @@ export function StampScanner({ eventId, eventName, boardId, boardName, slots, re
       )}
 
       {/* Congestion control */}
-      <div className="rounded-2xl border bg-white p-5">
-        <h2 className="font-bold mb-3">혼잡도 관리</h2>
+      <div className="rounded-2xl border border-[#E8F0E4] bg-white p-5 shadow-sm">
+        <h2 className="mb-3 font-bold text-[#2D5A3D]">🏞️ 숲길 혼잡도 관리</h2>
         <div className="space-y-2">
           {slots.filter((s) => s.type === "MANUAL").map((slot) => {
             const current = congestionSlots[slot.id] ?? "GREEN";
             return (
-              <div key={slot.id} className="flex items-center gap-3 rounded-lg bg-neutral-50 p-3">
-                <span className="text-lg">{slot.icon || "📍"}</span>
-                <span className="flex-1 text-sm font-medium">{slot.name}</span>
+              <div key={slot.id} className="flex items-center gap-3 rounded-xl bg-[#FFF8F0] p-3">
+                <span className="text-lg">{slot.icon || "🍃"}</span>
+                <span className="flex-1 text-sm font-medium text-[#2C2C2C]">{slot.name}</span>
                 <div className="flex gap-1">
                   {(["GREEN", "YELLOW", "RED"] as const).map((status) => {
                     const c = CONGESTION_COLORS[status];
@@ -309,20 +314,20 @@ export function StampScanner({ eventId, eventName, boardId, boardName, slots, re
       </div>
 
       {/* Recent stamp history */}
-      <div className="rounded-2xl border bg-white p-5">
-        <h2 className="font-bold mb-3">최근 도장 기록</h2>
+      <div className="rounded-2xl border border-[#E8F0E4] bg-white p-5 shadow-sm">
+        <h2 className="mb-3 font-bold text-[#2D5A3D]">🐿️ 최근 도장 기록</h2>
         {history.length === 0 ? (
-          <p className="text-sm text-neutral-400 text-center py-6">아직 기록이 없습니다</p>
+          <p className="py-6 text-center text-sm text-[#6B6560]">아직 기록이 없어요</p>
         ) : (
-          <div className="space-y-2 max-h-64 overflow-y-auto">
+          <div className="max-h-64 space-y-2 overflow-y-auto">
             {history.map((item) => (
-              <div key={item.id} className="flex items-center gap-3 rounded-lg bg-neutral-50 p-3">
-                <span className="text-green-500">✅</span>
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium truncate">{item.participantName}</div>
-                  <div className="text-xs text-neutral-400">{item.slotName}</div>
+              <div key={item.id} className="flex items-center gap-3 rounded-xl bg-[#FFF8F0] p-3">
+                <span className="text-[#2D5A3D]">🌰</span>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-medium text-[#2C2C2C]">{item.participantName}</div>
+                  <div className="text-xs text-[#6B6560]">{item.slotName}</div>
                 </div>
-                <div className="text-[11px] text-neutral-400 whitespace-nowrap">
+                <div className="whitespace-nowrap text-[11px] text-[#C4956A]">
                   {new Date(item.stampedAt).toLocaleTimeString("ko-KR", {
                     hour: "2-digit",
                     minute: "2-digit",

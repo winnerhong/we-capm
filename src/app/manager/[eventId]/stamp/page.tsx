@@ -25,10 +25,10 @@ export default async function ManagerStampPage({ params }: { params: Promise<{ e
 
   if (!board) {
     return (
-      <div className="rounded-2xl border bg-white p-12 text-center">
-        <div className="text-5xl mb-4">🎫</div>
-        <h2 className="text-lg font-bold text-neutral-700">스탬프 보드가 없습니다</h2>
-        <p className="mt-2 text-sm text-neutral-500">관리자에게 스탬프 보드 생성을 요청하세요</p>
+      <div className="rounded-2xl border border-[#E8F0E4] bg-white p-12 text-center shadow-sm">
+        <div className="text-5xl mb-4" aria-hidden>🌰</div>
+        <h2 className="text-lg font-bold text-[#2D5A3D]">도장판이 아직 준비되지 않았어요</h2>
+        <p className="mt-2 text-sm text-[#6B6560]">관리자에게 도장판 생성을 요청해 주세요</p>
       </div>
     );
   }

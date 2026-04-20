@@ -78,18 +78,22 @@ export default async function AdminChatPage() {
   };
 
   const statusLabel: Record<string, { text: string; color: string }> = {
-    DRAFT: { text: "준비중", color: "bg-neutral-100 text-neutral-600" },
-    ACTIVE: { text: "진행중", color: "bg-green-100 text-green-700" },
+    DRAFT: { text: "준비중", color: "bg-[#FFF8F0] text-[#6B6560]" },
+    ACTIVE: { text: "진행중", color: "bg-[#E8F0E4] text-[#2D5A3D]" },
     ENDED: { text: "종료", color: "bg-yellow-100 text-yellow-700" },
     CONFIRMED: { text: "확정", color: "bg-blue-100 text-blue-700" },
   };
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2">
-        <WinnerTalkIcon size={28} />
-        <h1 className="text-xl font-bold">윙크톡</h1>
-        <span className="text-sm text-neutral-400">{events.length}개 행사</span>
+      {/* 헤더 — 숲 그라데이션 */}
+      <div className="rounded-2xl bg-gradient-to-br from-[#2D5A3D] via-[#3A7A52] to-[#4A7C59] p-6 text-white shadow-sm">
+        <div className="flex items-center gap-2">
+          <WinnerTalkIcon size={28} />
+          <h1 className="text-2xl font-bold">토리톡</h1>
+          <span className="text-sm text-white/80">{events.length}개 행사</span>
+        </div>
+        <p className="mt-1 text-sm text-white/80">🍃 숲길에서 들려오는 탐험가들의 이야기</p>
       </div>
 
       <div className="grid gap-3">
@@ -97,31 +101,31 @@ export default async function AdminChatPage() {
           const st = statusLabel[event.status] ?? statusLabel.DRAFT;
           return (
             <Link key={event.id} href={`/admin/events/${event.id}/chat`}
-              className="flex items-center gap-4 rounded-2xl border bg-white p-4 hover:shadow-md transition-shadow">
-              <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-violet-100">
+              className="flex items-center gap-4 rounded-2xl border border-[#D4E4BC] bg-white p-4 hover:shadow-md transition-shadow">
+              <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-[#E8F0E4]">
                 <WinnerTalkIcon size={28} />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="font-bold truncate">{event.name}</span>
+                  <span className="font-bold truncate text-[#2C2C2C]">{event.name}</span>
                   <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${st.color}`}>{st.text}</span>
                 </div>
-                <div className="text-xs text-neutral-500 mt-0.5 truncate">
+                <div className="text-xs text-[#6B6560] mt-0.5 truncate">
                   {event.roomCount}개 톡방 · {event.lastMessage ? event.lastMessage : "메시지 없음"}
                 </div>
               </div>
               <div className="text-right flex-shrink-0">
-                <div className="text-[10px] text-neutral-400">{formatTime(event.lastTime)}</div>
-                <div className="text-xs text-violet-600 mt-1">→</div>
+                <div className="text-[10px] text-[#6B6560]">{formatTime(event.lastTime)}</div>
+                <div className="text-xs text-[#2D5A3D] mt-1">→</div>
               </div>
             </Link>
           );
         })}
 
         {events.length === 0 && (
-          <div className="rounded-2xl border bg-white p-12 text-center text-neutral-400">
+          <div className="rounded-2xl border border-[#D4E4BC] bg-white p-12 text-center text-[#6B6560]">
             <WinnerTalkIcon size={48} />
-            <p className="mt-3">아직 행사가 없습니다</p>
+            <p className="mt-3">🌰 아직 숲길에 행사가 없어요</p>
           </div>
         )}
       </div>

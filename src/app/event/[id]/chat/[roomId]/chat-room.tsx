@@ -29,10 +29,10 @@ interface Props {
 
 function getSenderStyle(name: string, isMe: boolean) {
   if (name === "시스템") return { badge: "", bg: "", isSystem: true };
-  if (name.includes("[기관]") || name.includes("기관")) return { badge: "📢 기관", bg: "bg-violet-100", isSystem: false };
-  if (name.includes("선생님")) return { badge: "👩‍🏫 선생님", bg: "bg-blue-50", isSystem: false };
-  if (isMe) return { badge: "", bg: "bg-violet-100", isSystem: false };
-  return { badge: "", bg: "bg-neutral-100", isSystem: false };
+  if (name.includes("[기관]") || name.includes("기관")) return { badge: "📢 숲지기", bg: "bg-[#F5D9B5]", isSystem: false };
+  if (name.includes("선생님")) return { badge: "🌲 선생님", bg: "bg-[#E8F0E4]", isSystem: false };
+  if (isMe) return { badge: "", bg: "bg-violet-600 text-white", isSystem: false };
+  return { badge: "", bg: "bg-[#FEFCF8] border border-[#D4E4BC]", isSystem: false };
 }
 
 function cleanName(name: string) {
@@ -97,15 +97,15 @@ export function ChatRoom({ eventId, roomId, roomName, roomType, myName, initialM
   let lastDate = "";
 
   return (
-    <main className="flex h-dvh flex-col bg-white">
+    <main className="flex h-dvh flex-col bg-neutral-50">
       {/* 헤더 */}
-      <header className="flex items-center justify-between border-b px-4 py-3 bg-violet-600 text-white">
+      <header className="flex items-center justify-between px-4 py-3 bg-gradient-to-br from-[#2D5A3D] via-[#3A7A52] to-[#4A7C59] text-white shadow-lg">
         <Link href={`/event/${eventId}`} className="text-lg">←</Link>
         <div className="flex items-center gap-2">
           <WinnerTalkIcon size={24} className="brightness-200" />
           <div className="text-center">
-            <div className="font-bold">{roomName}</div>
-            {memberCount !== undefined && <div className="text-xs opacity-80">{memberCount}명 참여</div>}
+            <div className="font-bold">🌿 {roomName}</div>
+            {memberCount !== undefined && <div className="text-xs opacity-90">{memberCount}명과 함께</div>}
           </div>
         </div>
         <div className="w-6" />
@@ -131,7 +131,7 @@ export function ChatRoom({ eventId, roomId, roomName, roomType, myName, initialM
             return (
               <div key={msg.id}>
                 {dateHeader}
-                <div className="text-center text-xs text-neutral-400 py-1 bg-neutral-100 rounded-full mx-8 my-1">
+                <div className="text-center text-xs text-[#8B6F47] py-1 bg-[#F5D9B5] rounded-full mx-8 my-1">
                   {msg.is_deleted ? "삭제된 메시지" : msg.content}
                 </div>
               </div>
@@ -143,12 +143,12 @@ export function ChatRoom({ eventId, roomId, roomName, roomType, myName, initialM
             return (
               <div key={msg.id}>
                 {dateHeader}
-                <div className="rounded-xl bg-violet-50 border border-violet-200 p-3 my-1">
-                  <div className="flex items-center gap-1 text-xs text-violet-600 font-semibold mb-1">
-                    📢 공지
+                <div className="rounded-xl bg-[#F5D9B5] border border-[#C4956A] p-3 my-1">
+                  <div className="flex items-center gap-1 text-xs text-[#8B6F47] font-semibold mb-1">
+                    📢 숲지기 공지
                   </div>
                   <p className="text-sm">{msg.content}</p>
-                  <div className="text-[10px] text-neutral-400 mt-1">{formatTime(msg.created_at)}</div>
+                  <div className="text-[10px] text-[#8B6F47] opacity-70 mt-1">{formatTime(msg.created_at)}</div>
                 </div>
               </div>
             );
@@ -162,9 +162,9 @@ export function ChatRoom({ eventId, roomId, roomName, roomType, myName, initialM
                   <div className="flex flex-col items-start max-w-[75%]">
                     <div className="flex items-center gap-1 mb-0.5">
                       {style.badge && (
-                        <span className="rounded-full bg-violet-600 text-white px-1.5 py-0.5 text-[10px]">{style.badge}</span>
+                        <span className="rounded-full bg-[#2D5A3D] text-white px-1.5 py-0.5 text-[10px]">{style.badge}</span>
                       )}
-                      <span className="text-xs font-medium">{name}</span>
+                      <span className="text-xs font-medium text-[#2C2C2C]">{name}</span>
                     </div>
                     <div className={`rounded-2xl rounded-tl-sm ${style.bg} px-3.5 py-2`}>
                       {msg.type === "IMAGE" && msg.file_url && <ChatImage path={msg.file_url} />}
@@ -190,18 +190,18 @@ export function ChatRoom({ eventId, roomId, roomName, roomType, myName, initialM
       </div>
 
       {/* 입력 */}
-      <div className="border-t bg-white px-3 py-2 flex items-center gap-2">
+      <div className="border-t border-[#D4E4BC] bg-white px-3 py-2 flex items-center gap-2">
         <label className="cursor-pointer text-lg">
           📷
           <input type="file" className="hidden" accept="image/*"
             onChange={(e) => { const f = e.target.files?.[0]; if (f) sendFile(f); e.target.value = ""; }} />
         </label>
         <input type="text" value={input} onChange={(e) => setInput(e.target.value)}
-          onKeyDown={handleKeyDown} placeholder="메시지를 입력하세요"
-          className="flex-1 rounded-2xl border px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-violet-500" />
+          onKeyDown={handleKeyDown} placeholder="숲에서 만난 이야기를 나눠보세요 🌿"
+          className="flex-1 rounded-2xl border border-[#D4E4BC] px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-violet-500" />
         <button onClick={sendMessage} disabled={pending || !input.trim()}
           className="rounded-2xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-50">
-          전송
+          보내기
         </button>
       </div>
     </main>

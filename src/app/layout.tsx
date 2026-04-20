@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "윙크",
+  title: "토리로",
   description: "캠핑 + 피크닉 행사 운영",
   manifest: "/manifest.json",
   other: { "theme-color": "#7c3aed" },
@@ -36,7 +36,13 @@ export default function RootLayout({
         {children}
         <script
           dangerouslySetInnerHTML={{
-            __html: `if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js')}`,
+            __html: `if('serviceWorker' in navigator){
+              if(location.hostname==='localhost'){
+                navigator.serviceWorker.getRegistrations().then(function(regs){regs.forEach(function(r){r.unregister()})});
+              } else {
+                navigator.serviceWorker.register('/sw.js');
+              }
+            }`,
           }}
         />
       </body>
