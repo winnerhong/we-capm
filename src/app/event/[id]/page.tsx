@@ -4,6 +4,9 @@ import { createClient } from "@/lib/supabase/server";
 import { getParticipant } from "@/lib/participant-session";
 import { checkAndEndEvent } from "@/lib/event-lifecycle";
 import { RealtimeRefresh } from "@/components/realtime-refresh";
+import { TreeGrowthCard } from "@/components/tree-growth-card";
+import { ChallengeCard } from "@/components/challenge-card";
+import { CouponCard } from "@/components/coupon-card";
 
 export const dynamic = "force-dynamic";
 
@@ -81,6 +84,31 @@ export default async function EventHomePage({ params }: { params: Promise<{ id: 
           </Link>
         )}
 
+        {/* 나무 성장 카드 */}
+        <TreeGrowthCard acorns={participant?.total_score ?? 0} />
+
+        {/* 이번주 챌린지 */}
+        <ChallengeCard completedMissions={completedCount} />
+
+        {/* AI 숲길 추천 (준비 중) */}
+        <div
+          aria-disabled="true"
+          className="rounded-2xl border border-dashed border-[#A8C686]/60 bg-white/70 p-5 opacity-80"
+        >
+          <div className="flex items-center gap-3">
+            <div className="text-3xl">🤖</div>
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <h3 className="font-bold text-[#2D5A3D]">토리가 추천하는 숲길</h3>
+                <span className="rounded-full bg-[#D4E4BC] px-2 py-0.5 text-[10px] font-semibold text-[#2D5A3D]">
+                  준비 중
+                </span>
+              </div>
+              <p className="mt-1 text-xs text-[#6B6560]">당신에게 딱 맞는 숲길을 찾는 중...</p>
+            </div>
+          </div>
+        </div>
+
         {/* 다음 미션 (가장 큰 카드) */}
         {nextMission && !isEnded && (
           <Link href={`/event/${id}/missions/${nextMission.id}`}
@@ -99,6 +127,28 @@ export default async function EventHomePage({ params }: { params: Promise<{ id: 
             <p className="mt-1 text-sm text-[#6B6560]">결과 발표를 기다려주세요</p>
           </div>
         )}
+
+        {/* 명예의 전당 바로가기 */}
+        {event.show_leaderboard !== false && (
+          <Link
+            href={`/event/${id}/leaderboard`}
+            className="block rounded-2xl border bg-white p-4 hover:shadow-lg"
+          >
+            <div className="flex items-center gap-3">
+              <div className="text-3xl">🏆</div>
+              <div className="flex-1">
+                <h3 className="font-bold text-[#2D5A3D]">숲지기 명예의 전당</h3>
+                <p className="mt-0.5 text-xs text-[#6B6560]">
+                  내 순위 {myRank || "-"}등 · 전체 {totalParticipants}명
+                </p>
+              </div>
+              <div className="text-[#6B6560]">→</div>
+            </div>
+          </Link>
+        )}
+
+        {/* 오늘의 선물 (쿠폰) */}
+        <CouponCard />
 
         {/* 완료 미션 */}
         {completedCount > 0 && (

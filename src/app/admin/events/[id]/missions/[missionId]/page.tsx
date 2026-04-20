@@ -6,11 +6,11 @@ import { updateMissionAction } from "../actions";
 export const dynamic = "force-dynamic";
 
 const TEMPLATE_LABEL: Record<string, string> = {
-  PHOTO: "📸 사진 미션",
-  VIDEO: "🎥 영상 미션",
-  LOCATION: "📍 위치 미션",
+  PHOTO: "📸 사진 숲길",
+  VIDEO: "🎥 영상 숲길",
+  LOCATION: "📍 위치 숲길",
   QUIZ: "✍️ 퀴즈",
-  MIXED: "🎯 복합 미션",
+  MIXED: "🎯 복합 숲길",
   TEAM: "🤝 팀 협력",
   TIMEATTACK: "🏃 타임어택",
 };
@@ -36,21 +36,21 @@ export default async function EditMissionPage({
         href={`/admin/events/${eventId}/missions`}
         className="text-sm text-neutral-500 hover:underline"
       >
-        ← 미션 목록
+        ← 숲길 목록
       </Link>
 
       <div>
         <p className="text-sm text-neutral-500">
           {TEMPLATE_LABEL[mission.template_type] ?? mission.template_type}
         </p>
-        <h1 className="text-2xl font-bold">미션 편집</h1>
+        <h1 className="text-2xl font-bold">숲길 편집</h1>
       </div>
 
       <form
         action={updateMissionAction.bind(null, eventId, missionId)}
         className="space-y-4 rounded-lg border bg-white p-6"
       >
-        <Field label="미션명" name="title" required defaultValue={mission.title} />
+        <Field label="숲길 이름" name="title" required defaultValue={mission.title} />
         <div>
           <label className="mb-1 block text-sm font-medium">설명</label>
           <textarea
@@ -62,7 +62,7 @@ export default async function EditMissionPage({
           />
         </div>
         <Field
-          label="배점"
+          label="도토리 배점"
           name="points"
           type="number"
           required
@@ -71,7 +71,7 @@ export default async function EditMissionPage({
 
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" name="auto_approve" defaultChecked={mission.auto_approve} />
-          자동 승인 (제출 즉시 점수 반영)
+          자동 승인 (제출 즉시 도토리 반영)
         </label>
 
         <button

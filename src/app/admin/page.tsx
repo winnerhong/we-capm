@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { WinnerTalkIcon } from "@/components/winner-talk-icon";
 
 export default async function AdminHome() {
   const supabase = await createClient();
@@ -48,24 +47,86 @@ export default async function AdminHome() {
         </div>
       </div>
 
-      {/* 빠른 액션 */}
-      <div className="grid grid-cols-3 gap-3">
-        <Link href="/admin/events/new"
-          className="flex flex-col items-center gap-2 rounded-xl border-2 border-dashed border-violet-300 bg-violet-50 p-4 hover:border-violet-500 hover:shadow-md transition-all">
-          <span className="text-2xl">➕</span>
-          <span className="text-sm font-semibold text-violet-700">새 행사</span>
-        </Link>
-        <Link href="/admin/chat"
-          className="flex flex-col items-center gap-2 rounded-xl border bg-white p-4 hover:border-violet-500 hover:shadow-md transition-all">
-          <WinnerTalkIcon size={28} />
-          <span className="text-sm font-semibold">토리톡</span>
-        </Link>
-        <Link href="/admin/stats"
-          className="flex flex-col items-center gap-2 rounded-xl border bg-white p-4 hover:border-violet-500 hover:shadow-md transition-all">
-          <span className="text-2xl">📊</span>
-          <span className="text-sm font-semibold">전체통계</span>
-        </Link>
-      </div>
+      {/* 매출 한눈에 */}
+      <section className="rounded-2xl bg-gradient-to-br from-[#FFF8F0] to-[#F5E6D3] border border-[#E5D3B8] p-5 relative overflow-hidden">
+        <div className="absolute top-2 right-3 text-3xl opacity-20 select-none">🌰</div>
+        <div className="absolute bottom-2 right-8 text-2xl opacity-10 select-none">🌰</div>
+        <div className="relative z-10">
+          <h2 className="text-sm font-bold text-[#6B4423] flex items-center gap-1.5">
+            <span>💰</span>
+            <span>이번달 매출</span>
+          </h2>
+          <div className="mt-3 grid grid-cols-3 gap-2">
+            <div className="rounded-xl bg-white/70 backdrop-blur-sm p-3 border border-white/50">
+              <div className="text-[10px] font-medium text-[#8B6F47]">매출</div>
+              <div className="text-lg font-extrabold text-[#6B4423] mt-0.5">0원</div>
+            </div>
+            <div className="rounded-xl bg-white/70 backdrop-blur-sm p-3 border border-white/50">
+              <div className="text-[10px] font-medium text-[#8B6F47]">업체</div>
+              <div className="text-lg font-extrabold text-[#6B4423] mt-0.5">0곳 <span className="text-[10px] font-medium">활동</span></div>
+            </div>
+            <div className="rounded-xl bg-white/70 backdrop-blur-sm p-3 border border-white/50">
+              <div className="text-[10px] font-medium text-[#8B6F47]">MRR</div>
+              <div className="text-lg font-extrabold text-[#6B4423] mt-0.5">0원</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 핵심 메뉴 8칸 */}
+      <section>
+        <h2 className="text-sm font-bold text-[#2D5A3D] mb-3 px-1">🌲 숲의 메뉴</h2>
+        <div className="grid grid-cols-4 gap-2.5">
+          <Link href="/admin/events/new"
+            className="rounded-2xl border border-[#D4E4BC] bg-white p-4 flex flex-col items-center gap-1.5 hover:border-[#2D5A3D] hover:shadow-md transition-all">
+            <span className="text-3xl">🌲</span>
+            <span className="text-sm font-semibold text-[#2D5A3D] text-center">새 숲 다람이</span>
+            <span className="text-[10px] text-[#6B6560]">숲길 열기</span>
+          </Link>
+          <Link href="/admin/chat"
+            className="rounded-2xl border border-[#D4E4BC] bg-white p-4 flex flex-col items-center gap-1.5 hover:border-[#2D5A3D] hover:shadow-md transition-all">
+            <span className="text-3xl">🌰</span>
+            <span className="text-sm font-semibold text-[#2D5A3D] text-center">토리톡</span>
+            <span className="text-[10px] text-[#6B6560]">이야기 나누기</span>
+          </Link>
+          <Link href="/admin/stats"
+            className="rounded-2xl border border-[#D4E4BC] bg-white p-4 flex flex-col items-center gap-1.5 hover:border-[#2D5A3D] hover:shadow-md transition-all">
+            <span className="text-3xl">📊</span>
+            <span className="text-sm font-semibold text-[#2D5A3D] text-center">전체 통계</span>
+            <span className="text-[10px] text-[#6B6560]">숲의 현황</span>
+          </Link>
+          <Link href="/admin/partners"
+            className="rounded-2xl border border-[#D4E4BC] bg-white p-4 flex flex-col items-center gap-1.5 hover:border-[#2D5A3D] hover:shadow-md transition-all">
+            <span className="text-3xl">🏢</span>
+            <span className="text-sm font-semibold text-[#2D5A3D] text-center">숲지기 관리</span>
+            <span className="text-[10px] text-[#6B6560]">파트너 업체</span>
+          </Link>
+          <Link href="/admin/challenges"
+            className="rounded-2xl border border-[#D4E4BC] bg-white p-4 flex flex-col items-center gap-1.5 hover:border-[#2D5A3D] hover:shadow-md transition-all">
+            <span className="text-3xl">🎯</span>
+            <span className="text-sm font-semibold text-[#2D5A3D] text-center">챌린지 관리</span>
+            <span className="text-[10px] text-[#6B6560]">주간 챌린지</span>
+          </Link>
+          <Link href="/admin/acorns"
+            className="rounded-2xl border border-[#D4E4BC] bg-white p-4 flex flex-col items-center gap-1.5 hover:border-[#2D5A3D] hover:shadow-md transition-all">
+            <span className="text-3xl">🎁</span>
+            <span className="text-sm font-semibold text-[#2D5A3D] text-center">도토리 충전</span>
+            <span className="text-[10px] text-[#6B6560]">크레딧 충전</span>
+          </Link>
+          <Link href="/admin/ads"
+            className="rounded-2xl border border-[#D4E4BC] bg-white p-4 flex flex-col items-center gap-1.5 hover:border-[#2D5A3D] hover:shadow-md transition-all">
+            <span className="text-3xl">📣</span>
+            <span className="text-sm font-semibold text-[#2D5A3D] text-center">숲속 정령</span>
+            <span className="text-[10px] text-[#6B6560]">광고 관리</span>
+          </Link>
+          <Link href="/admin/settings"
+            className="rounded-2xl border border-[#D4E4BC] bg-white p-4 flex flex-col items-center gap-1.5 hover:border-[#2D5A3D] hover:shadow-md transition-all">
+            <span className="text-3xl">⚙️</span>
+            <span className="text-sm font-semibold text-[#2D5A3D] text-center">시스템 설정</span>
+            <span className="text-[10px] text-[#6B6560]">운영 설정</span>
+          </Link>
+        </div>
+      </section>
 
       {/* 최근 행사 */}
       <section className="rounded-2xl border bg-white p-5">
@@ -108,6 +169,40 @@ export default async function AdminHome() {
             </p>
           </div>
         )}
+      </section>
+
+      {/* 14가지 수익원 미니 대시보드 */}
+      <section className="rounded-2xl border border-[#E5D3B8] bg-gradient-to-br from-white to-[#FFF8F0] p-5">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-sm font-bold text-[#6B4423] flex items-center gap-1.5">
+            <span>💎</span>
+            <span>수익원 현황</span>
+          </h2>
+          <span className="text-[10px] text-[#8B6F47] font-medium">14개 수익 모델</span>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          {[
+            { icon: "🌰", label: "크레딧 판매" },
+            { icon: "📅", label: "구독 서비스" },
+            { icon: "💼", label: "B2B 행사" },
+            { icon: "🎪", label: "마켓 수수료" },
+            { icon: "👑", label: "프리미엄 멤버십" },
+            { icon: "📢", label: "광고 게재" },
+            { icon: "🎟️", label: "쿠폰 판매" },
+            { icon: "📦", label: "구독박스" },
+            { icon: "📸", label: "포토 서비스" },
+            { icon: "🌱", label: "ESG 프로그램" },
+          ].map((item) => (
+            <div key={item.label} className="flex items-center justify-between rounded-xl bg-white/70 border border-[#E5D3B8]/50 px-3 py-2">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <span className="text-base flex-shrink-0">{item.icon}</span>
+                <span className="text-xs font-medium text-[#6B4423] truncate">{item.label}</span>
+              </div>
+              <span className="text-[9px] font-semibold text-[#8B6F47] bg-[#F5E6D3] rounded-full px-1.5 py-0.5 flex-shrink-0">준비 중</span>
+            </div>
+          ))}
+        </div>
+        <p className="mt-3 text-[10px] text-[#8B6F47] text-center">나머지 4개 수익원은 곧 공개됩니다 🌳</p>
       </section>
     </div>
   );

@@ -35,13 +35,13 @@ export default async function MissionsPage({ params }: { params: Promise<{ id: s
           <Link href={`/admin/events/${id}`} className="text-sm text-neutral-500 hover:underline">
             ← {event.name}
           </Link>
-          <h1 className="text-2xl font-bold">미션 관리</h1>
+          <h1 className="text-2xl font-bold">숲길 관리</h1>
         </div>
         <Link
           href={`/admin/events/${id}/missions/new`}
           className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700"
         >
-          + 새 미션
+          + 새 숲길
         </Link>
       </div>
 
@@ -60,7 +60,7 @@ export default async function MissionsPage({ params }: { params: Promise<{ id: s
                   {TEMPLATE_LABEL[m.template_type] ?? m.template_type}
                 </span>
                 <span className="font-semibold">{m.title}</span>
-                <span className="text-sm text-neutral-500">{m.points}점</span>
+                <span className="text-sm text-neutral-500">🌰 {m.points}</span>
                 {m.auto_approve && (
                   <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs text-green-700">
                     자동 승인
@@ -114,9 +114,9 @@ export default async function MissionsPage({ params }: { params: Promise<{ id: s
         </ul>
       ) : (
         <div className="rounded-lg border bg-white p-12 text-center text-neutral-500">
-          아직 등록된 미션이 없습니다.{" "}
+          아직 등록된 숲길이 없어요.{" "}
           <Link href={`/admin/events/${id}/missions/new`} className="text-violet-600 hover:underline">
-            첫 미션 만들기 →
+            첫 숲길 만들기 →
           </Link>
         </div>
       )}

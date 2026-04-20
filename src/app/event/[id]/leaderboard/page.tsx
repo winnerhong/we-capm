@@ -31,7 +31,7 @@ export default async function LeaderboardPage({
   if (!event.show_leaderboard) {
     return (
       <main className="flex min-h-dvh items-center justify-center p-6">
-        <p className="text-sm text-neutral-500">이 행사는 리더보드가 비공개입니다</p>
+        <p className="text-sm text-neutral-500">이 숲길은 명예의 전당이 비공개예요</p>
       </main>
     );
   }

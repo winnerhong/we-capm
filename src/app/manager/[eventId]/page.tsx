@@ -38,6 +38,17 @@ export default async function ManagerDashboard({ params }: { params: Promise<{ e
     .from("participants").select("id, phone, total_score")
     .eq("event_id", id).order("total_score", { ascending: false }).limit(3);
 
+  const { data: allScores } = await supabase.from("participants").select("total_score").eq("event_id", id);
+  const avgScore = allScores && allScores.length > 0
+    ? Math.round(allScores.reduce((sum, p) => sum + (p.total_score ?? 0), 0) / allScores.length)
+    : 0;
+
+  const now = new Date();
+  const startAt = new Date(event.start_at);
+  const diffMs = startAt.getTime() - now.getTime();
+  const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+  const ddayLabel = diffDays === 0 ? "D-DAY" : diffDays > 0 ? `D-${diffDays}` : `D+${Math.abs(diffDays)}`;
+
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://we-capm.vercel.app";
   const joinUrl = `${appUrl}/join/${event.join_code}`;
   const next = NEXT_STATUS[event.status];
@@ -49,7 +60,7 @@ export default async function ManagerDashboard({ params }: { params: Promise<{ e
     { done: true, label: "행사 정보 입력", link: `/admin/events/${id}/edit` },
     { done: teacherCount > 0, label: `참가 선생님 등록 (${teacherCount}명)`, link: `/admin/events/${id}/staff` },
     { done: familyCount > 0, label: `참가 가족 등록 (${familyCount}명)`, link: `/admin/events/${id}/registrations` },
-    { done: (missionCount ?? 0) > 0, label: `미션 만들기 (${missionCount ?? 0}개)`, link: `/admin/events/${id}/missions` },
+    { done: (missionCount ?? 0) > 0, label: `숲길 만들기 (${missionCount ?? 0}개)`, link: `/admin/events/${id}/missions` },
     { done: (rewardCount ?? 0) > 0, label: `보상 만들기 (${rewardCount ?? 0}개)`, link: `/admin/events/${id}/rewards` },
   ];
 
@@ -89,12 +100,48 @@ export default async function ManagerDashboard({ params }: { params: Promise<{ e
           </div>
           <div className="rounded-xl bg-white/15 p-3 text-center backdrop-blur-sm">
             <div className="text-2xl font-bold">{missionCount ?? 0}</div>
-            <div className="text-xs opacity-80">🍃 미션</div>
+            <div className="text-xs opacity-80">🍃 숲길</div>
           </div>
           <Link href={`/admin/events/${id}/submissions`} className="rounded-xl bg-white/15 p-3 text-center backdrop-blur-sm transition-colors hover:bg-white/25">
             <div className={`text-2xl font-bold ${(pendingCount ?? 0) > 0 ? "text-[#F5D58C]" : ""}`}>{pendingCount ?? 0}</div>
             <div className="text-xs opacity-80">🌰 승인 대기</div>
           </Link>
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        <h2 className="font-bold text-[#2D5A3D]">🏫 숲친구들 CRM</h2>
+        <div className="grid grid-cols-3 gap-3">
+          <div className="rounded-2xl border border-[#D4E4BC] bg-white p-4 text-center shadow-sm">
+            <div className="text-2xl" aria-hidden>🐿️</div>
+            <div className="mt-1 text-xs text-[#6B6560]">참가 다람이가족</div>
+            <div className="mt-1 text-lg font-bold text-[#2D5A3D]">
+              {familyCount}<span className="text-xs font-normal text-[#6B6560]">명 / 목표 {regCount ?? 0}명</span>
+            </div>
+          </div>
+          <div className="rounded-2xl border border-[#D4E4BC] bg-white p-4 text-center shadow-sm">
+            <div className="text-2xl" aria-hidden>📊</div>
+            <div className="mt-1 text-xs text-[#6B6560]">평균 도토리</div>
+            <div className="mt-1 text-lg font-bold text-[#2D5A3D]">
+              {avgScore}<span className="text-xs font-normal text-[#6B6560]">점</span>
+            </div>
+          </div>
+          <div className="rounded-2xl border border-[#D4E4BC] bg-white p-4 text-center shadow-sm">
+            <div className="text-2xl" aria-hidden>💬</div>
+            <div className="mt-1 text-xs text-[#6B6560]">오늘 토리톡</div>
+            <div className="mt-1 text-sm font-bold text-[#2D5A3D]">활발해요 🌿</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-[#D4E4BC] bg-[#FFF8F0] p-5 shadow-sm">
+        <div className="flex items-center justify-between">
+          <h2 className="font-bold text-[#2D5A3D]">📆 다음 일정</h2>
+          <span className="rounded-full bg-[#2D5A3D] px-3 py-1 text-xs font-bold text-white">{ddayLabel}</span>
+        </div>
+        <div className="mt-3 space-y-1.5 text-sm text-[#2C2C2C]">
+          <div>🌅 시작: <strong className="text-[#2D5A3D]">{startAt.toLocaleString("ko-KR", { year: "numeric", month: "long", day: "numeric", weekday: "short", hour: "2-digit", minute: "2-digit" })}</strong></div>
+          <div>📍 장소: <strong className="text-[#2D5A3D]">{event.location}</strong></div>
         </div>
       </div>
 
@@ -130,7 +177,7 @@ export default async function ManagerDashboard({ params }: { params: Promise<{ e
             </Link>
             <Link href={`/admin/events/${id}/chat`}
               className="flex flex-col items-center gap-2 rounded-2xl border-2 border-[#E8F0E4] bg-white p-4 shadow-sm transition-colors hover:border-[#4A7C59]">
-              <span className="text-3xl">🍃</span><span className="font-semibold text-[#2C2C2C]">채팅/공지</span>
+              <span className="text-3xl">🍃</span><span className="font-semibold text-[#2C2C2C]">토리톡/공지</span>
             </Link>
             <Link href={`/admin/events/${id}/entry-status`}
               className="flex flex-col items-center gap-2 rounded-2xl border-2 border-[#E8F0E4] bg-white p-4 shadow-sm transition-colors hover:border-[#4A7C59]">
@@ -150,7 +197,7 @@ export default async function ManagerDashboard({ params }: { params: Promise<{ e
               return (
                 <li key={p.id} className="flex items-center justify-between rounded-xl bg-[#E8F0E4] p-3">
                   <span className="font-semibold text-[#2C2C2C]">{medal} {name}</span>
-                  <span className="font-bold text-[#2D5A3D]">{p.total_score}점</span>
+                  <span className="font-bold text-[#2D5A3D]">🌰 {p.total_score}</span>
                 </li>
               );
             })}

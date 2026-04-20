@@ -10,7 +10,7 @@ const TYPE_ICON: Record<string, string> = {
   POINT: "🏅", RANK: "🏆", BADGE: "🎖️", LOTTERY: "🎰", INSTANT: "⚡",
 };
 const TYPE_LABEL: Record<string, string> = {
-  POINT: "점수 누적", RANK: "순위", BADGE: "뱃지", LOTTERY: "추첨", INSTANT: "즉시",
+  POINT: "도토리 누적", RANK: "숲지기 순위", BADGE: "뱃지", LOTTERY: "추첨", INSTANT: "즉시",
 };
 
 export default async function RewardsPage({ params }: { params: Promise<{ id: string }> }) {
@@ -107,11 +107,11 @@ export default async function RewardsPage({ params }: { params: Promise<{ id: st
                       </div>
                       {r.description && <p className="text-xs text-[#6B6560] mt-0.5">{r.description}</p>}
                       <p className="text-xs text-[#6B6560] mt-1">
-                        {r.reward_type === "POINT" && `${config.threshold}점 이상`}
+                        {r.reward_type === "POINT" && `🌰 ${config.threshold}개 이상`}
                         {r.reward_type === "RANK" && `${config.rankFrom}~${config.rankTo}등`}
-                        {r.reward_type === "LOTTERY" && `최소 ${config.minScore}점 · ${config.winners}명 추첨`}
-                        {r.reward_type === "BADGE" && `미션 완료 시`}
-                        {r.reward_type === "INSTANT" && `미션 승인 즉시`}
+                        {r.reward_type === "LOTTERY" && `🌰 ${config.minScore}개 이상 · ${config.winners}명 추첨`}
+                        {r.reward_type === "BADGE" && `숲길 걸음 완료 시`}
+                        {r.reward_type === "INSTANT" && `숲길 승인 즉시`}
                         {r.quantity ? ` · 한정 ${r.quantity}개` : ""}
                       </p>
                     </div>

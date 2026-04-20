@@ -40,6 +40,8 @@ export default async function ManagerLayout({
             <Link href={`/admin/events/${eventId}/registrations`} className="rounded-lg px-3 py-1.5 text-[#2C2C2C] hover:bg-[#E8F0E4] hover:text-[#2D5A3D]">참가자</Link>
             <Link href={`/admin/events/${eventId}/staff`} className="rounded-lg px-3 py-1.5 text-[#2C2C2C] hover:bg-[#E8F0E4] hover:text-[#2D5A3D]">선생님</Link>
             <Link href={`/admin/events/${eventId}/chat`} className="rounded-lg px-3 py-1.5 text-[#2C2C2C] hover:bg-[#E8F0E4] hover:text-[#2D5A3D]">채팅</Link>
+            <Link href={`/manager/${eventId}/report`} className="rounded-lg px-3 py-1.5 text-[#2C2C2C] hover:bg-[#E8F0E4] hover:text-[#2D5A3D]">📋 행사 리포트</Link>
+            <Link href={`/manager/${eventId}/announce`} className="rounded-lg px-3 py-1.5 text-[#2C2C2C] hover:bg-[#E8F0E4] hover:text-[#2D5A3D]">💬 학부모 공지</Link>
             <span className="ml-2 rounded-full bg-[#E8F0E4] px-3 py-1 text-xs font-semibold text-[#2D5A3D]">{managerId}</span>
             <form action="/api/auth/manager-logout" method="post">
               <button className="rounded-lg border border-[#E8F0E4] px-3 py-1 text-xs text-[#6B6560] hover:bg-neutral-50">로그아웃</button>

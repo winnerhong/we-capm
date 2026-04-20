@@ -7,10 +7,10 @@ import { createMissionAction } from "../actions";
 import type { TemplateType } from "@/lib/supabase/database.types";
 
 const TEMPLATES: { value: TemplateType; label: string; description: string }[] = [
-  { value: "PHOTO", label: "📸 사진 미션", description: "지정된 장면을 촬영해 인증" },
+  { value: "PHOTO", label: "📸 사진 숲길", description: "지정된 장면을 촬영해 인증" },
   { value: "QUIZ", label: "✍️ 퀴즈", description: "질문에 정답 입력 (자동 채점 가능)" },
-  { value: "LOCATION", label: "📍 위치 미션", description: "특정 장소 방문 GPS 자동 인증" },
-  { value: "VIDEO", label: "🎥 영상 미션", description: "짧은 영상 촬영 후 업로드" },
+  { value: "LOCATION", label: "📍 위치 숲길", description: "특정 장소 방문 GPS 자동 인증" },
+  { value: "VIDEO", label: "🎥 영상 숲길", description: "짧은 영상 촬영 후 업로드" },
   { value: "TIMEATTACK", label: "🏃 타임어택", description: "제한시간 내 수행 + 카운트다운" },
 ];
 
@@ -25,13 +25,13 @@ export default function NewMissionPage({ params }: { params: Promise<{ id: strin
           href={`/admin/events/${eventId}/missions`}
           className="text-sm text-neutral-500 hover:underline"
         >
-          ← 미션 목록
+          ← 숲길 목록
         </Link>
-        <h1 className="text-2xl font-bold">새 미션</h1>
+        <h1 className="text-2xl font-bold">새 숲길</h1>
       </div>
 
       <div className="space-y-2">
-        <label className="text-sm font-medium">미션 종류</label>
+        <label className="text-sm font-medium">숲길 종류</label>
         <div className="grid grid-cols-1 gap-2">
           {TEMPLATES.map((t) => {
             const disabled = false;
@@ -61,7 +61,7 @@ export default function NewMissionPage({ params }: { params: Promise<{ id: strin
       >
         <input type="hidden" name="template_type" value={template} />
 
-        <Field label="미션명" name="title" required placeholder="가족 사진 찍기" />
+        <Field label="숲길 이름" name="title" required placeholder="가족 사진 찍기" />
         <div>
           <label className="mb-1 block text-sm font-medium">설명</label>
           <textarea
@@ -72,7 +72,7 @@ export default function NewMissionPage({ params }: { params: Promise<{ id: strin
             className="w-full rounded-lg border px-3 py-2 text-base outline-none focus:ring-2 focus:ring-violet-500"
           />
         </div>
-        <Field label="배점" name="points" type="number" required defaultValue="10" />
+        <Field label="도토리 배점" name="points" type="number" required defaultValue="10" />
 
         {template === "PHOTO" && (
           <div className="grid grid-cols-2 gap-3">
@@ -134,7 +134,7 @@ export default function NewMissionPage({ params }: { params: Promise<{ id: strin
 
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" name="auto_approve" defaultChecked={template === "QUIZ"} />
-          자동 승인 (제출 즉시 점수 반영)
+          자동 승인 (제출 즉시 도토리 반영)
         </label>
 
         <button

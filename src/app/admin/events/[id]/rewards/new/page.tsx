@@ -6,11 +6,11 @@ import { createRewardAction } from "../actions";
 import type { RewardType } from "@/lib/supabase/database.types";
 
 const TYPES: { value: RewardType; label: string; desc: string }[] = [
-  { value: "POINT", label: "🏅 점수 누적형", desc: "N점 이상 도달 시 자동 수령" },
-  { value: "INSTANT", label: "⚡ 즉시 보상형", desc: "특정 미션 승인 즉시 수령" },
-  { value: "BADGE", label: "🎖️ 뱃지", desc: "특정 미션 완료 시 획득" },
-  { value: "LOTTERY", label: "🎲 추첨형", desc: "행사 종료 후 추첨 실행" },
-  { value: "RANK", label: "🏆 순위형", desc: "행사 종료 시 상위 등수에게" },
+  { value: "POINT", label: "🌰 도토리 누적형", desc: "도토리 N개 이상 모으면 자동 수령" },
+  { value: "INSTANT", label: "⚡ 즉시 보상형", desc: "특정 숲길 승인 즉시 수령" },
+  { value: "BADGE", label: "🎖️ 뱃지", desc: "특정 숲길 걸음 완료 시 획득" },
+  { value: "LOTTERY", label: "🎲 추첨형", desc: "숲길 종료 후 추첨 실행" },
+  { value: "RANK", label: "🏆 숲지기 순위형", desc: "숲길 종료 시 상위 등수에게" },
 ];
 
 export default function NewRewardPage({ params }: { params: Promise<{ id: string }> }) {
@@ -55,7 +55,7 @@ export default function NewRewardPage({ params }: { params: Promise<{ id: string
 
         {type === "POINT" && (
           <Field
-            label="임계 점수"
+            label="🌰 필요 도토리 수"
             name="threshold"
             type="number"
             required
@@ -64,7 +64,7 @@ export default function NewRewardPage({ params }: { params: Promise<{ id: string
         )}
 
         {(type === "BADGE" || type === "INSTANT") && (
-          <Field label="미션 ID" name="mission_id" required placeholder="mission UUID" />
+          <Field label="숲길 ID" name="mission_id" required placeholder="mission UUID" />
         )}
 
         {type === "RANK" && (
@@ -77,7 +77,7 @@ export default function NewRewardPage({ params }: { params: Promise<{ id: string
         {type === "LOTTERY" && (
           <>
             <Field
-              label="응모 최소 점수"
+              label="응모 최소 도토리"
               name="lottery_min_score"
               type="number"
               defaultValue="0"

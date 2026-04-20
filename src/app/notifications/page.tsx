@@ -30,7 +30,7 @@ export default async function NotificationsPage() {
         </Link>
 
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold">알림</h1>
+          <h1 className="text-2xl font-bold">숲의 소식</h1>
           {unreadCount > 0 && (
             <form action={markAllReadAction}>
               <button className="text-sm text-violet-600 hover:underline">모두 읽음</button>
@@ -62,7 +62,7 @@ export default async function NotificationsPage() {
           </ul>
         ) : (
           <div className="rounded-lg border bg-white p-12 text-center text-sm">
-            알림이 없습니다
+            아직 숲의 소식이 없어요
           </div>
         )}
       </div>
