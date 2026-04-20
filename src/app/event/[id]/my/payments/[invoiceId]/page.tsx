@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { getParticipant } from "@/lib/participant-session";
 import { createClient } from "@/lib/supabase/server";
@@ -80,22 +79,13 @@ export default async function PaymentDetailPage({
   params,
   searchParams,
 }: {
-  params: Promise<{ id: string }>;
+  params: Promise<{ id: string; invoiceId: string }>;
   searchParams: Promise<{ refund?: string }>;
 }) {
   const awaitedParams = await params;
-  const invoiceId = awaitedParams.id;
+  const invoiceId = awaitedParams.invoiceId;
+  const eventId = awaitedParams.id;
   const { refund } = await searchParams;
-
-  // eventId는 요청 경로에서 추출
-  const hdrs = await headers();
-  const pathname =
-    hdrs.get("x-next-pathname") ??
-    hdrs.get("x-pathname") ??
-    hdrs.get("referer") ??
-    "";
-  const match = pathname.match(/\/event\/([^/?#]+)\/my\/payments/);
-  const eventId = match?.[1] ?? "";
 
   if (!eventId) {
     // 경로 추출 실패 시 목록으로 되돌릴 수 없음 → /join

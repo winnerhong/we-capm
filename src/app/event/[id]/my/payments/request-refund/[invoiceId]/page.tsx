@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { getParticipant } from "@/lib/participant-session";
 import { createClient } from "@/lib/supabase/server";
@@ -83,19 +82,11 @@ function calcRefundPolicy(paidAt: string | null, total: number) {
 export default async function RefundRequestPage({
   params,
 }: {
-  params: Promise<{ id: string }>;
+  params: Promise<{ id: string; invoiceId: string }>;
 }) {
   const awaitedParams = await params;
-  const invoiceId = awaitedParams.id;
-
-  const hdrs = await headers();
-  const pathname =
-    hdrs.get("x-next-pathname") ??
-    hdrs.get("x-pathname") ??
-    hdrs.get("referer") ??
-    "";
-  const match = pathname.match(/\/event\/([^/?#]+)\/my\/payments/);
-  const eventId = match?.[1] ?? "";
+  const invoiceId = awaitedParams.invoiceId;
+  const eventId = awaitedParams.id;
 
   if (!eventId) redirect("/join");
 
