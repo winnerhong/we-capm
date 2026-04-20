@@ -31,7 +31,7 @@ const menus: MenuCard[] = [
     desc: "활성·만료 쿠폰 한눈에",
   },
   {
-    href: "/store/dashboard#new-coupon",
+    href: "/store/coupons/new",
     icon: "✨",
     title: "새 쿠폰 만들기",
     desc: "4단계 마법사로 쉽게",
@@ -128,7 +128,7 @@ export default function StoreDashboardPage() {
             </p>
           </div>
           <Link
-            href="/store/dashboard#new-coupon"
+            href="/store/coupons/new"
             className="inline-flex items-center justify-center gap-1 self-start rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-[#8B5E3C] shadow-sm transition hover:bg-[#FFF8F0] md:self-auto"
           >
             ✨ 새 쿠폰 만들기

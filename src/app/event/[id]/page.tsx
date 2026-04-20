@@ -148,7 +148,7 @@ export default async function EventHomePage({ params }: { params: Promise<{ id: 
         )}
 
         {/* 오늘의 선물 (쿠폰) */}
-        <CouponCard />
+        <CouponCard eventId={id} />
 
         {/* 완료 미션 */}
         {completedCount > 0 && (
