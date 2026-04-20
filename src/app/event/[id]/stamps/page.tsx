@@ -4,6 +4,7 @@ import { getParticipant } from "@/lib/participant-session";
 import { RealtimeRefresh } from "@/components/realtime-refresh";
 import type { StampTierConfig } from "@/lib/supabase/database.types";
 import { StampQRModal } from "./stamp-qr";
+import { AlbumSection } from "./album-section";
 
 export const dynamic = "force-dynamic";
 
@@ -96,6 +97,7 @@ export default async function EventStampsPage({ params }: { params: Promise<{ id
     .order("order", { ascending: true });
 
   let stampedSlotIds = new Set<string>();
+  let albumPhotos: Array<{ id: string; slot_id: string; photo_url: string; caption: string | null; created_at: string }> = [];
   if (participant) {
     const slotIds = (slots ?? []).map((s) => s.id);
     if (slotIds.length > 0) {
@@ -105,6 +107,14 @@ export default async function EventStampsPage({ params }: { params: Promise<{ id
         .eq("participant_id", participant.id)
         .in("slot_id", slotIds);
       stampedSlotIds = new Set((records ?? []).map((r) => r.slot_id));
+
+      const { data: albums } = await supabase
+        .from("stamp_albums")
+        .select("id, slot_id, photo_url, caption, created_at")
+        .eq("participant_id", participant.id)
+        .in("slot_id", slotIds)
+        .order("created_at", { ascending: false });
+      albumPhotos = albums ?? [];
     }
   }
 
@@ -270,6 +280,17 @@ export default async function EventStampsPage({ params }: { params: Promise<{ id
               </div>
             </div>
           </section>
+        )}
+
+        {/* Album section - 스탬프 찍은 슬롯들에 대한 사진 업로드 */}
+        {participant && stampedSlotIds.size > 0 && (
+          <AlbumSection
+            eventId={id}
+            stampedSlots={(slots ?? [])
+              .filter((s) => stampedSlotIds.has(s.id))
+              .map((s) => ({ id: s.id, name: s.name, icon: s.icon }))}
+            photos={albumPhotos}
+          />
         )}
 
         {/* All stamps collected */}

@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { generateJoinCode } from "@/lib/codes";
 import type { EventStatus, EventType, ParticipationType } from "@/lib/supabase/database.types";
-import { confirmResults } from "@/lib/event-lifecycle";
+import { confirmResults, postReviewRequest } from "@/lib/event-lifecycle";
 import { queueEventEndCoupons } from "@/lib/coupon-delivery";
 import { getAllSchools } from "@/lib/school-db";
 import { requireAdmin, requireAdminOrManager } from "@/lib/auth-guard";
@@ -116,6 +116,7 @@ export async function updateEventStatusAction(eventId: string, status: EventStat
     // Auto-deliver coupons when status is manually flipped to ENDED
     if (status === "ENDED") {
       await queueEventEndCoupons(supabase, eventId);
+      await postReviewRequest(supabase, eventId);
     }
   }
 

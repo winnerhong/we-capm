@@ -22,7 +22,7 @@ const STATS: StatCard[] = [
 ];
 
 const MENUS: MenuItem[] = [
-  { icon: "🗺️", label: "프로그램 관리", href: "/partner/dashboard", desc: "체험 상품 등록" },
+  { icon: "🗺️", label: "프로그램 관리", href: "/partner/programs", desc: "체험 상품 등록" },
   { icon: "🎨", label: "나만의 숲길", href: "/partner/dashboard", desc: "QR · 미션" },
   { icon: "🏫", label: "기관 고객", href: "/partner/dashboard", desc: "B2B2C" },
   { icon: "👥", label: "개인 고객", href: "/partner/dashboard", desc: "B2C" },

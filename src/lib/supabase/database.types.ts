@@ -847,6 +847,72 @@ export interface Database {
         };
         Relationships: [];
       };
+      partner_programs: {
+        Row: {
+          id: string;
+          partner_id: string | null;
+          title: string;
+          description: string | null;
+          category: "FOREST" | "CAMPING" | "KIDS" | "FAMILY" | "TEAM" | "ART";
+          duration_hours: number | null;
+          capacity_min: number | null;
+          capacity_max: number | null;
+          price_per_person: number;
+          b2b_price_per_person: number | null;
+          location_region: string | null;
+          location_detail: string | null;
+          image_url: string | null;
+          tags: string[] | null;
+          rating_avg: number | null;
+          rating_count: number;
+          booking_count: number;
+          is_published: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          partner_id?: string | null;
+          title: string;
+          description?: string | null;
+          category: "FOREST" | "CAMPING" | "KIDS" | "FAMILY" | "TEAM" | "ART";
+          duration_hours?: number | null;
+          capacity_min?: number | null;
+          capacity_max?: number | null;
+          price_per_person: number;
+          b2b_price_per_person?: number | null;
+          location_region?: string | null;
+          location_detail?: string | null;
+          image_url?: string | null;
+          tags?: string[] | null;
+          rating_avg?: number | null;
+          rating_count?: number;
+          booking_count?: number;
+          is_published?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          partner_id?: string | null;
+          title?: string;
+          description?: string | null;
+          category?: "FOREST" | "CAMPING" | "KIDS" | "FAMILY" | "TEAM" | "ART";
+          duration_hours?: number | null;
+          capacity_min?: number | null;
+          capacity_max?: number | null;
+          price_per_person?: number;
+          b2b_price_per_person?: number | null;
+          location_region?: string | null;
+          location_detail?: string | null;
+          image_url?: string | null;
+          tags?: string[] | null;
+          rating_avg?: number | null;
+          rating_count?: number;
+          booking_count?: number;
+          is_published?: boolean;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       challenges: {
         Row: {
           id: string;
@@ -891,6 +957,48 @@ export interface Database {
           starts_at?: string;
           ends_at?: string;
           status?: "ACTIVE" | "ENDED" | "ARCHIVED";
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      event_reviews: {
+        Row: {
+          id: string;
+          event_id: string;
+          participant_phone: string;
+          participant_name: string | null;
+          rating: number;
+          comment: string | null;
+          mission_highlight: string | null;
+          improvement: string | null;
+          photo_consent: boolean;
+          is_public: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          event_id: string;
+          participant_phone: string;
+          participant_name?: string | null;
+          rating: number;
+          comment?: string | null;
+          mission_highlight?: string | null;
+          improvement?: string | null;
+          photo_consent?: boolean;
+          is_public?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          event_id?: string;
+          participant_phone?: string;
+          participant_name?: string | null;
+          rating?: number;
+          comment?: string | null;
+          mission_highlight?: string | null;
+          improvement?: string | null;
+          photo_consent?: boolean;
+          is_public?: boolean;
           created_at?: string;
         };
         Relationships: [];

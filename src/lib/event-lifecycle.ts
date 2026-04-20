@@ -4,6 +4,33 @@ import { queueEventEndCoupons } from "./coupon-delivery";
 
 type DBClient = SupabaseClient<Database>;
 
+/**
+ * Post a review request system message to the event's 전체 단톡방.
+ * Stub: just posts the chat message. SMS/Push 등은 추후 확장.
+ * Swallows errors — review prompt is nice-to-have, never blocks event end.
+ */
+export async function postReviewRequest(supabase: DBClient, eventId: string) {
+  try {
+    const { data: groupRoom } = await supabase
+      .from("chat_rooms")
+      .select("id")
+      .eq("event_id", eventId)
+      .eq("name", "💬 전체 단톡방")
+      .maybeSingle();
+
+    if (!groupRoom) return;
+
+    await supabase.from("chat_messages").insert({
+      room_id: groupRoom.id,
+      sender_name: "시스템",
+      type: "SYSTEM",
+      content: `🌱 행사가 끝났어요! 소중한 후기를 남겨주세요 → /event/${eventId}/review`,
+    });
+  } catch (err) {
+    console.error("[event-lifecycle] postReviewRequest failed", err);
+  }
+}
+
 export async function checkAndEndEvent(supabase: DBClient, eventId: string) {
   const { data: event } = await supabase
     .from("events")
@@ -17,6 +44,8 @@ export async function checkAndEndEvent(supabase: DBClient, eventId: string) {
     await supabase.from("events").update({ status: "ENDED" }).eq("id", eventId);
     // Auto-deliver coupons on event end (failures are swallowed inside)
     await queueEventEndCoupons(supabase, eventId);
+    // Ask participants for reviews (stub: group chat system message)
+    await postReviewRequest(supabase, eventId);
   }
 }
 
@@ -80,4 +109,7 @@ export async function confirmResults(supabase: DBClient, eventId: string, userId
   // Also deliver coupons on confirm, in case the event skipped straight past ENDED.
   // Idempotent: duplicates are filtered inside.
   await queueEventEndCoupons(supabase, eventId);
+  // Ask for reviews here too (no-op if the group room already has a review prompt
+  // — duplicate SYSTEM messages are harmless and rare).
+  await postReviewRequest(supabase, eventId);
 }
