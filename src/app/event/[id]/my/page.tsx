@@ -128,6 +128,21 @@ export default async function MyPage({
     .select("id", { count: "exact", head: true })
     .eq("phone", session.phone);
 
+  // 누적 결제액 (PAID + CONFIRMED 인보이스)
+  let totalSpent = 0;
+  {
+    const { data: paidInvoices } = await supabase
+      .from("invoices")
+      .select("total_amount, status")
+      .eq("target_type", "PARTICIPANT")
+      .eq("target_phone", session.phone)
+      .in("status", ["PAID", "CONFIRMED"]);
+    totalSpent = (paidInvoices ?? []).reduce(
+      (sum, inv) => sum + (inv.total_amount ?? 0),
+      0
+    );
+  }
+
   const joinedDate = participant?.joined_at ?? registration?.created_at ?? null;
 
   return (
@@ -205,6 +220,13 @@ export default async function MyPage({
             <StatBox icon="🎁" label="보상" value={`${rewardsCount}`} />
             <StatBox icon="📝" label="후기" value={`${reviewsCnt ?? 0}`} />
           </div>
+          <div className="mt-2 grid grid-cols-1 gap-2">
+            <StatBox
+              icon="💳"
+              label="누적 결제액"
+              value={`${totalSpent.toLocaleString("ko-KR")}원`}
+            />
+          </div>
           <p className="mt-3 text-[11px] text-[#8B7F75]">
             총 제출 수: {submissionsCount}건 (승인/대기 포함)
           </p>
@@ -227,6 +249,16 @@ export default async function MyPage({
               <span className="flex items-center gap-2">
                 <span>✏️</span>
                 <span>내 정보 수정</span>
+              </span>
+              <span aria-hidden>→</span>
+            </Link>
+            <Link
+              href={`/event/${id}/my/payments`}
+              className="flex items-center justify-between rounded-xl border border-[#D4E4BC] bg-[#FFF8F0] px-4 py-3 text-sm font-semibold text-[#2D5A3D] hover:bg-[#E8F0E4]"
+            >
+              <span className="flex items-center gap-2">
+                <span>💳</span>
+                <span>결제 이력</span>
               </span>
               <span aria-hidden>→</span>
             </Link>

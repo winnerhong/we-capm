@@ -56,7 +56,7 @@ const menus: MenuCard[] = [
     desc: "고객 문의·후기 대응",
   },
   {
-    href: "/store/dashboard#billing",
+    href: "/store/billing",
     icon: "💳",
     title: "결제·정산",
     desc: "이번 정산 주기 확인",
@@ -165,6 +165,61 @@ export default function StoreDashboardPage() {
               <p className="mt-0.5 text-lg font-bold text-[#2D5A3D] md:text-xl">{s.value}</p>
             </article>
           ))}
+        </div>
+      </section>
+
+      {/* 📊 이번달 쿠폰 사용 요약 (billing 미리보기) */}
+      <section
+        aria-labelledby="coupon-usage-heading"
+        className="rounded-3xl border border-[#E8C9A0] bg-gradient-to-br from-[#FFF8F0] via-white to-[#FAE7D0] p-5 shadow-sm md:p-6"
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2
+              id="coupon-usage-heading"
+              className="text-base font-bold text-[#2D5A3D] md:text-lg"
+            >
+              📊 이번달 쿠폰 사용
+            </h2>
+            <p className="mt-1 text-xs text-[#6B6560]">
+              사용된 쿠폰만큼만 수수료가 발생해요 · 매달 10일 정산
+            </p>
+          </div>
+          <Link
+            href="/store/billing"
+            className="shrink-0 rounded-xl border border-[#C4956A] bg-white px-3 py-2 text-xs font-semibold text-[#8B5E3C] transition hover:bg-[#FFF8F0]"
+          >
+            정산 상세 →
+          </Link>
+        </div>
+
+        <dl className="mt-4 grid grid-cols-3 gap-3">
+          <div className="rounded-2xl bg-white/80 p-3 text-center">
+            <dt className="text-[11px] text-[#6B6560]">발행</dt>
+            <dd className="mt-1 text-lg font-bold text-[#2D5A3D]">42장</dd>
+          </div>
+          <div className="rounded-2xl bg-white/80 p-3 text-center">
+            <dt className="text-[11px] text-[#6B6560]">사용</dt>
+            <dd className="mt-1 text-lg font-bold text-[#8B5E3C]">18장</dd>
+          </div>
+          <div className="rounded-2xl bg-[#E8F0E4] p-3 text-center">
+            <dt className="text-[11px] text-[#2D5A3D]">예정 정산</dt>
+            <dd className="mt-1 text-lg font-bold text-[#2D5A3D]">₩9,900</dd>
+          </div>
+        </dl>
+
+        <div className="mt-4">
+          <div className="flex items-center justify-between text-[11px] text-[#6B6560]">
+            <span>사용률</span>
+            <span className="font-semibold text-[#2D5A3D]">43%</span>
+          </div>
+          <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-[#F1D9B8]">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-[#2D5A3D] to-[#3A7A52]"
+              style={{ width: "43%" }}
+              aria-hidden
+            />
+          </div>
         </div>
       </section>
 

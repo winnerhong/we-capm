@@ -219,6 +219,22 @@ export default async function ManagerDashboard({ params }: { params: Promise<{ e
         </Link>
       </div>
 
+      <Link
+        href={`/manager/${id}/billing`}
+        className="flex items-center gap-4 rounded-2xl border border-blue-100 bg-gradient-to-br from-blue-50 to-white p-5 shadow-sm transition-shadow hover:shadow-md"
+      >
+        <div className="text-3xl" aria-hidden>💳</div>
+        <div className="flex-1">
+          <div className="text-sm font-bold text-blue-800">결제 & 정산</div>
+          <div className="text-[11px] text-[#6B6560]">
+            행사 비용 · 도토리 충전 · 학부모 참가비 한눈에 관리
+          </div>
+        </div>
+        <span className="rounded-lg bg-blue-600 px-3 py-1 text-xs font-semibold text-white">
+          바로가기 →
+        </span>
+      </Link>
+
       <div className="rounded-2xl border border-[#E8F0E4] bg-white p-5 shadow-sm">
         <h2 className="mb-3 font-semibold text-[#2D5A3D]">📱 입장 QR</h2>
         <div className="flex items-center gap-4">

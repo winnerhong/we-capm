@@ -19,6 +19,50 @@ type PartnerRow = {
   acorn_balance: number | null;
 };
 
+type AcornInvoice = {
+  id: string;
+  invoice_number: string;
+  target_name: string | null;
+  amount: number;
+  total_amount: number;
+  acorns_credited: number | null;
+  status:
+    | "DRAFT"
+    | "PENDING"
+    | "PAID"
+    | "CONFIRMED"
+    | "EXPIRED"
+    | "CANCELED"
+    | "REFUNDED";
+  issued_at: string;
+  paid_at: string | null;
+};
+
+const ACORN_INVOICE_STATUS: Record<
+  AcornInvoice["status"],
+  { label: string; cls: string }
+> = {
+  DRAFT: { label: "초안", cls: "bg-gray-100 text-gray-700" },
+  PENDING: { label: "대기", cls: "bg-amber-100 text-amber-800" },
+  PAID: { label: "입금됨", cls: "bg-blue-100 text-blue-800" },
+  CONFIRMED: { label: "완료", cls: "bg-green-100 text-green-800" },
+  EXPIRED: { label: "만료", cls: "bg-gray-100 text-gray-600" },
+  CANCELED: { label: "취소", cls: "bg-red-50 text-red-700" },
+  REFUNDED: { label: "환불", cls: "bg-purple-100 text-purple-800" },
+};
+
+function fmtDateShort(iso: string | null | undefined): string {
+  if (!iso) return "-";
+  try {
+    return new Date(iso).toLocaleDateString("ko-KR", {
+      month: "2-digit",
+      day: "2-digit",
+    });
+  } catch {
+    return "-";
+  }
+}
+
 export default async function AdminAcornsPage() {
   const supabase = await createClient();
 
@@ -67,6 +111,40 @@ export default async function AdminAcornsPage() {
     tableMissing = true;
   }
 
+  // 최근 도토리 청구서 (ACORN_RECHARGE 카테고리)
+  let acornInvoices: AcornInvoice[] = [];
+  try {
+    const { data } = await (
+      supabase as unknown as {
+        from: (t: string) => {
+          select: (c: string) => {
+            eq: (k: string, v: string) => {
+              order: (
+                col: string,
+                opts: { ascending: boolean },
+              ) => {
+                limit: (n: number) => Promise<{
+                  data: AcornInvoice[] | null;
+                  error: unknown;
+                }>;
+              };
+            };
+          };
+        };
+      }
+    )
+      .from("invoices")
+      .select(
+        "id, invoice_number, target_name, amount, total_amount, acorns_credited, status, issued_at, paid_at",
+      )
+      .eq("category", "ACORN_RECHARGE")
+      .order("issued_at", { ascending: false })
+      .limit(10);
+    acornInvoices = data ?? [];
+  } catch {
+    acornInvoices = [];
+  }
+
   return (
     <div className="space-y-6">
       {/* 상단 네비 */}
@@ -92,6 +170,25 @@ export default async function AdminAcornsPage() {
           숲지기(업체)의 도토리 크레딧 충전을 관리해요
         </p>
       </div>
+
+      {/* 청구서 발송 CTA */}
+      <Link
+        href="/admin/invoices/new?category=ACORN_RECHARGE&target_type=PARTNER"
+        className="flex items-center justify-between gap-3 rounded-2xl bg-gradient-to-br from-[#2D5A3D] via-[#3A7A52] to-[#4A7C59] p-5 text-white shadow-sm transition-transform hover:scale-[1.01] active:scale-[0.99]"
+      >
+        <div className="flex items-center gap-3">
+          <span className="text-3xl">📤</span>
+          <div>
+            <div className="text-lg font-extrabold">
+              지사에게 도토리 충전 청구서 발송
+            </div>
+            <div className="text-xs text-white/80">
+              결제 링크와 세금계산서가 포함된 청구서를 바로 보내요
+            </div>
+          </div>
+        </div>
+        <span className="text-2xl">→</span>
+      </Link>
 
       {/* 충전 패널 */}
       {!tableMissing && (
@@ -179,24 +276,78 @@ export default async function AdminAcornsPage() {
         </div>
       </section>
 
-      {/* 최근 충전 내역 */}
+      {/* 최근 도토리 청구서 */}
       <section>
-        <h2 className="text-sm font-bold text-[#2D5A3D] mb-3">
-          📋 최근 충전 내역
-        </h2>
-        <div className="rounded-2xl border border-[#D4E4BC] bg-white p-5">
-          <div className="py-12 text-center">
-            <span className="text-4xl">🌰</span>
-            <p className="mt-3 text-sm font-semibold text-[#2D5A3D]">
-              아직 충전 내역이 없어요
-            </p>
-            <p className="mt-1 text-xs text-[#6B6560]">
-              숲지기가 도토리를 충전하면 이곳에 표시됩니다
-            </p>
-            <p className="mt-2 text-[10px] text-[#8B6F47]">
-              (acorn_recharges 테이블 추가 후 자동 연동)
-            </p>
-          </div>
+        <div className="mb-3 flex items-end justify-between">
+          <h2 className="text-sm font-bold text-[#2D5A3D]">📋 최근 도토리 청구서</h2>
+          <Link
+            href="/admin/invoices?category=ACORN_RECHARGE"
+            className="text-xs font-semibold text-[#2D5A3D] hover:underline"
+          >
+            전체 보기 →
+          </Link>
+        </div>
+        <div className="overflow-hidden rounded-2xl border border-[#D4E4BC] bg-white">
+          {acornInvoices.length === 0 ? (
+            <div className="py-12 text-center">
+              <span className="text-4xl">🌰</span>
+              <p className="mt-3 text-sm font-semibold text-[#2D5A3D]">
+                아직 청구서가 없어요
+              </p>
+              <p className="mt-1 text-xs text-[#6B6560]">
+                위의 파란 버튼으로 첫 청구서를 발송해보세요
+              </p>
+            </div>
+          ) : (
+            <table className="w-full text-sm">
+              <thead className="bg-[#F5E6D3]/40 text-left text-xs text-[#8B6F47]">
+                <tr>
+                  <th className="px-4 py-3 font-semibold">발송일</th>
+                  <th className="px-4 py-3 font-semibold">청구번호</th>
+                  <th className="px-4 py-3 font-semibold">대상</th>
+                  <th className="px-4 py-3 text-right font-semibold">금액</th>
+                  <th className="px-4 py-3 text-right font-semibold">도토리</th>
+                  <th className="px-4 py-3 font-semibold">상태</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#E8F0E4]">
+                {acornInvoices.map((r) => {
+                  const s = ACORN_INVOICE_STATUS[r.status];
+                  return (
+                    <tr key={r.id} className="hover:bg-[#FFF8F0]/40">
+                      <td className="px-4 py-2.5 text-xs text-[#6B6560]">
+                        {fmtDateShort(r.issued_at)}
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <Link
+                          href={`/admin/invoices/${r.id}`}
+                          className="font-mono text-xs text-[#2D5A3D] hover:underline"
+                        >
+                          {r.invoice_number}
+                        </Link>
+                      </td>
+                      <td className="px-4 py-2.5 font-semibold text-[#2C2C2C]">
+                        {r.target_name ?? "-"}
+                      </td>
+                      <td className="px-4 py-2.5 text-right font-semibold text-[#2D5A3D]">
+                        {r.total_amount.toLocaleString("ko-KR")}원
+                      </td>
+                      <td className="px-4 py-2.5 text-right text-[#6B4423]">
+                        🌰 {(r.acorns_credited ?? 0).toLocaleString("ko-KR")}
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${s.cls}`}
+                        >
+                          {s.label}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
         </div>
       </section>
 

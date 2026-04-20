@@ -107,11 +107,17 @@ export default async function AdminHome() {
             <span className="text-sm font-semibold text-[#2D5A3D] text-center">챌린지 관리</span>
             <span className="text-[10px] text-[#6B6560]">주간 챌린지</span>
           </Link>
-          <Link href="/admin/acorns"
+          <Link href="/admin/invoices?category=ACORN_RECHARGE"
             className="rounded-2xl border border-[#D4E4BC] bg-white p-4 flex flex-col items-center gap-1.5 hover:border-[#2D5A3D] hover:shadow-md transition-all">
             <span className="text-3xl">🎁</span>
             <span className="text-sm font-semibold text-[#2D5A3D] text-center">도토리 충전</span>
             <span className="text-[10px] text-[#6B6560]">크레딧 충전</span>
+          </Link>
+          <Link href="/admin/invoices"
+            className="rounded-2xl border border-[#D4E4BC] bg-white p-4 flex flex-col items-center gap-1.5 hover:border-[#2D5A3D] hover:shadow-md transition-all">
+            <span className="text-3xl">📄</span>
+            <span className="text-sm font-semibold text-[#2D5A3D] text-center">청구서</span>
+            <span className="text-[10px] text-[#6B6560]">결제/정산</span>
           </Link>
           <Link href="/admin/ads"
             className="rounded-2xl border border-[#D4E4BC] bg-white p-4 flex flex-col items-center gap-1.5 hover:border-[#2D5A3D] hover:shadow-md transition-all">

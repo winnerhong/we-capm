@@ -5,6 +5,7 @@ const STATS = [
   { label: "총 클릭", value: "0", unit: "회", icon: "👆", accent: "from-[#FFF8F0] to-[#F5E6D3]", text: "#6B4423" },
   { label: "전환률", value: "0.0", unit: "%", icon: "📈", accent: "from-[#FFF8F0] to-[#F5E6D3]", text: "#6B4423" },
   { label: "집행 예산", value: "0", unit: "원", icon: "💰", accent: "from-[#FFF8F0] to-[#F5E6D3]", text: "#6B4423" },
+  { label: "예치금 잔액", value: "1,200,000", unit: "원", icon: "🌰", accent: "from-[#F5F9EF] to-[#E8F0E4]", text: "#2D5A3D", href: "/ads-portal/billing" },
 ];
 
 const MENU = [
@@ -75,28 +76,48 @@ export default function AdsPortalDashboardPage() {
         </div>
       </section>
 
-      {/* 4 통계 카드 */}
-      <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        {STATS.map((s) => (
-          <div
-            key={s.label}
-            className={`rounded-2xl border border-[#E5D3B8] bg-gradient-to-br ${s.accent} p-4 relative overflow-hidden`}
-          >
-            <div className="absolute top-2 right-2 text-2xl opacity-30 select-none" aria-hidden>
-              {s.icon}
+      {/* 5 통계 카드 — 예치금 잔액 포함 */}
+      <section className="grid grid-cols-2 gap-3 md:grid-cols-5">
+        {STATS.map((s) => {
+          const inner = (
+            <>
+              <div className="absolute top-2 right-2 text-2xl opacity-30 select-none" aria-hidden>
+                {s.icon}
+              </div>
+              <p className="text-[11px] font-semibold" style={{ color: "#8B6F47" }}>
+                {s.label}
+              </p>
+              <p className="mt-2 flex items-baseline gap-1">
+                <span className="text-2xl font-extrabold" style={{ color: s.text }}>
+                  {s.value}
+                </span>
+                <span className="text-xs font-medium text-[#8B6F47]">{s.unit}</span>
+              </p>
+              <p className="mt-1 text-[10px] text-[#8B6F47]">
+                {s.href ? "충전하러 가기 →" : "Stage 2 오픈 후 집계"}
+              </p>
+            </>
+          );
+          if (s.href) {
+            return (
+              <Link
+                key={s.label}
+                href={s.href}
+                className={`rounded-2xl border-2 border-[#D4E4BC] bg-gradient-to-br ${s.accent} p-4 relative overflow-hidden hover:border-[#2D5A3D] hover:shadow-md transition-all`}
+              >
+                {inner}
+              </Link>
+            );
+          }
+          return (
+            <div
+              key={s.label}
+              className={`rounded-2xl border border-[#E5D3B8] bg-gradient-to-br ${s.accent} p-4 relative overflow-hidden`}
+            >
+              {inner}
             </div>
-            <p className="text-[11px] font-semibold" style={{ color: "#8B6F47" }}>
-              {s.label}
-            </p>
-            <p className="mt-2 flex items-baseline gap-1">
-              <span className="text-2xl font-extrabold" style={{ color: s.text }}>
-                {s.value}
-              </span>
-              <span className="text-xs font-medium text-[#8B6F47]">{s.unit}</span>
-            </p>
-            <p className="mt-1 text-[10px] text-[#8B6F47]">Stage 2 오픈 후 집계</p>
-          </div>
-        ))}
+          );
+        })}
       </section>
 
       {/* 8-메뉴 그리드 */}

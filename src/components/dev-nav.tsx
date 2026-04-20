@@ -5,11 +5,11 @@ import { usePathname } from "next/navigation";
 
 const PORTALS = [
   { label: "관리자", icon: "👨‍💼", href: "/api/dev-login?role=admin", match: "/admin", color: "bg-violet-600", activeColor: "bg-violet-500 ring-2 ring-white" },
+  { label: "숲지기(지사)", icon: "🏡", href: "/api/dev-login?role=partner", match: "/partner", color: "bg-emerald-600", activeColor: "bg-emerald-500 ring-2 ring-white" },
   { label: "기관", icon: "🏢", href: "/api/dev-login?role=manager", match: "/manager", color: "bg-blue-600", activeColor: "bg-blue-500 ring-2 ring-white" },
-  { label: "숲지기", icon: "🏡", href: "/api/dev-login?role=partner", match: "/partner", color: "bg-emerald-600", activeColor: "bg-emerald-500 ring-2 ring-white" },
   { label: "이용자", icon: "👨‍👩‍👧", href: "/api/dev-login?role=participant", match: "/event", color: "bg-green-600", activeColor: "bg-green-500 ring-2 ring-white" },
   { label: "광고주", icon: "🧚", href: "/ads-portal", match: "/ads-portal", color: "bg-amber-600", activeColor: "bg-amber-500 ring-2 ring-white" },
-  { label: "가맹점", icon: "🌳", href: "/store", match: "/store", color: "bg-orange-600", activeColor: "bg-orange-500 ring-2 ring-white" },
+  { label: "가맹점(지역상점)", icon: "🌳", href: "/store", match: "/store", color: "bg-orange-600", activeColor: "bg-orange-500 ring-2 ring-white" },
 ];
 
 const QUICK_LINKS = [

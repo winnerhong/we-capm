@@ -397,6 +397,139 @@ export async function GET() {
     log.push(`❌ 광고: 테이블 없음`);
   }
 
+  // ================================
+  // Phase billing: 청구서 / 정산 / 세금계산서
+  // ================================
+
+  // 13. Invoices (4 samples — ACORN_RECHARGE pending/confirmed, B2B_CONTRACT, SUBSCRIPTION)
+  try {
+    await (supabase.from("invoices" as never) as unknown as { delete: () => { neq: (k: string, v: string) => Promise<unknown> } })
+      .delete()
+      .neq("id", "00000000-0000-0000-0000-000000000000");
+
+    const sampleInvoices = [
+      // Partner acorn recharge (pending, 7일 후 만료)
+      {
+        invoice_number: "INV-20260420-A001",
+        issued_by_type: "ADMIN",
+        issued_by_id: "admin",
+        target_type: "PARTNER",
+        target_id: "sample-partner-1",
+        target_name: "서초지사",
+        category: "ACORN_RECHARGE",
+        amount: 1000000,
+        bonus_rate: 0.15,
+        bonus_amount: 150,
+        vat: 100000,
+        total_amount: 1100000,
+        acorns_credited: 1150,
+        payment_methods: ["BANK_TRANSFER", "CARD"],
+        bank_account: "우리은행 1002-456-789012 (주)토리로",
+        payment_link_token: "token-001",
+        status: "PENDING",
+        description: "도토리 100만원 충전",
+        expires_at: new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString(),
+      },
+      // Partner acorn recharge (confirmed)
+      {
+        invoice_number: "INV-20260419-A002",
+        issued_by_type: "ADMIN",
+        issued_by_id: "admin",
+        target_type: "PARTNER",
+        target_id: "sample-partner-2",
+        target_name: "강남지사",
+        category: "ACORN_RECHARGE",
+        amount: 300000,
+        bonus_rate: 0.1,
+        bonus_amount: 30,
+        vat: 30000,
+        total_amount: 330000,
+        acorns_credited: 330,
+        payment_methods: ["BANK_TRANSFER"],
+        bank_account: "우리은행 1002-456-789012 (주)토리로",
+        status: "CONFIRMED",
+        description: "도토리 30만원 충전",
+        expires_at: new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString(),
+        paid_at: new Date().toISOString(),
+        confirmed_at: new Date().toISOString(),
+        confirmed_by: "admin",
+      },
+      // B2B contract (30일 만료)
+      {
+        invoice_number: "INV-20260420-B001",
+        issued_by_type: "ADMIN",
+        issued_by_id: "admin",
+        target_type: "B2B_CLIENT",
+        target_id: "b2b-001",
+        target_name: "(주)에이그룹",
+        category: "B2B_CONTRACT",
+        amount: 25000000,
+        vat: 2500000,
+        total_amount: 27500000,
+        payment_methods: ["BANK_TRANSFER"],
+        status: "PENDING",
+        description: "봄 ESG 행사 계약금",
+        expires_at: new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString(),
+      },
+      // Subscription (확정, 3일 후 만료)
+      {
+        invoice_number: "INV-20260415-S001",
+        issued_by_type: "SYSTEM",
+        issued_by_id: "system",
+        target_type: "PARTICIPANT",
+        target_id: "010-1111-0001",
+        target_name: "김민준 가족",
+        category: "SUBSCRIPTION",
+        amount: 99000,
+        vat: 9900,
+        total_amount: 108900,
+        payment_methods: ["CARD", "KAKAOPAY"],
+        status: "CONFIRMED",
+        description: "나무 플랜 월구독",
+        expires_at: new Date(Date.now() + 3 * 24 * 3600 * 1000).toISOString(),
+        paid_at: new Date().toISOString(),
+        confirmed_at: new Date().toISOString(),
+      },
+    ];
+
+    const { error: invErr } = await (supabase.from("invoices" as never) as unknown as { insert: (d: unknown) => Promise<{ error: unknown }> }).insert(sampleInvoices);
+    log.push(invErr ? `❌ 청구서: 테이블 없음` : `✅ 청구서: ${sampleInvoices.length}건`);
+  } catch {
+    log.push(`❌ 청구서: 테이블 없음`);
+  }
+
+  // 14. Settlements (정산 샘플 1건 — partner_id는 FK 제약 있을 수 있어 skip-safe)
+  try {
+    await (supabase.from("settlements" as never) as unknown as { delete: () => { neq: (k: string, v: string) => Promise<unknown> } })
+      .delete()
+      .neq("id", "00000000-0000-0000-0000-000000000000");
+    // 실제 파트너 id가 있어야 FK 통과 → partners 테이블에서 가져오기
+    const { data: partnerIds } = await (supabase.from("partners" as never) as unknown as { select: (c: string) => { limit: (n: number) => Promise<{ data: Array<{ id: string }> | null }> } }).select("id").limit(1);
+    if (partnerIds && partnerIds.length > 0) {
+      const sampleSettlements = [
+        {
+          partner_id: partnerIds[0].id,
+          period_start: "2026-03-01",
+          period_end: "2026-03-31",
+          gross_sales: 8500000,
+          refunds: 50000,
+          commission_rate: 15,
+          commission_amount: 1275000,
+          acorn_deduction: 300000,
+          net_amount: 6875000,
+          status: "PAID",
+          paid_at: new Date().toISOString(),
+        },
+      ];
+      const { error: stErr } = await (supabase.from("settlements" as never) as unknown as { insert: (d: unknown) => Promise<{ error: unknown }> }).insert(sampleSettlements);
+      log.push(stErr ? `❌ 정산: 테이블 없음` : `✅ 정산: ${sampleSettlements.length}건`);
+    } else {
+      log.push(`⚠️ 정산: 파트너 없어서 skip`);
+    }
+  } catch {
+    log.push(`❌ 정산: 테이블 없음`);
+  }
+
   // dev-login용 테스트 참가자 쿠키 데이터도 업데이트
   const testParticipant = participants?.find((p) => p.phone === "010-1111-0001");
 

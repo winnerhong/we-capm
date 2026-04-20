@@ -1183,6 +1183,417 @@ export interface Database {
         };
         Relationships: [];
       };
+      invoices: {
+        Row: {
+          id: string;
+          invoice_number: string;
+          issued_by_type: "ADMIN" | "SYSTEM" | "PARTNER" | "PLATFORM";
+          issued_by_id: string;
+          target_type: "PARTNER" | "MANAGER" | "PARTICIPANT" | "ADVERTISER" | "AFFILIATE" | "ORG" | "B2B_CLIENT";
+          target_id: string;
+          target_name: string | null;
+          target_email: string | null;
+          target_phone: string | null;
+          category:
+            | "ACORN_RECHARGE"
+            | "SUBSCRIPTION"
+            | "EVENT_FEE"
+            | "AD_CAMPAIGN"
+            | "COUPON_FEE"
+            | "B2B_CONTRACT"
+            | "SETTLEMENT"
+            | "REFUND"
+            | "OTHER";
+          amount: number;
+          bonus_rate: number | null;
+          bonus_amount: number | null;
+          vat: number;
+          total_amount: number;
+          acorns_credited: number | null;
+          payment_methods: string[];
+          bank_account: string | null;
+          payment_link_token: string | null;
+          description: string | null;
+          memo: string | null;
+          metadata: Json | null;
+          status: "DRAFT" | "PENDING" | "PAID" | "CONFIRMED" | "EXPIRED" | "CANCELED" | "REFUNDED";
+          issued_at: string;
+          expires_at: string;
+          paid_at: string | null;
+          confirmed_at: string | null;
+          confirmed_by: string | null;
+          canceled_at: string | null;
+          tax_invoice_issued: boolean;
+          email_sent_at: string | null;
+          reminder_count: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          invoice_number: string;
+          issued_by_type: "ADMIN" | "SYSTEM" | "PARTNER" | "PLATFORM";
+          issued_by_id: string;
+          target_type: "PARTNER" | "MANAGER" | "PARTICIPANT" | "ADVERTISER" | "AFFILIATE" | "ORG" | "B2B_CLIENT";
+          target_id: string;
+          target_name?: string | null;
+          target_email?: string | null;
+          target_phone?: string | null;
+          category:
+            | "ACORN_RECHARGE"
+            | "SUBSCRIPTION"
+            | "EVENT_FEE"
+            | "AD_CAMPAIGN"
+            | "COUPON_FEE"
+            | "B2B_CONTRACT"
+            | "SETTLEMENT"
+            | "REFUND"
+            | "OTHER";
+          amount: number;
+          bonus_rate?: number | null;
+          bonus_amount?: number | null;
+          vat?: number;
+          total_amount: number;
+          acorns_credited?: number | null;
+          payment_methods: string[];
+          bank_account?: string | null;
+          payment_link_token?: string | null;
+          description?: string | null;
+          memo?: string | null;
+          metadata?: Json | null;
+          status?: "DRAFT" | "PENDING" | "PAID" | "CONFIRMED" | "EXPIRED" | "CANCELED" | "REFUNDED";
+          issued_at?: string;
+          expires_at: string;
+          paid_at?: string | null;
+          confirmed_at?: string | null;
+          confirmed_by?: string | null;
+          canceled_at?: string | null;
+          tax_invoice_issued?: boolean;
+          email_sent_at?: string | null;
+          reminder_count?: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          invoice_number?: string;
+          issued_by_type?: "ADMIN" | "SYSTEM" | "PARTNER" | "PLATFORM";
+          issued_by_id?: string;
+          target_type?: "PARTNER" | "MANAGER" | "PARTICIPANT" | "ADVERTISER" | "AFFILIATE" | "ORG" | "B2B_CLIENT";
+          target_id?: string;
+          target_name?: string | null;
+          target_email?: string | null;
+          target_phone?: string | null;
+          category?:
+            | "ACORN_RECHARGE"
+            | "SUBSCRIPTION"
+            | "EVENT_FEE"
+            | "AD_CAMPAIGN"
+            | "COUPON_FEE"
+            | "B2B_CONTRACT"
+            | "SETTLEMENT"
+            | "REFUND"
+            | "OTHER";
+          amount?: number;
+          bonus_rate?: number | null;
+          bonus_amount?: number | null;
+          vat?: number;
+          total_amount?: number;
+          acorns_credited?: number | null;
+          payment_methods?: string[];
+          bank_account?: string | null;
+          payment_link_token?: string | null;
+          description?: string | null;
+          memo?: string | null;
+          metadata?: Json | null;
+          status?: "DRAFT" | "PENDING" | "PAID" | "CONFIRMED" | "EXPIRED" | "CANCELED" | "REFUNDED";
+          issued_at?: string;
+          expires_at?: string;
+          paid_at?: string | null;
+          confirmed_at?: string | null;
+          confirmed_by?: string | null;
+          canceled_at?: string | null;
+          tax_invoice_issued?: boolean;
+          email_sent_at?: string | null;
+          reminder_count?: number;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      payment_transactions: {
+        Row: {
+          id: string;
+          invoice_id: string;
+          method:
+            | "CARD"
+            | "KAKAOPAY"
+            | "NAVERPAY"
+            | "TOSSPAY"
+            | "BANK_TRANSFER"
+            | "VIRTUAL_ACCOUNT"
+            | "ESCROW";
+          amount: number;
+          fee: number | null;
+          net_amount: number;
+          pg_provider: string | null;
+          pg_transaction_id: string | null;
+          pg_response: Json | null;
+          status: "PENDING" | "PROCESSING" | "SUCCESS" | "FAILED" | "CANCELED" | "REFUNDED";
+          attempted_at: string;
+          completed_at: string | null;
+          failure_reason: string | null;
+          refunded_amount: number | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          invoice_id: string;
+          method:
+            | "CARD"
+            | "KAKAOPAY"
+            | "NAVERPAY"
+            | "TOSSPAY"
+            | "BANK_TRANSFER"
+            | "VIRTUAL_ACCOUNT"
+            | "ESCROW";
+          amount: number;
+          fee?: number | null;
+          net_amount: number;
+          pg_provider?: string | null;
+          pg_transaction_id?: string | null;
+          pg_response?: Json | null;
+          status?: "PENDING" | "PROCESSING" | "SUCCESS" | "FAILED" | "CANCELED" | "REFUNDED";
+          attempted_at?: string;
+          completed_at?: string | null;
+          failure_reason?: string | null;
+          refunded_amount?: number | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          invoice_id?: string;
+          method?:
+            | "CARD"
+            | "KAKAOPAY"
+            | "NAVERPAY"
+            | "TOSSPAY"
+            | "BANK_TRANSFER"
+            | "VIRTUAL_ACCOUNT"
+            | "ESCROW";
+          amount?: number;
+          fee?: number | null;
+          net_amount?: number;
+          pg_provider?: string | null;
+          pg_transaction_id?: string | null;
+          pg_response?: Json | null;
+          status?: "PENDING" | "PROCESSING" | "SUCCESS" | "FAILED" | "CANCELED" | "REFUNDED";
+          attempted_at?: string;
+          completed_at?: string | null;
+          failure_reason?: string | null;
+          refunded_amount?: number | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      tax_invoices: {
+        Row: {
+          id: string;
+          invoice_id: string | null;
+          tax_invoice_number: string | null;
+          type: "TAX" | "CASH_RECEIPT" | "SIMPLE_RECEIPT";
+          supplier_business_number: string | null;
+          supplier_name: string | null;
+          supplier_representative: string | null;
+          supplier_address: string | null;
+          buyer_business_number: string | null;
+          buyer_name: string | null;
+          buyer_representative: string | null;
+          buyer_address: string | null;
+          buyer_email: string | null;
+          item_name: string;
+          supply_amount: number;
+          tax_amount: number;
+          total_amount: number;
+          issue_date: string;
+          hometax_status: "PENDING" | "SUBMITTED" | "APPROVED" | "REJECTED" | null;
+          hometax_reference: string | null;
+          hometax_response: Json | null;
+          pdf_url: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          invoice_id?: string | null;
+          tax_invoice_number?: string | null;
+          type: "TAX" | "CASH_RECEIPT" | "SIMPLE_RECEIPT";
+          supplier_business_number?: string | null;
+          supplier_name?: string | null;
+          supplier_representative?: string | null;
+          supplier_address?: string | null;
+          buyer_business_number?: string | null;
+          buyer_name?: string | null;
+          buyer_representative?: string | null;
+          buyer_address?: string | null;
+          buyer_email?: string | null;
+          item_name: string;
+          supply_amount: number;
+          tax_amount: number;
+          total_amount: number;
+          issue_date?: string;
+          hometax_status?: "PENDING" | "SUBMITTED" | "APPROVED" | "REJECTED" | null;
+          hometax_reference?: string | null;
+          hometax_response?: Json | null;
+          pdf_url?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          invoice_id?: string | null;
+          tax_invoice_number?: string | null;
+          type?: "TAX" | "CASH_RECEIPT" | "SIMPLE_RECEIPT";
+          supplier_business_number?: string | null;
+          supplier_name?: string | null;
+          supplier_representative?: string | null;
+          supplier_address?: string | null;
+          buyer_business_number?: string | null;
+          buyer_name?: string | null;
+          buyer_representative?: string | null;
+          buyer_address?: string | null;
+          buyer_email?: string | null;
+          item_name?: string;
+          supply_amount?: number;
+          tax_amount?: number;
+          total_amount?: number;
+          issue_date?: string;
+          hometax_status?: "PENDING" | "SUBMITTED" | "APPROVED" | "REJECTED" | null;
+          hometax_reference?: string | null;
+          hometax_response?: Json | null;
+          pdf_url?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      settlements: {
+        Row: {
+          id: string;
+          partner_id: string | null;
+          period_start: string;
+          period_end: string;
+          gross_sales: number;
+          refunds: number;
+          commission_rate: number;
+          commission_amount: number;
+          acorn_deduction: number;
+          other_deductions: number;
+          net_amount: number;
+          bank_account: string | null;
+          account_holder: string | null;
+          status: "DRAFT" | "REVIEW" | "APPROVED" | "PAID" | "DISPUTED";
+          reviewed_by: string | null;
+          approved_by: string | null;
+          paid_at: string | null;
+          pay_reference: string | null;
+          notes: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          partner_id?: string | null;
+          period_start: string;
+          period_end: string;
+          gross_sales?: number;
+          refunds?: number;
+          commission_rate: number;
+          commission_amount?: number;
+          acorn_deduction?: number;
+          other_deductions?: number;
+          net_amount?: number;
+          bank_account?: string | null;
+          account_holder?: string | null;
+          status?: "DRAFT" | "REVIEW" | "APPROVED" | "PAID" | "DISPUTED";
+          reviewed_by?: string | null;
+          approved_by?: string | null;
+          paid_at?: string | null;
+          pay_reference?: string | null;
+          notes?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          partner_id?: string | null;
+          period_start?: string;
+          period_end?: string;
+          gross_sales?: number;
+          refunds?: number;
+          commission_rate?: number;
+          commission_amount?: number;
+          acorn_deduction?: number;
+          other_deductions?: number;
+          net_amount?: number;
+          bank_account?: string | null;
+          account_holder?: string | null;
+          status?: "DRAFT" | "REVIEW" | "APPROVED" | "PAID" | "DISPUTED";
+          reviewed_by?: string | null;
+          approved_by?: string | null;
+          paid_at?: string | null;
+          pay_reference?: string | null;
+          notes?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      refunds: {
+        Row: {
+          id: string;
+          payment_transaction_id: string | null;
+          invoice_id: string | null;
+          requested_by_type: string;
+          requested_by_id: string;
+          reason: string;
+          reason_category: "SCHEDULE_CONFLICT" | "HEALTH" | "SERVICE_ISSUE" | "DUPLICATE" | "OTHER" | null;
+          requested_amount: number;
+          approved_amount: number | null;
+          status: "PENDING" | "APPROVED" | "REJECTED" | "COMPLETED" | "CANCELED";
+          reviewed_by: string | null;
+          reviewed_at: string | null;
+          processed_at: string | null;
+          admin_note: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          payment_transaction_id?: string | null;
+          invoice_id?: string | null;
+          requested_by_type: string;
+          requested_by_id: string;
+          reason: string;
+          reason_category?: "SCHEDULE_CONFLICT" | "HEALTH" | "SERVICE_ISSUE" | "DUPLICATE" | "OTHER" | null;
+          requested_amount: number;
+          approved_amount?: number | null;
+          status?: "PENDING" | "APPROVED" | "REJECTED" | "COMPLETED" | "CANCELED";
+          reviewed_by?: string | null;
+          reviewed_at?: string | null;
+          processed_at?: string | null;
+          admin_note?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          payment_transaction_id?: string | null;
+          invoice_id?: string | null;
+          requested_by_type?: string;
+          requested_by_id?: string;
+          reason?: string;
+          reason_category?: "SCHEDULE_CONFLICT" | "HEALTH" | "SERVICE_ISSUE" | "DUPLICATE" | "OTHER" | null;
+          requested_amount?: number;
+          approved_amount?: number | null;
+          status?: "PENDING" | "APPROVED" | "REJECTED" | "COMPLETED" | "CANCELED";
+          reviewed_by?: string | null;
+          reviewed_at?: string | null;
+          processed_at?: string | null;
+          admin_note?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: {

@@ -1,7 +1,6 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
-import { WinnerTalkIcon } from "@/components/winner-talk-icon";
+import { AdminNav } from "@/components/admin-nav";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const cookieStore = await cookies();
@@ -26,39 +25,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   return (
     <div className="min-h-dvh bg-[#FFF8F0]">
-      <header className="border-b border-[#D4E4BC] bg-white shadow-sm">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-2">
-          <div className="flex items-center gap-6">
-            {isAdmin ? (
-              <>
-                <Link href="/admin" className="flex items-center gap-2 font-bold text-[#2D5A3D]">
-                  <span className="text-xl">🌰</span><span>토리로</span>
-                </Link>
-                <nav className="flex items-center gap-1 text-sm">
-                  <Link href="/admin/events" className="rounded-lg px-3 py-1.5 text-[#2C2C2C] hover:bg-[#E8F0E4]">🌲 행사목록</Link>
-                  <Link href="/admin/chat" className="flex items-center gap-1 rounded-lg px-3 py-1.5 text-[#2C2C2C] hover:bg-[#E8F0E4]">
-                    <WinnerTalkIcon size={16} />토리톡
-                  </Link>
-                  <Link href="/admin/stats" className="rounded-lg px-3 py-1.5 text-[#2C2C2C] hover:bg-[#E8F0E4]">📊 전체통계</Link>
-                </nav>
-              </>
-            ) : (
-              <Link href={`/manager/${managerEventId}`} className="flex items-center gap-2 font-bold text-[#2D5A3D]">
-                <span className="text-xl">🏢</span><span>{displayName}</span>
-              </Link>
-            )}
-          </div>
-          <div className="flex items-center gap-3 text-sm">
-            <span className={`rounded-full px-3 py-1 text-xs font-semibold ${isAdmin ? "bg-[#E8F0E4] text-[#2D5A3D]" : "bg-blue-100 text-blue-700"}`}>
-              {isAdmin ? "관리자" : "기관"}
-            </span>
-            <form action={isAdmin ? "/api/auth/admin-logout" : "/api/auth/manager-logout"} method="post">
-              <button className="rounded-lg border border-[#D4E4BC] px-3 py-1 text-xs text-[#6B6560] hover:bg-[#FFF8F0]">로그아웃</button>
-            </form>
-          </div>
-        </div>
-      </header>
-      <div className="mx-auto max-w-6xl p-4">{children}</div>
+      <AdminNav isAdmin={isAdmin} displayName={displayName} managerEventId={managerEventId} />
+      <div className="mx-auto max-w-7xl p-4">{children}</div>
     </div>
   );
 }
