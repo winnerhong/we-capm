@@ -1,10 +1,16 @@
 "use server";
 
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { formatKorean } from "@/lib/phone";
+import { logAccess, getRequestMeta } from "@/lib/audit-log";
+import { recordConsent, type ConsentInput } from "@/lib/consent";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
-export async function directPhoneLoginAction(phoneDigits: string) {
+export async function directPhoneLoginAction(
+  phoneDigits: string,
+  consent?: ConsentInput
+) {
   const supabase = await createClient();
 
   const phone = phoneDigits.startsWith("0") ? phoneDigits : `0${phoneDigits}`;
@@ -28,16 +34,17 @@ export async function directPhoneLoginAction(phoneDigits: string) {
     }
 
     const reg = partialRegs[0];
-    return await enterEvent(supabase, reg);
+    return await enterEvent(supabase, reg, consent);
   }
 
   const reg = regs[0];
-  return await enterEvent(supabase, reg);
+  return await enterEvent(supabase, reg, consent);
 }
 
 async function enterEvent(
   supabase: Awaited<ReturnType<typeof createClient>>,
-  reg: { id: string; event_id: string; name: string; phone: string; status: string }
+  reg: { id: string; event_id: string; name: string; phone: string; status: string },
+  consent?: ConsentInput
 ) {
   if (reg.status !== "ENTERED") {
     await supabase
@@ -103,6 +110,32 @@ async function enterEvent(
       path: "/",
     }
   );
+
+  try {
+    const hdrs = await headers();
+    const meta = getRequestMeta(hdrs);
+    await logAccess(supabase as unknown as SupabaseClient, {
+      user_type: "PARTICIPANT",
+      user_id: participantId,
+      user_identifier: reg.phone,
+      action: "LOGIN",
+      resource: `event:${reg.event_id}`,
+      status_code: 200,
+      ...meta,
+    });
+
+    if (consent) {
+      await recordConsent(supabase as unknown as SupabaseClient, {
+        user_type: "participant",
+        user_identifier: reg.phone,
+        consent,
+        ip_address: meta.ip_address ?? undefined,
+        user_agent: meta.user_agent ?? undefined,
+      });
+    }
+  } catch {
+    // best-effort
+  }
 
   return { ok: true, eventId: reg.event_id, name: reg.name };
 }

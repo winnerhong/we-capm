@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/auth-guard";
 import { createClient } from "@/lib/supabase/server";
+import { hashPassword } from "@/lib/password";
 
 type PartnerTier = "SPROUT" | "EXPLORER" | "TREE" | "FOREST" | "LEGEND";
 type PartnerStatus = "PENDING" | "ACTIVE" | "SUSPENDED" | "CLOSED";
@@ -45,13 +46,15 @@ export async function createPartnerAction(formData: FormData) {
     throw new Error("이미 사용 중인 아이디입니다");
   }
 
+  const hashedPassword = await hashPassword(password);
+
   const { error } = await (supabase as unknown as { from: (t: string) => { insert: (row: Record<string, unknown>) => Promise<{ error: { message: string } | null }> } })
     .from("partners")
     .insert({
       name,
       business_name,
       username,
-      password,
+      password: hashedPassword,
       email,
       phone,
       tier,

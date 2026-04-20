@@ -1099,6 +1099,45 @@ export interface Database {
         };
         Relationships: [];
       };
+      access_logs: {
+        Row: {
+          id: string;
+          user_type: "ADMIN" | "MANAGER" | "PARTNER" | "PARTICIPANT" | "PUBLIC";
+          user_id: string | null;
+          user_identifier: string | null;
+          action: string;
+          resource: string | null;
+          ip_address: string | null;
+          user_agent: string | null;
+          status_code: number | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_type: "ADMIN" | "MANAGER" | "PARTNER" | "PARTICIPANT" | "PUBLIC";
+          user_id?: string | null;
+          user_identifier?: string | null;
+          action: string;
+          resource?: string | null;
+          ip_address?: string | null;
+          user_agent?: string | null;
+          status_code?: number | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_type?: "ADMIN" | "MANAGER" | "PARTNER" | "PARTICIPANT" | "PUBLIC";
+          user_id?: string | null;
+          user_identifier?: string | null;
+          action?: string;
+          resource?: string | null;
+          ip_address?: string | null;
+          user_agent?: string | null;
+          status_code?: number | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       acorn_recharges: {
         Row: {
           id: string;

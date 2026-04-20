@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useTransition, useState } from "react";
 import { submitB2BInquiryAction } from "./actions";
 
@@ -13,12 +14,22 @@ const PACKAGE_OPTIONS: Array<{ value: PackageKey; emoji: string; label: string; 
 export function InquiryForm({ defaultPackage }: { defaultPackage?: PackageKey }) {
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [privacyAgreed, setPrivacyAgreed] = useState(false);
+  const [marketingAgreed, setMarketingAgreed] = useState(false);
 
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
+
+    if (!privacyAgreed) {
+      setError("개인정보 수집·이용 동의(필수)에 체크해주세요");
+      return;
+    }
+
     const form = e.currentTarget;
     const fd = new FormData(form);
+    fd.set("consent_privacy", privacyAgreed ? "1" : "0");
+    fd.set("consent_marketing", marketingAgreed ? "1" : "0");
     start(async () => {
       try {
         await submitB2BInquiryAction(fd);
@@ -145,6 +156,48 @@ export function InquiryForm({ defaultPackage }: { defaultPackage?: PackageKey })
         />
       </label>
 
+      {/* PIPA 간소 동의 (B2B 상담 문의) */}
+      <div className="rounded-xl border border-[#D4E4BC] bg-[#FFF8F0] p-4 space-y-2">
+        <label className="flex items-center gap-2 cursor-pointer text-sm">
+          <input
+            type="checkbox"
+            checked={privacyAgreed}
+            onChange={(e) => setPrivacyAgreed(e.target.checked)}
+            className="h-4 w-4 rounded accent-[#2D5A3D]"
+          />
+          <span className="flex-1">
+            <span className="text-[#2D5A3D] font-semibold mr-1">[필수]</span>
+            <span className="text-[#2C2C2C]">개인정보 수집·이용 동의 (상담 문의 목적)</span>
+          </span>
+          <Link
+            href="/privacy"
+            target="_blank"
+            className="text-xs text-[#6B6560] underline hover:text-[#2D5A3D]"
+          >
+            보기
+          </Link>
+        </label>
+        <label className="flex items-center gap-2 cursor-pointer text-sm">
+          <input
+            type="checkbox"
+            checked={marketingAgreed}
+            onChange={(e) => setMarketingAgreed(e.target.checked)}
+            className="h-4 w-4 rounded accent-[#2D5A3D]"
+          />
+          <span className="flex-1">
+            <span className="text-[#6B6560] font-semibold mr-1">[선택]</span>
+            <span className="text-[#2C2C2C]">마케팅 정보 수신 동의 (뉴스레터/제안서)</span>
+          </span>
+          <Link
+            href="/privacy#marketing"
+            target="_blank"
+            className="text-xs text-[#6B6560] underline hover:text-[#2D5A3D]"
+          >
+            자세히
+          </Link>
+        </label>
+      </div>
+
       {error && (
         <div
           role="alert"
@@ -160,7 +213,7 @@ export function InquiryForm({ defaultPackage }: { defaultPackage?: PackageKey })
         </p>
         <button
           type="submit"
-          disabled={pending}
+          disabled={pending || !privacyAgreed}
           className="whitespace-nowrap rounded-xl bg-[#2D5A3D] px-6 py-3 text-sm font-bold text-white shadow-sm transition-all hover:bg-[#3A7A52] disabled:opacity-60"
         >
           {pending ? "접수 중..." : "상담 신청 →"}

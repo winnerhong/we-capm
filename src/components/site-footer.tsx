@@ -15,7 +15,7 @@ export function SiteFooter() {
               <span>토리로</span>
             </Link>
             <p className="mt-3 text-xs leading-relaxed text-[#6B6560]">
-              숲길에서 만나는 가족의 하루.
+              숲에서 자라는 가족의 시간.
               <br />
               가족 · 기업 · 지역사회가 함께하는 곳.
             </p>
@@ -97,51 +97,98 @@ export function SiteFooter() {
             </ul>
           </nav>
 
-          {/* 회사 */}
-          <nav aria-label="회사 링크">
+          {/* 고객지원 / 법적고지 */}
+          <nav aria-label="고객 지원 및 법적 고지">
             <h3 className="text-xs font-bold tracking-wider text-[#2D5A3D]">
-              회사
+              고객지원
             </h3>
             <ul className="mt-3 space-y-2 text-xs text-[#6B6560]">
-              <li>
-                <Link href="/about" className="hover:text-[#2D5A3D]">
-                  회사 소개
-                </Link>
-              </li>
-              <li>
-                <a
-                  href="mailto:careers@toriro.kr"
-                  className="hover:text-[#2D5A3D]"
-                >
-                  채용
-                </a>
-              </li>
-              <li>
-                <Link href="/privacy" className="hover:text-[#2D5A3D]">
-                  개인정보처리방침
-                </Link>
-              </li>
               <li>
                 <Link href="/terms" className="hover:text-[#2D5A3D]">
                   이용약관
                 </Link>
               </li>
+              <li>
+                <Link
+                  href="/privacy"
+                  className="font-semibold text-[#2D5A3D] hover:underline"
+                >
+                  개인정보처리방침
+                </Link>
+              </li>
+              <li>
+                <Link href="/business" className="hover:text-[#2D5A3D]">
+                  사업자 정보
+                </Link>
+              </li>
+              <li>
+                <a
+                  href="mailto:hello@toriro.com"
+                  className="hover:text-[#2D5A3D]"
+                >
+                  고객센터
+                </a>
+              </li>
             </ul>
           </nav>
         </div>
 
-        {/* 사업자 정보 */}
+        {/* 사업자 정보 (전자상거래법 제10조) */}
         <div className="mt-10 border-t border-[#E8F0E4] pt-6 text-[11px] leading-relaxed text-[#8B6F47]">
-          <p className="font-semibold">(주)토리로</p>
-          <p className="mt-1">
-            대표 홍보광 · 사업자등록번호 123-45-67890 · 통신판매업신고 제
-            2026-서울성동-0000호
+          <p className="text-sm font-bold text-[#2D5A3D]">
+            토리로 (TORIRO)
           </p>
-          <p className="mt-1">
-            서울특별시 성동구 성수동 1가 숲속로 25 · 고객센터 1544-0000 ·
-            hello@toriro.kr
+          <div className="mt-2 grid gap-x-4 gap-y-1 md:grid-cols-2">
+            <p>
+              <span className="text-[#6B6560]">상호</span> 토리로 ·{" "}
+              <span className="text-[#6B6560]">대표</span> 홍길동
+            </p>
+            <p>
+              <span className="text-[#6B6560]">사업자등록번호</span>{" "}
+              000-00-00000
+            </p>
+            <p>
+              <span className="text-[#6B6560]">통신판매업신고</span>{" "}
+              제2026-서울-0000호
+            </p>
+            <p>
+              <span className="text-[#6B6560]">개인정보보호책임자</span>{" "}
+              홍길동 (privacy@toriro.com)
+            </p>
+            <p className="md:col-span-2">
+              <span className="text-[#6B6560]">주소</span>{" "}
+              서울특별시 ○○구 ○○로 00, 00층
+            </p>
+            <p>
+              <span className="text-[#6B6560]">고객센터</span> 1588-0000
+              (평일 10:00-17:00)
+            </p>
+            <p>
+              <span className="text-[#6B6560]">이메일</span>{" "}
+              <a
+                href="mailto:hello@toriro.com"
+                className="underline hover:no-underline"
+              >
+                hello@toriro.com
+              </a>
+            </p>
+            <p className="md:col-span-2">
+              <span className="text-[#6B6560]">호스팅 제공자</span> Vercel
+              Inc. / Amazon Web Services
+            </p>
+          </div>
+
+          <p className="mt-4 text-[11px] text-[#C4956A]">
+            ⚠️ 위 사업자 정보는 샘플 플레이스홀더입니다. 실제 서비스 운영 시
+            반드시 실제 사업자 정보로 교체해 주세요.{" "}
+            <Link href="/business" className="underline hover:no-underline">
+              사업자 정보 전체 보기
+            </Link>
           </p>
-          <p className="mt-3">© 2026 Toriro Inc. All rights reserved.</p>
+
+          <p className="mt-4 text-[11px]">
+            © 2026 TORIRO. All rights reserved.
+          </p>
         </div>
       </div>
     </footer>

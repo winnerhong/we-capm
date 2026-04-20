@@ -1,8 +1,11 @@
 "use server";
 
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { verifyPassword } from "@/lib/password";
+import { logAccess, getRequestMeta } from "@/lib/audit-log";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 export type PartnerLoginResult =
   | { ok: true }
@@ -26,6 +29,8 @@ export async function partnerLoginAction(
   }
 
   const supabase = await createClient();
+  const hdrs = await headers();
+  const meta = getRequestMeta(hdrs);
 
   const queryAny = supabase as unknown as {
     from: (t: string) => {
@@ -46,8 +51,29 @@ export async function partnerLoginAction(
     .eq("username", username)
     .maybeSingle();
 
-  if (!partner) return { ok: false, error: "존재하지 않는 계정입니다" };
-  if (partner.password !== password) {
+  if (!partner) {
+    await logAccess(supabase as unknown as SupabaseClient, {
+      user_type: "PARTNER",
+      user_identifier: username,
+      action: "LOGIN_FAIL",
+      resource: "partners",
+      status_code: 404,
+      ...meta,
+    });
+    return { ok: false, error: "존재하지 않는 계정입니다" };
+  }
+
+  const passwordOk = await verifyPassword(password, partner.password);
+  if (!passwordOk) {
+    await logAccess(supabase as unknown as SupabaseClient, {
+      user_type: "PARTNER",
+      user_id: partner.id,
+      user_identifier: username,
+      action: "LOGIN_FAIL",
+      resource: "partners",
+      status_code: 401,
+      ...meta,
+    });
     return { ok: false, error: "비밀번호가 일치하지 않습니다" };
   }
   if (partner.status === "PENDING") {
@@ -81,11 +107,49 @@ export async function partnerLoginAction(
     }
   );
 
+  await logAccess(supabase as unknown as SupabaseClient, {
+    user_type: "PARTNER",
+    user_id: partner.id,
+    user_identifier: username,
+    action: "LOGIN",
+    resource: "partners",
+    status_code: 200,
+    ...meta,
+  });
+
   return { ok: true };
 }
 
 export async function partnerLogoutAction() {
   const cookieStore = await cookies();
+  const raw = cookieStore.get("campnic_partner")?.value;
+  let partnerInfo: { id?: string; username?: string } = {};
+  if (raw) {
+    try {
+      partnerInfo = JSON.parse(raw);
+    } catch {
+      // ignore
+    }
+  }
+
   cookieStore.delete("campnic_partner");
+
+  try {
+    const supabase = await createClient();
+    const hdrs = await headers();
+    const meta = getRequestMeta(hdrs);
+    await logAccess(supabase as unknown as SupabaseClient, {
+      user_type: "PARTNER",
+      user_id: partnerInfo.id,
+      user_identifier: partnerInfo.username,
+      action: "LOGOUT",
+      resource: "partners",
+      status_code: 200,
+      ...meta,
+    });
+  } catch {
+    // best-effort
+  }
+
   redirect("/partner");
 }

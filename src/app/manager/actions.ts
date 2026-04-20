@@ -1,11 +1,15 @@
 "use server";
 
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { findSchoolByUsername } from "@/lib/school-db";
+import { logAccess, getRequestMeta } from "@/lib/audit-log";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 export async function managerLoginAction(managerId: string, password: string) {
   const supabase = await createClient();
+  const hdrs = await headers();
+  const meta = getRequestMeta(hdrs);
 
   // 1. campnic events에서 manager_id로 찾기
   const { data: events } = await supabase
@@ -17,6 +21,15 @@ export async function managerLoginAction(managerId: string, password: string) {
 
   if (event) {
     await setManagerCookie(event.id, event.name, event.manager_id ?? managerId);
+    await logAccess(supabase as unknown as SupabaseClient, {
+      user_type: "MANAGER",
+      user_id: event.id,
+      user_identifier: managerId,
+      action: "LOGIN",
+      resource: `event:${event.id}`,
+      status_code: 200,
+      ...meta,
+    });
     return { ok: true, eventId: event.id, eventName: event.name };
   }
 
@@ -31,11 +44,28 @@ export async function managerLoginAction(managerId: string, password: string) {
     if (schoolEvents && schoolEvents.length > 0) {
       const ev = schoolEvents[0];
       await setManagerCookie(ev.id, ev.name, school.username);
+      await logAccess(supabase as unknown as SupabaseClient, {
+        user_type: "MANAGER",
+        user_id: ev.id,
+        user_identifier: school.username,
+        action: "LOGIN",
+        resource: `event:${ev.id}`,
+        status_code: 200,
+        ...meta,
+      });
       return { ok: true, eventId: ev.id, eventName: ev.name };
     }
     return { ok: false, message: "배정된 행사가 없습니다. 관리자에게 문의하세요." };
   }
 
+  await logAccess(supabase as unknown as SupabaseClient, {
+    user_type: "MANAGER",
+    user_identifier: managerId,
+    action: "LOGIN_FAIL",
+    resource: "manager",
+    status_code: 401,
+    ...meta,
+  });
   return { ok: false, message: "아이디 또는 비밀번호가 틀렸습니다" };
 }
 

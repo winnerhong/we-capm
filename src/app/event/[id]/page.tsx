@@ -57,8 +57,20 @@ export default async function EventHomePage({ params }: { params: Promise<{ id: 
 
         {/* 헤더 — 토리로 포레스트 그라데이션 */}
         <div className="rounded-2xl bg-gradient-to-br from-[#2D5A3D] via-[#3A7A52] to-[#4A7C59] p-5 text-white shadow-lg">
-          <h1 className="text-xl font-bold">🌲 {event.name}</h1>
-          <p className="mt-1 text-sm opacity-90">🏞️ {event.location}</p>
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h1 className="text-xl font-bold">🌲 {event.name}</h1>
+              <p className="mt-1 text-sm opacity-90">🏞️ {event.location}</p>
+            </div>
+            <Link
+              href={`/event/${id}/my`}
+              aria-label="나의 숲 기록 · 개인정보 관리"
+              className="flex shrink-0 items-center gap-1 rounded-full bg-white/20 px-3 py-1.5 text-xs font-semibold hover:bg-white/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+            >
+              <span aria-hidden>🌲</span>
+              <span>내 정보</span>
+            </Link>
+          </div>
           <div className="mt-3 flex gap-3">
             <div className="flex-1 rounded-xl bg-white/20 p-3 text-center">
               <div className="text-2xl font-bold">{participant?.total_score ?? 0}<span className="ml-0.5 text-xs">🌰</span></div>

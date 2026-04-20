@@ -1,8 +1,12 @@
 "use server";
 
+import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { recordConsent } from "@/lib/consent";
+import { getRequestMeta } from "@/lib/audit-log";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 type InquiryStatus = "NEW" | "CONTACTED" | "PROPOSED" | "WON" | "LOST";
 const STATUS_SET = new Set<InquiryStatus>(["NEW", "CONTACTED", "PROPOSED", "WON", "LOST"]);
@@ -32,10 +36,16 @@ export async function submitB2BInquiryAction(formData: FormData) {
 
   const message = String(formData.get("message") ?? "").trim() || null;
 
+  const privacy_agreed = formData.get("consent_privacy") === "1";
+  const marketing_agreed = formData.get("consent_marketing") === "1";
+
   if (!company_name) throw new Error("회사명을 입력해주세요");
   if (!contact_name) throw new Error("담당자 이름을 입력해주세요");
   if (!contact_email && !contact_phone) {
     throw new Error("이메일 또는 전화번호 중 하나는 필수입니다");
+  }
+  if (!privacy_agreed) {
+    throw new Error("개인정보 수집·이용 동의(필수)에 체크해주세요");
   }
 
   const { error } = await (
@@ -59,6 +69,27 @@ export async function submitB2BInquiryAction(formData: FormData) {
     });
 
   if (error) throw new Error(error.message);
+
+  // PIPA 동의 이력 저장 (best-effort)
+  try {
+    const hdrs = await headers();
+    const meta = getRequestMeta(hdrs);
+    await recordConsent(supabase as unknown as SupabaseClient, {
+      user_type: "b2b_inquiry",
+      user_identifier: contact_email || contact_phone || company_name,
+      consent: {
+        terms: true, // implicit via form submit
+        privacy: privacy_agreed,
+        marketing: marketing_agreed,
+        thirdParty: false,
+        ageConfirm: true, // B2B staff assumed adult
+      },
+      ip_address: meta.ip_address ?? undefined,
+      user_agent: meta.user_agent ?? undefined,
+    });
+  } catch (e) {
+    console.error("[enterprise] consent record error:", e);
+  }
 
   revalidatePath("/admin/b2b");
   redirect("/enterprise/thank-you");

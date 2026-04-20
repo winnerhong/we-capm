@@ -3,14 +3,32 @@
 import Link from "next/link";
 import { useState, useTransition } from "react";
 import { partnerSignupAction } from "./actions";
+import {
+  ConsentCheckboxes,
+  defaultConsent,
+  isConsentValid,
+  type ConsentState,
+} from "@/components/consent-checkboxes";
 
 export function PartnerSignupForm() {
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+  const [consent, setConsent] = useState<ConsentState>(defaultConsent);
+
+  const consentOk = isConsentValid(consent);
 
   const onSubmit = (formData: FormData) => {
     setError(null);
+    if (!consentOk) {
+      setError("필수 항목에 동의해주세요");
+      return;
+    }
+    formData.set("consent_terms", consent.terms ? "1" : "0");
+    formData.set("consent_privacy", consent.privacy ? "1" : "0");
+    formData.set("consent_marketing", consent.marketing ? "1" : "0");
+    formData.set("consent_third_party", consent.thirdParty ? "1" : "0");
+    formData.set("consent_age", consent.ageConfirm ? "1" : "0");
     start(async () => {
       const result = await partnerSignupAction(formData);
       if (result.ok) {
@@ -171,27 +189,15 @@ export function PartnerSignupForm() {
         />
       </div>
 
-      <label
-        htmlFor="agree"
-        className="flex items-start gap-2 rounded-xl border border-[#D4E4BC] bg-[#FFF8F0] p-3 text-xs text-[#6B6560]"
-      >
-        <input
-          id="agree"
-          name="agree"
-          type="checkbox"
-          required
-          className="mt-0.5 h-4 w-4 accent-[#2D5A3D]"
-        />
-        <span>
-          토리로의 <b className="text-[#2D5A3D]">이용약관</b>과{" "}
-          <b className="text-[#2D5A3D]">개인정보 처리방침</b>에 동의하며,
-          입력한 정보가 숲지기 심사에 사용되는 것에 동의합니다.
-        </span>
-      </label>
+      {/* PIPA 동의 */}
+      <ConsentCheckboxes value={consent} onChange={setConsent} />
+
+      {/* hidden agree for backwards compat with server action */}
+      <input type="hidden" name="agree" value={consentOk ? "on" : ""} />
 
       <button
         type="submit"
-        disabled={pending}
+        disabled={pending || !consentOk}
         className="w-full rounded-xl bg-[#2D5A3D] px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[#3A7A52] focus:outline-none focus:ring-2 focus:ring-[#3A7A52]/50 disabled:opacity-60"
       >
         {pending ? "신청 중…" : "🌲 숲지기 신청하기"}

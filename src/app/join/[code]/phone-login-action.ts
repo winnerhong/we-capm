@@ -1,10 +1,17 @@
 "use server";
 
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { formatKorean } from "@/lib/phone";
+import { logAccess, getRequestMeta } from "@/lib/audit-log";
+import { recordConsent, type ConsentInput } from "@/lib/consent";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
-export async function phoneLoginAction(joinCode: string, phoneDigits: string) {
+export async function phoneLoginAction(
+  joinCode: string,
+  phoneDigits: string,
+  consent?: ConsentInput
+) {
   const supabase = await createClient();
 
   const phone = phoneDigits.startsWith("0") ? phoneDigits : `0${phoneDigits}`;
@@ -141,6 +148,32 @@ export async function phoneLoginAction(joinCode: string, phoneDigits: string) {
       path: "/",
     }
   );
+
+  try {
+    const hdrs = await headers();
+    const meta = getRequestMeta(hdrs);
+    await logAccess(supabase as unknown as SupabaseClient, {
+      user_type: "PARTICIPANT",
+      user_id: participantId,
+      user_identifier: formatted,
+      action: "LOGIN",
+      resource: `event:${event.id}`,
+      status_code: 200,
+      ...meta,
+    });
+
+    if (consent) {
+      await recordConsent(supabase as unknown as SupabaseClient, {
+        user_type: "participant",
+        user_identifier: formatted,
+        consent,
+        ip_address: meta.ip_address ?? undefined,
+        user_agent: meta.user_agent ?? undefined,
+      });
+    }
+  } catch {
+    // best-effort
+  }
 
   return { ok: true, eventId: event.id, name };
 }

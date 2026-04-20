@@ -4,6 +4,12 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { formatKorean } from "@/lib/phone";
 import { phoneLoginAction } from "./phone-login-action";
+import {
+  ConsentCheckboxes,
+  defaultConsent,
+  isConsentValid,
+  type ConsentState,
+} from "@/components/consent-checkboxes";
 
 interface Props {
   eventId: string;
@@ -15,13 +21,21 @@ interface Props {
 export function PhoneEntry({ eventId, eventName, location, joinCode }: Props) {
   const router = useRouter();
   const [phone, setPhone] = useState("");
+  const [consent, setConsent] = useState<ConsentState>(defaultConsent);
   const [welcomeName, setWelcomeName] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
+  const consentOk = isConsentValid(consent);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+
+    if (!consentOk) {
+      setError("필수 항목에 동의해주세요");
+      return;
+    }
 
     const digits = phone.replace(/\D/g, "");
     if (digits.length < 10) {
@@ -31,7 +45,13 @@ export function PhoneEntry({ eventId, eventName, location, joinCode }: Props) {
 
     startTransition(async () => {
       try {
-        const result = await phoneLoginAction(joinCode, digits);
+        const result = await phoneLoginAction(joinCode, digits, {
+          terms: consent.terms,
+          privacy: consent.privacy,
+          marketing: consent.marketing,
+          thirdParty: consent.thirdParty,
+          ageConfirm: consent.ageConfirm,
+        });
         if (!result.ok) {
           setError(result.message ?? "입장 실패");
           return;
@@ -68,6 +88,8 @@ export function PhoneEntry({ eventId, eventName, location, joinCode }: Props) {
           <p className="text-sm">📍 {location}</p>
         </div>
 
+        <ConsentCheckboxes value={consent} onChange={setConsent} showChildGuardian />
+
         <div className="space-y-2">
           <label htmlFor="phone" className="text-sm font-medium">
             휴대폰 번호만 입력하면 바로 입장!
@@ -81,7 +103,6 @@ export function PhoneEntry({ eventId, eventName, location, joinCode }: Props) {
             value={phone}
             onChange={(e) => setPhone(formatKorean(e.target.value))}
             className="w-full rounded-2xl border-2 px-4 py-4 text-lg text-center outline-none focus:border-violet-500"
-            autoFocus
             required
           />
         </div>
@@ -90,7 +111,7 @@ export function PhoneEntry({ eventId, eventName, location, joinCode }: Props) {
 
         <button
           type="submit"
-          disabled={pending}
+          disabled={pending || !consentOk}
           className="w-full rounded-2xl bg-violet-600 py-4 text-lg font-bold text-white hover:bg-violet-700 disabled:opacity-50"
         >
           {pending ? "확인 중..." : "입장하기"}

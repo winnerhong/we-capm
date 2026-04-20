@@ -3,12 +3,13 @@
 -- Supabase 대시보드 → SQL Editor에 붙여넣고 Run
 -- 멱등(idempotent) 처리됨 - 여러번 실행해도 안전
 -- =====================================================
--- 포함된 테이블 (총 16개):
+-- 포함된 테이블 (총 17개):
 --   [스탬프 랠리] stamp_boards, stamp_slots, stamp_records, stamp_albums
 --   [Phase C] partners, subscriptions, coupons, coupon_deliveries,
 --             ad_campaigns, guilds, guild_members, challenges
 --   [기타] partner_programs, event_reviews, b2b_inquiries, referrals,
 --          acorn_recharges
+--   [PIPA] access_logs
 -- =====================================================
 
 
@@ -417,6 +418,34 @@ CREATE POLICY "acorn_recharges_all" ON acorn_recharges FOR ALL USING (true) WITH
 
 
 -- =====================================================
+-- 📜 PIPA 동의 이력 저장 (user_consents) (2026-04-24)
+-- =====================================================
+
+CREATE TABLE IF NOT EXISTS user_consents (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_type text NOT NULL,
+  user_identifier text NOT NULL,
+  terms_agreed boolean NOT NULL DEFAULT false,
+  terms_version text,
+  privacy_agreed boolean NOT NULL DEFAULT false,
+  privacy_version text,
+  marketing_agreed boolean NOT NULL DEFAULT false,
+  third_party_agreed boolean NOT NULL DEFAULT false,
+  age_confirmed boolean NOT NULL DEFAULT false,
+  ip_address text,
+  user_agent text,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_consents_user
+  ON user_consents(user_identifier, created_at DESC);
+
+ALTER TABLE user_consents ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "user_consents_all" ON user_consents;
+CREATE POLICY "user_consents_all" ON user_consents FOR ALL USING (true) WITH CHECK (true);
+
+
+-- =====================================================
 -- 📡 Realtime 구독 설정 (멱등)
 -- =====================================================
 
@@ -436,5 +465,31 @@ END $$;
 
 
 -- =====================================================
--- ✅ 완료! 16개 테이블 생성됨
+-- 🔒 Access audit log for PIPA compliance (2026-04-24)
+-- =====================================================
+CREATE TABLE IF NOT EXISTS access_logs (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_type text NOT NULL CHECK (user_type IN ('ADMIN','MANAGER','PARTNER','PARTICIPANT','PUBLIC')),
+  user_id text,
+  user_identifier text,
+  action text NOT NULL,
+  resource text,
+  ip_address text,
+  user_agent text,
+  status_code int,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_access_logs_user ON access_logs(user_identifier, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_access_logs_action ON access_logs(action, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_access_logs_created ON access_logs(created_at DESC);
+
+ALTER TABLE access_logs ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "access_logs_all" ON access_logs;
+CREATE POLICY "access_logs_all" ON access_logs FOR ALL USING (true) WITH CHECK (true);
+
+-- Retention: PIPA requires 6+ months of access logs
+-- Recommended: delete logs older than 1 year via scheduled job
+
+-- =====================================================
+-- ✅ 완료! 17개 테이블 생성됨
 -- =====================================================

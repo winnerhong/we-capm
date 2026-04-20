@@ -30,6 +30,7 @@ const MENUS: MenuItem[] = [
   { icon: "💳", label: "결제 관리", href: "/partner/dashboard", desc: "정산 · 수익" },
   { icon: "🛠️", label: "마케팅 센터", href: "/partner/dashboard", desc: "홍보 · 쿠폰" },
   { icon: "⚙️", label: "설정", href: "/partner/settings", desc: "계정 · 프로필" },
+  { icon: "🪪", label: "내 정보", href: "/partner/my", desc: "열람 · 해지" },
 ];
 
 const TASKS = [
