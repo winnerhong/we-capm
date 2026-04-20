@@ -66,11 +66,17 @@ export default async function SubmissionsPage({
   return (
     <div className="space-y-4">
       <RealtimeRefresher />
-      <div>
-        <Link href={`/admin/events/${id}`} className="text-sm text-neutral-500 hover:underline">
-          ← {event.name}
-        </Link>
-        <h1 className="text-2xl font-bold">승인 대기함</h1>
+      <div className="flex items-start justify-between">
+        <div>
+          <Link href={`/admin/events/${id}`} className="text-sm text-neutral-500 hover:underline">
+            ← {event.name}
+          </Link>
+          <h1 className="text-2xl font-bold">승인 대기함</h1>
+        </div>
+        <a href={`/api/export/submissions?event_id=${id}`} download
+          className="rounded-lg border border-[#D4E4BC] px-3 py-2 text-sm text-[#2D5A3D] hover:bg-[#E8F0E4]">
+          📥 CSV 다운로드
+        </a>
       </div>
 
       <div className="flex gap-2 text-sm">

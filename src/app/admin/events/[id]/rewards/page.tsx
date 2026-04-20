@@ -58,6 +58,8 @@ export default async function RewardsPage({ params }: { params: Promise<{ id: st
             <p className="mt-1 text-sm text-white/80">탐험가들에게 전할 숲의 선물을 준비해요</p>
           </div>
           <div className="flex gap-2">
+            <a href={`/api/export/rewards?event_id=${id}`} download
+              className="rounded-lg bg-white/10 border border-white/20 px-3 py-2 text-sm text-white hover:bg-white/20">📥 CSV 다운로드</a>
             <Link href={`/admin/events/${id}/claim`}
               className="rounded-lg bg-white/10 border border-white/20 px-3 py-2 text-sm text-white hover:bg-white/20">🎫 수령처리</Link>
             <Link href={`/admin/events/${id}/rewards/new`}

@@ -1,20 +1,38 @@
 {
-  "name": "토리로 CampNic",
+  "name": "토리로 TORIRO - 숲에서 자라는 가족의 시간",
   "short_name": "토리로",
+  "description": "작은 도토리 하나가 숲으로 가는 길이 됩니다",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#7c3aed",
+  "orientation": "portrait",
+  "background_color": "#FFF8F0",
+  "theme_color": "#2D5A3D",
+  "categories": ["lifestyle", "education", "travel"],
+  "lang": "ko-KR",
   "icons": [
     {
       "src": "/icon-192.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     },
     {
       "src": "/icon-512.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "숲길 참여",
+      "url": "/events",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "기업 문의",
+      "url": "/enterprise",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
     }
   ]
 }

@@ -120,3 +120,31 @@ textarea::placeholder {
 .text-bark { color: #8B6F47; }
 .text-warm-gray { color: #6B6560; }
 .border-leaf { border-color: #D4E4BC; }
+
+/* 접근성: 모션 최소화 선호 시 애니메이션 축소 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Toast 슬라이드 인 애니메이션 */
+@keyframes slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-slide-in {
+  animation: slide-in 0.2s ease-out;
+}

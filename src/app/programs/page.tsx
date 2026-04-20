@@ -3,7 +3,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
-  title: "숲지기 프로그램 · 토리로",
+  title: "프로그램 둘러보기",
   description:
     "전국의 토리로 숲지기들이 운영하는 체험 프로그램을 카테고리별로 찾아보세요.",
 };

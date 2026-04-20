@@ -171,7 +171,7 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
       )}
 
       {/* 관리 메뉴 */}
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-4 gap-2">
         <Link href={`/admin/events/${id}/stats`}
           className="flex flex-col items-center gap-1 rounded-2xl border border-[#D4E4BC] bg-white p-3 hover:border-[#2D5A3D] transition-colors">
           <span className="text-xl">📊</span><span className="text-[11px] text-[#2C2C2C]">통계</span>
@@ -183,6 +183,10 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
         <Link href={`/admin/events/${id}/chat`}
           className="flex flex-col items-center gap-1 rounded-2xl border border-[#D4E4BC] bg-white p-3 hover:border-[#2D5A3D] transition-colors">
           <WinnerTalkIcon size={22} /><span className="text-[11px] text-[#2C2C2C]">토리톡</span>
+        </Link>
+        <Link href={`/admin/events/${id}/esg`}
+          className="flex flex-col items-center gap-1 rounded-2xl border border-[#D4E4BC] bg-white p-3 hover:border-[#2D5A3D] transition-colors">
+          <span className="text-xl">🌱</span><span className="text-[11px] text-[#2C2C2C]">ESG</span>
         </Link>
       </div>
 

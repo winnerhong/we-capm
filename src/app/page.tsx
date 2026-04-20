@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { Testimonials } from "@/components/testimonials";
+import { SiteFooter } from "@/components/site-footer";
 
 export const metadata: Metadata = {
   title: "토리로 — 숲길에서 만나는 가족의 하루",
@@ -240,33 +242,9 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="border-t border-[#D4E4BC] bg-white py-8">
-        <div className="mx-auto flex max-w-5xl flex-col items-center gap-2 px-4 text-center text-xs text-[#8B6F47]">
-          <p className="flex items-center gap-1 font-bold text-[#2D5A3D]">
-            <span aria-hidden>🌰</span>
-            <span>토리로</span>
-          </p>
-          <p>가족 · 기업 · 지역사회가 숲에서 만나는 곳</p>
-          <nav className="mt-2 flex flex-wrap justify-center gap-3">
-            <Link href="/events" className="hover:text-[#2D5A3D]">
-              숲길 찾기
-            </Link>
-            <Link href="/programs" className="hover:text-[#2D5A3D]">
-              프로그램
-            </Link>
-            <Link href="/enterprise" className="hover:text-[#2D5A3D]">
-              기업
-            </Link>
-            <Link href="/partner" className="hover:text-[#2D5A3D]">
-              숲지기
-            </Link>
-            <Link href="/join" className="hover:text-[#2D5A3D]">
-              코드 입장
-            </Link>
-          </nav>
-        </div>
-      </footer>
+      <Testimonials />
+
+      <SiteFooter />
     </div>
   );
 }

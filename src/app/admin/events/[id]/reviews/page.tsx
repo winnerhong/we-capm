@@ -64,14 +64,13 @@ export default async function AdminReviewsPage({
         <Link href={`/admin/events/${id}`} className="text-sm text-[#2D5A3D] hover:underline">
           ← {event.name}
         </Link>
-        <button
-          type="button"
-          disabled
-          title="CSV 내보내기 (준비중)"
-          className="rounded-lg border border-[#D4E4BC] px-3 py-1 text-sm text-[#6B6560] opacity-60"
+        <a
+          href={`/api/export/reviews?event_id=${id}`}
+          download
+          className="rounded-lg border border-[#D4E4BC] px-3 py-1 text-sm text-[#2D5A3D] hover:bg-[#E8F0E4]"
         >
           📊 CSV 내보내기
-        </button>
+        </a>
       </div>
 
       <header>

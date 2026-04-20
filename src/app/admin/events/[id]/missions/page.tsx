@@ -37,12 +37,20 @@ export default async function MissionsPage({ params }: { params: Promise<{ id: s
           </Link>
           <h1 className="text-2xl font-bold">숲길 관리</h1>
         </div>
-        <Link
-          href={`/admin/events/${id}/missions/new`}
-          className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700"
-        >
-          + 새 숲길
-        </Link>
+        <div className="flex gap-2">
+          <Link
+            href={`/admin/events/${id}/missions/templates`}
+            className="rounded-lg border border-violet-300 bg-white px-4 py-2 text-sm font-semibold text-violet-700 hover:bg-violet-50"
+          >
+            📚 템플릿에서 시작
+          </Link>
+          <Link
+            href={`/admin/events/${id}/missions/new`}
+            className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700"
+          >
+            + 새 숲길
+          </Link>
+        </div>
       </div>
 
       {missions && missions.length > 0 ? (

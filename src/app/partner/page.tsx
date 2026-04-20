@@ -1,7 +1,14 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getPartner } from "@/lib/auth-guard";
 import { PartnerLoginForm } from "./login-form";
+
+export const metadata: Metadata = {
+  title: "숲지기 되기",
+  description:
+    "토리로 숲지기가 되어 우리 숲길과 체험 프로그램을 운영해보세요.",
+};
 
 export const dynamic = "force-dynamic";
 

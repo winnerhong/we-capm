@@ -3,7 +3,7 @@ import Link from "next/link";
 import { InquiryForm } from "./inquiry-form";
 
 export const metadata: Metadata = {
-  title: "기업 패키지 · 토리로 ESG 팀빌딩",
+  title: "기업 프로그램",
   description:
     "임직원과 가족이 함께하는 숲 속 ESG 실천 프로그램. 50명부터 500명 이상까지, 토리로가 기업 맞춤형 팀빌딩을 설계합니다.",
 };
@@ -305,6 +305,18 @@ export default function EnterprisePage() {
                 <p className="mt-1.5 text-xs leading-relaxed text-[#6B6560]">{e.desc}</p>
               </div>
             ))}
+          </div>
+
+          <div className="mt-8 flex flex-col items-center gap-3">
+            <Link
+              href="/enterprise/esg-sample"
+              className="inline-flex items-center gap-2 rounded-xl bg-[#2D5A3D] px-6 py-3 text-sm font-bold text-white shadow-md transition-all hover:translate-y-[-1px] hover:bg-[#3A7A52] hover:shadow-lg"
+            >
+              📄 ESG 리포트 샘플 자세히 보기 →
+            </Link>
+            <p className="text-[11px] text-[#6B6560]">
+              실제 B2B 고객사에 전달되는 공식 리포트 양식을 확인해보세요
+            </p>
           </div>
         </div>
       </section>

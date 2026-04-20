@@ -8,9 +8,8 @@ import type {
 } from "@/lib/supabase/database.types";
 
 export const metadata: Metadata = {
-  title: "토리로 숲길 찾기",
-  description:
-    "오늘 가족과 함께 걸어볼 토리로 숲길을 찾아보세요. 지역 · 날짜 · 참여 방식으로 검색할 수 있습니다.",
+  title: "숲길 찾기",
+  description: "전국의 토리로 숲길 모음",
 };
 
 export const dynamic = "force-dynamic";

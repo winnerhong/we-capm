@@ -88,10 +88,26 @@ export default async function StatsPage({ params }: { params: Promise<{ id: stri
         </ol>
       </section>
 
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <a href={`/admin/events/${id}/export`} download
           className="flex-1 rounded-lg bg-violet-600 py-3 text-center font-semibold text-white hover:bg-violet-700">
           📊 결과 CSV 다운로드
+        </a>
+        <a href={`/api/export/stats?event_id=${id}`} download
+          className="rounded-lg border border-[#D4E4BC] px-4 py-3 text-sm font-semibold text-[#2D5A3D] hover:bg-[#E8F0E4]">
+          📥 요약 CSV
+        </a>
+        <a href={`/api/export/participants?event_id=${id}`} download
+          className="rounded-lg border border-[#D4E4BC] px-4 py-3 text-sm font-semibold text-[#2D5A3D] hover:bg-[#E8F0E4]">
+          👥 참가자
+        </a>
+        <a href={`/api/export/submissions?event_id=${id}`} download
+          className="rounded-lg border border-[#D4E4BC] px-4 py-3 text-sm font-semibold text-[#2D5A3D] hover:bg-[#E8F0E4]">
+          📝 제출
+        </a>
+        <a href={`/api/export/rewards?event_id=${id}`} download
+          className="rounded-lg border border-[#D4E4BC] px-4 py-3 text-sm font-semibold text-[#2D5A3D] hover:bg-[#E8F0E4]">
+          🎁 보상
         </a>
       </div>
     </div>

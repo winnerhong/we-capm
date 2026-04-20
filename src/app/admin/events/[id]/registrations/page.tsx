@@ -39,10 +39,16 @@ export default async function RegistrationsPage({
           <p className="text-sm">등록: {total}명 | 입장: {entered}명 | 미입장: {total - entered}명</p>
         </div>
         {total > 0 && (
-          <a href={`/admin/events/${id}/registrations/download`} download
-            className="rounded-lg border px-4 py-2 text-sm hover:bg-neutral-50">
-            📥 엑셀 다운로드
-          </a>
+          <div className="flex gap-2">
+            <a href={`/admin/events/${id}/registrations/download`} download
+              className="rounded-lg border px-4 py-2 text-sm hover:bg-neutral-50">
+              📥 엑셀 다운로드
+            </a>
+            <a href={`/api/export/participants?event_id=${id}`} download
+              className="rounded-lg border border-[#D4E4BC] px-3 py-2 text-sm text-[#2D5A3D] hover:bg-[#E8F0E4]">
+              📥 CSV 다운로드
+            </a>
+          </div>
         )}
       </div>
 
