@@ -22,10 +22,10 @@ type ProgramRow = {
 
 const MENUS: MenuItem[] = [
   { icon: "🗺️", label: "프로그램 관리", href: "/partner/programs", desc: "체험 상품 등록" },
-  { icon: "🎨", label: "나만의 숲길", href: "/partner/dashboard", desc: "QR · 미션" },
-  { icon: "🏫", label: "기관 고객", href: "/partner/dashboard", desc: "B2B2C" },
-  { icon: "👥", label: "개인 고객", href: "/partner/dashboard", desc: "B2C" },
-  { icon: "🏢", label: "기업 고객", href: "/partner/dashboard", desc: "B2B" },
+  { icon: "🎨", label: "나만의 숲길", href: "/partner/missions", desc: "QR · 미션" },
+  { icon: "👥", label: "고객 관리", href: "/partner/customers", desc: "CRM 허브" },
+  { icon: "🎯", label: "세그먼트", href: "/partner/customers/segments", desc: "고객 그룹" },
+  { icon: "📡", label: "실시간 활동", href: "/partner/customers/activity", desc: "타임라인" },
   { icon: "📊", label: "분석", href: "/partner/analytics", desc: "성과 리포트" },
   { icon: "💳", label: "결제 관리", href: "/partner/billing", desc: "정산 · 수익" },
   { icon: "🌰", label: "도토리 충전", href: "/partner/billing/acorns", desc: "크레딧 충전" },
@@ -280,7 +280,7 @@ export default async function PartnerDashboardPage() {
       <section className="rounded-2xl border border-[#D4E4BC] bg-white p-4 shadow-sm md:p-6">
         <h2 className="mb-4 flex items-center gap-2 text-base font-bold text-[#2D5A3D]">
           <span>🌳</span>
-          <span>숲지기 메뉴</span>
+          <span>숲지기 빠른메뉴</span>
         </h2>
         <div className="grid grid-cols-3 gap-3">
           {MENUS.map((m) => (

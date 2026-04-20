@@ -33,9 +33,13 @@ const NAV_GROUPS: NavGroup[] = [
     icon: "👥",
     match: ["/partner/customers", "/partner/b2b", "/partner/b2c"],
     items: [
+      { label: "CRM 대시보드", href: "/partner/customers", icon: "🏠" },
       { label: "기관 고객 (B2B2C)", href: "/partner/customers/org", icon: "🏫" },
       { label: "개인 고객 (B2C)", href: "/partner/customers/individual", icon: "👨‍👩‍👧" },
       { label: "기업 고객 (B2B)", href: "/partner/customers/corporate", icon: "🏢" },
+      { label: "세그먼트", href: "/partner/customers/segments", icon: "🎯" },
+      { label: "실시간 활동", href: "/partner/customers/activity", icon: "📊" },
+      { label: "엑셀 일괄등록", href: "/partner/customers/bulk-import", icon: "📥" },
     ],
   },
   {
