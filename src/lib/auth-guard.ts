@@ -1,4 +1,33 @@
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+
+export type PartnerSession = {
+  id: string;
+  name: string;
+  username: string;
+};
+
+export async function requirePartner(): Promise<PartnerSession> {
+  const cookieStore = await cookies();
+  const partnerCookie = cookieStore.get("campnic_partner")?.value;
+  if (!partnerCookie) redirect("/partner");
+  try {
+    return JSON.parse(partnerCookie) as PartnerSession;
+  } catch {
+    redirect("/partner");
+  }
+}
+
+export async function getPartner(): Promise<PartnerSession | null> {
+  const cookieStore = await cookies();
+  const partnerCookie = cookieStore.get("campnic_partner")?.value;
+  if (!partnerCookie) return null;
+  try {
+    return JSON.parse(partnerCookie) as PartnerSession;
+  } catch {
+    return null;
+  }
+}
 
 export async function requireAdmin() {
   const cookieStore = await cookies();

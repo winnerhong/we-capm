@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
+import { requirePartner } from "@/lib/auth-guard";
 import {
   deleteProgramAction,
   togglePublishAction,
@@ -83,28 +83,6 @@ function renderStars(avg: number | null, count: number): string {
   )} ${avg.toFixed(1)} (${count})`;
 }
 
-async function resolvePartnerId(): Promise<string | null> {
-  const cookieStore = await cookies();
-  const fromCookie = cookieStore.get("campnic_partner")?.value;
-  if (fromCookie) return fromCookie;
-
-  const supabase = await createClient();
-  const { data } = await (
-    supabase.from("partners") as unknown as {
-      select: (c: string) => {
-        limit: (n: number) => {
-          maybeSingle: () => Promise<{ data: { id: string } | null }>;
-        };
-      };
-    }
-  )
-    .select("id")
-    .limit(1)
-    .maybeSingle();
-
-  return data?.id ?? null;
-}
-
 async function loadPrograms(partnerId: string | null): Promise<Program[]> {
   const supabase = await createClient();
   const columns =
@@ -127,8 +105,8 @@ async function loadPrograms(partnerId: string | null): Promise<Program[]> {
 }
 
 export default async function PartnerProgramsPage() {
-  const partnerId = await resolvePartnerId();
-  const programs = await loadPrograms(partnerId);
+  const partner = await requirePartner();
+  const programs = await loadPrograms(partner.id);
 
   const total = programs.length;
   const publishedCount = programs.filter((p) => p.is_published).length;
@@ -352,19 +330,6 @@ export default async function PartnerProgramsPage() {
         </section>
       )}
 
-      {/* Dev 안내 */}
-      <section
-        role="note"
-        className="rounded-xl border border-amber-300 bg-amber-50 p-4 flex items-center gap-3"
-      >
-        <span className="text-xl flex-shrink-0" aria-hidden>
-          🌱
-        </span>
-        <p className="text-xs text-amber-900 leading-relaxed">
-          숲지기 로그인 연동 전까지는 등록된 첫 번째 파트너 계정 소속으로
-          저장됩니다. 추후 로그인 연결 시 자동으로 본인 계정 프로그램만 보여요.
-        </p>
-      </section>
     </div>
   );
 }

@@ -1003,6 +1003,57 @@ export interface Database {
         };
         Relationships: [];
       };
+      referrals: {
+        Row: {
+          id: string;
+          referrer_phone: string;
+          referrer_name: string | null;
+          referrer_event_id: string | null;
+          referral_code: string;
+          invitee_phone: string | null;
+          invitee_name: string | null;
+          invitee_joined_at: string | null;
+          invitee_event_id: string | null;
+          status: "PENDING" | "JOINED" | "COMPLETED" | "EXPIRED";
+          reward_acorns: number;
+          reward_given: boolean;
+          created_at: string;
+          expires_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          referrer_phone: string;
+          referrer_name?: string | null;
+          referrer_event_id?: string | null;
+          referral_code: string;
+          invitee_phone?: string | null;
+          invitee_name?: string | null;
+          invitee_joined_at?: string | null;
+          invitee_event_id?: string | null;
+          status?: "PENDING" | "JOINED" | "COMPLETED" | "EXPIRED";
+          reward_acorns?: number;
+          reward_given?: boolean;
+          created_at?: string;
+          expires_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          referrer_phone?: string;
+          referrer_name?: string | null;
+          referrer_event_id?: string | null;
+          referral_code?: string;
+          invitee_phone?: string | null;
+          invitee_name?: string | null;
+          invitee_joined_at?: string | null;
+          invitee_event_id?: string | null;
+          status?: "PENDING" | "JOINED" | "COMPLETED" | "EXPIRED";
+          reward_acorns?: number;
+          reward_given?: boolean;
+          created_at?: string;
+          expires_at?: string | null;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: {

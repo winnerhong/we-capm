@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { requirePartner } from "@/lib/auth-guard";
 import {
   createProgramAction,
   updateProgramAction,
@@ -53,6 +54,7 @@ export default async function NewProgramPage({
 }: {
   searchParams: Promise<{ edit?: string }>;
 }) {
+  await requirePartner();
   const sp = await searchParams;
   const editId = sp?.edit;
   const existing = editId ? await loadProgram(editId) : null;

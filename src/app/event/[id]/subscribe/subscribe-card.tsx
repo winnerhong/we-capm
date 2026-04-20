@@ -2,6 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { PaymentModal } from "@/components/payment-modal";
+import type { PaymentResult } from "@/lib/payments";
 import { subscribeAction, type SubscriptionTier } from "./actions";
 
 export type Tier = {
@@ -38,21 +40,27 @@ export function SubscribeCard({ tier, selected, onSelect, eventId }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [payOpen, setPayOpen] = useState(false);
 
   const theme = getTierTheme(tier.id);
 
+  // 1단계: "시작하기" 클릭 → 결제 모달 오픈
   const handleStart = () => {
     if (isPending) return;
-    const ok = window.confirm(
-      `${tier.emoji} ${tier.name}을(를) 시작하시겠어요?\n\n월 ${tier.price.toLocaleString("ko-KR")}원\n\n(결제 연동 전 — 지금은 구독 레코드만 생성됩니다)`,
-    );
-    if (!ok) return;
-
     setErrorMsg(null);
+    setPayOpen(true);
+  };
+
+  // 2단계: 결제 성공 → subscribeAction 호출 → 구독 페이지로 이동
+  const handlePaymentSuccess = (result: PaymentResult) => {
+    setPayOpen(false);
     startTransition(async () => {
       try {
-        const result = await subscribeAction(eventId, TIER_MAP[tier.id]);
-        if (result?.ok) {
+        const sub = await subscribeAction(eventId, TIER_MAP[tier.id]);
+        if (sub?.ok) {
+          // TODO: 실제 PG 연동 시 result.transactionId를 subscriptions.payment_txn_id 컬럼에 저장
+          // (현재는 mock 트랜잭션이므로 서버에 전달하지 않음)
+          void result;
           router.push(`/event/${eventId}/subscription`);
           router.refresh();
         }
@@ -65,6 +73,7 @@ export function SubscribeCard({ tier, selected, onSelect, eventId }: Props) {
   };
 
   return (
+    <>
     <button
       type="button"
       onClick={() => onSelect(tier.id)}
@@ -157,6 +166,16 @@ export function SubscribeCard({ tier, selected, onSelect, eventId }: Props) {
         </p>
       )}
     </button>
+    <PaymentModal
+      open={payOpen}
+      onClose={() => setPayOpen(false)}
+      onSuccess={handlePaymentSuccess}
+      orderName={`${tier.emoji} ${tier.name} (월 구독)`}
+      amount={tier.price}
+      orderPrefix="SUB"
+      metadata={{ eventId, tier: TIER_MAP[tier.id] }}
+    />
+    </>
   );
 }
 

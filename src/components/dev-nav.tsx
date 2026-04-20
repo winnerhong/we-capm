@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 const PORTALS = [
   { label: "관리자포털", icon: "👨‍💼", href: "/api/dev-login?role=admin", match: "/admin", color: "bg-violet-600", activeColor: "bg-violet-500 ring-2 ring-white" },
   { label: "기관포털", icon: "🏢", href: "/api/dev-login?role=manager", match: "/manager", color: "bg-blue-600", activeColor: "bg-blue-500 ring-2 ring-white" },
+  { label: "숲지기포털", icon: "🏡", href: "/api/dev-login?role=partner", match: "/partner", color: "bg-emerald-600", activeColor: "bg-emerald-500 ring-2 ring-white" },
   { label: "이용자포털", icon: "👨‍👩‍👧", href: "/api/dev-login?role=participant", match: "/event", color: "bg-green-600", activeColor: "bg-green-500 ring-2 ring-white" },
 ];
 

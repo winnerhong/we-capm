@@ -1,6 +1,13 @@
 import Link from "next/link";
+import { getPartner } from "@/lib/auth-guard";
 
-export default function PartnerLayout({ children }: { children: React.ReactNode }) {
+export default async function PartnerLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const partner = await getPartner();
+
   return (
     <div className="min-h-dvh bg-[#FFF8F0]">
       {/* 준비 중 wait-list 배너 */}
@@ -10,22 +17,36 @@ export default function PartnerLayout({ children }: { children: React.ReactNode 
 
       <header className="border-b border-[#D4E4BC] bg-white shadow-sm">
         <div className="mx-auto flex max-w-4xl items-center justify-between px-4 py-3">
-          <Link href="/partner/dashboard" className="flex items-center gap-2 font-bold text-[#2D5A3D]">
+          <Link
+            href={partner ? "/partner/dashboard" : "/partner"}
+            className="flex items-center gap-2 font-bold text-[#2D5A3D]"
+          >
             <span className="text-xl">🏡</span>
             <span>토리로 숲지기</span>
           </Link>
           <div className="flex items-center gap-3 text-sm">
-            <span className="rounded-full bg-[#E8F0E4] px-3 py-1 text-xs font-semibold text-[#2D5A3D]">
-              🌿 숲지기
-            </span>
-            <form action="/partner" method="get">
-              <button
-                type="submit"
+            {partner ? (
+              <>
+                <span className="rounded-full bg-[#E8F0E4] px-3 py-1 text-xs font-semibold text-[#2D5A3D]">
+                  🌿 {partner.name}
+                </span>
+                <form action="/api/auth/partner-logout" method="post">
+                  <button
+                    type="submit"
+                    className="rounded-lg border border-[#D4E4BC] px-3 py-1 text-xs text-[#6B6560] hover:bg-[#FFF8F0]"
+                  >
+                    로그아웃
+                  </button>
+                </form>
+              </>
+            ) : (
+              <Link
+                href="/partner"
                 className="rounded-lg border border-[#D4E4BC] px-3 py-1 text-xs text-[#6B6560] hover:bg-[#FFF8F0]"
               >
-                로그아웃
-              </button>
-            </form>
+                로그인
+              </Link>
+            )}
           </div>
         </div>
       </header>

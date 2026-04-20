@@ -34,6 +34,7 @@ export async function GET(request: NextRequest) {
   cookieStore.delete("campnic_admin");
   cookieStore.delete("campnic_manager");
   cookieStore.delete("campnic_participant");
+  cookieStore.delete("campnic_partner");
 
   if (role === "admin") {
     cookieStore.set("campnic_admin", JSON.stringify({
@@ -50,6 +51,43 @@ export async function GET(request: NextRequest) {
       loginAt: new Date().toISOString(),
     }), cookieOpts);
     return htmlRedirect(`/manager/${EVENT_ID}`, "🏢 기관으로 로그인 중...");
+  }
+
+  if (role === "partner") {
+    const supabase = await createClient();
+    const { data: partner } = await (supabase as unknown as {
+      from: (t: string) => {
+        select: (c: string) => {
+          eq: (k: string, v: string) => {
+            limit: (n: number) => {
+              maybeSingle: () => Promise<{
+                data: { id: string; name: string; username: string } | null;
+              }>;
+            };
+          };
+        };
+      };
+    })
+      .from("partners")
+      .select("id, name, username")
+      .eq("status", "ACTIVE")
+      .limit(1)
+      .maybeSingle();
+
+    if (!partner) {
+      return NextResponse.json(
+        { error: "ACTIVE 상태의 partner가 없습니다. 먼저 숲지기 가입 후 관리자에서 승인하세요." },
+        { status: 404 }
+      );
+    }
+
+    cookieStore.set("campnic_partner", JSON.stringify({
+      id: partner.id,
+      name: partner.name,
+      username: partner.username,
+      loginAt: new Date().toISOString(),
+    }), cookieOpts);
+    return htmlRedirect("/partner/dashboard", "🏡 숲지기로 로그인 중...");
   }
 
   if (role === "participant") {
@@ -79,5 +117,5 @@ export async function GET(request: NextRequest) {
     return htmlRedirect(`/event/${EVENT_ID}`, "👨‍👩‍👧 이용자로 로그인 중...");
   }
 
-  return NextResponse.json({ error: "role required: admin | manager | participant" }, { status: 400 });
+  return NextResponse.json({ error: "role required: admin | manager | partner | participant" }, { status: 400 });
 }
