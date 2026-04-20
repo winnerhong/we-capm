@@ -7,32 +7,8 @@ import { requirePartner } from "@/lib/auth-guard";
 import { createAutoAccount } from "@/lib/crm/auto-account";
 import { notify } from "@/lib/notifications";
 
-export type PipelineStage =
-  | "LEAD"
-  | "PROPOSED"
-  | "NEGOTIATING"
-  | "CONTRACTED"
-  | "ACTIVE"
-  | "RENEWAL"
-  | "CHURNED";
-
-export const PIPELINE_STAGES: PipelineStage[] = [
-  "LEAD",
-  "PROPOSED",
-  "NEGOTIATING",
-  "CONTRACTED",
-  "ACTIVE",
-  "RENEWAL",
-  "CHURNED",
-];
-
-export type ContactRole =
-  | "HR"
-  | "ESG"
-  | "FINANCE"
-  | "CEO"
-  | "MARKETING"
-  | "OTHER";
+import type { PipelineStage, ContactRole } from "./types";
+import { PIPELINE_STAGES } from "./types";
 
 const ROLE_SET = new Set<ContactRole>([
   "HR",

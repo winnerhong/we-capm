@@ -6,8 +6,8 @@ import {
   addContactAction,
   removeContactAction,
   updateContactAction,
-  type ContactRole,
 } from "../../actions";
+import { type ContactRole } from "../../types";
 
 export const dynamic = "force-dynamic";
 

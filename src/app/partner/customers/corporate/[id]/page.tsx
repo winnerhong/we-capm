@@ -2,12 +2,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requirePartner } from "@/lib/auth-guard";
 import { createClient } from "@/lib/supabase/server";
+import { updatePipelineStageAction } from "../actions";
 import {
   PIPELINE_STAGES,
-  updatePipelineStageAction,
   type PipelineStage,
   type ContactRole,
-} from "../actions";
+} from "../types";
 import { StageSelect } from "../stage-select";
 
 export const dynamic = "force-dynamic";

@@ -1,11 +1,8 @@
 import Link from "next/link";
 import { requirePartner } from "@/lib/auth-guard";
 import { createClient } from "@/lib/supabase/server";
-import {
-  PIPELINE_STAGES,
-  updatePipelineStageAction,
-  type PipelineStage,
-} from "./actions";
+import { updatePipelineStageAction } from "./actions";
+import { PIPELINE_STAGES, type PipelineStage } from "./types";
 import { StageSelect } from "./stage-select";
 
 export const dynamic = "force-dynamic";
