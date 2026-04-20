@@ -7,6 +7,7 @@ import {
   getRelatedArticles,
 } from "../articles";
 import { SiteFooter } from "@/components/site-footer";
+import { BackToTop } from "@/components/back-to-top";
 
 type Params = Promise<{ slug: string }>;
 
@@ -198,6 +199,7 @@ export default async function BlogArticlePage({
       </main>
 
       <SiteFooter />
+      <BackToTop />
     </div>
   );
 }

@@ -3,6 +3,8 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { Testimonials } from "@/components/testimonials";
 import { SiteFooter } from "@/components/site-footer";
+import { PWAInstallPrompt } from "@/components/pwa-install-prompt";
+import { OrganizationLD } from "@/components/organization-ld";
 
 export const metadata: Metadata = {
   title: "토리로 — 숲길에서 만나는 가족의 하루",
@@ -42,6 +44,7 @@ export default async function HomePage() {
 
   return (
     <div className="min-h-dvh bg-[#FFF8F0] text-[#2C2C2C]">
+      <OrganizationLD />
       {/* Top bar */}
       <header className="sticky top-0 z-20 border-b border-[#D4E4BC] bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
@@ -245,6 +248,7 @@ export default async function HomePage() {
       <Testimonials />
 
       <SiteFooter />
+      <PWAInstallPrompt />
     </div>
   );
 }

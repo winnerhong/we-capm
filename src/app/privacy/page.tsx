@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { SiteFooter } from "@/components/site-footer";
+import { BackToTop } from "@/components/back-to-top";
 
 export const metadata: Metadata = {
   title: "개인정보처리방침 · 토리로",
@@ -148,9 +149,7 @@ export default function PrivacyPage() {
         </p>
 
         <div className="mt-6 rounded-2xl border border-[#D4E4BC] bg-[#E8F0E4]/60 p-5 text-sm leading-relaxed text-[#2D5A3D]">
-          (주)토리로(이하 '회사')는 이용자의 개인정보를 소중히 여기며,
-          개인정보보호법 및 관련 법령을 준수합니다. 본 방침은 회사가 제공하는
-          모든 서비스에 적용됩니다.
+          {`(주)토리로(이하 '회사')는 이용자의 개인정보를 소중히 여기며, 개인정보보호법 및 관련 법령을 준수합니다. 본 방침은 회사가 제공하는 모든 서비스에 적용됩니다.`}
         </div>
 
         <div className="mt-8 space-y-10 rounded-3xl border border-[#D4E4BC] bg-white p-7 shadow-sm md:p-10">
@@ -175,6 +174,7 @@ export default function PrivacyPage() {
       </main>
 
       <SiteFooter />
+      <BackToTop />
     </div>
   );
 }

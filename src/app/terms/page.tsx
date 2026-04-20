@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { SiteFooter } from "@/components/site-footer";
+import { BackToTop } from "@/components/back-to-top";
 
 export const metadata: Metadata = {
   title: "이용약관 · 토리로",
@@ -166,6 +167,7 @@ export default function TermsPage() {
       </main>
 
       <SiteFooter />
+      <BackToTop />
     </div>
   );
 }

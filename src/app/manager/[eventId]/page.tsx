@@ -52,7 +52,6 @@ export default async function ManagerDashboard({ params }: { params: Promise<{ e
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://we-capm.vercel.app";
   const joinUrl = `${appUrl}/join/${event.join_code}`;
   const next = NEXT_STATUS[event.status];
-  const isDraft = event.status === "DRAFT";
   const isActive = event.status === "ACTIVE";
   const isEnded = event.status === "ENDED" || event.status === "CONFIRMED";
 

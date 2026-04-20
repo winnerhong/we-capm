@@ -57,7 +57,7 @@ const CONGESTION_COLORS = {
   RED: { bg: "bg-red-100", text: "text-red-700", border: "border-red-300", icon: "🔴", label: "혼잡" },
 } as const;
 
-export function StampScanner({ eventId, eventName, boardId, boardName, slots, recentHistory }: Props) {
+export function StampScanner({ eventId, eventName, boardName, slots, recentHistory }: Props) {
   const [phone, setPhone] = useState("");
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState("");

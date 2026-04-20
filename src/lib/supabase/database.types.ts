@@ -1054,6 +1054,96 @@ export interface Database {
         };
         Relationships: [];
       };
+      b2b_inquiries: {
+        Row: {
+          id: string;
+          company_name: string;
+          contact_name: string;
+          contact_email: string | null;
+          contact_phone: string | null;
+          expected_attendees: string | null;
+          interested_packages: string[] | null;
+          preferred_date: string | null;
+          message: string | null;
+          status: "NEW" | "CONTACTED" | "PROPOSED" | "WON" | "LOST";
+          assigned_to: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          company_name: string;
+          contact_name: string;
+          contact_email?: string | null;
+          contact_phone?: string | null;
+          expected_attendees?: string | null;
+          interested_packages?: string[] | null;
+          preferred_date?: string | null;
+          message?: string | null;
+          status?: "NEW" | "CONTACTED" | "PROPOSED" | "WON" | "LOST";
+          assigned_to?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          company_name?: string;
+          contact_name?: string;
+          contact_email?: string | null;
+          contact_phone?: string | null;
+          expected_attendees?: string | null;
+          interested_packages?: string[] | null;
+          preferred_date?: string | null;
+          message?: string | null;
+          status?: "NEW" | "CONTACTED" | "PROPOSED" | "WON" | "LOST";
+          assigned_to?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      acorn_recharges: {
+        Row: {
+          id: string;
+          partner_id: string;
+          amount: number;
+          bonus: number;
+          total_credited: number;
+          payment_transaction_id: string | null;
+          payment_method: string | null;
+          status: "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
+          initiated_by: string | null;
+          notes: string | null;
+          created_at: string;
+          completed_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          partner_id: string;
+          amount: number;
+          bonus?: number;
+          total_credited: number;
+          payment_transaction_id?: string | null;
+          payment_method?: string | null;
+          status?: "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
+          initiated_by?: string | null;
+          notes?: string | null;
+          created_at?: string;
+          completed_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          partner_id?: string;
+          amount?: number;
+          bonus?: number;
+          total_credited?: number;
+          payment_transaction_id?: string | null;
+          payment_method?: string | null;
+          status?: "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
+          initiated_by?: string | null;
+          notes?: string | null;
+          created_at?: string;
+          completed_at?: string | null;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: {

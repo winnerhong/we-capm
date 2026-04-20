@@ -116,6 +116,7 @@ export async function queueEventEndCoupons(supabase: DBClient, eventId: string) 
  * Called on event start for coupon categories that deliver DURING the event (e.g., early-arrival bonus).
  * Placeholder for future logic.
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export async function queueEventStartCoupons(_supabase: DBClient, _eventId: string) {
   return { delivered: 0 };
 }

@@ -7,13 +7,13 @@ import { createClient } from "@/lib/supabase/server";
 /**
  * 파트너(숲지기) 도토리 크레딧 충전.
  *
- * 현재는 MOCK 결제(`mockPaymentRequest`)로부터 트랜잭션 ID만 받아
- * `partners.acorn_balance`를 단순히 증가시키는 스텁입니다.
+ * MOCK 결제(`mockPaymentRequest`)로부터 트랜잭션 ID를 받아
+ *   1) `acorn_recharges` 테이블에 거래 내역 영구 기록 (status=COMPLETED)
+ *   2) `partners.acorn_balance`를 증가
  *
  * Future: 실제 PG 연동 시
- *   1) 서버에서 결제 검증(토스 `approve`, 포트원 `getPaymentByImpUid`)
- *   2) `acorn_recharges` 테이블에 거래 내역 영구 기록
- *   3) 보너스 로직(티어별 %) 중앙 정책화
+ *   - 서버에서 결제 검증(토스 `approve`, 포트원 `getPaymentByImpUid`)
+ *   - 보너스 로직(티어별 %) 중앙 정책화
  */
 export async function rechargePartnerAction(
   partnerId: string,
@@ -54,8 +54,32 @@ export async function rechargePartnerAction(
   if (!current) throw new Error("숲지기를 찾을 수 없습니다");
 
   const newBalance = (current.acorn_balance ?? 0) + amountUnits;
+  const nowIso = new Date().toISOString();
 
-  // 2) 잔액 업데이트
+  // 2) acorn_recharges 트랜잭션 기록 (status=COMPLETED)
+  const { error: logErr } = await (
+    supabase as unknown as {
+      from: (t: string) => {
+        insert: (p: Record<string, unknown>) => Promise<{ error: { message: string } | null }>;
+      };
+    }
+  )
+    .from("acorn_recharges")
+    .insert({
+      partner_id: partnerId,
+      amount: amountUnits,
+      bonus: 0,
+      total_credited: amountUnits,
+      payment_transaction_id: txnId,
+      payment_method: "MOCK",
+      status: "COMPLETED",
+      initiated_by: "ADMIN",
+      completed_at: nowIso,
+    });
+
+  if (logErr) throw new Error(logErr.message);
+
+  // 3) 파트너 잔액 업데이트
   const { error: updErr } = await (
     supabase as unknown as {
       from: (t: string) => {
@@ -71,15 +95,12 @@ export async function rechargePartnerAction(
 
   if (updErr) throw new Error(updErr.message);
 
-  // 3) 거래 로그 (스텁 — 추후 acorn_recharges 테이블에 insert)
-  // TODO: create `acorn_recharges` table and persist { partner_id, amount_units, txn_id, paid_at, method }
-  // For now, we just console.log on the server for auditability during dev.
   console.info("[acorn-recharge]", {
     partnerId,
     amountUnits,
     txnId,
     newBalance,
-    at: new Date().toISOString(),
+    at: nowIso,
   });
 
   revalidatePath("/admin/acorns");

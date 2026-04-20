@@ -25,9 +25,16 @@ interface Props {
  * - 결제 수단 선택 → 결제 버튼 → 1.5s 진행 시뮬레이션
  * - 모바일은 바텀시트, 데스크톱은 센터 모달
  * - Esc 키로 닫기, 바깥 클릭으로 닫기 (처리 중엔 잠금)
+ *
+ * NOTE: Inner component is mounted/unmounted with `open`, which gives us
+ * a natural state reset without needing a setState-in-effect.
  */
-export function PaymentModal({
-  open,
+export function PaymentModal(props: Props) {
+  if (!props.open) return null;
+  return <PaymentModalInner {...props} />;
+}
+
+function PaymentModalInner({
   onClose,
   onSuccess,
   orderName,
@@ -41,23 +48,12 @@ export function PaymentModal({
 
   // Esc 키로 닫기
   useEffect(() => {
-    if (!open) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape" && !processing) onClose();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [open, processing, onClose]);
-
-  // 모달 열릴 때 상태 초기화
-  useEffect(() => {
-    if (open) {
-      setError(null);
-      setProcessing(false);
-    }
-  }, [open]);
-
-  if (!open) return null;
+  }, [processing, onClose]);
 
   const handlePay = async () => {
     setProcessing(true);

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { adminLoginAction } from "./admin-login-action";
@@ -71,9 +72,9 @@ export default function LoginPage() {
           {pending ? "로그인 중..." : "로그인"}
         </button>
 
-        <a href="/join" className="block text-center text-xs text-neutral-400 hover:text-violet-600">
+        <Link href="/join" className="block text-center text-xs text-neutral-400 hover:text-violet-600">
           ← 참가자 입장으로 돌아가기
-        </a>
+        </Link>
       </form>
     </main>
   );

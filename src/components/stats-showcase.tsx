@@ -61,16 +61,16 @@ function StatCard({
 
 export function StatsShowcase() {
   const ref = useRef<HTMLDivElement | null>(null);
-  const [start, setStart] = useState(false);
+  // If IntersectionObserver isn't available (very old browsers / SSR),
+  // start the counter immediately. Otherwise wait until we scroll into view.
+  const [start, setStart] = useState<boolean>(
+    () => typeof IntersectionObserver === "undefined"
+  );
 
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-
-    if (typeof IntersectionObserver === "undefined") {
-      setStart(true);
-      return;
-    }
+    if (typeof IntersectionObserver === "undefined") return;
 
     const obs = new IntersectionObserver(
       (entries) => {

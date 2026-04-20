@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { managerLoginAction } from "./actions";
@@ -92,12 +93,12 @@ export default function ManagerLoginPage() {
             {pending ? "숲길을 여는 중..." : "로그인"}
           </button>
 
-          <a
+          <Link
             href="/join"
             className="block text-center text-xs text-[#6B6560] hover:text-[#2D5A3D]"
           >
             ← 참가자 입장
-          </a>
+          </Link>
         </form>
 
         <p className="mt-5 text-center text-[11px] text-[#6B6560]">

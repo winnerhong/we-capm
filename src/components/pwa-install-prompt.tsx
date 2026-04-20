@@ -9,13 +9,14 @@ interface BeforeInstallPromptEvent extends Event {
 export function PWAInstallPrompt() {
   const [deferredPrompt, setDeferredPrompt] =
     useState<BeforeInstallPromptEvent | null>(null);
-  const [dismissed, setDismissed] = useState(false);
+  // Lazy init reads localStorage only once on mount (SSR-safe guard).
+  const [dismissed, setDismissed] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return Boolean(localStorage.getItem("toriro_install_dismissed"));
+  });
 
   useEffect(() => {
-    if (localStorage.getItem("toriro_install_dismissed")) {
-      setDismissed(true);
-      return;
-    }
+    if (dismissed) return;
 
     const handler = (e: Event) => {
       e.preventDefault();
@@ -24,7 +25,7 @@ export function PWAInstallPrompt() {
 
     window.addEventListener("beforeinstallprompt", handler);
     return () => window.removeEventListener("beforeinstallprompt", handler);
-  }, []);
+  }, [dismissed]);
 
   const handleInstall = async () => {
     if (!deferredPrompt) return;

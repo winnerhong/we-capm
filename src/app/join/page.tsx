@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { formatKorean } from "@/lib/phone";
@@ -85,8 +86,8 @@ export default function DirectJoinPage() {
         </button>
 
         <div className="flex justify-center gap-4 text-xs text-neutral-400">
-          <a href="/manager" className="hover:text-violet-600">행사 기관 →</a>
-          <a href="/login" className="hover:text-violet-600">관리자 →</a>
+          <Link href="/manager" className="hover:text-violet-600">행사 기관 →</Link>
+          <Link href="/login" className="hover:text-violet-600">관리자 →</Link>
         </div>
       </form>
     </main>

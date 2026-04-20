@@ -3,6 +3,7 @@ import Link from "next/link";
 import { FAQ_ITEMS } from "./faq-data";
 import { FaqClient } from "./faq-client";
 import { SiteFooter } from "@/components/site-footer";
+import { BackToTop } from "@/components/back-to-top";
 
 export const metadata: Metadata = {
   title: "자주 묻는 질문 · 토리로",
@@ -99,6 +100,7 @@ export default function FaqPage() {
       </main>
 
       <SiteFooter />
+      <BackToTop />
     </div>
   );
 }

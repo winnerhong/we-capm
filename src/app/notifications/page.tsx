@@ -86,7 +86,8 @@ export default async function NotificationsPage({
     return "all";
   })();
 
-  const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const now = new Date();
+  const since24h = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
 
   // 1) 사용자 프로필 notifications (기존 테이블)
   const { data: notifications } = await supabase

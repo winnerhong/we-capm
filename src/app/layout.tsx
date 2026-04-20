@@ -14,6 +14,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_APP_URL ?? "https://we-capm.vercel.app"
+  ),
   title: {
     default: "토리로 TORIRO - 숲에서 자라는 가족의 시간",
     template: "%s | 토리로",
