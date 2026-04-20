@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
+import { queueEventEndCoupons } from "./coupon-delivery";
 
 type DBClient = SupabaseClient<Database>;
 
@@ -14,6 +15,8 @@ export async function checkAndEndEvent(supabase: DBClient, eventId: string) {
 
   if (new Date(event.end_at) <= new Date()) {
     await supabase.from("events").update({ status: "ENDED" }).eq("id", eventId);
+    // Auto-deliver coupons on event end (failures are swallowed inside)
+    await queueEventEndCoupons(supabase, eventId);
   }
 }
 
@@ -73,4 +76,8 @@ export async function confirmResults(supabase: DBClient, eventId: string, userId
   }
 
   await supabase.from("events").update({ status: "CONFIRMED" }).eq("id", eventId);
+
+  // Also deliver coupons on confirm, in case the event skipped straight past ENDED.
+  // Idempotent: duplicates are filtered inside.
+  await queueEventEndCoupons(supabase, eventId);
 }

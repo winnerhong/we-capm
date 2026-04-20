@@ -49,12 +49,12 @@ export default function PartnerLoginPage() {
         </form>
 
         <div className="mt-6 border-t border-[#D4E4BC] pt-4 text-center text-sm text-[#6B6560]">
-          아직 숲지기가 아니신가요?{" "}
+          아직 가입하지 않으셨나요?{" "}
           <Link
             href="/partner/signup"
             className="font-semibold text-[#2D5A3D] underline-offset-2 hover:underline"
           >
-            숲지기 등록 신청 🌱
+            숲지기 되기 →
           </Link>
         </div>
       </div>

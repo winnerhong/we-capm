@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useState, useTransition } from "react";
+import { subscribeAction, type SubscriptionTier } from "./actions";
 
 export type Tier = {
   id: "sprout" | "tree" | "forest";
@@ -16,6 +18,13 @@ type Props = {
   tier: Tier;
   selected: boolean;
   onSelect: (id: Tier["id"]) => void;
+  eventId: string;
+};
+
+const TIER_MAP: Record<Tier["id"], SubscriptionTier> = {
+  sprout: "SPROUT",
+  tree: "TREE",
+  forest: "FOREST",
 };
 
 /**
@@ -23,25 +32,36 @@ type Props = {
  * - 3단계 tier별 컬러 테마 (sprout: 연두, tree: 포레스트 그린, forest: 골드)
  * - 선택 상태 시각적 강조
  * - hover 애니메이션
+ * - 시작하기 클릭 시 subscribeAction 호출 → /event/[id]/subscription 이동
  */
-export function SubscribeCard({ tier, selected, onSelect }: Props) {
-  const [pending, setPending] = useState(false);
+export function SubscribeCard({ tier, selected, onSelect, eventId }: Props) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const theme = getTierTheme(tier.id);
 
   const handleStart = () => {
-    if (pending) return;
-    setPending(true);
-    // 더미 confirm — 실제 결제 연동 전
-    setTimeout(() => {
-      const ok = window.confirm(
-        `${tier.emoji} ${tier.name}을(를) 시작하시겠어요?\n\n월 ${tier.price.toLocaleString("ko-KR")}원\n\n(실제 결제는 아직 열리지 않았어요. 곧 오픈!)`,
-      );
-      if (ok) {
-        alert("🌳 구독 기능은 곧 열려요! 먼저 숲길을 걸어볼까요?");
+    if (isPending) return;
+    const ok = window.confirm(
+      `${tier.emoji} ${tier.name}을(를) 시작하시겠어요?\n\n월 ${tier.price.toLocaleString("ko-KR")}원\n\n(결제 연동 전 — 지금은 구독 레코드만 생성됩니다)`,
+    );
+    if (!ok) return;
+
+    setErrorMsg(null);
+    startTransition(async () => {
+      try {
+        const result = await subscribeAction(eventId, TIER_MAP[tier.id]);
+        if (result?.ok) {
+          router.push(`/event/${eventId}/subscription`);
+          router.refresh();
+        }
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "구독 요청 실패";
+        setErrorMsg(msg);
+        window.alert(`구독 실패: ${msg}`);
       }
-      setPending(false);
-    }, 200);
+    });
   };
 
   return (
@@ -116,17 +136,26 @@ export function SubscribeCard({ tier, selected, onSelect }: Props) {
           e.stopPropagation();
           handleStart();
         }}
-        aria-disabled={pending}
+        aria-disabled={isPending}
         className={`mt-6 w-full rounded-2xl py-3 text-center text-sm font-bold text-white shadow-sm transition-all ${theme.button} ${
-          pending ? "opacity-60" : "hover:shadow-md active:scale-[0.98]"
+          isPending ? "opacity-60" : "hover:shadow-md active:scale-[0.98]"
         }`}
       >
-        {pending ? "처리 중..." : "🌱 시작하기"}
+        {isPending ? "처리 중..." : "🌱 시작하기"}
       </div>
 
-      <p className="mt-2 text-center text-[10px] text-[#6B6560]">
-        곧 열려요 · 언제든 해지 가능
-      </p>
+      {errorMsg ? (
+        <p
+          role="alert"
+          className="mt-2 text-center text-[11px] font-medium text-red-600"
+        >
+          {errorMsg}
+        </p>
+      ) : (
+        <p className="mt-2 text-center text-[10px] text-[#6B6560]">
+          언제든 해지 가능
+        </p>
+      )}
     </button>
   );
 }

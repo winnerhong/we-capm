@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { generateJoinCode } from "@/lib/codes";
 import type { EventStatus, EventType, ParticipationType } from "@/lib/supabase/database.types";
 import { confirmResults } from "@/lib/event-lifecycle";
+import { queueEventEndCoupons } from "@/lib/coupon-delivery";
 import { getAllSchools } from "@/lib/school-db";
 import { requireAdmin, requireAdminOrManager } from "@/lib/auth-guard";
 
@@ -112,10 +113,26 @@ export async function updateEventStatusAction(eventId: string, status: EventStat
   } else {
     const { error } = await supabase.from("events").update({ status }).eq("id", eventId);
     if (error) throw new Error(error.message);
+    // Auto-deliver coupons when status is manually flipped to ENDED
+    if (status === "ENDED") {
+      await queueEventEndCoupons(supabase, eventId);
+    }
   }
 
   revalidatePath(`/admin/events/${eventId}`);
   revalidatePath("/admin/events");
+}
+
+/**
+ * Manual admin trigger to (re)deliver coupons for an event.
+ * Idempotent — existing (coupon, phone, event) rows are skipped.
+ */
+export async function manualDeliverCouponsAction(eventId: string) {
+  await requireAdminOrManager(eventId);
+  const supabase = await createClient();
+  const result = await queueEventEndCoupons(supabase, eventId);
+  revalidatePath(`/admin/events/${eventId}`);
+  return result;
 }
 
 export async function duplicateEventAction(sourceEventId: string) {

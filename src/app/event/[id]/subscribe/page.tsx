@@ -135,6 +135,7 @@ export default function SubscribePage() {
               tier={tier}
               selected={selected === tier.id}
               onSelect={setSelected}
+              eventId={eventId}
             />
           ))}
         </section>

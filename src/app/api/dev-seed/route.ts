@@ -266,6 +266,137 @@ export async function GET() {
     log.push("✅ 채팅 메시지 삽입 완료");
   }
 
+  // ================================
+  // Phase C: 파트너/챌린지/쿠폰/길드/광고
+  // ================================
+
+  // 8. Partners (3 samples)
+  try {
+    await (supabase.from("partners" as never) as unknown as { delete: () => { neq: (k: string, v: string) => Promise<unknown> } })
+      .delete()
+      .neq("id", "00000000-0000-0000-0000-000000000000");
+    const partnerInserts = [
+      { name: "숲속친구 체험원", business_name: "(주)숲속친구", username: "partner_test1", password: "1234", email: "test1@toriro.com", phone: "010-5555-1111", tier: "TREE", commission_rate: 15, acorn_balance: 500000, total_sales: 12000000, total_events: 45, avg_rating: 4.7, status: "ACTIVE" },
+      { name: "자연놀이터", business_name: "(주)자연놀이터", username: "partner_test2", password: "1234", email: "test2@toriro.com", phone: "010-5555-2222", tier: "EXPLORER", commission_rate: 18, acorn_balance: 150000, total_sales: 3500000, total_events: 12, avg_rating: 4.3, status: "ACTIVE" },
+      { name: "도토리 농장", business_name: "도토리농장협동조합", username: "partner_test3", password: "1234", email: "test3@toriro.com", phone: "010-5555-3333", tier: "SPROUT", commission_rate: 20, acorn_balance: 30000, total_sales: 800000, total_events: 3, avg_rating: null, status: "PENDING" },
+    ];
+    const { error: prErr } = await (supabase.from("partners" as never) as unknown as { insert: (d: unknown) => Promise<{ error: unknown }> }).insert(partnerInserts);
+    log.push(prErr ? `❌ 파트너: 테이블 없음` : `✅ 파트너: ${partnerInserts.length}개`);
+  } catch {
+    log.push(`❌ 파트너: 테이블 없음`);
+  }
+
+  // 9. Challenges (2 samples)
+  try {
+    await (supabase.from("challenges" as never) as unknown as { delete: () => { eq: (k: string, v: string) => Promise<unknown> } })
+      .delete()
+      .eq("event_id", EVENT_ID);
+    const challengeInserts = [
+      { event_id: EVENT_ID, title: "이번주 숲길 챌린지", description: "3개의 숲길을 완주해보세요", icon: "🎯", goal_type: "MISSION_COUNT", goal_value: 3, reward_acorns: 10, starts_at: new Date().toISOString(), ends_at: new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString(), status: "ACTIVE" },
+      { event_id: EVENT_ID, title: "도토리 수집가", description: "도토리 50개를 모으세요", icon: "🌰", goal_type: "ACORN_COUNT", goal_value: 50, reward_acorns: 20, starts_at: new Date().toISOString(), ends_at: new Date(Date.now() + 14 * 24 * 3600 * 1000).toISOString(), status: "ACTIVE" },
+    ];
+    const { error: chErr } = await (supabase.from("challenges" as never) as unknown as { insert: (d: unknown) => Promise<{ error: unknown }> }).insert(challengeInserts);
+    log.push(chErr ? `❌ 챌린지: 테이블 없음` : `✅ 챌린지: ${challengeInserts.length}개`);
+  } catch {
+    log.push(`❌ 챌린지: 테이블 없음`);
+  }
+
+  // 10. Coupons (3 samples) + Coupon Deliveries
+  try {
+    await (supabase.from("coupons" as never) as unknown as { delete: () => { neq: (k: string, v: string) => Promise<unknown> } })
+      .delete()
+      .neq("id", "00000000-0000-0000-0000-000000000000");
+    const couponInserts = [
+      { affiliate_name: "숲속 카페", title: "아메리카노 30% 할인", description: "따뜻한 음료 한잔", discount_type: "PERCENT", discount_value: 30, category: "CAFE", send_delay_minutes: 30, valid_from: new Date().toISOString(), valid_until: new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString(), max_uses: 100, status: "ACTIVE" },
+      { affiliate_name: "도토리 피자", title: "피자 1판 무료 사이드", description: "치즈 스틱 증정", discount_type: "FREE", category: "FOOD", send_delay_minutes: 30, valid_from: new Date().toISOString(), valid_until: new Date(Date.now() + 14 * 24 * 3600 * 1000).toISOString(), status: "ACTIVE" },
+      { affiliate_name: "자연 체험관", title: "다음 체험 5,000원 할인", description: "전 체험 프로그램", discount_type: "AMOUNT", discount_value: 5000, category: "ACTIVITY", send_delay_minutes: 120, valid_from: new Date().toISOString(), valid_until: new Date(Date.now() + 60 * 24 * 3600 * 1000).toISOString(), status: "ACTIVE" },
+    ];
+    const { error: cpErr } = await (supabase.from("coupons" as never) as unknown as { insert: (d: unknown) => Promise<{ error: unknown }> }).insert(couponInserts);
+    if (cpErr) {
+      log.push(`❌ 쿠폰: 테이블 없음`);
+    } else {
+      log.push(`✅ 쿠폰: ${couponInserts.length}개`);
+
+      // Coupon deliveries
+      try {
+        const { data: couponsData } = await (supabase.from("coupons" as never) as unknown as { select: (c: string) => Promise<{ data: Array<{ id: string }> | null }> }).select("id");
+        if (participants && couponsData && couponsData.length > 0) {
+          const firstThree = participants.slice(0, 3);
+          const deliveries: Array<{ coupon_id: string; participant_phone: string; event_id: string }> = [];
+          for (const p of firstThree) {
+            if (!p.phone) continue;
+            for (const c of couponsData) {
+              deliveries.push({ coupon_id: c.id, participant_phone: p.phone, event_id: EVENT_ID });
+            }
+          }
+          const { error: cdErr } = await (supabase.from("coupon_deliveries" as never) as unknown as { insert: (d: unknown) => Promise<{ error: unknown }> }).insert(deliveries);
+          log.push(cdErr ? `❌ 쿠폰 발송: 테이블 없음` : `✅ 쿠폰 발송: ${deliveries.length}건`);
+        }
+      } catch {
+        log.push(`❌ 쿠폰 발송: 테이블 없음`);
+      }
+    }
+  } catch {
+    log.push(`❌ 쿠폰: 테이블 없음`);
+  }
+
+  // 11. Guilds (2 samples) + Guild Members
+  try {
+    await (supabase.from("guilds" as never) as unknown as { delete: () => { eq: (k: string, v: string) => Promise<unknown> } })
+      .delete()
+      .eq("event_id", EVENT_ID);
+    const guildInserts = [
+      { event_id: EVENT_ID, name: "해바라기 패밀리", description: "해바라기반 친구들", icon: "🌻", leader_phone: "010-1111-0001", max_members: 10, total_acorns: 200, is_public: true },
+      { event_id: EVENT_ID, name: "도토리 탐험대", description: "탐험을 좋아하는 가족들", icon: "🐿️", leader_phone: "010-2222-0001", max_members: 8, total_acorns: 120, is_public: true },
+    ];
+    const { error: gErr } = await (supabase.from("guilds" as never) as unknown as { insert: (d: unknown) => Promise<{ error: unknown }> }).insert(guildInserts);
+    if (gErr) {
+      log.push(`❌ 길드: 테이블 없음`);
+    } else {
+      log.push(`✅ 길드: ${guildInserts.length}개`);
+
+      // Guild members
+      try {
+        const { data: guildsData } = await (supabase.from("guilds" as never) as unknown as { select: (c: string) => { eq: (k: string, v: string) => Promise<{ data: Array<{ id: string; name: string }> | null }> } }).select("id, name").eq("event_id", EVENT_ID);
+        if (guildsData && guildsData.length >= 2) {
+          const sunflower = guildsData.find((g) => g.name === "해바라기 패밀리");
+          const acorn = guildsData.find((g) => g.name === "도토리 탐험대");
+          const memberInserts: Array<{ guild_id: string; participant_phone: string; role: string }> = [];
+          if (sunflower) {
+            memberInserts.push({ guild_id: sunflower.id, participant_phone: "010-1111-0001", role: "LEADER" });
+            memberInserts.push({ guild_id: sunflower.id, participant_phone: "010-1111-0002", role: "MEMBER" });
+            memberInserts.push({ guild_id: sunflower.id, participant_phone: "010-1111-0003", role: "MEMBER" });
+          }
+          if (acorn) {
+            memberInserts.push({ guild_id: acorn.id, participant_phone: "010-2222-0001", role: "LEADER" });
+            memberInserts.push({ guild_id: acorn.id, participant_phone: "010-2222-0002", role: "MEMBER" });
+          }
+          const { error: gmErr } = await (supabase.from("guild_members" as never) as unknown as { insert: (d: unknown) => Promise<{ error: unknown }> }).insert(memberInserts);
+          log.push(gmErr ? `❌ 길드 멤버: 테이블 없음` : `✅ 길드 멤버: ${memberInserts.length}명`);
+        }
+      } catch {
+        log.push(`❌ 길드 멤버: 테이블 없음`);
+      }
+    }
+  } catch {
+    log.push(`❌ 길드: 테이블 없음`);
+  }
+
+  // 12. Ad Campaigns (2 samples, DRAFT/PENDING)
+  try {
+    await (supabase.from("ad_campaigns" as never) as unknown as { delete: () => { neq: (k: string, v: string) => Promise<unknown> } })
+      .delete()
+      .neq("id", "00000000-0000-0000-0000-000000000000");
+    const adInserts = [
+      { advertiser_name: "토리로 플랫폼 자체", title: "봄맞이 숲길 이벤트 광고", target_portal: "FAMILY", placement: "BANNER", budget: 500000, status: "DRAFT" },
+      { advertiser_name: "캠핑용품 브랜드", title: "텐트 특가", target_portal: "PARTNER", placement: "CARD", budget: 1000000, status: "PENDING" },
+    ];
+    const { error: adErr } = await (supabase.from("ad_campaigns" as never) as unknown as { insert: (d: unknown) => Promise<{ error: unknown }> }).insert(adInserts);
+    log.push(adErr ? `❌ 광고: 테이블 없음` : `✅ 광고: ${adInserts.length}개`);
+  } catch {
+    log.push(`❌ 광고: 테이블 없음`);
+  }
+
   // dev-login용 테스트 참가자 쿠키 데이터도 업데이트
   const testParticipant = participants?.find((p) => p.phone === "010-1111-0001");
 
