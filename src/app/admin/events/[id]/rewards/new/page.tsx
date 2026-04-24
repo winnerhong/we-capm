@@ -1,12 +1,21 @@
 "use client";
 
-import { useState, use } from "react";
+import { useState, use, type ReactNode } from "react";
 import Link from "next/link";
 import { createRewardAction } from "../actions";
 import type { RewardType } from "@/lib/supabase/database.types";
+import { AcornIcon } from "@/components/acorn-icon";
 
-const TYPES: { value: RewardType; label: string; desc: string }[] = [
-  { value: "POINT", label: "🌰 도토리 누적형", desc: "도토리 N개 이상 모으면 자동 수령" },
+const TYPES: { value: RewardType; label: ReactNode; desc: string }[] = [
+  {
+    value: "POINT",
+    label: (
+      <span className="inline-flex items-center gap-1">
+        <AcornIcon /> 도토리 누적형
+      </span>
+    ),
+    desc: "도토리 N개 이상 모으면 자동 수령",
+  },
   { value: "INSTANT", label: "⚡ 즉시 보상형", desc: "특정 숲길 승인 즉시 수령" },
   { value: "BADGE", label: "🎖️ 뱃지", desc: "특정 숲길 걸음 완료 시 획득" },
   { value: "LOTTERY", label: "🎲 추첨형", desc: "숲길 종료 후 추첨 실행" },
@@ -55,7 +64,11 @@ export default function NewRewardPage({ params }: { params: Promise<{ id: string
 
         {type === "POINT" && (
           <Field
-            label="🌰 필요 도토리 수"
+            label={
+              <span className="inline-flex items-center gap-1">
+                <AcornIcon /> 필요 도토리 수
+              </span>
+            }
             name="threshold"
             type="number"
             required
@@ -105,7 +118,7 @@ function Field({
   placeholder,
   defaultValue,
 }: {
-  label: string;
+  label: ReactNode;
   name: string;
   type?: string;
   required?: boolean;

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { AcornIcon } from "@/components/acorn-icon";
 
 export const metadata: Metadata = {
   title: "상담 신청 접수 · 토리로",
@@ -24,7 +25,7 @@ export default function EnterpriseThankYouPage() {
 
         <div className="mt-8 rounded-2xl border border-[#E5D3B8] bg-[#FFF8F0] p-4 text-left">
           <p className="flex items-center gap-1.5 text-xs font-bold text-[#6B4423]">
-            <span>🌰</span>
+            <AcornIcon />
             <span>기다리시는 동안</span>
           </p>
           <ul className="mt-2 space-y-1 text-xs text-[#8B6F47]">

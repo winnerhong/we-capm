@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { AcornIcon } from "@/components/acorn-icon";
 
 interface Props {
   eventName: string;
@@ -98,7 +99,7 @@ export function ESGShareCard({
         {/* Header: Logo + Title */}
         <div className="flex items-center justify-between border-b-2 border-[#E8F0E4] pb-4">
           <div className="flex items-center gap-2">
-            <span className="text-2xl">🌰</span>
+            <AcornIcon size={24} className="text-[#2D5A3D]" />
             <span className="font-bold text-[#2D5A3D]">토리로</span>
           </div>
           <div className="text-right">

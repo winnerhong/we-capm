@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { createMissionAction } from "../actions";
 import type { TemplateType } from "@/lib/supabase/database.types";
 import { getTemplateById, type MissionTemplate } from "@/lib/mission-templates";
+import { AcornIcon } from "@/components/acorn-icon";
 
 const TEMPLATES: { value: TemplateType; label: string; description: string }[] = [
   { value: "PHOTO", label: "📸 사진 숲길", description: "지정된 장면을 촬영해 인증" },
@@ -67,7 +68,7 @@ function NewMissionForm({ eventId }: { eventId: string }) {
           <div className="flex-1">
             <div className="font-semibold text-violet-900">✨ 템플릿 적용됨</div>
             <div className="text-violet-700">
-              <span className="font-medium">{prefill.title}</span> · 🌰 {prefill.points}
+              <span className="font-medium">{prefill.title}</span> · <AcornIcon /> {prefill.points}
             </div>
           </div>
           <Link

@@ -2,7 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { requirePartner } from "@/lib/auth-guard";
-import { createAutoAccount } from "@/lib/crm/auto-account";
+import { createAutoAccount, createOrgAccountFromProfile } from "@/lib/crm/auto-account";
 import { notifyNewCustomer } from "@/lib/crm/notify-customer";
 import {
   normalizePhone,
@@ -118,13 +118,20 @@ async function importOrgRow(
   const orgName = row["기관명*"] ?? row["기관명"] ?? "";
   const repName = row["대표자*"] ?? row["대표자"] ?? "";
   const repPhoneRaw = row["대표전화*"] ?? row["대표전화"] ?? "";
+  const orgPhoneRaw =
+    row["기관전화*"] ?? row["기관전화"] ?? row["기관전화번호"] ?? "";
 
   if (!orgName.trim()) throw new Error("기관명 누락");
   if (!repName.trim()) throw new Error("대표자 누락");
-  if (!repPhoneRaw.trim()) throw new Error("대표전화 누락");
+  if (!repPhoneRaw.trim()) throw new Error("대표전화(담당자 핸드폰) 누락");
+  if (!orgPhoneRaw.trim()) throw new Error("기관 전화번호 누락 (로그인 아이디용)");
 
   const phone = normalizePhone(repPhoneRaw);
   if (!validatePhone(phone)) throw new Error(`대표전화 형식 오류: ${repPhoneRaw}`);
+
+  const orgPhone = normalizePhone(orgPhoneRaw);
+  if (orgPhone.replace(/\D/g, "").length < 7)
+    throw new Error(`기관 전화번호 형식 오류: ${orgPhoneRaw}`);
 
   const email = (row["이메일"] ?? "").trim();
   if (email && !validateEmail(email)) throw new Error(`이메일 형식 오류: ${email}`);
@@ -153,6 +160,7 @@ async function importOrgRow(
     // UPDATE
     const updater = sb.from("partner_orgs").update!;
     const { error } = await updater({
+      org_phone: orgPhone,
       representative_name: repName.trim(),
       representative_phone: phone,
       email: email || null,
@@ -167,13 +175,14 @@ async function importOrgRow(
     return;
   }
 
-  // New insert with auto account
-  const account = await createAutoAccount("ORG", orgName);
+  // New insert with auto account (아이디=기관 전화번호 / 비번=담당자 핸드폰 뒷4자리)
+  const account = await createOrgAccountFromProfile(orgPhone, phone);
 
   const { error } = await sb.from("partner_orgs").insert({
     partner_id: partnerId,
     org_name: orgName.trim(),
     org_type: orgType,
+    org_phone: orgPhone,
     representative_name: repName.trim(),
     representative_phone: phone,
     email: email || null,

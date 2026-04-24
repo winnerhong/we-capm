@@ -6,6 +6,7 @@ import {
   searchParticipantStampsAction,
   updateCongestionAction,
 } from "./actions";
+import { AcornIcon } from "@/components/acorn-icon";
 
 interface SlotInfo {
   id: string;
@@ -161,7 +162,7 @@ export function StampScanner({ eventId, eventName, boardName, slots, recentHisto
           <span aria-hidden>🌲</span>
           <span>도장 찍어주기</span>
         </div>
-        <h1 className="mt-1 text-2xl font-bold">🌰 도장 찍어주기</h1>
+        <h1 className="mt-1 inline-flex items-center gap-2 text-2xl font-bold"><AcornIcon size={24} /> 도장 찍어주기</h1>
         <p className="mt-1 text-sm text-[#D4E4BC]">{eventName} · {boardName}</p>
       </div>
 
@@ -199,8 +200,8 @@ export function StampScanner({ eventId, eventName, boardName, slots, recentHisto
         </div>
       )}
       {success && (
-        <div className="rounded-xl border border-[#4A7C59]/30 bg-[#E8F0E4] p-4 text-sm text-[#2D5A3D]" role="status">
-          🌰 {success}
+        <div className="inline-flex items-center gap-1.5 rounded-xl border border-[#4A7C59]/30 bg-[#E8F0E4] p-4 text-sm text-[#2D5A3D]" role="status">
+          <AcornIcon /> {success}
         </div>
       )}
 
@@ -210,7 +211,7 @@ export function StampScanner({ eventId, eventName, boardName, slots, recentHisto
           {/* Participant info header */}
           <div className="flex items-center gap-3">
             <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#E8F0E4] text-2xl">
-              {foundParticipant.currentTier?.emoji ?? "🌰"}
+              {foundParticipant.currentTier?.emoji ?? <AcornIcon size={24} />}
             </div>
             <div>
               <h3 className="text-lg font-bold text-[#2C2C2C]">{foundParticipant.name}</h3>
@@ -250,7 +251,7 @@ export function StampScanner({ eventId, eventName, boardName, slots, recentHisto
       {confirmSlot && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#2D5A3D]/60 p-4 backdrop-blur-sm">
           <div className="w-full max-w-xs rounded-2xl border border-[#E8F0E4] bg-white p-6 text-center shadow-[0_20px_60px_-12px_rgba(45,90,61,0.5)]">
-            <div className="mb-3 text-4xl" aria-hidden>🌰</div>
+            <div className="mb-3 flex justify-center" aria-hidden><AcornIcon size={40} className="text-[#C4956A]" /></div>
             <h3 className="text-lg font-bold text-[#2C2C2C]">도토리를 드릴까요?</h3>
             <p className="mt-2 text-sm text-[#6B6560]">
               <span className="font-semibold text-[#2D5A3D]">{foundParticipant?.name}</span>님의
@@ -322,7 +323,7 @@ export function StampScanner({ eventId, eventName, boardName, slots, recentHisto
           <div className="max-h-64 space-y-2 overflow-y-auto">
             {history.map((item) => (
               <div key={item.id} className="flex items-center gap-3 rounded-xl bg-[#FFF8F0] p-3">
-                <span className="text-[#2D5A3D]">🌰</span>
+                <span className="text-[#2D5A3D]"><AcornIcon /></span>
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-sm font-medium text-[#2C2C2C]">{item.participantName}</div>
                   <div className="text-xs text-[#6B6560]">{item.slotName}</div>

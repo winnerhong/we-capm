@@ -1,7 +1,9 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { InvoiceActions } from "./invoice-actions";
+import { AcornIcon } from "@/components/acorn-icon";
 
 export const dynamic = "force-dynamic";
 
@@ -83,8 +85,8 @@ const STATUS_LABEL: Record<
   REFUNDED: { label: "환불", dot: "bg-purple-500", text: "text-purple-800", bg: "bg-purple-100" },
 };
 
-const CATEGORY_LABEL: Record<Category, { label: string; emoji: string }> = {
-  ACORN_RECHARGE: { label: "도토리 충전", emoji: "🌰" },
+const CATEGORY_LABEL: Record<Category, { label: string; emoji: ReactNode }> = {
+  ACORN_RECHARGE: { label: "도토리 충전", emoji: <AcornIcon size={20} /> },
   SUBSCRIPTION: { label: "구독료", emoji: "🔁" },
   EVENT_FEE: { label: "행사 참가비", emoji: "🎫" },
   AD_CAMPAIGN: { label: "광고비", emoji: "📣" },
@@ -274,7 +276,7 @@ export default async function InvoiceDetailPage({ params }: Props) {
             <div className="flex justify-between text-[#2D5A3D]">
               <dt>지급 도토리</dt>
               <dd className="font-semibold">
-                🌰 {fmtKRW(invoice.acorns_credited)}
+                <AcornIcon /> {fmtKRW(invoice.acorns_credited)}
               </dd>
             </div>
           )}

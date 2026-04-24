@@ -1,9 +1,11 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { notFound, redirect } from "next/navigation";
 import { getPartner } from "@/lib/auth-guard";
 import { createClient } from "@/lib/supabase/server";
 import { PayButton } from "./pay-button";
 import { CopyButton } from "./copy-button";
+import { AcornIcon } from "@/components/acorn-icon";
 
 export const dynamic = "force-dynamic";
 
@@ -32,8 +34,12 @@ type InvoiceRow = {
   tax_invoice_issued: boolean | null;
 };
 
-const CATEGORY_LABEL: Record<string, string> = {
-  ACORN_RECHARGE: "🌰 도토리 충전",
+const CATEGORY_LABEL: Record<string, ReactNode> = {
+  ACORN_RECHARGE: (
+    <>
+      <AcornIcon /> 도토리 충전
+    </>
+  ),
   SUBSCRIPTION: "📅 구독료",
   EVENT_FEE: "🎪 행사 비용",
   AD_CAMPAIGN: "📢 광고 캠페인",
@@ -203,10 +209,10 @@ export default async function PartnerInvoiceDetailPage({
           (inv.acorns_credited ?? 0) > 0 && (
             <div className="mt-4 rounded-xl border border-[#C4956A]/30 bg-white/60 p-3">
               <p className="text-[11px] font-semibold text-[#6B4423]">
-                🌰 결제 시 지급되는 도토리
+                <AcornIcon /> 결제 시 지급되는 도토리
               </p>
               <p className="mt-1 text-base font-extrabold text-[#6B4423]">
-                {(inv.acorns_credited ?? 0).toLocaleString("ko-KR")}🌰
+                {(inv.acorns_credited ?? 0).toLocaleString("ko-KR")}<AcornIcon />
                 {(inv.bonus_amount ?? 0) > 0 && (
                   <span className="ml-2 rounded-full bg-[#2D5A3D] px-2 py-0.5 text-[10px] font-bold text-white">
                     보너스 +{Math.round((inv.bonus_rate ?? 0) * 100)}%

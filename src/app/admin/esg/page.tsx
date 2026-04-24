@@ -7,6 +7,7 @@ import {
   getESGGradeColor,
   getMonthlyESGTrend,
 } from "@/lib/esg-metrics";
+import { AcornIcon } from "@/components/acorn-icon";
 
 export const dynamic = "force-dynamic";
 
@@ -263,8 +264,8 @@ export default async function AdminESGPage() {
         </div>
       </section>
 
-      <p className="text-center text-[10px] text-[#8B6F47] py-4">
-        본 리포트는 토리로 플랫폼 데이터를 기반으로 자동 생성되었습니다. 🌰
+      <p className="flex items-center justify-center gap-1 text-center text-[10px] text-[#8B6F47] py-4">
+        <span>본 리포트는 토리로 플랫폼 데이터를 기반으로 자동 생성되었습니다.</span> <AcornIcon />
       </p>
     </div>
   );

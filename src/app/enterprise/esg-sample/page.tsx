@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { AcornIcon } from "@/components/acorn-icon";
 
 export const metadata: Metadata = {
   title: "ESG 임팩트 리포트 샘플 · 토리로",
@@ -59,7 +60,7 @@ export default function ESGSamplePage() {
       <header className="sticky top-0 z-20 border-b border-[#D4E4BC] bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-4xl items-center justify-between px-4 py-3">
           <Link href="/enterprise" className="flex items-center gap-2 font-bold text-[#2D5A3D]">
-            <span className="text-xl">🌰</span>
+            <AcornIcon size={20} />
             <span>토리로</span>
             <span className="text-xs font-medium text-[#8B6F47]">for Enterprise</span>
           </Link>

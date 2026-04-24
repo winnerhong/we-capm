@@ -1,10 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getAppUser } from "@/lib/user-auth-guard";
 import { Testimonials } from "@/components/testimonials";
 import { SiteFooter } from "@/components/site-footer";
 import { PWAInstallPrompt } from "@/components/pwa-install-prompt";
 import { OrganizationLD } from "@/components/organization-ld";
+import { AcornIcon } from "@/components/acorn-icon";
 
 export const metadata: Metadata = {
   title: "토리로 — 숲길에서 만나는 가족의 하루",
@@ -40,6 +43,10 @@ async function loadStats(): Promise<{
 }
 
 export default async function HomePage() {
+  // 참가자 로그인 상태면 참가자 포털 홈으로 리다이렉트
+  const appUser = await getAppUser();
+  if (appUser) redirect("/home");
+
   const stats = await loadStats();
 
   return (
@@ -49,9 +56,7 @@ export default async function HomePage() {
       <header className="sticky top-0 z-20 border-b border-[#D4E4BC] bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
           <Link href="/" className="flex items-center gap-2 font-bold text-[#2D5A3D]">
-            <span className="text-xl" aria-hidden>
-              🌰
-            </span>
+            <AcornIcon size={20} />
             <span>토리로</span>
           </Link>
           <nav className="flex items-center gap-1 text-xs font-semibold">
@@ -74,6 +79,12 @@ export default async function HomePage() {
               기업
             </Link>
             <Link
+              href="/user-login"
+              className="inline-flex items-center gap-1 rounded-full border border-[#D4E4BC] bg-white px-3 py-1.5 text-[#2D5A3D] hover:bg-[#E8F0E4]"
+            >
+              <AcornIcon /> 로그인
+            </Link>
+            <Link
               href="/partner"
               className="rounded-full bg-[#2D5A3D] px-3 py-1.5 text-white hover:bg-[#234a30]"
             >
@@ -89,7 +100,7 @@ export default async function HomePage() {
           <div className="absolute left-6 top-10 text-7xl">🌲</div>
           <div className="absolute right-10 top-20 text-6xl">🌳</div>
           <div className="absolute bottom-10 left-1/4 text-6xl">🍂</div>
-          <div className="absolute bottom-6 right-1/4 text-5xl">🌰</div>
+          <div className="absolute bottom-6 right-1/4 text-5xl"><AcornIcon size={40} /></div>
           <div className="absolute left-1/2 top-1/3 text-5xl">🐿️</div>
         </div>
         <div className="relative z-10 mx-auto max-w-4xl px-4 py-16 text-center md:py-24">
@@ -220,8 +231,8 @@ export default async function HomePage() {
               </p>
             </div>
             <div className="rounded-2xl border border-[#D4E4BC] bg-white p-6 shadow-sm">
-              <div className="text-4xl" aria-hidden>
-                🌰
+              <div className="text-[#2D5A3D]">
+                <AcornIcon size={36} />
               </div>
               <h3 className="mt-3 text-base font-extrabold text-[#2D5A3D]">
                 도토리 리워드

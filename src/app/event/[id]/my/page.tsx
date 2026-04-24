@@ -1,8 +1,10 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getParticipant } from "@/lib/participant-session";
 import { MarketingTogglesCard } from "./marketing-toggles";
+import { AcornIcon } from "@/components/acorn-icon";
 
 export const dynamic = "force-dynamic";
 
@@ -197,7 +199,7 @@ export default async function MyPage({
 
           <div className="mt-4 grid grid-cols-2 gap-2">
             <StatBox
-              icon="🌰"
+              icon={<AcornIcon size={20} />}
               label="도토리 잔액"
               value={`${participant?.total_score ?? 0}개`}
             />
@@ -331,7 +333,7 @@ function StatBox({
   label,
   value,
 }: {
-  icon: string;
+  icon: ReactNode;
   label: string;
   value: string;
 }) {

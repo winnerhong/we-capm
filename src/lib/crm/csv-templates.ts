@@ -3,6 +3,7 @@ export function getOrgTemplate(): string {
   const headers = [
     "기관명*",
     "기관유형",
+    "기관전화*",
     "대표자*",
     "대표전화*",
     "이메일",
@@ -14,6 +15,7 @@ export function getOrgTemplate(): string {
   const sample = [
     "해바라기어린이집",
     "DAYCARE",
+    "02-123-4567",
     "김영희",
     "010-1234-5678",
     "hello@daycare.com",

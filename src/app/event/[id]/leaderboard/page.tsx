@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { getParticipant, getParticipantDb } from "@/lib/participant-session";
 import { createClient } from "@/lib/supabase/server";
 import { RealtimeRefresh } from "@/components/realtime-refresh";
+import { AcornIcon } from "@/components/acorn-icon";
 
 export const dynamic = "force-dynamic";
 
@@ -64,7 +65,7 @@ export default async function LeaderboardPage({
           ← {event.name}
         </Link>
         <h1 className="mt-1 text-xl font-bold">🏞️ 함께 걷는 숲</h1>
-        <p className="mt-1 text-xs opacity-90">숲에서 만난 친구들의 도토리 🌰</p>
+        <p className="mt-1 text-xs opacity-90">숲에서 만난 친구들의 도토리 <AcornIcon /></p>
       </div>
 
       <div className="mx-auto max-w-lg space-y-4 px-4 pt-4">
@@ -107,7 +108,7 @@ export default async function LeaderboardPage({
                     <span className="font-medium">{profile?.name ?? "?"}</span>
                     {isMe && <span className="text-xs font-semibold text-violet-600">(나)</span>}
                   </div>
-                  <span className="font-bold text-[#2D5A3D]">🌰 {p.total_score}</span>
+                  <span className="font-bold text-[#2D5A3D]"><AcornIcon /> {p.total_score}</span>
                 </li>
               );
             })}
@@ -134,7 +135,7 @@ export default async function LeaderboardPage({
                     <span className="font-medium">{t.name}</span>
                     {isMyTeam && <span className="text-xs font-semibold text-violet-600">(우리 숲)</span>}
                   </div>
-                  <span className="font-bold text-[#2D5A3D]">🌰 {t.total_score}</span>
+                  <span className="font-bold text-[#2D5A3D]"><AcornIcon /> {t.total_score}</span>
                 </li>
               );
             })}

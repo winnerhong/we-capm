@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { SiteFooter } from "@/components/site-footer";
+import { AcornIcon } from "@/components/acorn-icon";
 
 export const metadata: Metadata = {
   title: "회사 소개 · 토리로",
@@ -31,11 +32,15 @@ const VALUES: { emoji: string; title: string; desc: string }[] = [
   },
 ];
 
-const MILESTONES: { date: string; emoji: string; title: string; desc: string }[] =
-  [
+const MILESTONES: {
+  date: string;
+  emoji: React.ReactNode;
+  title: string;
+  desc: string;
+}[] = [
     {
       date: "2025.02",
-      emoji: "🌰",
+      emoji: <AcornIcon size={18} />,
       title: "팀 결성",
       desc: "창업자 홍보광 포함 3인이 도토리 하나를 들고 시작했습니다.",
     },
@@ -96,9 +101,7 @@ export default function AboutPage() {
             href="/"
             className="flex items-center gap-2 font-bold text-[#2D5A3D]"
           >
-            <span className="text-xl" aria-hidden>
-              🌰
-            </span>
+            <AcornIcon size={20} />
             <span>토리로</span>
           </Link>
           <nav className="flex items-center gap-1 text-xs font-semibold">
@@ -129,7 +132,7 @@ export default function AboutPage() {
         <div className="pointer-events-none absolute inset-0 opacity-15">
           <div className="absolute left-8 top-8 text-7xl">🌲</div>
           <div className="absolute right-12 top-16 text-6xl">🌳</div>
-          <div className="absolute bottom-10 left-1/3 text-6xl">🌰</div>
+          <div className="absolute bottom-10 left-1/3 text-6xl"><AcornIcon size={60} /></div>
         </div>
         <div className="relative z-10 mx-auto max-w-4xl px-4 py-16 text-center md:py-24">
           <p className="text-xs font-semibold tracking-[0.4em] text-[#D4E4BC]">
@@ -344,8 +347,8 @@ export default function AboutPage() {
         {/* Contact */}
         <section aria-labelledby="contact-heading">
           <div className="rounded-3xl border border-[#D4E4BC] bg-gradient-to-br from-[#E8F0E4] to-[#FFF8F0] p-8 text-center shadow-sm md:p-12">
-            <p className="text-4xl" aria-hidden>
-              🌰
+            <p className="text-[#2D5A3D]">
+              <AcornIcon size={36} />
             </p>
             <h2
               id="contact-heading"

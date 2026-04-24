@@ -6,6 +6,7 @@ import type {
   EventType,
   ParticipationType,
 } from "@/lib/supabase/database.types";
+import { AcornIcon } from "@/components/acorn-icon";
 
 export const metadata: Metadata = {
   title: "숲길 찾기",
@@ -301,9 +302,7 @@ export default async function EventsDiscoveryPage({
       <header className="sticky top-0 z-20 border-b border-[#D4E4BC] bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
           <Link href="/" className="flex items-center gap-2 font-bold text-[#2D5A3D]">
-            <span className="text-xl" aria-hidden>
-              🌰
-            </span>
+            <AcornIcon size={20} />
             <span>토리로</span>
           </Link>
           <Link
@@ -501,8 +500,8 @@ export default async function EventsDiscoveryPage({
                       <span className="pointer-events-none absolute right-6 top-10 text-3xl opacity-60" aria-hidden>
                         🍂
                       </span>
-                      <span className="pointer-events-none absolute bottom-3 right-4 text-4xl opacity-80" aria-hidden>
-                        🌰
+                      <span className="pointer-events-none absolute bottom-3 right-4 opacity-80 text-white">
+                        <AcornIcon size={32} />
                       </span>
                       <span
                         className={`absolute left-3 top-3 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${badge.className}`}
@@ -592,7 +591,7 @@ export default async function EventsDiscoveryPage({
       <footer className="border-t border-[#D4E4BC] bg-white py-8">
         <div className="mx-auto max-w-6xl px-4 text-center text-xs text-[#8B6F47]">
           <p className="flex items-center justify-center gap-1 font-bold text-[#2D5A3D]">
-            <span aria-hidden>🌰</span>
+            <AcornIcon />
             <span>토리로</span>
           </p>
           <p className="mt-2">가족과 함께하는 숲길 · 기업 ESG 팀빌딩 · 숲지기 체험</p>

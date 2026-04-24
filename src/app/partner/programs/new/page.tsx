@@ -7,6 +7,7 @@ import {
   updateProgramAction,
   type ProgramCategory,
 } from "../actions";
+import { CategoryPicker } from "@/components/category-picker";
 
 type ProgramRow = {
   id: string;
@@ -49,16 +50,44 @@ async function loadProgram(id: string): Promise<ProgramRow | null> {
   return (data ?? null) as ProgramRow | null;
 }
 
+async function loadCustomCategories(partnerId: string): Promise<string[]> {
+  const supabase = await createClient();
+  const sb = supabase as unknown as {
+    from: (t: string) => {
+      select: (c: string) => {
+        eq: (k: string, v: string) => Promise<{
+          data: Array<{ category: string | null }> | null;
+        }>;
+      };
+    };
+  };
+  const builtIn = new Set(["FOREST", "CAMPING", "KIDS", "FAMILY", "TEAM", "ART"]);
+  try {
+    const { data } = await sb
+      .from("partner_programs")
+      .select("category")
+      .eq("partner_id", partnerId);
+    const set = new Set<string>();
+    for (const row of data ?? []) {
+      if (row.category && !builtIn.has(row.category)) set.add(row.category);
+    }
+    return Array.from(set).sort();
+  } catch {
+    return [];
+  }
+}
+
 export default async function NewProgramPage({
   searchParams,
 }: {
   searchParams: Promise<{ edit?: string }>;
 }) {
-  await requirePartner();
+  const partner = await requirePartner();
   const sp = await searchParams;
   const editId = sp?.edit;
   const existing = editId ? await loadProgram(editId) : null;
   if (editId && !existing) notFound();
+  const customCategories = await loadCustomCategories(partner.id);
 
   const isEdit = Boolean(existing);
   const tagsText = existing?.tags?.join(", ") ?? "";
@@ -157,19 +186,12 @@ export default async function NewProgramPage({
               >
                 카테고리 <span className="text-rose-600">*</span>
               </label>
-              <select
-                id="category"
+              <CategoryPicker
                 name="category"
-                required
                 defaultValue={existing?.category ?? "FOREST"}
-                className="w-full rounded-xl border border-[#D4E4BC] bg-[#FFF8F0] px-3 py-2.5 text-sm text-[#2C2C2C] focus:border-[#3A7A52] focus:outline-none focus:ring-2 focus:ring-[#3A7A52]/30"
-              >
-                {CATEGORY_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.icon} {o.label}
-                  </option>
-                ))}
-              </select>
+                customCategories={customCategories}
+                required
+              />
             </div>
 
             <div>

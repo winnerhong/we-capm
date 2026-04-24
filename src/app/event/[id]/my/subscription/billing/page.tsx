@@ -1,7 +1,9 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { getParticipant } from "@/lib/participant-session";
 import { createClient } from "@/lib/supabase/server";
+import { AcornIcon } from "@/components/acorn-icon";
 
 export const dynamic = "force-dynamic";
 
@@ -125,7 +127,12 @@ export default async function SubscriptionBillingPage({
               />
               <InfoRow
                 label="월 지급 도토리"
-                value={`🌰 ${subscription.monthly_acorns.toLocaleString("ko-KR")}개`}
+                value={
+                  <>
+                    <AcornIcon />{" "}
+                    {subscription.monthly_acorns.toLocaleString("ko-KR")}개
+                  </>
+                }
               />
               <InfoRow
                 label="시작일"
@@ -285,7 +292,7 @@ function InfoRow({
   strong = false,
 }: {
   label: string;
-  value: string;
+  value: ReactNode;
   strong?: boolean;
 }) {
   return (

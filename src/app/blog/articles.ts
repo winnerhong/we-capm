@@ -40,7 +40,7 @@ export const ARTICLES: Article[] = [
     category: "공지사항",
     author: "홍보광",
     authorEmoji: "🌲",
-    coverEmoji: "🌰",
+    coverEmoji: "🌻",
     coverGradient: "from-[#2D5A3D] via-[#4A7C59] to-[#8FB98A]",
     readMinutes: 4,
     paragraphs: [
@@ -137,7 +137,7 @@ export const ARTICLES: Article[] = [
     category: "운영 노하우",
     author: "민지호 프로덕트 리드",
     authorEmoji: "🎯",
-    coverEmoji: "🌰",
+    coverEmoji: "🏆",
     coverGradient: "from-[#B8860B] via-[#D4A853] to-[#FFF6D9]",
     readMinutes: 5,
     paragraphs: [

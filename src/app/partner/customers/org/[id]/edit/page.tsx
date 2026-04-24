@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requirePartner } from "@/lib/auth-guard";
 import { createClient } from "@/lib/supabase/server";
-import { updateOrgAction } from "../../actions";
+import { updateOrgAction, regenerateOrgAccountAction } from "../../actions";
 import { ORG_TYPE_OPTIONS, type OrgRow } from "../../meta";
 
 export const dynamic = "force-dynamic";
@@ -12,7 +12,7 @@ const INPUT_CLASS =
 const LABEL_CLASS = "mb-1 block text-xs font-semibold text-[#2D5A3D]";
 
 const COLUMNS =
-  "id,partner_id,org_name,org_type,representative_name,representative_phone,email,address,children_count,class_count,teacher_count,business_number,tax_email,commission_rate,discount_rate,contract_start,contract_end,tags,internal_memo,auto_username,status,created_at";
+  "id,partner_id,org_name,org_type,org_phone,representative_name,representative_phone,email,address,children_count,class_count,teacher_count,business_number,tax_email,commission_rate,discount_rate,contract_start,contract_end,tags,internal_memo,auto_username,status,created_at";
 
 async function loadOrg(id: string): Promise<OrgRow | null> {
   const supabase = await createClient();
@@ -40,11 +40,14 @@ async function loadOrg(id: string): Promise<OrgRow | null> {
 
 export default async function EditOrgPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ regen?: string }>;
 }) {
   await requirePartner();
   const { id } = await params;
+  const sp = await searchParams;
   const org = await loadOrg(id);
   if (!org) notFound();
 
@@ -53,7 +56,18 @@ export default async function EditOrgPage({
     await updateOrgAction(id, formData);
   }
 
+  async function regenAction() {
+    "use server";
+    await regenerateOrgAccountAction(id);
+  }
+
   const tagsText = (org.tags ?? []).join(", ");
+
+  // 아이디 미리보기 (기관 전화번호 숫자만)
+  const usernamePreview = (org.org_phone ?? "").replace(/\D/g, "") || null;
+  // 비밀번호 미리보기 (담당자 핸드폰 뒷 4자리)
+  const repDigits = (org.representative_phone ?? "").replace(/\D/g, "");
+  const passwordPreview = repDigits.length >= 4 ? repDigits.slice(-4) : null;
 
   return (
     <div className="space-y-6">
@@ -134,6 +148,25 @@ export default async function EditOrgPage({
               </select>
             </div>
             <div>
+              <label htmlFor="org_phone" className={LABEL_CLASS}>
+                기관 전화번호 <span className="text-rose-600">*</span>
+              </label>
+              <input
+                id="org_phone"
+                name="org_phone"
+                type="tel"
+                inputMode="tel"
+                required
+                autoComplete="tel"
+                defaultValue={org.org_phone ?? ""}
+                placeholder="예) 02-123-4567"
+                className={INPUT_CLASS}
+              />
+              <p className="mt-1 text-[11px] text-[#8B7F75]">
+                🔑 로그인 아이디로 사용됩니다 (숫자만 추출)
+              </p>
+            </div>
+            <div className="md:col-span-2">
               <label htmlFor="email" className={LABEL_CLASS}>
                 대표 이메일
               </label>
@@ -354,7 +387,7 @@ export default async function EditOrgPage({
             </div>
             <div>
               <label htmlFor="representative_phone" className={LABEL_CLASS}>
-                담당자 연락처 <span className="text-rose-600">*</span>
+                담당자 핸드폰 <span className="text-rose-600">*</span>
               </label>
               <input
                 id="representative_phone"
@@ -366,11 +399,80 @@ export default async function EditOrgPage({
                 defaultValue={org.representative_phone ?? ""}
                 className={INPUT_CLASS}
               />
+              <p className="mt-1 text-[11px] text-[#8B7F75]">
+                🔑 뒷 4자리가 초기 비밀번호
+              </p>
             </div>
           </div>
         </section>
 
-        {/* Section 6: 메모 */}
+        {/* Section 6: 자동 발급 계정 */}
+        <section className="rounded-2xl border border-[#D4A15A] bg-[#FFF8F0] p-5 shadow-sm md:p-6">
+          <h2 className="mb-4 flex items-center gap-2 text-sm font-bold text-[#8B6B3F]">
+            <span aria-hidden>🔐</span>
+            <span>로그인 계정 (/manager)</span>
+          </h2>
+
+          {sp.regen === "1" && (
+            <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
+              ✅ 계정이 재발급되었어요. 아래 정보를 기관에 전달하세요.
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            {/* 아이디 */}
+            <div className="rounded-xl border border-[#D4E4BC] bg-white p-3">
+              <p className="text-[10px] font-semibold text-[#8B7F75]">아이디</p>
+              <p className="mt-1 break-all font-mono text-sm font-bold text-[#2D5A3D]">
+                {org.auto_username ?? (
+                  usernamePreview ? (
+                    <span className="text-amber-600">미발급 (저장 시 {usernamePreview})</span>
+                  ) : (
+                    <span className="text-rose-600">기관 전화번호 필요</span>
+                  )
+                )}
+              </p>
+              <p className="mt-1 text-[10px] text-[#8B7F75]">
+                🏢 기관 전화번호 (숫자만 추출)
+              </p>
+            </div>
+
+            {/* 비밀번호 */}
+            <div className="rounded-xl border border-[#D4E4BC] bg-white p-3">
+              <p className="text-[10px] font-semibold text-[#8B7F75]">초기 비밀번호</p>
+              <p className="mt-1 font-mono text-sm font-bold text-[#2D5A3D]">
+                {passwordPreview ? (
+                  <span className="rounded bg-[#FFF0D9] px-2 py-0.5">
+                    {passwordPreview}
+                  </span>
+                ) : (
+                  <span className="text-rose-600">담당자 핸드폰 필요</span>
+                )}
+              </p>
+              <p className="mt-1 text-[10px] text-[#8B7F75]">
+                📱 담당자 핸드폰 뒷 4자리 (초기 셋팅)
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white/60 p-3">
+            <p className="text-[11px] text-[#6B6560]">
+              💡 기관 전화번호 또는 담당자 핸드폰을 수정한 뒤 <strong>먼저 저장</strong>하고,
+              <br className="sm:hidden" /> 이 버튼으로 계정을 갱신하세요.
+            </p>
+            <button
+              type="submit"
+              formAction={regenAction}
+              formNoValidate
+              className="inline-flex items-center gap-1.5 rounded-xl border border-[#D4A15A] bg-[#FFF0D9] px-4 py-2 text-xs font-bold text-[#8B6B3F] hover:bg-[#F5E8D3]"
+            >
+              <span aria-hidden>🔄</span>
+              <span>이 기관 계정 재발급</span>
+            </button>
+          </div>
+        </section>
+
+        {/* Section 7: 메모 */}
         <section className="rounded-2xl border border-[#D4E4BC] bg-white p-5 shadow-sm md:p-6">
           <h2 className="mb-4 flex items-center gap-2 text-sm font-bold text-[#2D5A3D]">
             <span aria-hidden>📝</span>

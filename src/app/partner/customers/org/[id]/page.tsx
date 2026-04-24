@@ -154,6 +154,12 @@ export default async function OrgDetailPage({
 
           <div className="flex flex-wrap items-center gap-2">
             <Link
+              href={`/partner/customers/org/${org.id}/documents`}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-[#D4E4BC] bg-[#E8F0E4] px-3.5 py-2 text-xs font-semibold text-[#2D5A3D] hover:bg-[#D4E4BC]"
+            >
+              📄 서류 관리 →
+            </Link>
+            <Link
               href={`/partner/customers/org/${org.id}/edit`}
               className="inline-flex items-center gap-1.5 rounded-xl border border-[#E5D3B8] bg-white px-3.5 py-2 text-xs font-semibold text-[#6B4423] hover:bg-[#FFF8F0]"
             >
@@ -238,7 +244,15 @@ export default async function OrgDetailPage({
         />
       )}
       {activeTab === "contacts" && <StubTab title="담당자 관리" desc="추가 담당자를 등록할 수 있어요. 곧 오픈 예정." icon="👤" />}
-      {activeTab === "docs" && <StubTab title="서류" desc="계약서·업무위탁서 PDF 업로드 기능은 준비 중입니다." icon="📄" />}
+      {activeTab === "docs" && (
+        <StubTab
+          title="기관 서류 관리"
+          desc="세금계산서용·운영 서류를 한 곳에서 관리해요. 기관 제출물 승인·반려와 대행 업로드도 지원합니다."
+          icon="📄"
+          ctaLabel="서류 관리 열기"
+          ctaHref={`/partner/customers/org/${org.id}/documents`}
+        />
+      )}
       {activeTab === "messages" && <StubTab title="메시지" desc="SMS·알림톡 발송 이력과 템플릿 관리가 여기 표시됩니다." icon="💬" />}
       {activeTab === "memo" && <MemoTab memo={org.internal_memo} />}
 
@@ -341,7 +355,9 @@ function InfoTab({ org }: { org: OrgRow }) {
               <CopyButton text={org.auto_username} label="복사" />
             </div>
             <p className="mt-2 text-[11px] text-[#8B7F75]">
-              비밀번호는 저장되지 않아 재발급이 필요해요.
+              🏢 아이디: 기관 전화번호 (숫자만)
+              <br />
+              🔑 초기 비밀번호: 담당자 핸드폰 <strong>뒷 4자리</strong>
             </p>
           </div>
         ) : (

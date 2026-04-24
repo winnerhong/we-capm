@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { AcornIcon } from "@/components/acorn-icon";
 
 interface Props {
   participantId: string;
@@ -31,9 +32,9 @@ export function StampQRModal({ participantId, eventId, participantName, stampCou
     <>
       <button
         onClick={() => { setShowQR(true); setTimestamp(Date.now()); }}
-        className="w-full rounded-2xl bg-violet-600 py-4 text-center font-bold text-white shadow-lg shadow-[#2D5A3D]/20 hover:bg-violet-700 active:scale-[0.98] transition-all"
+        className="w-full rounded-2xl bg-violet-600 py-4 text-center font-bold text-white shadow-lg shadow-[#2D5A3D]/20 hover:bg-violet-700 active:scale-[0.98] transition-all inline-flex items-center justify-center gap-2"
       >
-        🌰 도토리 받기
+        <AcornIcon size={20} /> 도토리 받기
       </button>
 
       {showQR && (
@@ -50,7 +51,7 @@ export function StampQRModal({ participantId, eventId, participantName, stampCou
               <div className="text-sm text-[#4A7C59] font-medium">{currentTier}</div>
               <h3 className="text-xl font-bold text-[#2D5A3D]">🐿️ {participantName}</h3>
               <div className="mt-1 text-sm text-[#4A7C59]">
-                도토리 <span className="font-bold text-[#2D5A3D]">{stampCount}</span>개 모음 🌰
+                도토리 <span className="font-bold text-[#2D5A3D]">{stampCount}</span>개 모음 <AcornIcon />
               </div>
             </div>
 

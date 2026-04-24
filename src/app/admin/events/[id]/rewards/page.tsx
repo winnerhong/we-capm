@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { deleteRewardAction, drawLotteryAction } from "./actions";
 import { RealtimeRefresh } from "@/components/realtime-refresh";
+import { AcornIcon } from "@/components/acorn-icon";
 
 export const dynamic = "force-dynamic";
 
@@ -76,7 +77,7 @@ export default async function RewardsPage({ params }: { params: Promise<{ id: st
         </div>
         <div className="rounded-2xl bg-[#FFF8F0] border border-[#C4956A]/40 p-4 text-center">
           <div className="text-2xl font-bold text-[#C4956A]">{totalEarned}</div>
-          <div className="text-xs text-[#8B6F47]">🌰 미수령</div>
+          <div className="text-xs text-[#8B6F47] inline-flex items-center gap-1"><AcornIcon /> 미수령</div>
         </div>
         <div className="rounded-2xl bg-[#D4E4BC] border border-[#A8C686] p-4 text-center">
           <div className="text-2xl font-bold text-[#2D5A3D]">{totalClaimed}</div>
@@ -108,10 +109,18 @@ export default async function RewardsPage({ params }: { params: Promise<{ id: st
                         </span>
                       </div>
                       {r.description && <p className="text-xs text-[#6B6560] mt-0.5">{r.description}</p>}
-                      <p className="text-xs text-[#6B6560] mt-1">
-                        {r.reward_type === "POINT" && `🌰 ${config.threshold}개 이상`}
+                      <p className="text-xs text-[#6B6560] mt-1 inline-flex items-center gap-1 flex-wrap">
+                        {r.reward_type === "POINT" && (
+                          <>
+                            <AcornIcon /> {config.threshold}개 이상
+                          </>
+                        )}
                         {r.reward_type === "RANK" && `${config.rankFrom}~${config.rankTo}등`}
-                        {r.reward_type === "LOTTERY" && `🌰 ${config.minScore}개 이상 · ${config.winners}명 추첨`}
+                        {r.reward_type === "LOTTERY" && (
+                          <>
+                            <AcornIcon /> {config.minScore}개 이상 · {config.winners}명 추첨
+                          </>
+                        )}
                         {r.reward_type === "BADGE" && `숲길 걸음 완료 시`}
                         {r.reward_type === "INSTANT" && `숲길 승인 즉시`}
                         {r.quantity ? ` · 한정 ${r.quantity}개` : ""}
@@ -147,7 +156,7 @@ export default async function RewardsPage({ params }: { params: Promise<{ id: st
         </div>
       ) : (
         <div className="rounded-2xl border border-[#D4E4BC] bg-white p-12 text-center">
-          <div className="text-4xl mb-3">🌰</div>
+          <div className="mb-3 flex justify-center"><AcornIcon size={40} /></div>
           <p className="text-[#6B6560]">아직 준비된 보상이 없어요</p>
           <Link href={`/admin/events/${id}/rewards/new`}
             className="mt-3 inline-block rounded-xl bg-[#2D5A3D] px-4 py-2 text-sm font-semibold text-white hover:bg-[#1F4229]">

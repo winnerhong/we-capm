@@ -11,6 +11,7 @@ import {
   isConsentValid,
   type ConsentState,
 } from "@/components/consent-checkboxes";
+import { AcornIcon } from "@/components/acorn-icon";
 
 export default function DirectJoinPage() {
   const router = useRouter();
@@ -77,7 +78,9 @@ export default function DirectJoinPage() {
     <main className="flex min-h-dvh items-center justify-center p-6">
       <form onSubmit={handleSubmit} className="w-full max-w-sm space-y-6">
         <div className="space-y-3 text-center">
-          <div className="text-5xl">🌰</div>
+          <div className="flex justify-center text-forest">
+            <AcornIcon size={40} />
+          </div>
           <h1 className="text-3xl font-extrabold text-forest tracking-tight">토리로</h1>
           <p className="text-xs text-acorn tracking-[0.4em] font-light">TORIRO</p>
           <p className="text-sm text-warm-gray mt-4">오늘, 어디로 걸어볼까요?</p>

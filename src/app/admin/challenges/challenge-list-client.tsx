@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 import { endChallengeAction, deleteChallengeAction } from "./actions";
+import { AcornIcon } from "@/components/acorn-icon";
 
 export type ChallengeRow = {
   id: string;
@@ -151,7 +152,7 @@ export function ChallengeListClient({
           <div className="mt-1 text-2xl font-extrabold text-[#6B6560]">{endedCount}개</div>
         </div>
         <div className="rounded-2xl border border-[#D4E4BC] bg-[#FFF8F0] p-4">
-          <div className="text-xs font-medium text-[#8B6F47]">🌰 총 발급 도토리</div>
+          <div className="inline-flex items-center gap-1 text-xs font-medium text-[#8B6F47]"><AcornIcon /> 총 발급 도토리</div>
           <div className="mt-1 text-2xl font-extrabold text-[#6B4423]">
             {totalAcorns.toLocaleString("ko-KR")}개
           </div>
@@ -193,7 +194,7 @@ export function ChallengeListClient({
         </div>
       ) : filtered.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-[#D4E4BC] bg-[#FFF8F0] p-8 text-center">
-          <div className="text-3xl">🌰</div>
+          <div className="flex justify-center"><AcornIcon size={30} /></div>
           <p className="mt-2 text-sm font-semibold text-[#2D5A3D]">
             아직 챌린지가 없어요
           </p>
@@ -240,7 +241,7 @@ export function ChallengeListClient({
                     </div>
                   </div>
                   <div className="rounded-xl bg-[#FFF8F0] p-2.5">
-                    <div className="text-[10px] font-medium text-[#8B6F47]">🌰 보상</div>
+                    <div className="inline-flex items-center gap-1 text-[10px] font-medium text-[#8B6F47]"><AcornIcon /> 보상</div>
                     <div className="mt-0.5 font-semibold text-[#6B4423]">
                       도토리 {c.reward_acorns ?? 0}개
                       {c.reward_badge ? ` + ${c.reward_badge}` : ""}

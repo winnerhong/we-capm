@@ -121,6 +121,7 @@ export interface OrgRow {
   partner_id: string;
   org_name: string;
   org_type: OrgType;
+  org_phone: string | null;
   representative_name: string | null;
   representative_phone: string | null;
   email: string | null;

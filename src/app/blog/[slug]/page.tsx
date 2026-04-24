@@ -8,6 +8,7 @@ import {
 } from "../articles";
 import { SiteFooter } from "@/components/site-footer";
 import { BackToTop } from "@/components/back-to-top";
+import { AcornIcon } from "@/components/acorn-icon";
 
 type Params = Promise<{ slug: string }>;
 
@@ -54,9 +55,7 @@ export default async function BlogArticlePage({
             href="/"
             className="flex items-center gap-2 font-bold text-[#2D5A3D]"
           >
-            <span className="text-xl" aria-hidden>
-              🌰
-            </span>
+            <AcornIcon size={20} />
             <span>토리로</span>
           </Link>
           <nav className="flex items-center gap-1 text-xs font-semibold">

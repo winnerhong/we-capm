@@ -1,13 +1,15 @@
+import type { ReactNode } from "react";
 import { notFound, redirect } from "next/navigation";
 import { getParticipant } from "@/lib/participant-session";
 import { createClient } from "@/lib/supabase/server";
 import { RealtimeRefresh } from "@/components/realtime-refresh";
 import { ClaimQRButton } from "./claim-qr";
+import { AcornIcon } from "@/components/acorn-icon";
 
 export const dynamic = "force-dynamic";
 
-const TYPE_ICON: Record<string, string> = {
-  POINT: "🌰", RANK: "🏆", BADGE: "🎖️", LOTTERY: "🎰", INSTANT: "🍃",
+const TYPE_ICON: Record<string, ReactNode> = {
+  POINT: <AcornIcon />, RANK: "🏆", BADGE: "🎖️", LOTTERY: "🎰", INSTANT: "🍃",
 };
 const TYPE_LABEL: Record<string, string> = {
   POINT: "도토리 모으기", RANK: "숲의 영광", BADGE: "기념 뱃지", LOTTERY: "추첨 당첨", INSTANT: "즉시 선물",
@@ -68,7 +70,7 @@ export default async function EventRewardsPage({ params }: { params: Promise<{ i
         <p className="mt-1 text-xs opacity-90">도토리를 모아 특별한 선물을 만나보세요</p>
         <div className="mt-3 flex gap-3">
           <div className="flex-1 rounded-xl bg-white/20 p-3 text-center">
-            <div className="text-2xl font-bold">{myScore}<span className="ml-0.5 text-xs">🌰</span></div>
+            <div className="text-2xl font-bold">{myScore}<span className="ml-0.5 text-xs"><AcornIcon size={12} /></span></div>
             <div className="text-[11px] opacity-80">내 도토리</div>
           </div>
           <div className="flex-1 rounded-xl bg-white/20 p-3 text-center">
@@ -141,7 +143,7 @@ export default async function EventRewardsPage({ params }: { params: Promise<{ i
         {/* 목표 보상 (POINT 진행률) */}
         {pointRewards.length > 0 && (
           <section>
-            <h2 className="mb-2 text-sm font-bold text-[#2D5A3D]">🌰 도토리 모으기</h2>
+            <h2 className="mb-2 text-sm font-bold text-[#2D5A3D]"><AcornIcon /> 도토리 모으기</h2>
             <div className="space-y-2">
               {pointRewards.map((r) => {
                 const cfg = (r.config ?? {}) as { threshold?: number };
@@ -156,7 +158,7 @@ export default async function EventRewardsPage({ params }: { params: Promise<{ i
                         <span className="font-semibold">{r.name}</span>
                       </div>
                       <span className={`text-xs font-bold ${earned ? "text-[#2D5A3D]" : "text-violet-600"}`}>
-                        🌰 {myScore} / {threshold}
+                        <AcornIcon /> {myScore} / {threshold}
                       </span>
                     </div>
                     {r.description && <p className="text-xs text-[#6B6560] mt-1 ml-8">{r.description}</p>}

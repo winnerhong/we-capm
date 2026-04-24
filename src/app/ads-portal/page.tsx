@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AcornIcon } from "@/components/acorn-icon";
 
 const STAGES = [
   {
@@ -267,7 +268,7 @@ export default function AdsPortalLandingPage() {
       {/* 하단 CTA */}
       <section className="rounded-2xl bg-gradient-to-r from-[#2D5A3D] to-[#3A7A52] p-5 text-white text-center">
         <p className="text-sm font-semibold">
-          🌰 미리 둘러보시려면 대시보드 프리뷰로 이동하세요
+          <AcornIcon /> 미리 둘러보시려면 대시보드 프리뷰로 이동하세요
         </p>
         <Link
           href="/ads-portal/dashboard"

@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
+import { AcornIcon } from "@/components/acorn-icon";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -45,9 +46,7 @@ export function PWAInstallPrompt() {
 
   return (
     <div className="fixed bottom-4 left-4 right-4 z-50 mx-auto flex max-w-sm items-center gap-3 rounded-2xl bg-[#2D5A3D] p-4 text-white shadow-2xl">
-      <span className="text-3xl" aria-hidden>
-        🌰
-      </span>
+      <AcornIcon size={28} className="flex-shrink-0" />
       <div className="flex-1">
         <p className="text-sm font-bold">토리로 앱 설치하기</p>
         <p className="mt-0.5 text-xs opacity-80">홈 화면에 추가하면 더 편해요!</p>

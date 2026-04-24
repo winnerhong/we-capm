@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ARTICLES } from "./articles";
 import { BlogList } from "./blog-list";
 import { SiteFooter } from "@/components/site-footer";
+import { AcornIcon } from "@/components/acorn-icon";
 
 export const metadata: Metadata = {
   title: "토리로 이야기 · 블로그",
@@ -22,9 +23,7 @@ export default function BlogIndexPage() {
             href="/"
             className="flex items-center gap-2 font-bold text-[#2D5A3D]"
           >
-            <span className="text-xl" aria-hidden>
-              🌰
-            </span>
+            <AcornIcon size={20} />
             <span>토리로</span>
           </Link>
           <nav className="flex items-center gap-1 text-xs font-semibold">

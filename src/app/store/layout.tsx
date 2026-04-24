@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AcornIcon } from "@/components/acorn-icon";
 
 export default function StoreLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -32,7 +33,7 @@ export default function StoreLayout({ children }: { children: React.ReactNode })
 
           <div className="flex items-center gap-2 text-sm">
             <span className="rounded-full bg-[#FAE7D0] px-3 py-1 text-xs font-semibold text-[#8B5E3C]">
-              🌰 숲길 친구
+              <AcornIcon /> 숲길 친구
             </span>
             <form action="/store" method="get">
               <button

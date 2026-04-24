@@ -4,29 +4,9 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getParticipant } from "@/lib/participant-session";
+import type { Guild, GuildMember } from "./types";
 
 type AnySupabase = ReturnType<typeof createClient> extends Promise<infer T> ? T : never;
-
-// Minimal shape we need — bypass types since tables may not be in database.types.ts yet
-type Guild = {
-  id: string;
-  event_id: string;
-  name: string;
-  description: string | null;
-  icon: string | null;
-  leader_phone: string;
-  max_members: number;
-  total_acorns: number;
-  is_public: boolean;
-};
-
-type GuildMember = {
-  id: string;
-  guild_id: string;
-  participant_phone: string;
-  participant_name: string;
-  role: "LEADER" | "MEMBER";
-};
 
 function tbl(supabase: AnySupabase, name: string) {
   // Escape hatch: DB types may not include the new tables yet
@@ -145,5 +125,3 @@ export async function leaveGuildAction(eventId: string, guildId: string) {
 
   revalidatePath(`/event/${eventId}/guild`);
 }
-
-export type { Guild, GuildMember };

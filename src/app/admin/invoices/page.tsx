@@ -1,5 +1,7 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { AcornIcon } from "@/components/acorn-icon";
 
 export const dynamic = "force-dynamic";
 
@@ -80,8 +82,8 @@ const TARGET_LABEL: Record<TargetType, { label: string; emoji: string }> = {
   B2B_CLIENT: { label: "B2B 기업", emoji: "💼" },
 };
 
-const CATEGORY_LABEL: Record<Category, { label: string; emoji: string }> = {
-  ACORN_RECHARGE: { label: "도토리 충전", emoji: "🌰" },
+const CATEGORY_LABEL: Record<Category, { label: string; emoji: ReactNode }> = {
+  ACORN_RECHARGE: { label: "도토리 충전", emoji: <AcornIcon size={16} /> },
   SUBSCRIPTION: { label: "구독료", emoji: "🔁" },
   EVENT_FEE: { label: "행사 참가비", emoji: "🎫" },
   AD_CAMPAIGN: { label: "광고비", emoji: "📣" },

@@ -3,8 +3,10 @@
 import { useState } from "react";
 import Link from "next/link";
 import { createChallengeAction } from "../actions";
+import { AcornIcon } from "@/components/acorn-icon";
 
-const ICONS = ["🎯", "🌰", "🏆", "🌿", "🌲"];
+// 챌린지 아이콘 선택지. 도토리는 별도 AcornIcon 컴포넌트로 처리하므로 제외.
+const ICONS = ["🎯", "🏆", "🌿", "🌲"];
 
 const GOAL_TYPES: { value: string; label: string; unit: string }[] = [
   { value: "MISSION_COUNT", label: "미션 개수", unit: "개" },
@@ -69,8 +71,8 @@ export function NewChallengeForm({
 
       {/* 제목 */}
       <div>
-        <label htmlFor="challenge-title" className="mb-1 block text-sm font-medium text-[#2C2C2C]">
-          🌰 챌린지 이름
+        <label htmlFor="challenge-title" className="mb-1 inline-flex items-center gap-1 text-sm font-medium text-[#2C2C2C]">
+          <AcornIcon /> 챌린지 이름
         </label>
         <input
           id="challenge-title"
@@ -136,8 +138,8 @@ export function NewChallengeForm({
       {/* 보상 */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div>
-          <label htmlFor="reward-acorns" className="mb-1 block text-sm font-medium text-[#2C2C2C]">
-            🌰 보상 도토리
+          <label htmlFor="reward-acorns" className="mb-1 inline-flex items-center gap-1 text-sm font-medium text-[#2C2C2C]">
+            <AcornIcon /> 보상 도토리
           </label>
           <input
             id="reward-acorns"

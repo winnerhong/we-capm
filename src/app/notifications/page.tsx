@@ -1,7 +1,9 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { markAllReadAction } from "./actions";
+import { AcornIcon } from "@/components/acorn-icon";
 
 export const dynamic = "force-dynamic";
 
@@ -10,7 +12,7 @@ type Tab = "all" | "talk" | "reward" | "event";
 type FeedItem = {
   key: string;
   category: Tab;
-  icon: string;
+  icon: ReactNode;
   title: string;
   description: string;
   createdAt: string;
@@ -33,8 +35,8 @@ function relativeTime(iso: string): string {
   return new Date(iso).toLocaleDateString("ko-KR");
 }
 
-const REWARD_ICON: Record<string, string> = {
-  POINT: "🌰",
+const REWARD_ICON: Record<string, ReactNode> = {
+  POINT: <AcornIcon size={20} />,
   RANK: "🏆",
   BADGE: "🎖️",
   LOTTERY: "🎰",
@@ -250,7 +252,7 @@ export default async function NotificationsPage({
       feed.push({
         key: `s:${s.id}`,
         category: "reward",
-        icon: slot.icon ?? "🌰",
+        icon: slot.icon ?? <AcornIcon size={20} />,
         title: `도토리 획득`,
         description: `${slot.name} 구간을 걸었어요`,
         createdAt: s.stamped_at,

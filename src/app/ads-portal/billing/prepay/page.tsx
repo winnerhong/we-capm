@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prepayDepositAction } from "../actions";
 import { calculateAcornBonus, calculateVat } from "@/lib/billing/invoice";
+import { AcornIcon } from "@/components/acorn-icon";
 
 const AMOUNT_OPTIONS = [
   { label: "100만원", value: 1_000_000, tone: "emerald" },
@@ -76,14 +77,14 @@ export default async function PrepayPage({
           className="absolute -right-6 -top-6 text-[140px] opacity-10 select-none"
           aria-hidden
         >
-          🌰
+          <AcornIcon size={140} />
         </div>
         <div className="relative z-10">
           <p className="text-[11px] tracking-[0.4em] opacity-80 font-light">
             PREPAY
           </p>
           <h1 className="mt-1 text-2xl font-extrabold flex items-center gap-2">
-            <span aria-hidden>🌰</span>
+            <AcornIcon size={24} />
             <span>선수금 충전</span>
           </h1>
           <p className="mt-2 text-sm opacity-95">

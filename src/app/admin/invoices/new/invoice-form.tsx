@@ -1,8 +1,10 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useState, useTransition, type ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
-import { createInvoiceAction, acornBonusRate } from "../actions";
+import { createInvoiceAction } from "../actions";
+import { acornBonusRate } from "@/lib/invoice-policy";
+import { AcornIcon } from "@/components/acorn-icon";
 
 export interface PartnerOption {
   id: string;
@@ -42,8 +44,8 @@ const TARGET_OPTIONS: { value: TargetType; label: string; emoji: string }[] = [
   { value: "PARTICIPANT", label: "참가자", emoji: "👤" },
 ];
 
-const CATEGORY_OPTIONS: { value: Category; label: string; emoji: string }[] = [
-  { value: "ACORN_RECHARGE", label: "도토리 충전", emoji: "🌰" },
+const CATEGORY_OPTIONS: { value: Category; label: string; emoji: ReactNode }[] = [
+  { value: "ACORN_RECHARGE", label: "도토리 충전", emoji: <AcornIcon size={16} /> },
   { value: "SUBSCRIPTION", label: "구독료", emoji: "🔁" },
   { value: "EVENT_FEE", label: "행사 참가비", emoji: "🎫" },
   { value: "AD_CAMPAIGN", label: "광고비", emoji: "📣" },
@@ -437,7 +439,7 @@ export function InvoiceForm({ partners }: Props) {
           </div>
           {category === "ACORN_RECHARGE" && (
             <div className="mt-2 rounded-lg bg-[#E8F0E4] p-2 text-xs text-[#2D5A3D]">
-              입금 확인 시 자동 지급: 🌰{" "}
+              입금 확인 시 자동 지급: <AcornIcon />{" "}
               <b>{fmtKRW(totalAcorns)}</b> (기본 {fmtKRW(baseAcorns)} + 보너스{" "}
               {bonusRate}% = {fmtKRW(bonusAcorns)})
             </div>

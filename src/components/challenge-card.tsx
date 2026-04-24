@@ -1,21 +1,32 @@
 "use client";
 
+import type { ReactNode } from "react";
+import { AcornIcon } from "@/components/acorn-icon";
+
 interface Challenge {
   title: string;
-  description: string;
-  icon: string;
+  description: ReactNode;
+  icon: ReactNode;
   progress: number;
   goal: number;
-  reward: string;
+  reward: ReactNode;
 }
 
 const THIS_WEEK: Challenge = {
   title: "이번주 숲길 챌린지",
-  description: "숲길 3개 완주하고 🌰 10개 받기",
+  description: (
+    <>
+      숲길 3개 완주하고 <AcornIcon /> 10개 받기
+    </>
+  ),
   icon: "🎯",
   progress: 0,
   goal: 3,
-  reward: "🌰 10",
+  reward: (
+    <span className="inline-flex items-center gap-1">
+      <AcornIcon /> 10
+    </span>
+  ),
 };
 
 export function ChallengeCard({ completedMissions = 0 }: { completedMissions?: number }) {
@@ -28,7 +39,10 @@ export function ChallengeCard({ completedMissions = 0 }: { completedMissions?: n
       <div className="flex items-start justify-between mb-2">
         <div>
           <p className="text-[10px] font-bold text-[#C4956A] tracking-wide">THIS WEEK CHALLENGE</p>
-          <h3 className="text-base font-bold text-[#2D5A3D] mt-1">{THIS_WEEK.icon} {THIS_WEEK.title}</h3>
+          <h3 className="text-base font-bold text-[#2D5A3D] mt-1 inline-flex items-center gap-1">
+            <span>{THIS_WEEK.icon}</span>
+            <span>{THIS_WEEK.title}</span>
+          </h3>
           <p className="text-xs text-[#6B6560] mt-1">{THIS_WEEK.description}</p>
         </div>
         <span className="text-xs font-bold rounded-full bg-[#C4956A] text-white px-2.5 py-1">

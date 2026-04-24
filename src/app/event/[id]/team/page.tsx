@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { getParticipant, getParticipantDb } from "@/lib/participant-session";
 import { createClient } from "@/lib/supabase/server";
 import { createTeamAction, joinTeamAction, leaveTeamAction } from "./actions";
+import { AcornIcon } from "@/components/acorn-icon";
 
 export const dynamic = "force-dynamic";
 
@@ -67,7 +68,7 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
               </div>
               <div className="text-right">
                 <div className="text-xs opacity-90">모은 도토리</div>
-                <div className="text-2xl font-bold">🌰 {team?.total_score}</div>
+                <div className="text-2xl font-bold inline-flex items-center gap-1"><AcornIcon size={20} /> {team?.total_score}</div>
               </div>
             </div>
           </div>
@@ -85,11 +86,11 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
                       {p?.name ?? "?"}
                       {m.user_id === team?.leader_id && (
                         <span className="rounded-full bg-[#F5D9B5] px-2 py-0.5 text-xs text-[#8B6F47]">
-                          🌰 숲지기
+                          <AcornIcon className="text-[#8B6F47]" /> 숲지기
                         </span>
                       )}
                     </span>
-                    <span className="text-sm text-[#4A7C59]">🌰 {m.total_score}</span>
+                    <span className="text-sm text-[#4A7C59]"><AcornIcon /> {m.total_score}</span>
                   </li>
                 );
               })}

@@ -1,5 +1,6 @@
 "use client";
 import { getProgress, TREE_LEVELS } from "@/lib/tree-growth";
+import { AcornIcon } from "@/components/acorn-icon";
 
 export function TreeGrowthCard({ acorns }: { acorns: number }) {
   const { current, next, percent, remaining } = getProgress(acorns);
@@ -15,7 +16,7 @@ export function TreeGrowthCard({ acorns }: { acorns: number }) {
           </h3>
         </div>
         <div className="text-right">
-          <div className="text-2xl font-bold text-[#2D5A3D]">{acorns}<span className="text-sm">🌰</span></div>
+          <div className="text-2xl font-bold text-[#2D5A3D] flex items-center justify-end gap-1">{acorns}<AcornIcon size={14} /></div>
           <div className="text-[10px] text-[#6B6560]">도토리</div>
         </div>
       </div>
@@ -27,7 +28,7 @@ export function TreeGrowthCard({ acorns }: { acorns: number }) {
 
       {next ? (
         <p className="text-xs text-[#6B6560] text-center">
-          {next.emoji} <strong className="text-[#2D5A3D]">{next.name}</strong>까지 🌰 <strong>{remaining}개</strong>
+          {next.emoji} <strong className="text-[#2D5A3D]">{next.name}</strong>까지 <AcornIcon /> <strong>{remaining}개</strong>
         </p>
       ) : (
         <p className="text-xs text-[#2D5A3D] text-center font-semibold">🏞️ 최고 등급 달성! 당신은 진정한 숲지기</p>

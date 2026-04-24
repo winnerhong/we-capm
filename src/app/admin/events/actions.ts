@@ -33,6 +33,25 @@ export async function createEventAction(formData: FormData) {
     }
   }
 
+  // 지사 CRM 기관 연결: partner_orgs.auto_username을 manager_id로 자동 매핑.
+  // 비밀번호는 partner_orgs.auto_password_hash로 별도 검증되므로 events.manager_password는 비워둠.
+  const partnerOrgId = String(formData.get("partner_org_id") ?? "").trim();
+  if (partnerOrgId) {
+    const { data: orgRow } = await (supabase.from("partner_orgs" as never) as unknown as {
+      select: (c: string) => {
+        eq: (k: string, v: string) => {
+          maybeSingle: () => Promise<{ data: { auto_username: string | null } | null }>;
+        };
+      };
+    })
+      .select("auto_username")
+      .eq("id", partnerOrgId)
+      .maybeSingle();
+    if (orgRow?.auto_username && !manager_id) {
+      manager_id = orgRow.auto_username;
+    }
+  }
+
   if (!name || !start_at || !end_at || !location) {
     throw new Error("필수 항목이 비어있습니다");
   }

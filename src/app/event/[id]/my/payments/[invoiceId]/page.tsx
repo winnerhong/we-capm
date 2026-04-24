@@ -1,7 +1,9 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { notFound, redirect } from "next/navigation";
 import { getParticipant } from "@/lib/participant-session";
 import { createClient } from "@/lib/supabase/server";
+import { AcornIcon } from "@/components/acorn-icon";
 
 export const dynamic = "force-dynamic";
 
@@ -25,8 +27,8 @@ type InvoiceStatus =
   | "CANCELED"
   | "REFUNDED";
 
-const CATEGORY_LABEL: Record<InvoiceCategory, { emoji: string; label: string }> = {
-  ACORN_RECHARGE: { emoji: "🌰", label: "도토리 충전" },
+const CATEGORY_LABEL: Record<InvoiceCategory, { emoji: ReactNode; label: string }> = {
+  ACORN_RECHARGE: { emoji: <AcornIcon />, label: "도토리 충전" },
   SUBSCRIPTION: { emoji: "🌿", label: "구독" },
   EVENT_FEE: { emoji: "🎫", label: "행사" },
   AD_CAMPAIGN: { emoji: "📣", label: "광고" },
@@ -186,7 +188,14 @@ export default async function PaymentDetailPage({
           </h2>
           <dl className="space-y-2.5 text-sm">
             <InfoRow label="인보이스 번호" value={invoice.invoice_number} />
-            <InfoRow label="구분" value={`${cat.emoji} ${cat.label}`} />
+            <InfoRow
+              label="구분"
+              value={
+                <>
+                  {cat.emoji} {cat.label}
+                </>
+              }
+            />
             <InfoRow label="공급가액" value={formatWon(invoice.amount)} />
             <InfoRow label="부가세" value={formatWon(invoice.vat)} />
             <InfoRow
@@ -355,7 +364,7 @@ function InfoRow({
   strong = false,
 }: {
   label: string;
-  value: string;
+  value: ReactNode;
   strong?: boolean;
 }) {
   return (

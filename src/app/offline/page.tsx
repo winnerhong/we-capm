@@ -1,5 +1,7 @@
 "use client";
 
+import { AcornIcon } from "@/components/acorn-icon";
+
 export default function OfflinePage() {
   return (
     <main className="flex min-h-dvh items-center justify-center bg-[#FFF8F0] p-6">
@@ -32,8 +34,8 @@ export default function OfflinePage() {
           className="rounded-2xl border border-[#2D5A3D]/10 bg-white/70 p-4 text-left"
           aria-label="오프라인에서 볼 수 있는 페이지"
         >
-          <p className="text-xs font-semibold text-[#2D5A3D]">
-            🌰 오프라인에서도 볼 수 있어요
+          <p className="inline-flex items-center gap-1 text-xs font-semibold text-[#2D5A3D]">
+            <AcornIcon /> 오프라인에서도 볼 수 있어요
           </p>
           <ul className="mt-2 space-y-1 text-xs text-neutral-600">
             <li>• 최근에 본 숲길 정보</li>

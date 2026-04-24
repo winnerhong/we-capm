@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { managerLoginAction } from "./actions";
+import { AcornIcon } from "@/components/acorn-icon";
 
 export default function ManagerLoginPage() {
   const router = useRouter();
@@ -17,12 +18,26 @@ export default function ManagerLoginPage() {
     setError(null);
 
     startTransition(async () => {
-      const result = await managerLoginAction(id.trim(), password) as { ok: boolean; message?: string; eventId?: string; eventName?: string };
+      const result = await managerLoginAction(id.trim(), password) as {
+        ok: boolean;
+        message?: string;
+        eventId?: string;
+        eventName?: string;
+        orgId?: string;
+        orgName?: string;
+      };
       if (!result.ok) {
         setError(result.message ?? "로그인 실패");
         return;
       }
-      router.push(`/manager/${result.eventId}`);
+      if (result.eventId) {
+        router.push(`/manager/${result.eventId}`);
+      } else if (result.orgId) {
+        router.push(`/org/${result.orgId}`);
+      } else {
+        setError("로그인 응답이 올바르지 않습니다");
+        return;
+      }
       router.refresh();
     });
   };
@@ -45,7 +60,7 @@ export default function ManagerLoginPage() {
           className="space-y-5 rounded-2xl border border-[#E8F0E4] bg-white p-6 shadow-[0_10px_30px_-12px_rgba(45,90,61,0.25)]"
         >
           <div className="space-y-2 text-center">
-            <div className="text-2xl" aria-hidden>🌰</div>
+            <div aria-hidden className="flex justify-center"><AcornIcon size={24} className="text-[#2D5A3D]" /></div>
             <h2 className="text-lg font-bold text-[#2C2C2C]">운영자 입장</h2>
             <p className="text-xs text-[#6B6560]">부여받은 아이디와 비밀번호를 입력하세요</p>
           </div>

@@ -88,6 +88,25 @@ export default async function NewOrgPage() {
             </div>
 
             <div>
+              <label htmlFor="org_phone" className={LABEL_CLASS}>
+                기관 전화번호 <span className="text-rose-600">*</span>
+              </label>
+              <input
+                id="org_phone"
+                name="org_phone"
+                type="tel"
+                inputMode="tel"
+                required
+                autoComplete="tel"
+                placeholder="예) 02-123-4567"
+                className={INPUT_CLASS}
+              />
+              <p className="mt-1 text-[11px] text-[#8B7F75]">
+                🔑 로그인 아이디로 사용됩니다 (숫자만 추출)
+              </p>
+            </div>
+
+            <div className="md:col-span-2">
               <label htmlFor="email" className={LABEL_CLASS}>
                 대표 이메일
               </label>
@@ -337,7 +356,53 @@ export default async function NewOrgPage() {
                 className={INPUT_CLASS}
               />
               <p className="mt-1 text-[11px] text-[#8B7F75]">
-                이 번호로 환영 SMS와 자동 계정 정보가 전송됩니다.
+                🔑 뒷 4자리가 초기 비밀번호로 설정됩니다. 환영 SMS도 이 번호로 전송됩니다.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {/* Section 5.5: 로그인 계정 (선택) */}
+        <section className="rounded-2xl border border-violet-200 bg-violet-50/40 p-5 shadow-sm md:p-6">
+          <h2 className="mb-2 flex items-center gap-2 text-sm font-bold text-violet-900">
+            <span aria-hidden>🔑</span>
+            <span>로그인 계정 (선택)</span>
+          </h2>
+          <p className="mb-4 text-[11px] text-violet-800/80">
+            비워두면 자동 생성돼요 — 아이디=기관 전화번호 / 비밀번호=담당자 연락처 뒷 4자리.
+            직접 지정하려면 아래에 입력하세요.
+          </p>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div>
+              <label htmlFor="auto_username" className={LABEL_CLASS}>
+                아이디 (3자 이상)
+              </label>
+              <input
+                id="auto_username"
+                name="auto_username"
+                type="text"
+                autoComplete="off"
+                placeholder="예) torirokids2026 (비우면 자동)"
+                className={INPUT_CLASS}
+              />
+              <p className="mt-1 text-[11px] text-[#8B7F75]">
+                중복 시 자동으로 -2, -3 접미사가 붙어요.
+              </p>
+            </div>
+            <div>
+              <label htmlFor="auto_password" className={LABEL_CLASS}>
+                비밀번호 (4자 이상)
+              </label>
+              <input
+                id="auto_password"
+                name="auto_password"
+                type="text"
+                autoComplete="off"
+                placeholder="예) tori2026! (비우면 담당자 뒷 4자리)"
+                className={INPUT_CLASS}
+              />
+              <p className="mt-1 text-[11px] text-[#8B7F75]">
+                담당자에게 바로 전달할 임시 비밀번호예요. 일반 텍스트로 보이니 화면을 가리고 입력하세요.
               </p>
             </div>
           </div>

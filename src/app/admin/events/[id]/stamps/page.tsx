@@ -10,6 +10,7 @@ import {
   deleteSlotAction,
   deleteStampBoardAction,
 } from "./actions";
+import { AcornIcon } from "@/components/acorn-icon";
 
 export const dynamic = "force-dynamic";
 
@@ -38,7 +39,7 @@ export default async function AdminStampsPage({ params }: { params: Promise<{ id
           <Link href={`/admin/events/${id}`} className="text-sm text-[#2D5A3D] hover:underline">&larr; {event.name}</Link>
           <div className="mt-2 rounded-2xl bg-gradient-to-br from-[#2D5A3D] via-[#3A7A52] to-[#4A7C59] p-6 text-white shadow-sm">
             <h1 className="flex items-center gap-2 text-2xl font-bold">
-              <span>🌰</span>
+              <span><AcornIcon size={24} /></span>
               <span>도토리 수집 랠리 만들기</span>
             </h1>
             <p className="mt-1 text-sm text-white/80">숲길을 걸으며 도토리를 모아보는 탐험을 시작해요</p>
@@ -92,9 +93,9 @@ export default async function AdminStampsPage({ params }: { params: Promise<{ id
           </div>
           <button
             type="submit"
-            className="w-full rounded-xl bg-[#2D5A3D] py-3 font-bold text-white hover:bg-[#1F4229] transition-colors"
+            className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-[#2D5A3D] py-3 font-bold text-white hover:bg-[#1F4229] transition-colors"
           >
-            🌰 도토리 보드 만들기
+            <AcornIcon /> 도토리 보드 만들기
           </button>
         </form>
       </div>
@@ -165,7 +166,7 @@ export default async function AdminStampsPage({ params }: { params: Promise<{ id
         <div className="mt-2 flex items-center justify-between rounded-2xl bg-gradient-to-br from-[#2D5A3D] via-[#3A7A52] to-[#4A7C59] p-6 text-white shadow-sm">
           <div>
             <h1 className="flex items-center gap-2 text-2xl font-bold">
-              <span>🌰</span>
+              <span><AcornIcon size={24} /></span>
               <span>{board.name}</span>
             </h1>
             <p className="mt-1 text-sm text-white/80">탐험가들이 숲길에서 모은 도토리 현황</p>
@@ -201,12 +202,12 @@ export default async function AdminStampsPage({ params }: { params: Promise<{ id
       <div className="rounded-2xl border border-[#D4E4BC] bg-white p-5">
         <h2 className="font-bold mb-3 text-[#2D5A3D]">🌲 등급 분포</h2>
         <div className="space-y-2">
-          {[
-            { key: "keeper", emoji: tierConfig.keeper.emoji, label: tierConfig.keeper.label, count: tierDist.keeper, color: "bg-[#2D5A3D]" },
-            { key: "explorer", emoji: tierConfig.explorer.emoji, label: tierConfig.explorer.label, count: tierDist.explorer, color: "bg-[#A8C686]" },
-            { key: "sprout", emoji: tierConfig.sprout.emoji, label: tierConfig.sprout.label, count: tierDist.sprout, color: "bg-[#D4E4BC]" },
-            { key: "none", emoji: "🌰", label: "미달성", count: tierDist.none, color: "bg-[#E8E3DA]" },
-          ].map((t) => {
+          {([
+            { key: "keeper", emoji: tierConfig.keeper.emoji as React.ReactNode, label: tierConfig.keeper.label, count: tierDist.keeper, color: "bg-[#2D5A3D]" },
+            { key: "explorer", emoji: tierConfig.explorer.emoji as React.ReactNode, label: tierConfig.explorer.label, count: tierDist.explorer, color: "bg-[#A8C686]" },
+            { key: "sprout", emoji: tierConfig.sprout.emoji as React.ReactNode, label: tierConfig.sprout.label, count: tierDist.sprout, color: "bg-[#D4E4BC]" },
+            { key: "none", emoji: <AcornIcon size={16} />, label: "미달성", count: tierDist.none, color: "bg-[#E8E3DA]" },
+          ]).map((t) => {
             const pct = participantsWithStamps > 0 ? Math.round((t.count / participantsWithStamps) * 100) : 0;
             return (
               <div key={t.key} className="flex items-center gap-3">
@@ -313,7 +314,7 @@ export default async function AdminStampsPage({ params }: { params: Promise<{ id
                   )}
                 </div>
                 <div className="text-right">
-                  <div className="text-sm font-bold text-[#C4956A]">🌰 {stampCount}</div>
+                  <div className="inline-flex items-center gap-1 text-sm font-bold text-[#C4956A]"><AcornIcon /> {stampCount}</div>
                   <div className="text-[10px] text-[#6B6560]">도토리</div>
                 </div>
                 <form action={async () => { "use server"; await deleteSlotAction(id, slot.id); }}>

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AcornIcon } from "@/components/acorn-icon";
 
 export function SiteFooter() {
   return (
@@ -11,7 +12,7 @@ export function SiteFooter() {
               href="/"
               className="flex items-center gap-2 text-lg font-extrabold text-[#2D5A3D]"
             >
-              <span aria-hidden>🌰</span>
+              <AcornIcon size={18} />
               <span>토리로</span>
             </Link>
             <p className="mt-3 text-xs leading-relaxed text-[#6B6560]">

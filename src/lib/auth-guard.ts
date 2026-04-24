@@ -1,18 +1,43 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import type { TeamRole } from "@/lib/team/types";
 
 export type PartnerSession = {
   id: string;
+  teamMemberId: string | null;
   name: string;
   username: string;
+  role: TeamRole;
+  loginAt: string;
 };
+
+type RawPartnerCookie = {
+  id?: string;
+  teamMemberId?: string | null;
+  name?: string;
+  username?: string;
+  role?: string;
+  loginAt?: string;
+};
+
+function normalizePartnerSession(raw: RawPartnerCookie): PartnerSession {
+  const role = (raw.role as TeamRole | undefined) ?? "OWNER"; // 하위 호환
+  return {
+    id: String(raw.id ?? ""),
+    teamMemberId: raw.teamMemberId ?? null,
+    name: String(raw.name ?? ""),
+    username: String(raw.username ?? ""),
+    role,
+    loginAt: String(raw.loginAt ?? ""),
+  };
+}
 
 export async function requirePartner(): Promise<PartnerSession> {
   const cookieStore = await cookies();
   const partnerCookie = cookieStore.get("campnic_partner")?.value;
   if (!partnerCookie) redirect("/partner");
   try {
-    return JSON.parse(partnerCookie) as PartnerSession;
+    return normalizePartnerSession(JSON.parse(partnerCookie) as RawPartnerCookie);
   } catch {
     redirect("/partner");
   }
@@ -23,10 +48,20 @@ export async function getPartner(): Promise<PartnerSession | null> {
   const partnerCookie = cookieStore.get("campnic_partner")?.value;
   if (!partnerCookie) return null;
   try {
-    return JSON.parse(partnerCookie) as PartnerSession;
+    return normalizePartnerSession(JSON.parse(partnerCookie) as RawPartnerCookie);
   } catch {
     return null;
   }
+}
+
+export async function requirePartnerWithRole(
+  allowedRoles: TeamRole[]
+): Promise<PartnerSession> {
+  const p = await requirePartner();
+  if (!allowedRoles.includes(p.role)) {
+    throw new Error(`권한 없음: ${p.role}`);
+  }
+  return p;
 }
 
 export async function requireAdmin() {

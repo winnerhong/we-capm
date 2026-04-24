@@ -1,18 +1,19 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useState, useTransition, type ReactNode } from "react";
 import { selfChargeAcornsAction } from "./actions";
+import { AcornIcon } from "@/components/acorn-icon";
 
 interface Tier {
   amount: number;
   label: string;
   bonus: number; // 0.10 = +10%
   popular?: boolean;
-  sub: string;
+  sub: ReactNode;
 }
 
 const TIERS: Tier[] = [
-  { amount: 100_000, label: "10만원", bonus: 0, sub: "입문 · 100🌰" },
+  { amount: 100_000, label: "10만원", bonus: 0, sub: <>입문 · 100<AcornIcon /></> },
   { amount: 300_000, label: "30만원", bonus: 0.1, sub: "+10% 보너스" },
   { amount: 1_000_000, label: "100만원", bonus: 0.15, sub: "+15% 보너스", popular: true },
   { amount: 3_000_000, label: "300만원", bonus: 0.2, sub: "+20% 보너스" },
@@ -173,7 +174,7 @@ export function AcornsForm() {
           </span>
         </div>
         <p className="mt-1 text-[11px] text-[#8B6F47]">
-          최소 10,000원부터 충전 가능 · 1,000원당 🌰 1개 지급
+          최소 10,000원부터 충전 가능 · 1,000원당 <AcornIcon /> 1개 지급
         </p>
       </fieldset>
 
@@ -231,10 +232,10 @@ export function AcornsForm() {
         </dl>
         <div className="mt-3 rounded-xl bg-white/70 p-3">
           <p className="text-[11px] font-semibold text-[#8B6F47]">
-            🌰 지급 도토리
+            <AcornIcon /> 지급 도토리
           </p>
           <p className="mt-1 text-lg font-extrabold text-[#2D5A3D]">
-            {totalAcorns.toLocaleString("ko-KR")}🌰
+            {totalAcorns.toLocaleString("ko-KR")}<AcornIcon />
             {bonusRate > 0 && (
               <span className="ml-2 rounded-full bg-[#2D5A3D] px-2 py-0.5 text-[10px] font-bold text-white">
                 보너스 +{Math.round(bonusRate * 100)}%
@@ -242,8 +243,14 @@ export function AcornsForm() {
             )}
           </p>
           <p className="mt-0.5 text-[11px] text-[#8B6F47]">
-            기본 {baseAcorns.toLocaleString("ko-KR")}🌰
-            {bonusAcorns > 0 && ` + 보너스 ${bonusAcorns.toLocaleString("ko-KR")}🌰`}
+            기본 {baseAcorns.toLocaleString("ko-KR")}<AcornIcon />
+            {bonusAcorns > 0 && (
+              <>
+                {" + 보너스 "}
+                {bonusAcorns.toLocaleString("ko-KR")}
+                <AcornIcon />
+              </>
+            )}
           </p>
         </div>
       </section>

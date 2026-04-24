@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
+import { AcornIcon } from "@/components/acorn-icon";
 import {
   deleteCampaignAction,
   updateCampaignStatusAction,
@@ -136,7 +137,7 @@ async function SubmittedBanner({ submitted }: { submitted: boolean }) {
       className="rounded-2xl border border-emerald-300 bg-emerald-50 p-4 flex items-start gap-3"
     >
       <span className="text-2xl flex-shrink-0" aria-hidden>
-        🌰
+        <AcornIcon size={24} />
       </span>
       <div className="flex-1">
         <p className="text-sm font-bold text-emerald-900">

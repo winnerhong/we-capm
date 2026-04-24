@@ -1,5 +1,6 @@
 "use client";
 
+import * as Sentry from "@sentry/nextjs";
 import { useEffect } from "react";
 
 export default function ErrorPage({
@@ -13,6 +14,9 @@ export default function ErrorPage({
 }) {
   useEffect(() => {
     console.error(error);
+    if (process.env.NEXT_PUBLIC_SENTRY_DSN) {
+      Sentry.captureException(error);
+    }
   }, [error]);
 
   const handleRetry = () => {

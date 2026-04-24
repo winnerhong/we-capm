@@ -99,7 +99,7 @@ export async function queueEventEndCoupons(supabase: DBClient, eventId: string) 
           room_id: groupRoom.id,
           sender_name: "시스템",
           type: "SYSTEM",
-          content: `🎁 오늘의 선물 ${coupons.length}개가 도착했어요! 보상함에서 확인하세요 🌰`,
+          content: `🎁 오늘의 선물 ${coupons.length}개가 도착했어요! 보상함에서 확인하세요.`,
         });
       }
     }

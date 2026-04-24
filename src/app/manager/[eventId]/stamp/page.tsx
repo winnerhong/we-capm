@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { StampScanner } from "./stamp-scanner";
+import { AcornIcon } from "@/components/acorn-icon";
 
 export const dynamic = "force-dynamic";
 
@@ -26,7 +27,7 @@ export default async function ManagerStampPage({ params }: { params: Promise<{ e
   if (!board) {
     return (
       <div className="rounded-2xl border border-[#E8F0E4] bg-white p-12 text-center shadow-sm">
-        <div className="text-5xl mb-4" aria-hidden>🌰</div>
+        <div className="mb-4 flex justify-center" aria-hidden><AcornIcon size={48} className="text-[#C4956A]" /></div>
         <h2 className="text-lg font-bold text-[#2D5A3D]">도장판이 아직 준비되지 않았어요</h2>
         <p className="mt-2 text-sm text-[#6B6560]">관리자에게 도장판 생성을 요청해 주세요</p>
       </div>

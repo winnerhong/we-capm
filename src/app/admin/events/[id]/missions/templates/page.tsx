@@ -2,6 +2,7 @@
 
 import { use, useMemo, useState } from "react";
 import Link from "next/link";
+import { AcornIcon } from "@/components/acorn-icon";
 import {
   CATEGORIES,
   CATEGORY_COLORS,
@@ -174,8 +175,8 @@ function TemplateCard({
           <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs text-neutral-700">
             {TEMPLATE_TYPE_LABEL[template.template_type]}
           </span>
-          <span className="rounded-full bg-yellow-50 px-2 py-0.5 text-xs text-yellow-700">
-            🌰 {template.points}
+          <span className="inline-flex items-center gap-1 rounded-full bg-yellow-50 px-2 py-0.5 text-xs text-yellow-700">
+            <AcornIcon /> {template.points}
           </span>
           {template.auto_approve && (
             <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs text-green-700">

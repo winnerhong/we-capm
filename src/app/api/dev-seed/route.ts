@@ -293,7 +293,7 @@ export async function GET() {
       .eq("event_id", EVENT_ID);
     const challengeInserts = [
       { event_id: EVENT_ID, title: "이번주 숲길 챌린지", description: "3개의 숲길을 완주해보세요", icon: "🎯", goal_type: "MISSION_COUNT", goal_value: 3, reward_acorns: 10, starts_at: new Date().toISOString(), ends_at: new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString(), status: "ACTIVE" },
-      { event_id: EVENT_ID, title: "도토리 수집가", description: "도토리 50개를 모으세요", icon: "🌰", goal_type: "ACORN_COUNT", goal_value: 50, reward_acorns: 20, starts_at: new Date().toISOString(), ends_at: new Date(Date.now() + 14 * 24 * 3600 * 1000).toISOString(), status: "ACTIVE" },
+      { event_id: EVENT_ID, title: "도토리 수집가", description: "도토리 50개를 모으세요", icon: "🏆", goal_type: "ACORN_COUNT", goal_value: 50, reward_acorns: 20, starts_at: new Date().toISOString(), ends_at: new Date(Date.now() + 14 * 24 * 3600 * 1000).toISOString(), status: "ACTIVE" },
     ];
     const { error: chErr } = await (supabase.from("challenges" as never) as unknown as { insert: (d: unknown) => Promise<{ error: unknown }> }).insert(challengeInserts);
     log.push(chErr ? `❌ 챌린지: 테이블 없음` : `✅ 챌린지: ${challengeInserts.length}개`);

@@ -1,6 +1,12 @@
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
+import {
+  rateLimit,
+  getClientIp,
+  tooManyRequests,
+  maybeGcBuckets,
+} from "@/lib/rate-limit";
 
 const EVENT_ID = "aca98cdb-e727-4feb-a537-3b48375a5438";
 const TEST_PHONE = "010-1111-0001";
@@ -20,6 +26,16 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Not available" }, { status: 403 });
   }
 
+  // Rate limit: IP 당 분당 5회. dev 전용이라 stricter.
+  const ip = getClientIp(request) ?? "unknown";
+  const rl = rateLimit({
+    key: `dev-login:${ip}`,
+    windowMs: 60_000,
+    max: 5,
+  });
+  maybeGcBuckets();
+  if (!rl.allowed) return tooManyRequests(rl);
+
   const role = request.nextUrl.searchParams.get("role");
   const cookieStore = await cookies();
   const cookieOpts = {
@@ -33,6 +49,7 @@ export async function GET(request: NextRequest) {
   // 기존 쿠키 전부 제거
   cookieStore.delete("campnic_admin");
   cookieStore.delete("campnic_manager");
+  cookieStore.delete("campnic_org");
   cookieStore.delete("campnic_participant");
   cookieStore.delete("campnic_partner");
 
@@ -44,13 +61,62 @@ export async function GET(request: NextRequest) {
   }
 
   if (role === "manager") {
+    const supabase = await createClient();
+
+    // 첫 번째 파트너 기관(partner_orgs)을 가져와 기관 포털로 진입
+    const { data: org } = await (supabase as unknown as {
+      from: (t: string) => {
+        select: (c: string) => {
+          eq: (k: string, v: string) => {
+            limit: (n: number) => {
+              maybeSingle: () => Promise<{
+                data: {
+                  id: string;
+                  org_name: string;
+                  auto_username: string | null;
+                } | null;
+              }>;
+            };
+          };
+        };
+      };
+    })
+      .from("partner_orgs")
+      .select("id, org_name, auto_username")
+      .eq("status", "ACTIVE")
+      .limit(1)
+      .maybeSingle();
+
+    if (org) {
+      cookieStore.set("campnic_org", JSON.stringify({
+        orgId: org.id,
+        orgName: org.org_name,
+        managerId: org.auto_username ?? "dev-org",
+        loginAt: new Date().toISOString(),
+      }), cookieOpts);
+      cookieStore.set("campnic_manager", JSON.stringify({
+        eventId: EVENT_ID,
+        eventName: "테스트 토리로",
+        managerId: org.auto_username ?? "dev-org",
+        loginAt: new Date().toISOString(),
+      }), cookieOpts);
+      return htmlRedirect(
+        `/org/${org.id}/templates`,
+        `🏢 ${org.org_name}(으)로 로그인 중...`
+      );
+    }
+
+    // 폴백: partner_orgs가 아직 없으면 기존 manager 쿠키로 /manager 경로 진입
     cookieStore.set("campnic_manager", JSON.stringify({
       eventId: EVENT_ID,
       eventName: "테스트 토리로",
       managerId: "테스트기관",
       loginAt: new Date().toISOString(),
     }), cookieOpts);
-    return htmlRedirect(`/manager/${EVENT_ID}`, "🏢 기관으로 로그인 중...");
+    return htmlRedirect(
+      `/manager/${EVENT_ID}`,
+      "🏢 기관으로 로그인 중... (기관 계정이 없어 행사 매니저로 대체)"
+    );
   }
 
   if (role === "partner") {
@@ -114,7 +180,7 @@ export async function GET(request: NextRequest) {
       name,
       participantId: participant?.id ?? "dev-test",
     }), cookieOpts);
-    return htmlRedirect(`/event/${EVENT_ID}`, "👨‍👩‍👧 이용자로 로그인 중...");
+    return htmlRedirect(`/event/${EVENT_ID}`, "👨‍👩‍👧 참가자로 로그인 중...");
   }
 
   return NextResponse.json({ error: "role required: admin | manager | partner | participant" }, { status: 400 });

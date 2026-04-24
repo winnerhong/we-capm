@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
+import { AcornIcon } from "@/components/acorn-icon";
 
 export default async function ManagerLayout({
   children,
@@ -74,7 +75,7 @@ export default async function ManagerLayout({
               title="도토리 잔액 — 클릭하여 충전"
               className="ml-1 flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-100"
             >
-              <span aria-hidden>🌰</span>
+              <span aria-hidden><AcornIcon /></span>
               <span>{acornBalance.toLocaleString("ko-KR")}</span>
             </Link>
             <span className="ml-2 rounded-full bg-[#E8F0E4] px-3 py-1 text-xs font-semibold text-[#2D5A3D]">{managerId}</span>

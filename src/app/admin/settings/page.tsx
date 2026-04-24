@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AcornIcon } from "@/components/acorn-icon";
 
 const sections = [
   {
@@ -86,7 +87,7 @@ export default function AdminSettingsPage() {
         </h3>
         <p className="mt-2 text-xs text-[#8B6F47] leading-relaxed">
           초기에는 안정적인 기본값으로 운영되며, 사용자가 충분히 모이면 위 섹션부터 순차적으로 활성화돼요.
-          긴급한 설정이 필요하면 개발팀에 요청해 주세요 🌰
+          <span className="inline-flex items-center gap-1">긴급한 설정이 필요하면 개발팀에 요청해 주세요 <AcornIcon /></span>
         </p>
       </section>
     </div>

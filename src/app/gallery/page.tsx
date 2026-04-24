@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { GalleryFilters } from "./gallery-filters";
+import { AcornIcon } from "@/components/acorn-icon";
 
 export const metadata: Metadata = {
   title: "숲에서의 순간들 — 토리로 갤러리",
@@ -31,7 +32,8 @@ const GRADIENTS = [
   "from-[#6B4423] via-[#8B6F47] to-[#D4BC94]",
 ];
 
-const EMOJIS = ["🌲", "🌳", "🍂", "🌰", "🐿️", "🦋", "🌾", "🌻"];
+// 갤러리 랜덤 장식용 이모지. 도토리는 AcornIcon 컴포넌트로 따로 표기하므로 제외.
+const EMOJIS = ["🌲", "🌳", "🍂", "🌿", "🐿️", "🦋", "🌾", "🌻"];
 
 function pickGradient(seed: string, idx: number) {
   let hash = idx;
@@ -208,9 +210,7 @@ export default async function GalleryPage() {
             href="/"
             className="flex items-center gap-2 font-bold text-[#2D5A3D]"
           >
-            <span className="text-xl" aria-hidden>
-              🌰
-            </span>
+            <AcornIcon size={20} />
             <span>토리로</span>
           </Link>
           <nav className="flex items-center gap-1 text-xs font-semibold">

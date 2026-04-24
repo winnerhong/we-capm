@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { InviteAcceptClient } from "./accept-client";
+import { AcornIcon } from "@/components/acorn-icon";
 
 export const dynamic = "force-dynamic";
 
@@ -88,8 +89,8 @@ export default async function InviteLandingPage({
 
         {/* 보상 강조 카드 */}
         <div className="mt-6 rounded-3xl border-2 border-[#C4956A] bg-white p-5 text-center shadow-lg">
-          <div className="text-4xl mb-2" aria-hidden>
-            🌰
+          <div className="mb-2 flex justify-center text-[#C4956A]">
+            <AcornIcon size={36} />
           </div>
           <p className="text-lg font-bold text-[#2D5A3D]">
             가입하면 <span className="text-[#C4956A]">도토리 20개</span> 선물!

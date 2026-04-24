@@ -4,6 +4,7 @@ import { FAQ_ITEMS } from "./faq-data";
 import { FaqClient } from "./faq-client";
 import { SiteFooter } from "@/components/site-footer";
 import { BackToTop } from "@/components/back-to-top";
+import { AcornIcon } from "@/components/acorn-icon";
 
 export const metadata: Metadata = {
   title: "자주 묻는 질문 · 토리로",
@@ -21,9 +22,7 @@ export default function FaqPage() {
             href="/"
             className="flex items-center gap-2 font-bold text-[#2D5A3D]"
           >
-            <span className="text-xl" aria-hidden>
-              🌰
-            </span>
+            <AcornIcon size={20} />
             <span>토리로</span>
           </Link>
           <nav className="flex items-center gap-1 text-xs font-semibold">
@@ -73,8 +72,8 @@ export default function FaqPage() {
 
         {/* Still need help */}
         <div className="mt-14 rounded-3xl border border-[#D4E4BC] bg-white p-8 text-center shadow-sm md:p-10">
-          <p className="text-4xl" aria-hidden>
-            🌰
+          <p className="text-[#2D5A3D]">
+            <AcornIcon size={36} />
           </p>
           <h2 className="mt-3 text-xl font-extrabold text-[#2D5A3D] md:text-2xl">
             원하시는 답을 찾지 못하셨나요?

@@ -148,3 +148,264 @@ textarea::placeholder {
 .animate-slide-in {
   animation: slide-in 0.2s ease-out;
 }
+
+/* ======================================================= */
+/* 토리FM 전광판 VFX (Phase A)                              */
+/* ======================================================= */
+
+/* 떠오르는 하트 */
+.vfx-heart {
+  position: absolute;
+  left: 50%;
+  bottom: 8%;
+  line-height: 1;
+  pointer-events: none;
+  will-change: transform, opacity;
+  animation: vfx-heart-rise var(--duration, 2200ms) ease-out var(--delay, 0ms) forwards;
+  transform-origin: center;
+}
+
+@keyframes vfx-heart-rise {
+  0% {
+    transform: translate(calc(-50% + var(--x-start, 0px)), 0) scale(0.4);
+    opacity: 0;
+  }
+  10% {
+    transform: translate(calc(-50% + var(--x-start, 0px)), -6vh)
+      scale(1);
+    opacity: 1;
+  }
+  30% {
+    transform: translate(
+        calc(-50% + var(--x-start, 0px) + var(--x-drift, 0px) * 0.5),
+        -28vh
+      )
+      scale(1.05) rotate(-6deg);
+    opacity: 1;
+  }
+  60% {
+    transform: translate(
+        calc(-50% + var(--x-start, 0px) - var(--x-drift, 0px) * 0.5),
+        -55vh
+      )
+      scale(1.1) rotate(6deg);
+    opacity: 0.9;
+  }
+  85% {
+    transform: translate(
+        calc(-50% + var(--x-start, 0px) + var(--x-drift, 0px) * 0.4),
+        -78vh
+      )
+      scale(1.15) rotate(-3deg);
+    opacity: 0.5;
+  }
+  100% {
+    transform: translate(
+        calc(-50% + var(--x-start, 0px) + var(--x-drift, 0px)),
+        -95vh
+      )
+      scale(0.9) rotate(0deg);
+    opacity: 0;
+  }
+}
+
+/* 떠오르는 채팅 말풍선 */
+.vfx-chat {
+  position: absolute;
+  left: 1.5rem;
+  bottom: 8rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  max-width: 22rem;
+  padding: 0.625rem 0.875rem;
+  background: rgba(15, 10, 7, 0.88);
+  border: 1px solid #3a2f27;
+  border-radius: 1rem 1rem 1rem 0.25rem;
+  backdrop-filter: blur(6px);
+  color: #C4956A;
+  will-change: transform, opacity;
+  animation: vfx-chat-in 0.4s ease-out forwards,
+    vfx-chat-drift 5.5s ease-out 0.4s forwards;
+  transform: translateY(calc(var(--drift-offset, 0px) * -1));
+}
+
+.vfx-chat-dj {
+  background: linear-gradient(135deg, rgba(42, 31, 21, 0.95), rgba(26, 20, 16, 0.95));
+  border: 1px solid #D4A15A;
+  box-shadow: 0 0 20px rgba(212, 161, 90, 0.25),
+    inset 0 0 12px rgba(212, 161, 90, 0.1);
+  color: #E5B88A;
+}
+
+.vfx-chat-avatar {
+  flex-shrink: 0;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 9999px;
+  background: linear-gradient(135deg, #3A7A52, #4A7C59);
+  color: white;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.vfx-chat-dj .vfx-chat-avatar {
+  background: linear-gradient(135deg, #C4956A, #E5B88A);
+  color: #1B1410;
+  box-shadow: 0 0 12px rgba(212, 161, 90, 0.5);
+}
+
+.vfx-chat-body {
+  min-width: 0;
+  font-size: 0.85rem;
+  line-height: 1.35;
+}
+
+.vfx-chat-name {
+  font-weight: 800;
+  font-size: 0.7rem;
+  letter-spacing: 0.02em;
+  opacity: 0.75;
+}
+
+.vfx-chat-msg {
+  margin-top: 2px;
+  font-weight: 500;
+  color: inherit;
+  word-break: break-word;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+@keyframes vfx-chat-in {
+  from {
+    opacity: 0;
+    transform: translate(-12px, calc(var(--drift-offset, 0px) * -1 + 12px))
+      scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translate(0, calc(var(--drift-offset, 0px) * -1)) scale(1);
+  }
+}
+
+@keyframes vfx-chat-drift {
+  0% {
+    transform: translate(0, calc(var(--drift-offset, 0px) * -1));
+    opacity: 1;
+  }
+  70% {
+    transform: translate(0, calc(var(--drift-offset, 0px) * -1 - 180px));
+    opacity: 1;
+  }
+  100% {
+    transform: translate(0, calc(var(--drift-offset, 0px) * -1 - 260px));
+    opacity: 0;
+  }
+}
+
+.vfx-chat-fadeout {
+  animation: vfx-chat-fadeout 0.6s ease-in forwards !important;
+}
+
+@keyframes vfx-chat-fadeout {
+  to {
+    opacity: 0;
+    transform: translate(0, calc(var(--drift-offset, 0px) * -1 - 320px))
+      scale(0.9);
+  }
+}
+
+.vfx-chat-fastfade {
+  animation: vfx-chat-fastfade 0.3s ease-in forwards !important;
+}
+
+@keyframes vfx-chat-fastfade {
+  to {
+    opacity: 0;
+    transform: translate(-8px, calc(var(--drift-offset, 0px) * -1 - 40px));
+  }
+}
+
+/* ===== Phase B: TopBanner / EmojiRain / PollPopup ===== */
+
+/* TopBanner */
+.vfx-banner {
+  animation: vfx-banner-in 0.4s ease-out forwards,
+    vfx-banner-out 0.4s ease-in 3.4s forwards;
+  will-change: transform, opacity;
+}
+@keyframes vfx-banner-in {
+  from {
+    opacity: 0;
+    transform: translateY(-120%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes vfx-banner-out {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-120%);
+  }
+}
+
+/* Emoji Rain */
+.vfx-emoji-rain {
+  position: absolute;
+  top: -48px;
+  pointer-events: none;
+  will-change: transform, opacity;
+  animation: vfx-emoji-fall var(--duration, 3500ms) ease-in forwards;
+}
+@keyframes vfx-emoji-fall {
+  0% {
+    transform: translate(0, 0) rotate(0deg);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  50% {
+    transform: translate(var(--sway, 30px), 50vh) rotate(var(--rot-mid, 90deg));
+    opacity: 1;
+  }
+  80% {
+    transform: translate(calc(var(--sway, 30px) * -1), 85vh)
+      rotate(var(--rot-end, 180deg));
+    opacity: 0.8;
+  }
+  100% {
+    transform: translate(0, 110vh) rotate(var(--rot-final, 360deg));
+    opacity: 0;
+  }
+}
+
+/* Poll Popup */
+.vfx-poll-big {
+  animation: vfx-poll-zoomin 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)
+    forwards;
+  will-change: transform, opacity;
+}
+@keyframes vfx-poll-zoomin {
+  from {
+    transform: scale(0);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}

@@ -12,11 +12,13 @@ import {
   type OrgRow,
 } from "./meta";
 import type { OrgStatus, OrgType } from "./actions";
+import { regenerateAllOrgAccountsAction } from "./actions";
+import { OrgRowActions } from "./org-row-actions";
 
 export const dynamic = "force-dynamic";
 
 const COLUMNS =
-  "id,partner_id,org_name,org_type,representative_name,representative_phone,email,address,children_count,class_count,teacher_count,business_number,tax_email,commission_rate,discount_rate,contract_start,contract_end,tags,internal_memo,auto_username,status,created_at";
+  "id,partner_id,org_name,org_type,org_phone,representative_name,representative_phone,email,address,children_count,class_count,teacher_count,business_number,tax_email,commission_rate,discount_rate,contract_start,contract_end,tags,internal_memo,auto_username,status,created_at";
 
 async function loadOrgs(partnerId: string): Promise<OrgRow[]> {
   const supabase = await createClient();
@@ -40,7 +42,11 @@ async function loadOrgs(partnerId: string): Promise<OrgRow[]> {
       .order("created_at", { ascending: false });
 
     if (error) {
-      console.error("[partner/customers/org] load error", error);
+      const e = error as { message?: string; hint?: string; code?: string };
+      console.error(
+        "[partner/customers/org] load error",
+        JSON.stringify({ message: e.message, hint: e.hint, code: e.code })
+      );
       return [];
     }
     return data ?? [];
@@ -55,6 +61,10 @@ type SearchParams = {
   type?: string;
   status?: string;
   tag?: string;
+  regen?: string;
+  success?: string;
+  failed?: string;
+  skipped?: string;
 };
 
 export default async function OrgListPage({
@@ -173,8 +183,33 @@ export default async function OrgListPage({
               <span aria-hidden>📥</span>
               <span>엑셀 일괄등록</span>
             </Link>
+            <form action={regenerateAllOrgAccountsAction}>
+              <button
+                type="submit"
+                className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-[#D4A15A] bg-[#FFF8F0] px-4 py-2.5 text-sm font-semibold text-[#8B6B3F] hover:bg-[#F5E8D3]"
+                title="아이디=기관명, 비밀번호=담당자 연락처 뒷 4자리 로 일괄 재발급합니다"
+              >
+                <span aria-hidden>🔄</span>
+                <span>계정 일괄 갱신</span>
+              </button>
+            </form>
           </div>
         </div>
+        {sp.regen === "done" && (
+          <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+            ✅ 계정 일괄 갱신 완료 — 성공 <strong>{sp.success ?? 0}</strong>건 / 실패{" "}
+            <strong>{sp.failed ?? 0}</strong>건
+            {sp.skipped && Number(sp.skipped) > 0 && (
+              <> / 건너뜀 <strong>{sp.skipped}</strong>건 (기관 전화번호 없음)</>
+            )}
+            . 아이디=기관 전화번호, 비밀번호=담당자 핸드폰 뒷 4자리입니다.
+          </div>
+        )}
+        {sp.regen === "empty" && (
+          <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            ⚠️ 재발급할 기관이 없어요.
+          </div>
+        )}
       </header>
 
       {/* Stats */}
@@ -341,70 +376,80 @@ export default async function OrgListPage({
               const statusMeta = ORG_STATUS_META[o.status];
               const daysLeft = daysUntil(o.contract_end);
               return (
-                <Link
+                <div
                   key={o.id}
-                  href={`/partner/customers/org/${o.id}`}
                   className="rounded-2xl border border-[#D4E4BC] bg-white p-4 shadow-sm transition hover:border-[#3A7A52] hover:shadow-md"
                 >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <span
-                          className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${typeMeta.chip}`}
-                        >
-                          <span aria-hidden>{typeMeta.icon}</span>
-                          <span>{typeMeta.label}</span>
-                        </span>
-                        <span
-                          className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${statusMeta.chip}`}
-                        >
+                  <Link
+                    href={`/partner/customers/org/${o.id}`}
+                    className="block"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-1.5">
                           <span
-                            aria-hidden
-                            className={`h-1.5 w-1.5 rounded-full ${statusMeta.dot}`}
-                          />
-                          {statusMeta.label}
+                            className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${typeMeta.chip}`}
+                          >
+                            <span aria-hidden>{typeMeta.icon}</span>
+                            <span>{typeMeta.label}</span>
+                          </span>
+                          <span
+                            className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${statusMeta.chip}`}
+                          >
+                            <span
+                              aria-hidden
+                              className={`h-1.5 w-1.5 rounded-full ${statusMeta.dot}`}
+                            />
+                            {statusMeta.label}
+                          </span>
+                        </div>
+                        <h3 className="mt-1.5 truncate text-base font-bold text-[#2D5A3D]">
+                          {o.org_name}
+                        </h3>
+                        <p className="mt-0.5 text-xs text-[#6B6560]">
+                          {o.representative_name ?? "담당자 미지정"} ·{" "}
+                          {formatPhone(o.representative_phone)}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-3 grid grid-cols-3 gap-2 text-[11px]">
+                      <div className="rounded-lg bg-[#FFF8F0] px-2 py-1.5 text-center">
+                        <div className="text-[10px] text-[#8B7F75]">아동</div>
+                        <div className="font-bold text-[#2D5A3D]">
+                          {o.children_count.toLocaleString("ko-KR")}명
+                        </div>
+                      </div>
+                      <div className="rounded-lg bg-[#FFF8F0] px-2 py-1.5 text-center">
+                        <div className="text-[10px] text-[#8B7F75]">반</div>
+                        <div className="font-bold text-[#2D5A3D]">
+                          {o.class_count}
+                        </div>
+                      </div>
+                      <div className="rounded-lg bg-[#FFF8F0] px-2 py-1.5 text-center">
+                        <div className="text-[10px] text-[#8B7F75]">교사</div>
+                        <div className="font-bold text-[#2D5A3D]">
+                          {o.teacher_count}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mt-2 flex items-center justify-between text-[11px] text-[#8B7F75]">
+                      <span>작성 {formatDate(o.created_at)}</span>
+                      {daysLeft !== null && daysLeft <= 30 && daysLeft >= 0 ? (
+                        <span className="font-semibold text-amber-700">
+                          계약 {daysLeft}일 남음
                         </span>
-                      </div>
-                      <h3 className="mt-1.5 truncate text-base font-bold text-[#2D5A3D]">
-                        {o.org_name}
-                      </h3>
-                      <p className="mt-0.5 text-xs text-[#6B6560]">
-                        {o.representative_name ?? "담당자 미지정"} ·{" "}
-                        {formatPhone(o.representative_phone)}
-                      </p>
+                      ) : o.contract_end ? (
+                        <span>계약만료 {formatDate(o.contract_end)}</span>
+                      ) : null}
                     </div>
-                  </div>
-                  <div className="mt-3 grid grid-cols-3 gap-2 text-[11px]">
-                    <div className="rounded-lg bg-[#FFF8F0] px-2 py-1.5 text-center">
-                      <div className="text-[10px] text-[#8B7F75]">아동</div>
-                      <div className="font-bold text-[#2D5A3D]">
-                        {o.children_count.toLocaleString("ko-KR")}명
-                      </div>
-                    </div>
-                    <div className="rounded-lg bg-[#FFF8F0] px-2 py-1.5 text-center">
-                      <div className="text-[10px] text-[#8B7F75]">반</div>
-                      <div className="font-bold text-[#2D5A3D]">
-                        {o.class_count}
-                      </div>
-                    </div>
-                    <div className="rounded-lg bg-[#FFF8F0] px-2 py-1.5 text-center">
-                      <div className="text-[10px] text-[#8B7F75]">교사</div>
-                      <div className="font-bold text-[#2D5A3D]">
-                        {o.teacher_count}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="mt-2 flex items-center justify-between text-[11px] text-[#8B7F75]">
-                    <span>작성 {formatDate(o.created_at)}</span>
-                    {daysLeft !== null && daysLeft <= 30 && daysLeft >= 0 ? (
-                      <span className="font-semibold text-amber-700">
-                        계약 {daysLeft}일 남음
-                      </span>
-                    ) : o.contract_end ? (
-                      <span>계약만료 {formatDate(o.contract_end)}</span>
-                    ) : null}
-                  </div>
-                </Link>
+                  </Link>
+                  <OrgRowActions
+                    orgId={o.id}
+                    orgName={o.org_name}
+                    status={o.status}
+                    variant="card"
+                  />
+                </div>
               );
             })}
           </section>
@@ -495,20 +540,12 @@ export default async function OrgListPage({
                           {formatDate(o.created_at)}
                         </td>
                         <td className="px-4 py-3 text-right">
-                          <div className="flex justify-end gap-1">
-                            <Link
-                              href={`/partner/customers/org/${o.id}`}
-                              className="rounded-lg border border-[#D4E4BC] bg-white px-2.5 py-1 text-[11px] font-semibold text-[#2D5A3D] hover:bg-[#E8F0E4]"
-                            >
-                              상세
-                            </Link>
-                            <Link
-                              href={`/partner/customers/org/${o.id}/edit`}
-                              className="rounded-lg border border-[#E5D3B8] bg-white px-2.5 py-1 text-[11px] font-semibold text-[#6B4423] hover:bg-[#FFF8F0]"
-                            >
-                              편집
-                            </Link>
-                          </div>
+                          <OrgRowActions
+                            orgId={o.id}
+                            orgName={o.org_name}
+                            status={o.status}
+                            variant="table"
+                          />
                         </td>
                       </tr>
                     );

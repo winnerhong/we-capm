@@ -7,6 +7,7 @@ import { RealtimeRefresh } from "@/components/realtime-refresh";
 import { TreeGrowthCard } from "@/components/tree-growth-card";
 import { ChallengeCard } from "@/components/challenge-card";
 import { CouponCard } from "@/components/coupon-card";
+import { AcornIcon } from "@/components/acorn-icon";
 
 export const dynamic = "force-dynamic";
 
@@ -73,7 +74,7 @@ export default async function EventHomePage({ params }: { params: Promise<{ id: 
           </div>
           <div className="mt-3 flex gap-3">
             <div className="flex-1 rounded-xl bg-white/20 p-3 text-center">
-              <div className="text-2xl font-bold">{participant?.total_score ?? 0}<span className="ml-0.5 text-xs">🌰</span></div>
+              <div className="text-2xl font-bold">{participant?.total_score ?? 0}<span className="ml-0.5 text-xs"><AcornIcon size={12} /></span></div>
               <div className="text-xs opacity-80">내 도토리</div>
             </div>
             <div className="flex-1 rounded-xl bg-white/20 p-3 text-center">
@@ -127,7 +128,7 @@ export default async function EventHomePage({ params }: { params: Promise<{ id: 
             className="block rounded-2xl border-2 border-[#A8C686] bg-white p-6 hover:shadow-lg">
             <div className="text-xs font-semibold text-violet-600">🌿 다음 숲길</div>
             <h2 className="mt-2 text-xl font-bold">{nextMission.title}</h2>
-            <div className="mt-1 text-sm text-[#6B6560]">🌰 {nextMission.points}개</div>
+            <div className="mt-1 text-sm text-[#6B6560]"><AcornIcon /> {nextMission.points}개</div>
             <div className="mt-4 rounded-xl bg-violet-600 py-3 text-center font-bold text-white hover:bg-violet-700">지금 걸어볼까요 🐾</div>
           </Link>
         )}

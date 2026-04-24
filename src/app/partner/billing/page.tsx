@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getPartner } from "@/lib/auth-guard";
 import { createClient } from "@/lib/supabase/server";
+import { AcornIcon } from "@/components/acorn-icon";
 
 export const dynamic = "force-dynamic";
 
@@ -42,7 +43,7 @@ function thisMonthStart(): string {
 async function loadDashboard(partnerId: string) {
   const supabase = await createClient();
 
-  // 🌰 잔액
+  // 도토리 잔액
   let acornBalance = 0;
   try {
     const { data } = await (
@@ -171,12 +172,17 @@ async function loadDashboard(partnerId: string) {
   return { acornBalance, pendingInvoices, pendingTotal, thisMonthPaid, upcomingSettlement };
 }
 
-const TABS = [
+const TABS: Array<{
+  href: string;
+  icon: React.ReactNode;
+  label: string;
+  desc: string;
+}> = [
   { href: "/partner/billing/invoices", icon: "🧾", label: "청구서", desc: "결제 대기" },
   { href: "/partner/billing/settlements", icon: "💸", label: "정산", desc: "월별 정산 내역" },
   { href: "/partner/billing/receipts", icon: "📄", label: "영수증", desc: "세금계산서" },
-  { href: "/partner/billing/acorns", icon: "🌰", label: "도토리", desc: "자체 충전" },
-] as const;
+  { href: "/partner/billing/acorns", icon: <AcornIcon size={28} />, label: "도토리", desc: "자체 충전" },
+];
 
 export default async function PartnerBillingPage() {
   const partner = await getPartner();
@@ -214,12 +220,12 @@ export default async function PartnerBillingPage() {
       <section className="grid grid-cols-1 gap-3 md:grid-cols-3">
         <div className="rounded-2xl border border-[#E5D3B8] bg-gradient-to-br from-[#FFF8F0] to-[#F5E6D3] p-5 shadow-sm">
           <div className="flex items-center gap-2 text-xs font-semibold text-[#8B6F47]">
-            <span className="text-lg">🌰</span>
+            <AcornIcon size={18} />
             <span>보유 도토리</span>
           </div>
           <div className="mt-2 text-2xl font-extrabold text-[#6B4423]">
             {acornBalance.toLocaleString("ko-KR")}
-            <span className="ml-1 text-sm font-semibold">🌰</span>
+            <AcornIcon size={14} className="ml-1" />
           </div>
           <Link
             href="/partner/billing/acorns"

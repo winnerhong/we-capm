@@ -4,17 +4,20 @@ import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { WinnerTalkIcon } from "@/components/winner-talk-icon";
+import { AcornIcon } from "@/components/acorn-icon";
+
+import type { ReactNode } from "react";
 
 interface NavItem {
   label: string;
   href: string;
   badge?: string;
-  icon?: string;
+  icon?: ReactNode;
 }
 
 interface NavGroup {
   label: string;
-  icon: string;
+  icon: ReactNode;
   items: NavItem[];
   match: string[];
 }
@@ -32,13 +35,20 @@ const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
-    label: "지사",
+    label: "지사·기관",
     icon: "🏡",
-    match: ["/admin/partners", "/admin/acorns"],
+    match: [
+      "/admin/partners",
+      "/admin/orgs",
+      "/admin/acorns",
+      "/admin/documents",
+    ],
     items: [
       { label: "숲지기 관리", href: "/admin/partners", icon: "🏡" },
       { label: "새 지사 등록", href: "/admin/partners/new", icon: "➕" },
-      { label: "도토리 충전", href: "/admin/acorns", icon: "🌰" },
+      { label: "기관 관리", href: "/admin/orgs", icon: "🏫" },
+      { label: "서류 검토 대기", href: "/admin/documents", icon: "⏳" },
+      { label: "도토리 충전", href: "/admin/acorns", icon: <AcornIcon size={16} /> },
     ],
   },
   {
@@ -69,6 +79,19 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: "전체 통계", href: "/admin/stats", icon: "📊" },
       { label: "접근 기록", href: "/admin/audit-logs", icon: "📋" },
+    ],
+  },
+  {
+    label: "설정",
+    icon: "⚙️",
+    match: ["/admin/settings"],
+    items: [
+      { label: "시스템 설정", href: "/admin/settings", icon: "⚙️" },
+      {
+        label: "도토리 가이드라인",
+        href: "/admin/settings/acorn-guidelines",
+        icon: <AcornIcon size={16} />,
+      },
     ],
   },
 ];
@@ -127,7 +150,7 @@ export function AdminNav({ isAdmin, displayName, managerEventId }: Props) {
         {/* 로고 + 네비 */}
         <div className="flex items-center gap-4 lg:gap-6">
           <Link href="/admin" className="flex items-center gap-2 font-bold text-[#2D5A3D] flex-shrink-0">
-            <span className="text-xl">🌰</span>
+            <AcornIcon size={20} />
             <span className="hidden sm:inline">토리로</span>
           </Link>
 

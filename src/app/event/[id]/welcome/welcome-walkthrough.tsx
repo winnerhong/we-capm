@@ -3,6 +3,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { TREE_LEVELS } from "@/lib/tree-growth";
+import { AcornIcon } from "@/components/acorn-icon";
 
 type FirstMission = {
   id: string;
@@ -124,8 +125,8 @@ export function WelcomeWalkthrough({
 function StepWelcome({ eventName }: { eventName: string }) {
   return (
     <div className="flex flex-col items-center">
-      <div className="text-[7rem] leading-none animate-bounce md:text-[9rem]" role="img" aria-label="도토리">
-        🌰
+      <div className="text-[7rem] leading-none animate-bounce md:text-[9rem] text-[#C4956A]" role="img" aria-label="도토리">
+        <AcornIcon size={128} />
       </div>
       <h1 className="mt-8 text-2xl font-extrabold text-[#2D5A3D] md:text-3xl">
         토리로에 오신 것을 환영해요!
@@ -146,7 +147,7 @@ function StepToriro() {
         <div className="text-[7rem] leading-none animate-pulse md:text-[9rem]" role="img" aria-label="다람쥐 토리">
           🐿️
         </div>
-        <span className="absolute -right-2 top-2 text-3xl animate-bounce md:text-4xl">🌰</span>
+        <span className="absolute -right-2 top-2 text-3xl animate-bounce md:text-4xl text-[#C4956A]"><AcornIcon size={28} /></span>
       </div>
       <h2 className="mt-8 text-2xl font-extrabold text-[#2D5A3D] md:text-3xl">
         안녕하세요! 저는 토리예요
@@ -162,11 +163,11 @@ function StepToriro() {
 
 /* =========== Step 3: 숲길 설명 =========== */
 function StepForestPath() {
-  const steps = [
+  const steps: Array<{ emoji: React.ReactNode; label: string }> = [
     { emoji: "🎯", label: "미션" },
     { emoji: "📸", label: "수행" },
     { emoji: "✅", label: "승인" },
-    { emoji: "🌰", label: "도토리" },
+    { emoji: <AcornIcon size={28} className="text-[#C4956A]" />, label: "도토리" },
   ];
   return (
     <div className="flex flex-col items-center">
@@ -232,7 +233,7 @@ function StepTreeGrowth() {
                 {l.name}
               </div>
               <div className="text-[9px] text-[#6B6560] md:text-[10px]">
-                🌰 {l.min}+
+                <AcornIcon size={10} /> {l.min}+
               </div>
             </div>
           ))}
@@ -264,7 +265,7 @@ function StepFirstMission({ mission }: { mission: FirstMission }) {
             </span>
           </div>
           <h3 className="mt-2 text-lg font-bold text-[#2D5A3D]">{mission.title}</h3>
-          <p className="mt-1 text-sm text-[#6B6560]">🌰 {mission.points ?? 0}개</p>
+          <p className="mt-1 text-sm text-[#6B6560]"><AcornIcon /> {mission.points ?? 0}개</p>
         </div>
       ) : (
         <p className="mt-6 max-w-xs text-sm text-[#6B6560]">

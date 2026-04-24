@@ -5,6 +5,7 @@ import { updateEventStatusAction, deleteEventAction, duplicateEventAction } from
 import type { EventStatus } from "@/lib/supabase/database.types";
 import { RealtimeRefresh } from "@/components/realtime-refresh";
 import { WinnerTalkIcon } from "@/components/winner-talk-icon";
+import { AcornIcon } from "@/components/acorn-icon";
 
 export const dynamic = "force-dynamic";
 
@@ -82,7 +83,7 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
       {/* 헤더 — 숲 그라데이션 */}
       <div className="rounded-2xl bg-gradient-to-br from-[#2D5A3D] via-[#3A7A52] to-[#4A7C59] p-6 text-white shadow-sm">
         <h1 className="flex items-center gap-2 text-2xl font-bold">
-          <span>🌰</span>
+          <span><AcornIcon size={24} /></span>
           <span>{event.name}</span>
         </h1>
         <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm opacity-90">

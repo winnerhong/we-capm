@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AcornIcon } from "@/components/acorn-icon";
 
 type StatCard = {
   label: string;
@@ -120,7 +121,7 @@ export default function StoreDashboardPage() {
               오늘의 가게 현황
             </p>
             <h1 className="mt-1 text-2xl font-bold md:text-3xl">
-              🌰 숲속 베이커리님, 안녕하세요
+              <AcornIcon size={24} /> 숲속 베이커리님, 안녕하세요
             </h1>
             <p className="mt-2 text-sm text-white/90">
               오늘 근처에서 열리는 토리로 행사 <strong className="font-bold">2건</strong>이

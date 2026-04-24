@@ -3,9 +3,16 @@ import { createClient } from "@/lib/supabase/server";
 import { requirePartner } from "@/lib/auth-guard";
 import {
   deleteProgramAction,
-  togglePublishAction,
+  updateProgramVisibilityAction,
+  setProgramAssignmentsAction,
   type ProgramCategory,
 } from "./actions";
+import {
+  VISIBILITY_META,
+  type ProgramVisibility,
+} from "@/lib/partner-programs/types";
+import { VisibilityQuickControl } from "@/components/visibility-quick-control";
+import { ListSearchBar } from "@/components/list-search-bar";
 
 type Program = {
   id: string;
@@ -26,6 +33,7 @@ type Program = {
   rating_count: number;
   booking_count: number;
   is_published: boolean;
+  visibility: ProgramVisibility;
   created_at: string;
 };
 
@@ -86,7 +94,7 @@ function renderStars(avg: number | null, count: number): string {
 async function loadPrograms(partnerId: string | null): Promise<Program[]> {
   const supabase = await createClient();
   const columns =
-    "id,partner_id,title,description,category,duration_hours,capacity_min,capacity_max,price_per_person,b2b_price_per_person,location_region,location_detail,image_url,tags,rating_avg,rating_count,booking_count,is_published,created_at";
+    "id,partner_id,title,description,category,duration_hours,capacity_min,capacity_max,price_per_person,b2b_price_per_person,location_region,location_detail,image_url,tags,rating_avg,rating_count,booking_count,is_published,visibility,created_at";
 
   const query = supabase
     .from("partner_programs")
@@ -101,17 +109,101 @@ async function loadPrograms(partnerId: string | null): Promise<Program[]> {
     console.error("[partner/programs] load error", error);
     return [];
   }
-  return (data ?? []) as Program[];
+  return (data ?? []) as unknown as Program[];
 }
 
-export default async function PartnerProgramsPage() {
-  const partner = await requirePartner();
-  const programs = await loadPrograms(partner.id);
+async function loadPartnerOrgs(partnerId: string) {
+  const supabase = await createClient();
+  const sb = supabase as unknown as {
+    from: (t: string) => {
+      select: (c: string) => {
+        eq: (k: string, v: string) => {
+          order: (c: string, o: { ascending: boolean }) => Promise<{
+            data:
+              | Array<{ id: string; org_name: string; org_type: string | null }>
+              | null;
+          }>;
+        };
+      };
+    };
+  };
+  const { data } = await sb
+    .from("partner_orgs")
+    .select("id,org_name,org_type")
+    .eq("partner_id", partnerId)
+    .order("org_name", { ascending: true });
+  return (data ?? []).map((o) => ({
+    id: o.id,
+    name: o.org_name,
+    type: o.org_type,
+  }));
+}
 
-  const total = programs.length;
-  const publishedCount = programs.filter((p) => p.is_published).length;
+async function loadProgramAssignments(programIds: string[]) {
+  if (programIds.length === 0) return new Map<string, string[]>();
+  const supabase = await createClient();
+  const sb = supabase as unknown as {
+    from: (t: string) => {
+      select: (c: string) => {
+        in: (k: string, v: string[]) => Promise<{
+          data: Array<{ program_id: string; org_id: string }> | null;
+        }>;
+      };
+    };
+  };
+  const { data } = await sb
+    .from("partner_program_assignments")
+    .select("program_id,org_id")
+    .in("program_id", programIds);
+  const map = new Map<string, string[]>();
+  for (const row of data ?? []) {
+    if (!map.has(row.program_id)) map.set(row.program_id, []);
+    map.get(row.program_id)!.push(row.org_id);
+  }
+  return map;
+}
+
+export default async function PartnerProgramsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string; category?: string }>;
+}) {
+  const partner = await requirePartner();
+  const sp = await searchParams;
+  const q = (sp.q ?? "").trim().toLowerCase();
+  const categoryFilter = (sp.category ?? "").trim();
+
+  const allPrograms = await loadPrograms(partner.id);
+  const [orgs, assignmentsMap] = await Promise.all([
+    loadPartnerOrgs(partner.id),
+    loadProgramAssignments(allPrograms.map((p) => p.id)),
+  ]);
+
+  // 모든 실제 사용된 카테고리 수집 (검색 드롭다운 옵션용)
+  const usedCategories = Array.from(
+    new Set(allPrograms.map((p) => p.category).filter(Boolean))
+  ).sort();
+  const categoryOptions = usedCategories.map((c) => {
+    const meta = CATEGORY_META[c as keyof typeof CATEGORY_META];
+    return {
+      value: c,
+      label: meta ? `${meta.icon} ${meta.label}` : c,
+    };
+  });
+
+  // 필터 적용
+  const programs = allPrograms.filter((p) => {
+    if (categoryFilter && p.category !== categoryFilter) return false;
+    if (q && !p.title.toLowerCase().includes(q)) return false;
+    return true;
+  });
+
+  const total = allPrograms.length;
+  const publishedCount = allPrograms.filter(
+    (p) => p.visibility === "ALL" || p.visibility === "SELECTED"
+  ).length;
   const hiddenCount = total - publishedCount;
-  const totalBookings = programs.reduce((sum, p) => sum + (p.booking_count ?? 0), 0);
+  const totalBookings = allPrograms.reduce((sum, p) => sum + (p.booking_count ?? 0), 0);
 
   return (
     <div className="space-y-6">
@@ -172,30 +264,69 @@ export default async function PartnerProgramsPage() {
         </div>
       </section>
 
+      {/* 검색 & 카테고리 필터 */}
+      {allPrograms.length > 0 && (
+        <section className="rounded-2xl border border-[#D4E4BC] bg-white p-3 shadow-sm">
+          <ListSearchBar
+            queryKey="q"
+            selectKey="category"
+            selectLabel="전체 카테고리"
+            selectOptions={categoryOptions}
+            placeholder="프로그램 이름으로 검색..."
+          />
+          {(q || categoryFilter) && (
+            <p className="mt-2 text-[11px] text-[#6B6560]">
+              🔍 검색 결과 {programs.length}개
+              {categoryFilter && (
+                <span className="ml-1">
+                  · 카테고리: <strong>{categoryFilter}</strong>
+                </span>
+              )}
+              {q && (
+                <span className="ml-1">
+                  · 키워드: <strong>&ldquo;{q}&rdquo;</strong>
+                </span>
+              )}
+            </p>
+          )}
+        </section>
+      )}
+
       {/* 목록 */}
       {programs.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-[#D4E4BC] bg-white p-10 text-center">
           <div className="text-5xl" aria-hidden>
-            🌱
+            {allPrograms.length === 0 ? "🌱" : "🔍"}
           </div>
           <p className="mt-3 text-sm font-semibold text-[#2D5A3D]">
-            아직 등록된 프로그램이 없어요
+            {allPrograms.length === 0
+              ? "아직 등록된 프로그램이 없어요"
+              : "검색 결과가 없어요"}
           </p>
           <p className="mt-1 text-xs text-[#6B6560]">
-            첫 번째 체험 프로그램을 등록해 보세요.
+            {allPrograms.length === 0
+              ? "첫 번째 체험 프로그램을 등록해 보세요."
+              : "키워드나 카테고리 필터를 바꿔보세요."}
           </p>
-          <Link
-            href="/partner/programs/new"
-            className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-[#2D5A3D] px-4 py-2 text-xs font-bold text-white hover:bg-[#234a30]"
-          >
-            <span aria-hidden>+</span>
-            <span>새 프로그램 만들기</span>
-          </Link>
+          {allPrograms.length === 0 && (
+            <Link
+              href="/partner/programs/new"
+              className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-[#2D5A3D] px-4 py-2 text-xs font-bold text-white hover:bg-[#234a30]"
+            >
+              <span aria-hidden>+</span>
+              <span>새 프로그램 만들기</span>
+            </Link>
+          )}
         </div>
       ) : (
-        <section className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {programs.map((p) => {
-            const meta = CATEGORY_META[p.category] ?? CATEGORY_META.FOREST;
+            const builtinMeta = CATEGORY_META[p.category];
+            const meta = builtinMeta ?? {
+              label: p.category,
+              icon: "🏷️",
+              chip: "bg-zinc-50 text-zinc-700 border-zinc-200",
+            };
             return (
               <article
                 key={p.id}
@@ -215,22 +346,44 @@ export default async function PartnerProgramsPage() {
                       {meta.icon}
                     </span>
                   )}
-                  {/* Published badge */}
-                  <span
-                    className={`absolute left-3 top-3 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${
-                      p.is_published
-                        ? "border-emerald-300 bg-emerald-50 text-emerald-800"
-                        : "border-zinc-300 bg-white/90 text-zinc-600"
-                    }`}
-                  >
-                    <span
-                      className={`h-1.5 w-1.5 rounded-full ${
-                        p.is_published ? "bg-emerald-500" : "bg-zinc-400"
-                      }`}
-                      aria-hidden
-                    />
-                    {p.is_published ? "게시 중" : "숨김"}
-                  </span>
+                  {/* Visibility badge */}
+                  {(() => {
+                    const vm = VISIBILITY_META[p.visibility];
+                    return (
+                      <span
+                        className={`absolute left-3 top-3 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${vm.color}`}
+                      >
+                        {vm.icon} {vm.label}
+                      </span>
+                    );
+                  })()}
+
+                  {/* 우측 상단 아이콘 액션 (편집/삭제) */}
+                  <div className="absolute right-2 top-2 flex items-center gap-1">
+                    <Link
+                      href={`/partner/programs/${p.id}/edit`}
+                      className="flex h-7 w-7 items-center justify-center rounded-full border border-[#E5D3B8] bg-white/90 text-sm shadow-sm backdrop-blur-sm transition hover:bg-[#FFF8F0]"
+                      aria-label="편집"
+                      title="편집"
+                    >
+                      ✏️
+                    </Link>
+                    <form
+                      action={async () => {
+                        "use server";
+                        await deleteProgramAction(p.id);
+                      }}
+                    >
+                      <button
+                        type="submit"
+                        className="flex h-7 w-7 items-center justify-center rounded-full border border-rose-200 bg-white/90 text-sm shadow-sm backdrop-blur-sm transition hover:bg-rose-50"
+                        aria-label="삭제"
+                        title="삭제"
+                      >
+                        🗑
+                      </button>
+                    </form>
+                  </div>
                 </div>
 
                 {/* Body */}
@@ -284,45 +437,19 @@ export default async function PartnerProgramsPage() {
                     <span>예약 {p.booking_count.toLocaleString("ko-KR")}건</span>
                   </div>
 
-                  {/* Actions */}
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <form
-                      action={async () => {
-                        "use server";
-                        await togglePublishAction(p.id);
-                      }}
-                    >
-                      <button
-                        type="submit"
-                        className={`rounded-lg border px-3 py-1.5 text-xs font-semibold ${
-                          p.is_published
-                            ? "border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50"
-                            : "border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
-                        }`}
-                      >
-                        {p.is_published ? "숨기기" : "게시"}
-                      </button>
-                    </form>
-                    <Link
-                      href={`/partner/programs/new?edit=${p.id}`}
-                      className="rounded-lg border border-[#E5D3B8] bg-white px-3 py-1.5 text-xs font-semibold text-[#6B4423] hover:bg-[#FFF8F0]"
-                    >
-                      편집
-                    </Link>
-                    <form
-                      action={async () => {
-                        "use server";
-                        await deleteProgramAction(p.id);
-                      }}
-                    >
-                      <button
-                        type="submit"
-                        className="rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-50"
-                      >
-                        삭제
-                      </button>
-                    </form>
+                  {/* 배포 대상 (visibility + assignments) */}
+                  <div className="mt-3">
+                    <VisibilityQuickControl
+                      resourceId={p.id}
+                      currentVisibility={p.visibility}
+                      initialAssignedOrgIds={assignmentsMap.get(p.id) ?? []}
+                      availableOrgs={orgs}
+                      updateVisibilityAction={updateProgramVisibilityAction}
+                      setAssignmentsAction={setProgramAssignmentsAction}
+                      editHref={`/partner/programs/${p.id}/edit`}
+                    />
                   </div>
+
                 </div>
               </article>
             );

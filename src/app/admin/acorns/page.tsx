@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { RechargeButton } from "./recharge-button";
 import type { PartnerLite } from "./recharge-modal";
+import { AcornIcon } from "@/components/acorn-icon";
 
 export const dynamic = "force-dynamic";
 
@@ -229,7 +230,7 @@ export default async function AdminAcornsPage() {
           <div className="text-xs font-medium text-[#8B6F47]">총 보유 도토리</div>
           <div className="text-2xl font-bold text-[#6B4423] mt-1">
             {totalBalance.toLocaleString("ko-KR")}
-            <span className="text-sm font-medium ml-1">🌰</span>
+            <span className="ml-1 inline-flex items-center"><AcornIcon /></span>
           </div>
         </div>
         <div className="rounded-2xl border border-[#D4E4BC] bg-white p-5">
@@ -242,7 +243,7 @@ export default async function AdminAcornsPage() {
 
       {/* 충전 티어 테이블 */}
       <section>
-        <h2 className="text-sm font-bold text-[#2D5A3D] mb-3">🌰 충전 티어</h2>
+        <h2 className="text-sm font-bold text-[#2D5A3D] mb-3 flex items-center gap-1.5"><AcornIcon /> 충전 티어</h2>
         <div className="rounded-2xl border border-[#D4E4BC] bg-white overflow-hidden">
           <table className="w-full text-sm">
             <thead className="bg-[#E8F0E4] text-[#2D5A3D]">
@@ -267,7 +268,7 @@ export default async function AdminAcornsPage() {
                     +{t.bonus}
                   </td>
                   <td className="px-4 py-3 text-right text-[#6B6560]">
-                    {t.unit} / 🌰
+                    <span className="inline-flex items-center gap-1">{t.unit} / <AcornIcon /></span>
                   </td>
                 </tr>
               ))}
@@ -290,7 +291,7 @@ export default async function AdminAcornsPage() {
         <div className="overflow-hidden rounded-2xl border border-[#D4E4BC] bg-white">
           {acornInvoices.length === 0 ? (
             <div className="py-12 text-center">
-              <span className="text-4xl">🌰</span>
+              <AcornIcon size={40} />
               <p className="mt-3 text-sm font-semibold text-[#2D5A3D]">
                 아직 청구서가 없어요
               </p>
@@ -333,7 +334,7 @@ export default async function AdminAcornsPage() {
                         {r.total_amount.toLocaleString("ko-KR")}원
                       </td>
                       <td className="px-4 py-2.5 text-right text-[#6B4423]">
-                        🌰 {(r.acorns_credited ?? 0).toLocaleString("ko-KR")}
+                        <AcornIcon /> {(r.acorns_credited ?? 0).toLocaleString("ko-KR")}
                       </td>
                       <td className="px-4 py-2.5">
                         <span
@@ -359,7 +360,7 @@ export default async function AdminAcornsPage() {
         </h3>
         <ul className="mt-2 space-y-1 text-xs text-[#8B6F47] leading-relaxed list-disc pl-5">
           <li>
-            기본 단가는 🌰 1개당 <b>3,000원</b>입니다.
+            기본 단가는 <AcornIcon /> 1개당 <b>3,000원</b>입니다.
           </li>
           <li>충전액이 클수록 보너스 비율이 올라가 실질 단가가 낮아져요.</li>
           <li>

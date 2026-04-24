@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { ChargeAcornsForm } from "./charge-form";
+import { AcornIcon } from "@/components/acorn-icon";
 
 export const dynamic = "force-dynamic";
 
@@ -40,7 +41,7 @@ export default async function ChargeAcornsPage({
       <div className="flex items-center justify-between">
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-extrabold text-blue-800">
-            <span aria-hidden>🌰</span>
+            <span aria-hidden><AcornIcon size={24} /></span>
             <span>행사 도토리 충전</span>
           </h1>
           <p className="mt-1 text-sm text-[#6B6560]">
@@ -72,12 +73,12 @@ export default async function ChargeAcornsPage({
           </div>
           <div className="rounded-xl bg-white p-3 text-center">
             <div className="text-[11px] text-[#6B6560]">평균 도토리</div>
-            <div className="mt-1 text-lg font-bold text-blue-800">10🌰</div>
+            <div className="mt-1 inline-flex items-center gap-0.5 text-lg font-bold text-blue-800">10<AcornIcon /></div>
           </div>
           <div className="rounded-xl bg-blue-600 p-3 text-center text-white">
             <div className="text-[11px] opacity-80">추천 충전</div>
-            <div className="mt-1 text-lg font-bold">
-              {(families * missions * 10).toLocaleString("ko-KR")}🌰
+            <div className="mt-1 inline-flex items-center gap-0.5 text-lg font-bold">
+              {(families * missions * 10).toLocaleString("ko-KR")}<AcornIcon />
             </div>
           </div>
         </div>
@@ -95,7 +96,7 @@ export default async function ChargeAcornsPage({
           <span>충전 안내</span>
         </h3>
         <ul className="mt-2 space-y-1 pl-5 text-[12px] text-amber-900 list-disc">
-          <li>🌰 1개 = 1,000원 (VAT 별도)</li>
+          <li className="flex items-center gap-1"><AcornIcon /> 1개 = 1,000원 (VAT 별도)</li>
           <li>30만원 이상 +10% · 100만원 이상 +15% · 300만원 이상 +20% 보너스</li>
           <li>결제 후 자동 충전되며, 행사 종료 시 미사용분은 내부 정책에 따라 처리됩니다</li>
           <li>세금계산서는 결제 확정 후 이메일로 발송되어요</li>

@@ -1,6 +1,28 @@
 import Link from "next/link";
 import { getPartner } from "@/lib/auth-guard";
 import { PartnerNav } from "@/components/partner-nav";
+import { countPendingTeamMembers } from "@/lib/team/event-team-queries";
+import { loadPartnerProfileSnapshot } from "@/lib/profile-completeness/queries";
+import { calcCompleteness } from "@/lib/profile-completeness/calculator";
+import { PARTNER_PROFILE_SCHEMA } from "@/lib/profile-completeness/schemas/partner";
+
+async function safeCountPending(partnerId: string): Promise<number> {
+  try {
+    const n = await countPendingTeamMembers(partnerId);
+    return typeof n === "number" && Number.isFinite(n) ? n : 0;
+  } catch {
+    return 0;
+  }
+}
+
+async function safeProfilePercent(partnerId: string): Promise<number | null> {
+  try {
+    const snap = await loadPartnerProfileSnapshot(partnerId);
+    return calcCompleteness(PARTNER_PROFILE_SCHEMA, snap).percent;
+  } catch {
+    return null;
+  }
+}
 
 export default async function PartnerLayout({
   children,
@@ -8,6 +30,17 @@ export default async function PartnerLayout({
   children: React.ReactNode;
 }) {
   const partner = await getPartner();
+  // 세션에 role이 없으면 (구버전 쿠키) OWNER로 폴백 — auth-guard의 normalize에서도 처리됨
+  const partnerRole = partner?.role ?? null;
+
+  const [pendingCount, profilePercent] = partner
+    ? await Promise.all([
+        partner.role === "OWNER" || partner.role === "MANAGER"
+          ? safeCountPending(partner.id)
+          : Promise.resolve(0),
+        safeProfilePercent(partner.id),
+      ])
+    : [0, null as number | null];
 
   return (
     <div className="min-h-dvh bg-[#FFF8F0]">
@@ -18,7 +51,12 @@ export default async function PartnerLayout({
 
       {/* 로그인 안 한 상태면 심플 헤더, 로그인 되어 있으면 풀 네비 */}
       {partner ? (
-        <PartnerNav partnerName={partner.name} />
+        <PartnerNav
+          partnerName={partner.name}
+          role={partnerRole}
+          pendingCount={pendingCount}
+          profilePercent={profilePercent}
+        />
       ) : (
         <header className="border-b border-[#D4E4BC] bg-white shadow-sm">
           <div className="mx-auto flex max-w-4xl items-center justify-between px-4 py-3">

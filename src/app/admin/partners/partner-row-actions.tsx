@@ -56,14 +56,27 @@ export function PartnerRowActions({
     });
   };
 
+  const btnBase =
+    "inline-flex h-7 items-center justify-center rounded-md px-2 text-[11px] font-semibold leading-none whitespace-nowrap transition disabled:opacity-50";
+
   return (
-    <div className="flex flex-wrap items-center gap-1.5">
+    <div className="flex items-center justify-end gap-1 whitespace-nowrap">
+      <a
+        href={`/api/admin/impersonate?role=partner&id=${id}`}
+        target="_blank"
+        rel="noopener"
+        title={`${name} 지사로 새 창에서 로그인 전환`}
+        className={`${btnBase} gap-0.5 border border-violet-300 bg-violet-50 text-violet-800 hover:bg-violet-100`}
+      >
+        🔑 로그인↗
+      </a>
+
       <select
         value={tier}
         onChange={onTier}
         disabled={pending}
         aria-label="등급 변경"
-        className="rounded-lg border border-[#D4E4BC] bg-white px-2 py-1 text-xs text-[#2D5A3D] focus:outline-none focus:ring-2 focus:ring-[#3A7A52]/30"
+        className="h-7 rounded-md border border-[#D4E4BC] bg-white px-1.5 text-[11px] leading-none text-[#2D5A3D] focus:outline-none focus:ring-2 focus:ring-[#3A7A52]/30"
       >
         <option value="SPROUT">🌱 새싹</option>
         <option value="EXPLORER">🌿 탐험가</option>
@@ -77,7 +90,7 @@ export function PartnerRowActions({
           type="button"
           onClick={() => onStatus("ACTIVE")}
           disabled={pending}
-          className="rounded-lg bg-[#2D5A3D] px-2.5 py-1 text-xs font-semibold text-white hover:bg-[#3A7A52] disabled:opacity-50"
+          className={`${btnBase} bg-[#2D5A3D] text-white hover:bg-[#3A7A52]`}
         >
           승인
         </button>
@@ -87,7 +100,7 @@ export function PartnerRowActions({
           type="button"
           onClick={() => onStatus("SUSPENDED")}
           disabled={pending}
-          className="rounded-lg border border-[#E5D3B8] bg-[#FFF8F0] px-2.5 py-1 text-xs font-semibold text-[#B8860B] hover:bg-[#FFE9C7] disabled:opacity-50"
+          className={`${btnBase} border border-[#E5D3B8] bg-[#FFF8F0] text-[#B8860B] hover:bg-[#FFE9C7]`}
         >
           정지
         </button>
@@ -97,7 +110,7 @@ export function PartnerRowActions({
           type="button"
           onClick={() => onStatus("ACTIVE")}
           disabled={pending}
-          className="rounded-lg bg-[#2D5A3D] px-2.5 py-1 text-xs font-semibold text-white hover:bg-[#3A7A52] disabled:opacity-50"
+          className={`${btnBase} bg-[#2D5A3D] text-white hover:bg-[#3A7A52]`}
         >
           재활성
         </button>
@@ -107,7 +120,7 @@ export function PartnerRowActions({
           type="button"
           onClick={() => onStatus("ACTIVE")}
           disabled={pending}
-          className="rounded-lg border border-[#D4E4BC] bg-white px-2.5 py-1 text-xs font-semibold text-[#2D5A3D] hover:bg-[#E8F0E4] disabled:opacity-50"
+          className={`${btnBase} border border-[#D4E4BC] bg-white text-[#2D5A3D] hover:bg-[#E8F0E4]`}
         >
           복구
         </button>
@@ -117,7 +130,7 @@ export function PartnerRowActions({
         type="button"
         onClick={onDelete}
         disabled={pending}
-        className="rounded-lg border border-red-200 bg-white px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50"
+        className={`${btnBase} border border-red-200 bg-white text-red-600 hover:bg-red-50`}
       >
         삭제
       </button>

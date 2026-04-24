@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef } from "react";
+import { AcornIcon } from "@/components/acorn-icon";
 
 interface Props {
   eventName: string;
@@ -68,7 +69,7 @@ export function ShareCard({
         <p className="mt-2 text-lg">
           {totalParticipants}명 중 <strong>{rank}등</strong>
         </p>
-        <div className="mt-4 text-4xl font-bold">🌰 {score}</div>
+        <div className="mt-4 text-4xl font-bold inline-flex items-center gap-2 justify-center w-full"><AcornIcon size={36} /> {score}</div>
         <p className="text-xs opacity-80 mt-1">모은 도토리</p>
         <div className="mt-4 flex justify-center gap-6 text-sm opacity-95">
           <div>

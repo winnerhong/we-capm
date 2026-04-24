@@ -70,7 +70,7 @@ export const MISSION_TEMPLATES: MissionTemplate[] = [
   {
     id: "nature_acorn",
     category: "NATURE",
-    icon: "🌰",
+    icon: "🔍",
     title: "도토리 찾기",
     description: "숲에서 도토리 3개 찾아 인증",
     instruction: "도토리를 손에 올린 사진을 찍어주세요 (자연에 다시 돌려놓기!)",

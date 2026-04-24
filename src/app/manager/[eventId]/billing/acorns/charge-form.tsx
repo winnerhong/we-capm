@@ -3,6 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { chargeEventAcornsAction } from "../actions";
+import { AcornIcon } from "@/components/acorn-icon";
 
 const PACKAGES = [
   { amount: 100_000, label: "10만원", bonus: 0 },
@@ -148,8 +149,8 @@ export function ChargeAcornsForm({
                 <div className="mt-1 text-[11px] text-[#6B6560]">
                   {p.bonus > 0 ? `+${p.bonus * 100}% 보너스` : "보너스 없음"}
                 </div>
-                <div className="mt-1 text-xs font-semibold text-emerald-700">
-                  🌰 {Math.floor(
+                <div className="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-emerald-700">
+                  <AcornIcon /> {Math.floor(
                     (p.amount / 1000) * (1 + p.bonus),
                   ).toLocaleString("ko-KR")}
                 </div>
@@ -258,8 +259,8 @@ export function ChargeAcornsForm({
         </div>
         <div className="mt-2 flex justify-between">
           <span className="text-emerald-700">충전될 도토리</span>
-          <span className="font-bold text-emerald-700">
-            🌰 {totalAcorns.toLocaleString("ko-KR")}
+          <span className="inline-flex items-center gap-1 font-bold text-emerald-700">
+            <AcornIcon /> {totalAcorns.toLocaleString("ko-KR")}
             {bonusAcorns > 0 && (
               <span className="ml-1 text-[11px] font-normal">
                 (기본 {baseAcorns.toLocaleString("ko-KR")} + 보너스 {bonusAcorns.toLocaleString("ko-KR")})

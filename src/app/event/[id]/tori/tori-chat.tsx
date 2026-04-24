@@ -21,14 +21,14 @@ interface ToriContext {
 const SUGGESTIONS = [
   "🎯 오늘 뭐할까?",
   "🗺️ 근처 숲길 추천해줘",
-  "🌰 도토리 어떻게 모아?",
+  "도토리 어떻게 모아?",
   "🏆 내 순위 어때?",
 ];
 
 function getToriResponse(message: string, context: ToriContext): string {
   const msg = message.trim();
   if (msg.includes("오늘")) {
-    return `오늘은 도토리 ${context.acorns}개를 모으셨어요! 🌰 조금만 더 하면 다음 나무로 자랄 거예요 🌱`;
+    return `오늘은 도토리 ${context.acorns}개를 모으셨어요! 조금만 더 하면 다음 나무로 자랄 거예요 🌱`;
   }
   if (msg.includes("추천")) {
     const next = context.nextMissionTitle;
@@ -38,7 +38,7 @@ function getToriResponse(message: string, context: ToriContext): string {
     return "이번 행사의 모든 숲길을 걸었어요! 🏞️ 결과 발표를 기다려봐요.";
   }
   if (msg.includes("도토리")) {
-    return "도토리는 숲길을 걸을 때마다 모아져요! 숲길 카드에서 '지금 하기'를 눌러보세요 🌰";
+    return "도토리는 숲길을 걸을 때마다 모아져요! 숲길 카드에서 '지금 하기'를 눌러보세요";
   }
   if (msg.includes("순위") || msg.includes("랭킹") || msg.includes("등수")) {
     return `지금 ${context.tier} 단계예요! 명예의 전당에서 확인해보세요 🏆`;

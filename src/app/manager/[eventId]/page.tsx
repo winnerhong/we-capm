@@ -3,8 +3,11 @@ import { WinnerTalkIcon } from "@/components/winner-talk-icon";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getPartner } from "@/lib/auth-guard";
 import { updateEventStatusAction } from "@/app/admin/events/actions";
 import type { EventStatus } from "@/lib/supabase/database.types";
+import EventTeamSection from "./team/event-team-section";
+import { AcornIcon } from "@/components/acorn-icon";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +20,9 @@ const NEXT_STATUS: Partial<Record<EventStatus, { label: string; target: EventSta
 export default async function ManagerDashboard({ params }: { params: Promise<{ eventId: string }> }) {
   const { eventId: id } = await params;
   const supabase = await createClient();
+  const partner = await getPartner();
+  const canEditTeam =
+    !!partner && (partner.role === "OWNER" || partner.role === "MANAGER");
 
   const { data: event } = await supabase.from("events").select("*").eq("id", id).single();
   if (!event) notFound();
@@ -103,7 +109,7 @@ export default async function ManagerDashboard({ params }: { params: Promise<{ e
           </div>
           <Link href={`/admin/events/${id}/submissions`} className="rounded-xl bg-white/15 p-3 text-center backdrop-blur-sm transition-colors hover:bg-white/25">
             <div className={`text-2xl font-bold ${(pendingCount ?? 0) > 0 ? "text-[#F5D58C]" : ""}`}>{pendingCount ?? 0}</div>
-            <div className="text-xs opacity-80">🌰 승인 대기</div>
+            <div className="inline-flex items-center gap-1 text-xs opacity-80"><AcornIcon /> 승인 대기</div>
           </Link>
         </div>
       </div>
@@ -132,6 +138,12 @@ export default async function ManagerDashboard({ params }: { params: Promise<{ e
           </div>
         </div>
       </div>
+
+      <EventTeamSection
+        eventId={id}
+        partnerId={partner?.id ?? null}
+        canEdit={canEditTeam}
+      />
 
       <div className="rounded-2xl border border-[#D4E4BC] bg-[#FFF8F0] p-5 shadow-sm">
         <div className="flex items-center justify-between">
@@ -164,7 +176,7 @@ export default async function ManagerDashboard({ params }: { params: Promise<{ e
           {(pendingCount ?? 0) > 0 && (
             <Link href={`/admin/events/${id}/submissions`}
               className="block rounded-2xl border-2 border-[#C4956A]/40 bg-gradient-to-br from-[#FFF8F0] to-[#F5E6D3] p-6 text-center shadow-sm transition-shadow hover:shadow-md">
-              <div className="text-4xl font-bold text-[#C4956A]">🌰 {pendingCount}건</div>
+              <div className="inline-flex items-center justify-center gap-2 text-4xl font-bold text-[#C4956A]"><AcornIcon size={36} /> {pendingCount}건</div>
               <div className="mt-1 text-sm text-[#6B6560]">승인을 기다리는 도토리</div>
               <div className="mt-3 inline-block rounded-xl bg-[#C4956A] px-6 py-2 font-semibold text-white shadow-sm hover:bg-[#b0835a]">지금 살펴보기 →</div>
             </Link>
@@ -172,7 +184,7 @@ export default async function ManagerDashboard({ params }: { params: Promise<{ e
           <div className="grid grid-cols-3 gap-3">
             <Link href={`/admin/events/${id}/submissions`}
               className="flex flex-col items-center gap-2 rounded-2xl border-2 border-[#E8F0E4] bg-white p-4 shadow-sm transition-colors hover:border-[#4A7C59]">
-              <span className="text-3xl">🌰</span><span className="font-semibold text-[#2C2C2C]">승인</span>
+              <AcornIcon size={30} /><span className="font-semibold text-[#2C2C2C]">승인</span>
             </Link>
             <Link href={`/admin/events/${id}/chat`}
               className="flex flex-col items-center gap-2 rounded-2xl border-2 border-[#E8F0E4] bg-white p-4 shadow-sm transition-colors hover:border-[#4A7C59]">
@@ -196,7 +208,7 @@ export default async function ManagerDashboard({ params }: { params: Promise<{ e
               return (
                 <li key={p.id} className="flex items-center justify-between rounded-xl bg-[#E8F0E4] p-3">
                   <span className="font-semibold text-[#2C2C2C]">{medal} {name}</span>
-                  <span className="font-bold text-[#2D5A3D]">🌰 {p.total_score}</span>
+                  <span className="inline-flex items-center gap-1 font-bold text-[#2D5A3D]"><AcornIcon /> {p.total_score}</span>
                 </li>
               );
             })}

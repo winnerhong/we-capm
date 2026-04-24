@@ -1,6 +1,8 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { AcornIcon } from "@/components/acorn-icon";
 
 export const dynamic = "force-dynamic";
 
@@ -30,8 +32,12 @@ const STATUS_STYLE: Record<string, { label: string; cls: string }> = {
   REFUNDED: { label: "환불", cls: "bg-rose-100 text-rose-800" },
 };
 
-const CATEGORY_LABEL: Record<string, string> = {
-  ACORN_RECHARGE: "🌰 도토리 충전",
+const CATEGORY_LABEL: Record<string, ReactNode> = {
+  ACORN_RECHARGE: (
+    <span className="inline-flex items-center gap-1">
+      <AcornIcon size={14} /> 도토리 충전
+    </span>
+  ),
   SUBSCRIPTION: "🗓 구독료",
   EVENT_FEE: "🎟 행사 참가비",
   AD_CAMPAIGN: "📣 광고",
@@ -173,19 +179,19 @@ export default async function BillingHubPage({
       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
         <div className="rounded-2xl border border-blue-100 bg-gradient-to-br from-blue-50 to-white p-5 shadow-sm">
           <div className="text-xs font-semibold text-blue-700">행사 예상 비용</div>
-          <div className="mt-2 text-2xl font-bold text-[#2D5A3D]">
-            🌰 {estimatedNeed.toLocaleString("ko-KR")}
+          <div className="mt-2 inline-flex items-center gap-1.5 text-2xl font-bold text-[#2D5A3D]">
+            <AcornIcon size={20} /> {estimatedNeed.toLocaleString("ko-KR")}
             <span className="ml-1 text-xs font-normal text-[#6B6560]">도토리</span>
           </div>
-          <div className="mt-1 text-[11px] text-[#6B6560]">
-            가족 {familyCount ?? 0}명 × 미션 {MISSIONS_EXPECTED}개 × 평균 {AVG_ACORN_PER_MISSION}🌰
+          <div className="mt-1 inline-flex items-center gap-1 text-[11px] text-[#6B6560]">
+            가족 {familyCount ?? 0}명 × 미션 {MISSIONS_EXPECTED}개 × 평균 {AVG_ACORN_PER_MISSION}<AcornIcon />
           </div>
         </div>
 
         <div className="rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50 to-white p-5 shadow-sm">
           <div className="text-xs font-semibold text-emerald-700">충전된 도토리</div>
-          <div className="mt-2 text-2xl font-bold text-[#2D5A3D]">
-            🌰 {acornBalance.toLocaleString("ko-KR")}
+          <div className="mt-2 inline-flex items-center gap-1.5 text-2xl font-bold text-[#2D5A3D]">
+            <AcornIcon size={20} /> {acornBalance.toLocaleString("ko-KR")}
           </div>
           <div className="mt-1 text-[11px] text-[#6B6560]">
             이번 행사에 배정된 잔액
@@ -208,9 +214,9 @@ export default async function BillingHubPage({
       <div className="grid grid-cols-3 gap-2">
         <Link
           href={`/manager/${eventId}/billing/acorns`}
-          className="rounded-xl border border-blue-100 bg-white p-3 text-center text-sm font-semibold text-blue-800 shadow-sm transition-shadow hover:shadow-md"
+          className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-blue-100 bg-white p-3 text-center text-sm font-semibold text-blue-800 shadow-sm transition-shadow hover:shadow-md"
         >
-          🌰 도토리 충전
+          <AcornIcon /> 도토리 충전
         </Link>
         <Link
           href={`/manager/${eventId}/billing/parents`}

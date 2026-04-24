@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useState, useTransition, type ReactNode } from "react";
 import { PaymentModal } from "@/components/payment-modal";
 import type { PaymentResult } from "@/lib/payments";
 import { subscribeAction, type SubscriptionTier } from "./actions";
@@ -13,7 +13,7 @@ export type Tier = {
   price: number;
   discount: number;
   isPopular: boolean;
-  features: string[];
+  features: ReactNode[];
 };
 
 type Props = {
@@ -124,8 +124,8 @@ export function SubscribeCard({ tier, selected, onSelect, eventId }: Props) {
 
       {/* 기능 리스트 */}
       <ul className="mt-5 flex-1 space-y-2.5">
-        {tier.features.map((f) => (
-          <li key={f} className="flex items-start gap-2 text-sm text-[#3C3731]">
+        {tier.features.map((f, i) => (
+          <li key={i} className="flex items-start gap-2 text-sm text-[#3C3731]">
             <span
               className={`mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full text-xs font-bold ${theme.checkBg} ${theme.checkText}`}
               aria-hidden="true"

@@ -1,11 +1,23 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
+import { AcornIcon } from "@/components/acorn-icon";
 
-const STATS = [
+type StatItem = {
+  label: string;
+  value: string;
+  unit: string;
+  icon: ReactNode;
+  accent: string;
+  text: string;
+  href?: string;
+};
+
+const STATS: StatItem[] = [
   { label: "총 노출", value: "0", unit: "회", icon: "👀", accent: "from-[#FFF8F0] to-[#F5E6D3]", text: "#6B4423" },
   { label: "총 클릭", value: "0", unit: "회", icon: "👆", accent: "from-[#FFF8F0] to-[#F5E6D3]", text: "#6B4423" },
   { label: "전환률", value: "0.0", unit: "%", icon: "📈", accent: "from-[#FFF8F0] to-[#F5E6D3]", text: "#6B4423" },
   { label: "집행 예산", value: "0", unit: "원", icon: "💰", accent: "from-[#FFF8F0] to-[#F5E6D3]", text: "#6B4423" },
-  { label: "예치금 잔액", value: "1,200,000", unit: "원", icon: "🌰", accent: "from-[#F5F9EF] to-[#E8F0E4]", text: "#2D5A3D", href: "/ads-portal/billing" },
+  { label: "예치금 잔액", value: "1,200,000", unit: "원", icon: <AcornIcon size={24} />, accent: "from-[#F5F9EF] to-[#E8F0E4]", text: "#2D5A3D", href: "/ads-portal/billing" },
 ];
 
 const MENU = [
@@ -63,7 +75,7 @@ export default function AdsPortalDashboardPage() {
       {/* 헤더 — 도토리 그라디언트 */}
       <section className="rounded-2xl bg-gradient-to-br from-[#C4956A] via-[#B0845A] to-[#8B6F47] p-6 text-white shadow-lg relative overflow-hidden">
         <div className="absolute -right-6 -top-6 text-[140px] opacity-10 select-none" aria-hidden>🧚</div>
-        <div className="absolute bottom-2 right-20 text-4xl opacity-20 select-none" aria-hidden>🌰</div>
+        <div className="absolute bottom-2 right-20 text-4xl opacity-20 select-none" aria-hidden><AcornIcon size={32} /></div>
         <div className="relative z-10">
           <p className="text-[11px] tracking-[0.4em] opacity-80 font-light">ADVERTISER</p>
           <h1 className="mt-1 text-2xl font-extrabold flex items-center gap-2">

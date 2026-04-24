@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { AcornIcon } from "@/components/acorn-icon";
 
 export const dynamic = "force-dynamic";
 
@@ -254,7 +255,7 @@ export default async function AdminStatsPage() {
           <div className="rounded-xl bg-gradient-to-br from-[#FFF8F0] to-[#F5E6D3] p-4 border border-[#E5D3B8]">
             <div className="text-[10px] font-semibold text-[#6B4423] opacity-70">총 도토리 획득</div>
             <div className="mt-1 text-3xl font-extrabold text-[#6B4423]">{num(totalAcorns)}</div>
-            <div className="mt-1 text-[10px] text-[#6B4423] opacity-60">🌰 누적</div>
+            <div className="mt-1 inline-flex items-center gap-1 text-[10px] text-[#6B4423] opacity-60"><AcornIcon /> 누적</div>
           </div>
           <div className="rounded-xl bg-gradient-to-br from-[#E8F0E4] to-[#D4E4BC] p-4 border border-[#B8D4A0]">
             <div className="text-[10px] font-semibold text-[#2D5A3D] opacity-70">총 제출물</div>
@@ -267,7 +268,7 @@ export default async function AdminStatsPage() {
       {/* 7) 도토리 경제 (참가자 점수 기반 — 항상 동작) */}
       <section className="rounded-2xl border border-[#E5D3B8] bg-gradient-to-br from-white to-[#FFF8F0] p-5">
         <h2 className="text-sm font-bold text-[#6B4423] flex items-center gap-1.5 mb-4">
-          <span>🌰</span>
+          <span><AcornIcon /></span>
           <span>도토리 경제</span>
         </h2>
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4 mb-4">

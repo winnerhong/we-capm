@@ -3,6 +3,7 @@ import { redirect, notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getParticipant } from "@/lib/participant-session";
 import { joinGuildAction, leaveGuildAction } from "./actions";
+import { AcornIcon } from "@/components/acorn-icon";
 
 export const dynamic = "force-dynamic";
 
@@ -184,8 +185,8 @@ export default async function GuildPage({ params }: { params: Promise<{ id: stri
             {/* Total acorns */}
             <div className="mt-5 rounded-2xl bg-gradient-to-br from-[#FFF3E0] to-[#FDE2C2] p-4 text-center">
               <p className="text-xs text-[#8B6F47]">패밀리 총 도토리</p>
-              <p className="mt-1 text-3xl font-extrabold text-[#8B6F47]">
-                🌰 {totalAcorns.toLocaleString("ko-KR")}
+              <p className="mt-1 text-3xl font-extrabold text-[#8B6F47] inline-flex items-center justify-center gap-1">
+                <AcornIcon size={28} className="text-[#8B6F47]" /> {totalAcorns.toLocaleString("ko-KR")}
               </p>
               <p className="mt-1 text-xs text-[#8B6F47]">길드 명예의 전당 진입 중 🏆</p>
             </div>
@@ -220,13 +221,13 @@ export default async function GuildPage({ params }: { params: Promise<{ id: stri
                         )}
                         {m.role === "LEADER" && (
                           <span className="rounded-full bg-[#F5D9B5] px-2 py-0.5 text-[10px] font-bold text-[#8B6F47]">
-                            🌰 숲지기
+                            <AcornIcon className="text-[#8B6F47]" /> 숲지기
                           </span>
                         )}
                       </p>
                     </div>
                     <p className={`text-sm font-semibold ${FOREST_DARK}`}>
-                      🌰 {score.toLocaleString("ko-KR")}
+                      <AcornIcon /> {score.toLocaleString("ko-KR")}
                     </p>
                   </li>
                 );
@@ -334,7 +335,7 @@ export default async function GuildPage({ params }: { params: Promise<{ id: stri
                         👥 {count}/{g.max_members}
                       </span>
                       <span className="font-semibold text-[#8B6F47]">
-                        🌰 {g.total_acorns.toLocaleString("ko-KR")}
+                        <AcornIcon className="text-[#8B6F47]" /> {g.total_acorns.toLocaleString("ko-KR")}
                       </span>
                     </div>
                     <form action={joinGuildAction.bind(null, id, g.id)} className="mt-3">
@@ -357,7 +358,7 @@ export default async function GuildPage({ params }: { params: Promise<{ id: stri
         <section className={`rounded-2xl border ${FOREST_BORDER} bg-white p-5`}>
           <h3 className={`text-sm font-semibold ${FOREST_DARK}`}>🌳 패밀리가 있으면</h3>
           <ul className={`mt-2 space-y-1.5 text-xs ${FOREST_MUTED}`}>
-            <li>🌰 도토리를 합산해 길드 랭킹에 도전</li>
+            <li><AcornIcon /> 도토리를 합산해 길드 랭킹에 도전</li>
             <li>💬 우리끼리만의 토리톡 공간</li>
             <li>🏆 길드 명예의 전당 TOP 10</li>
           </ul>

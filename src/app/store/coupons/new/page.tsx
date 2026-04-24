@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 import { createCouponAction, type CouponCategory, type CouponDiscountType } from "../actions";
+import { AcornIcon } from "@/components/acorn-icon";
 
 type CategoryDef = {
   value: CouponCategory;
@@ -251,7 +252,7 @@ export default function NewCouponWizardPage() {
       <header className="rounded-3xl border border-[#E8C9A0] bg-gradient-to-br from-[#FAE7D0] via-white to-[#E8F0E4] p-5 shadow-sm md:p-7">
         <div className="flex items-center gap-3">
           <span className="text-3xl" aria-hidden>
-            🌰
+            <AcornIcon size={28} />
           </span>
           <div>
             <h1 className="text-xl font-bold text-[#2D5A3D] md:text-2xl">새 쿠폰 만들기</h1>
@@ -775,7 +776,7 @@ export default function NewCouponWizardPage() {
               disabled={isPending}
               className="inline-flex w-full items-center justify-center gap-1 rounded-xl bg-gradient-to-r from-[#2D5A3D] to-[#3A7A52] px-6 py-3 text-sm font-bold text-white shadow-md transition hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-[#3A7A52]/50 disabled:opacity-60 sm:w-auto"
             >
-              {isPending ? "저장 중..." : "🌰 쿠폰 저장하기"}
+              {isPending ? "저장 중..." : (<><AcornIcon /> 쿠폰 저장하기</>)}
             </button>
           )}
         </div>

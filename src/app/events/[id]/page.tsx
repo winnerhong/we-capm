@@ -9,6 +9,7 @@ import type {
   RewardType,
   TemplateType,
 } from "@/lib/supabase/database.types";
+import { AcornIcon } from "@/components/acorn-icon";
 
 export const dynamic = "force-dynamic";
 
@@ -263,7 +264,7 @@ export default async function EventDetailPage({
             <span>숲길 찾기</span>
           </Link>
           <Link href="/" className="flex items-center gap-1.5 text-sm font-bold text-[#2D5A3D]">
-            <span aria-hidden>🌰</span>
+            <AcornIcon size={18} />
             <span>토리로</span>
           </Link>
         </div>
@@ -275,7 +276,7 @@ export default async function EventDetailPage({
           <div className="absolute left-6 top-8 text-7xl">🌲</div>
           <div className="absolute right-10 top-20 text-6xl">🌳</div>
           <div className="absolute bottom-6 left-1/3 text-6xl">🍂</div>
-          <div className="absolute bottom-4 right-1/4 text-5xl">🌰</div>
+          <div className="absolute bottom-4 right-1/4 text-5xl"><AcornIcon size={40} /></div>
         </div>
         <div className="relative z-10 mx-auto max-w-4xl px-4 py-12 md:py-16">
           <div className="flex flex-wrap items-center gap-2">

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getPartner } from "@/lib/auth-guard";
 import { createClient } from "@/lib/supabase/server";
+import { AcornIcon } from "@/components/acorn-icon";
 
 export const dynamic = "force-dynamic";
 
@@ -241,7 +242,7 @@ export default async function PartnerInvoicesPage({
             href="/partner/billing/acorns"
             className="mt-4 inline-block rounded-xl bg-[#2D5A3D] px-4 py-2 text-xs font-semibold text-white hover:bg-[#3A7A52]"
           >
-            🌰 도토리 충전하러 가기
+            <AcornIcon /> 도토리 충전하러 가기
           </Link>
         </div>
       ) : (

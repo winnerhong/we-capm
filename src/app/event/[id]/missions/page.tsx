@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getParticipant } from "@/lib/participant-session";
+import { AcornIcon } from "@/components/acorn-icon";
 
 export const dynamic = "force-dynamic";
 
@@ -74,7 +75,7 @@ export default async function EventMissionsPage({
         )}
         {result === "pending" && (
           <div className="rounded-xl bg-[#FFF2D6] p-3 text-sm text-[#8B6F47]">
-            🌰 제출 완료 · 지기가 확인 중이에요
+            <AcornIcon className="text-[#8B6F47]" /> 제출 완료 · 지기가 확인 중이에요
           </div>
         )}
 
@@ -103,7 +104,7 @@ export default async function EventMissionsPage({
                         <p className="mt-1 text-sm text-[#6B6560]">{m.description}</p>
                       </div>
                       <div className="flex flex-col items-end gap-1">
-                        <span className="text-sm font-semibold text-violet-600">🌰 {m.points}</span>
+                        <span className="text-sm font-semibold text-violet-600"><AcornIcon /> {m.points}</span>
                         {statusInfo && (
                           <span className={`rounded-full px-2 py-0.5 text-xs ${statusInfo.color}`}>
                             {statusInfo.label}

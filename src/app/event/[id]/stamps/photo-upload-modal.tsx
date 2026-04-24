@@ -163,7 +163,7 @@ export function PhotoUploadModal({ eventId, slotId, slotName, slotEmoji }: Props
               value={caption}
               onChange={(e) => setCaption(e.target.value)}
               maxLength={80}
-              placeholder="예: 오늘의 작은 도토리 🌰"
+              placeholder="예: 오늘의 작은 도토리"
               autoComplete="off"
               inputMode="text"
               className="w-full rounded-xl border border-[#D4E4BC] bg-white px-3 py-2.5 text-sm placeholder:text-[#A8A49F] focus:border-[#4A7C59] focus:outline-none focus:ring-2 focus:ring-violet-200"

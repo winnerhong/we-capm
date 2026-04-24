@@ -1,7 +1,9 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { getParticipant } from "@/lib/participant-session";
 import { createClient } from "@/lib/supabase/server";
+import { AcornIcon } from "@/components/acorn-icon";
 
 export const dynamic = "force-dynamic";
 
@@ -47,7 +49,7 @@ const TABS: { key: TabKey; label: string }[] = [
 
 const CATEGORY_META: Record<
   InvoiceCategory,
-  { emoji: string; label: string; chip: string }
+  { emoji: ReactNode; label: string; chip: string }
 > = {
   SUBSCRIPTION: {
     emoji: "🌿",
@@ -60,7 +62,7 @@ const CATEGORY_META: Record<
     chip: "bg-[#E6D3B8] text-[#8B6F47]",
   },
   ACORN_RECHARGE: {
-    emoji: "🌰",
+    emoji: <AcornIcon />,
     label: "도토리 충전",
     chip: "bg-[#F5E4CB] text-[#8B6F47]",
   },
@@ -204,7 +206,7 @@ export default async function MyPaymentsPage({
             </div>
           </div>
           <div className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1 text-[11px] font-semibold">
-            <span>🌰</span>
+            <AcornIcon />
             <span>누적 결제액 {formatWon(totalSpent)}</span>
           </div>
         </div>

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AcornIcon } from "@/components/acorn-icon";
 
 export function InviteCard({ eventId }: { eventId: string }) {
   return (
@@ -12,7 +13,9 @@ export function InviteCard({ eventId }: { eventId: string }) {
           🎁
         </div>
         <div className="flex-1">
-          <p className="font-bold text-[#2D5A3D]">친구 초대하고 🌰 20개 받기</p>
+          <p className="font-bold text-[#2D5A3D]">
+            친구 초대하고 <AcornIcon /> 20개 받기
+          </p>
           <p className="text-xs text-[#6B6560] mt-0.5">둘 다 도토리 20개씩!</p>
         </div>
         <span className="text-[#C4956A]" aria-hidden>

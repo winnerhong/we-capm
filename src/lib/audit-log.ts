@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-export type AuditUserType = "ADMIN" | "MANAGER" | "PARTNER" | "PARTICIPANT" | "PUBLIC";
+export type AuditUserType = "ADMIN" | "MANAGER" | "PARTNER" | "PARTICIPANT" | "USER" | "PUBLIC";
 
 export interface AuditLogEntry {
   user_type: AuditUserType;

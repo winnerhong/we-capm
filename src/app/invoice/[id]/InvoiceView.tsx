@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState, useTransition, type ReactNode } from "react";
 import { PaymentModal } from "@/components/payment-modal";
 import { PaymentMethods, type PaymentMethodId } from "@/components/billing/payment-methods";
 import { InvoiceStatusBadge } from "@/components/billing/invoice-status-badge";
 import type { PaymentResult, PaymentMethod as LegacyMethod } from "@/lib/payments";
+import { AcornIcon } from "@/components/acorn-icon";
 
 /**
  * 공개 청구서 결제 뷰 — 포레스트 테마.
@@ -33,8 +34,8 @@ interface InvoiceData {
   paid_at: string | null;
 }
 
-const CATEGORY_ICON: Record<string, string> = {
-  ACORN_RECHARGE: "🌰",
+const CATEGORY_ICON: Record<string, ReactNode> = {
+  ACORN_RECHARGE: <AcornIcon size={28} />,
   SUBSCRIPTION: "📅",
   EVENT_FEE: "🏕️",
   AD_CAMPAIGN: "📣",
@@ -235,8 +236,8 @@ export function InvoiceView({ invoice }: { invoice: InvoiceData }) {
           {invoice.category === "ACORN_RECHARGE" &&
             invoice.acorns_credited != null && (
               <Row label="지급 도토리">
-                <span className="font-bold text-[#2D5A3D]">
-                  🌰 {fmt(invoice.acorns_credited)}개
+                <span className="inline-flex items-center gap-1 font-bold text-[#2D5A3D]">
+                  <AcornIcon /> {fmt(invoice.acorns_credited)}개
                 </span>
                 {invoice.bonus_rate && invoice.bonus_rate > 0 ? (
                   <span className="ml-1.5 rounded-full bg-emerald-100 text-emerald-700 px-2 py-0.5 text-[10px] font-bold">

@@ -3,14 +3,27 @@
 import { useState } from "react";
 import { usePathname } from "next/navigation";
 
-const PORTALS = [
-  { label: "관리자", icon: "👨‍💼", href: "/api/dev-login?role=admin", match: "/admin", color: "bg-violet-600", activeColor: "bg-violet-500 ring-2 ring-white" },
-  { label: "숲지기(지사)", icon: "🏡", href: "/api/dev-login?role=partner", match: "/partner", color: "bg-emerald-600", activeColor: "bg-emerald-500 ring-2 ring-white" },
-  { label: "기관", icon: "🏢", href: "/api/dev-login?role=manager", match: "/manager", color: "bg-blue-600", activeColor: "bg-blue-500 ring-2 ring-white" },
-  { label: "이용자", icon: "👨‍👩‍👧", href: "/api/dev-login?role=participant", match: "/event", color: "bg-green-600", activeColor: "bg-green-500 ring-2 ring-white" },
-  { label: "광고주", icon: "🧚", href: "/ads-portal", match: "/ads-portal", color: "bg-amber-600", activeColor: "bg-amber-500 ring-2 ring-white" },
-  { label: "가맹점(지역상점)", icon: "🌳", href: "/store", match: "/store", color: "bg-orange-600", activeColor: "bg-orange-500 ring-2 ring-white" },
+interface Portal {
+  label: string;
+  icon: string;
+  href: string;
+  matches: string[];
+  color: string;
+  activeColor: string;
+}
+
+const PORTALS: Portal[] = [
+  { label: "관리자", icon: "👨‍💼", href: "/api/dev-login?role=admin", matches: ["/admin"], color: "bg-violet-600", activeColor: "bg-violet-500 ring-2 ring-white" },
+  { label: "숲지기(지사)", icon: "🏡", href: "/api/dev-login?role=partner", matches: ["/partner"], color: "bg-emerald-600", activeColor: "bg-emerald-500 ring-2 ring-white" },
+  { label: "기관", icon: "🏢", href: "/api/dev-login?role=manager", matches: ["/manager", "/org"], color: "bg-blue-600", activeColor: "bg-blue-500 ring-2 ring-white" },
+  { label: "참가자", icon: "👨‍👩‍👧", href: "/api/dev-login?role=participant", matches: ["/event", "/trail"], color: "bg-green-600", activeColor: "bg-green-500 ring-2 ring-white" },
+  { label: "광고주", icon: "🧚", href: "/ads-portal", matches: ["/ads-portal"], color: "bg-amber-600", activeColor: "bg-amber-500 ring-2 ring-white" },
+  { label: "가맹점(지역상점)", icon: "🌳", href: "/store", matches: ["/store"], color: "bg-orange-600", activeColor: "bg-orange-500 ring-2 ring-white" },
 ];
+
+function matchesPortal(pathname: string, portal: Portal): boolean {
+  return portal.matches.some((m) => pathname.startsWith(m));
+}
 
 const QUICK_LINKS = [
   { label: "랜딩", icon: "🏠", href: "/" },
@@ -26,7 +39,7 @@ export function DevNav() {
   const [menuOpen, setMenuOpen] = useState(false);
   const pathname = usePathname();
 
-  const activePortal = PORTALS.find((p) => pathname.startsWith(p.match));
+  const activePortal = PORTALS.find((p) => matchesPortal(pathname, p));
 
   const handleSeed = async () => {
     if (!confirm("테스트 데이터를 초기화하고 새로 넣을까요?")) return;
@@ -61,7 +74,7 @@ export function DevNav() {
       )}
       <div className="h-4 w-px bg-neutral-600 flex-shrink-0" />
       {PORTALS.map((p) => {
-        const isActive = pathname.startsWith(p.match);
+        const isActive = matchesPortal(pathname, p);
         return (
           <a key={p.href} href={p.href}
             className={`whitespace-nowrap rounded px-2 py-0.5 font-semibold text-white transition-colors flex-shrink-0 ${isActive ? p.activeColor : p.color} hover:brightness-110`}>

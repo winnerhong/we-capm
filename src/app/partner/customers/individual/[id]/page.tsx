@@ -1,7 +1,9 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requirePartner } from "@/lib/auth-guard";
+import { AcornIcon } from "@/components/acorn-icon";
 import {
   deleteCustomerAction,
   updateTierAction,
@@ -299,7 +301,7 @@ export default async function CustomerDetailPage({
           tone="rose"
         />
         <StatCard
-          icon="🌰"
+          icon={<AcornIcon size={20} />}
           label="누적 도토리"
           value={`${Math.floor(c.total_spent / 100).toLocaleString("ko-KR")}개`}
           tone="sky"
@@ -555,7 +557,7 @@ function StatCard({
   value,
   tone,
 }: {
-  icon: string;
+  icon: ReactNode;
   label: string;
   value: string;
   tone: "forest" | "amber" | "rose" | "sky";

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { createReferralCodeAction } from "./actions";
+import { AcornIcon } from "@/components/acorn-icon";
 
 interface InviteClientProps {
   eventId: string;
@@ -34,7 +35,7 @@ export function InviteClient({ eventId, initialCode }: InviteClientProps) {
   const inviteUrl = code ? `${origin}/invite/${code}` : "";
   const displayUrl = code ? `toriro.com/invite/${code}` : "불러오는 중...";
 
-  const shareText = "토리로에서 재미있는 이벤트에 초대합니다! 가입하면 🌰 도토리 20개 선물!";
+  const shareText = "토리로에서 재미있는 이벤트에 초대합니다! 가입하면 도토리 20개 선물!";
 
   const handleCopy = async () => {
     if (!inviteUrl) return;
@@ -108,7 +109,7 @@ export function InviteClient({ eventId, initialCode }: InviteClientProps) {
         </div>
 
         <p className="mt-3 text-center text-[11px] text-[#6B6560]">
-          친구가 가입 후 첫 미션을 완료하면 🌰 20개가 지급돼요
+          친구가 가입 후 첫 미션을 완료하면 <AcornIcon /> 20개가 지급돼요
         </p>
       </div>
     </section>

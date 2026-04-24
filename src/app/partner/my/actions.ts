@@ -2,9 +2,50 @@
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requirePartner } from "@/lib/auth-guard";
 import { logAccess } from "@/lib/audit-log";
+
+function strOrNull(v: FormDataEntryValue | null): string | null {
+  const s = String(v ?? "").trim();
+  return s === "" ? null : s;
+}
+
+/** 회사 정보 + 정산 계좌 업데이트 */
+export async function updatePartnerProfileAction(formData: FormData) {
+  const partner = await requirePartner();
+  const supabase = await createClient();
+
+  const patch: Record<string, unknown> = {
+    business_name: strOrNull(formData.get("business_name")),
+    representative_name: strOrNull(formData.get("representative_name")),
+    business_number: strOrNull(formData.get("business_number")),
+    phone: strOrNull(formData.get("phone")),
+    email: strOrNull(formData.get("email")),
+    address: strOrNull(formData.get("address")),
+    bank_name: strOrNull(formData.get("bank_name")),
+    account_number: strOrNull(formData.get("account_number")),
+    account_holder: strOrNull(formData.get("account_holder")),
+  };
+
+  const { error } = await (
+    supabase.from("partners") as unknown as {
+      update: (p: unknown) => {
+        eq: (k: string, v: string) => Promise<{
+          error: { message: string } | null;
+        }>;
+      };
+    }
+  )
+    .update(patch as never)
+    .eq("id", partner.id);
+
+  if (error) throw new Error(`프로필 저장 실패: ${error.message}`);
+
+  revalidatePath("/partner/my");
+  redirect("/partner/my");
+}
 
 /**
  * 파트너 계약 해지 (PIPA 제36조 + 계약 해지)

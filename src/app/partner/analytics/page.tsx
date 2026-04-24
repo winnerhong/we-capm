@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getPartner } from "@/lib/auth-guard";
+import { AcornIcon } from "@/components/acorn-icon";
 
 export const dynamic = "force-dynamic";
 
@@ -454,7 +455,7 @@ export default async function PartnerAnalyticsPage({
         {/* 5. 도토리 크레딧 현황 */}
         <section className="rounded-2xl border border-[#E5D3B8] bg-gradient-to-br from-[#FFF8F0] to-[#FAE7D0] p-5 shadow-sm">
           <h2 className="mb-3 flex items-center gap-2 text-base font-bold text-[#6B4423]">
-            <span>🌰</span>
+            <AcornIcon size={18} />
             <span>도토리 크레딧</span>
           </h2>
           <div className="rounded-xl border border-[#E5D3B8] bg-white p-4">
@@ -463,7 +464,7 @@ export default async function PartnerAnalyticsPage({
             </p>
             <p className="mt-1 text-3xl font-extrabold text-[#6B4423]">
               {(partner?.acorn_balance ?? 0).toLocaleString("ko-KR")}
-              <span className="ml-1 text-base font-semibold">🌰</span>
+              <AcornIcon size={16} className="ml-1" />
             </p>
           </div>
           <div className="mt-3 grid grid-cols-2 gap-2 text-center">

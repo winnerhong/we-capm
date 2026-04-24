@@ -5,6 +5,7 @@ import { RealtimeRefresh } from "@/components/realtime-refresh";
 import type { StampTierConfig } from "@/lib/supabase/database.types";
 import { StampQRModal } from "./stamp-qr";
 import { AlbumSection } from "./album-section";
+import { AcornIcon } from "@/components/acorn-icon";
 
 export const dynamic = "force-dynamic";
 
@@ -150,7 +151,7 @@ export default async function EventStampsPage({ params }: { params: Promise<{ id
         <div className="mt-4 flex items-center gap-3">
           {/* Current tier badge */}
           <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-2xl bg-white/20 text-3xl">
-            {currentTier ? currentTier.emoji : "🌰"}
+            {currentTier ? currentTier.emoji : <AcornIcon size={32} />}
           </div>
           <div className="flex-1">
             <div className="flex items-center gap-2">
@@ -158,7 +159,7 @@ export default async function EventStampsPage({ params }: { params: Promise<{ id
                 {currentTier ? currentTier.label : "오늘, 어디로 걸어볼까요?"}
               </span>
               <span className="rounded-full bg-white/20 px-2 py-0.5 text-xs">
-                🌰 {stampCount}/{totalSlots}
+                <AcornIcon size={12} /> {stampCount}/{totalSlots}
               </span>
             </div>
             {/* Progress bar */}
@@ -200,7 +201,7 @@ export default async function EventStampsPage({ params }: { params: Promise<{ id
                   {t.label}
                 </div>
                 <div className={`text-[10px] mt-0.5 ${achieved ? "text-[#4A7C59]" : "text-[#6B6560]"}`}>
-                  {achieved ? "도달!" : `🌰 ${t.goal_count}개`}
+                  {achieved ? "도달!" : <><AcornIcon size={10} /> {t.goal_count}개</>}
                 </div>
               </div>
             );
@@ -232,7 +233,7 @@ export default async function EventStampsPage({ params }: { params: Promise<{ id
                         </span>
                       )}
                       <span className={`text-lg ${stamped ? "text-[#2D5A3D]" : "text-[#A8A49F]"}`}>
-                        {stamped ? "🌰" : "\u25CB"}
+                        {stamped ? <AcornIcon size={18} /> : "○"}
                       </span>
                     </div>
                   </div>

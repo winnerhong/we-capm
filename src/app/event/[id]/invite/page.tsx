@@ -3,6 +3,7 @@ import Link from "next/link";
 import { getParticipant } from "@/lib/participant-session";
 import { createClient } from "@/lib/supabase/server";
 import { InviteClient } from "./invite-client";
+import { AcornIcon } from "@/components/acorn-icon";
 
 export const dynamic = "force-dynamic";
 
@@ -91,7 +92,7 @@ export default async function InvitePage({ params }: { params: Promise<{ id: str
         <div className="text-5xl mb-2">🎁</div>
         <h1 className="text-2xl font-extrabold text-[#2D5A3D]">친구 초대하기</h1>
         <p className="mt-1 text-sm text-[#6B6560]">
-          친구를 초대하면 둘 다 <span className="font-bold text-[#C4956A]">🌰 20개</span>씩!
+          친구를 초대하면 둘 다 <span className="font-bold text-[#C4956A]"><AcornIcon className="text-[#C4956A]" /> 20개</span>씩!
         </p>
       </header>
 
@@ -114,8 +115,8 @@ export default async function InvitePage({ params }: { params: Promise<{ id: str
               <div className="mt-1 text-[11px] text-[#6B6560]">가입 완료</div>
             </div>
             <div className="rounded-2xl border-2 border-[#C4956A] bg-gradient-to-br from-[#FFF8F0] to-[#F5E6D3] p-4 text-center">
-              <div className="text-2xl font-extrabold text-[#C4956A]">
-                🌰{acornsEarned}
+              <div className="text-2xl font-extrabold text-[#C4956A] inline-flex items-center gap-1 justify-center w-full">
+                <AcornIcon size={20} className="text-[#C4956A]" />{acornsEarned}
               </div>
               <div className="mt-1 text-[11px] text-[#6B6560]">받은 도토리</div>
             </div>

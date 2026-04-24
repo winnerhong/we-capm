@@ -7,6 +7,7 @@ import { PhotoForm } from "./photo-form";
 import { LocationForm } from "./location-form";
 import { TimeattackForm } from "./timeattack-form";
 import { VideoForm } from "./video-form";
+import { AcornIcon } from "@/components/acorn-icon";
 
 export const dynamic = "force-dynamic";
 
@@ -62,7 +63,7 @@ export default async function MissionSubmitPage({
           </Link>
           <h1 className="mt-2 text-2xl font-bold">🌿 {mission.title}</h1>
           <p className="mt-1 text-sm opacity-90">{mission.description}</p>
-          <p className="mt-3 inline-block rounded-full bg-white/20 px-3 py-1 text-xs font-semibold">🌰 도토리 {mission.points}개</p>
+          <p className="mt-3 inline-flex items-center gap-1 rounded-full bg-white/20 px-3 py-1 text-xs font-semibold"><AcornIcon /> 도토리 {mission.points}개</p>
         </div>
 
         {existing && existing.status === "REJECTED" && existing.reject_reason && (
@@ -74,7 +75,7 @@ export default async function MissionSubmitPage({
         {!canSubmit ? (
           <div className="rounded-2xl border bg-white p-6 text-center">
             <p className="text-sm text-[#6B6560]">
-              {existing?.status === "PENDING" && "🌰 지기가 확인 중이에요"}
+              {existing?.status === "PENDING" && <><AcornIcon /> 지기가 확인 중이에요</>}
               {(existing?.status === "APPROVED" || existing?.status === "AUTO_APPROVED") &&
                 "🐾 이미 걸어온 숲길이에요"}
             </p>

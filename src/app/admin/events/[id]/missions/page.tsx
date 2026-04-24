@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { deleteMissionAction, toggleMissionActiveAction, duplicateMissionAction } from "./actions";
+import { AcornIcon } from "@/components/acorn-icon";
 
 export const dynamic = "force-dynamic";
 
@@ -68,7 +69,7 @@ export default async function MissionsPage({ params }: { params: Promise<{ id: s
                   {TEMPLATE_LABEL[m.template_type] ?? m.template_type}
                 </span>
                 <span className="font-semibold">{m.title}</span>
-                <span className="text-sm text-neutral-500">🌰 {m.points}</span>
+                <span className="inline-flex items-center gap-1 text-sm text-neutral-500"><AcornIcon /> {m.points}</span>
                 {m.auto_approve && (
                   <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs text-green-700">
                     자동 승인

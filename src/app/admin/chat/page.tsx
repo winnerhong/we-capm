@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
 import { WinnerTalkIcon } from "@/components/winner-talk-icon";
+import { AcornIcon } from "@/components/acorn-icon";
 
 export const dynamic = "force-dynamic";
 
@@ -125,7 +126,7 @@ export default async function AdminChatPage() {
         {events.length === 0 && (
           <div className="rounded-2xl border border-[#D4E4BC] bg-white p-12 text-center text-[#6B6560]">
             <WinnerTalkIcon size={48} />
-            <p className="mt-3">🌰 아직 숲길에 행사가 없어요</p>
+            <p className="mt-3 inline-flex items-center gap-1"><AcornIcon /> 아직 숲길에 행사가 없어요</p>
           </div>
         )}
       </div>

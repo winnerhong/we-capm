@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getPartner } from "@/lib/auth-guard";
 import { createClient } from "@/lib/supabase/server";
 import { AcornsForm } from "./acorns-form";
+import { AcornIcon } from "@/components/acorn-icon";
 
 export const dynamic = "force-dynamic";
 
@@ -54,7 +55,7 @@ export default async function PartnerAcornsPage() {
           Acorn Recharge
         </p>
         <h1 className="mt-2 flex items-center gap-2 text-2xl font-bold md:text-3xl">
-          <span>🌰</span>
+          <AcornIcon size={24} />
           <span>도토리 충전</span>
         </h1>
         <p className="mt-1 text-sm text-[#FFF8F0]">
@@ -65,7 +66,7 @@ export default async function PartnerAcornsPage() {
             현재 잔액
           </span>
           <span className="text-lg font-extrabold">
-            {balance.toLocaleString("ko-KR")}🌰
+            {balance.toLocaleString("ko-KR")}<AcornIcon size={16} />
           </span>
         </div>
       </section>
@@ -82,7 +83,7 @@ export default async function PartnerAcornsPage() {
         </h3>
         <ul className="mt-2 list-disc space-y-1 pl-5 text-xs leading-relaxed text-[#8B6F47]">
           <li>
-            기본 단가는 🌰 1개당 <b>1,000원</b>입니다 (공급가 기준).
+            기본 단가는 <AcornIcon /> 1개당 <b>1,000원</b>입니다 (공급가 기준).
           </li>
           <li>
             충전액이 클수록 보너스 비율이 올라가요:

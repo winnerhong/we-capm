@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState, useTransition } from "react";
 import { sendBroadcastAction, type BroadcastResult } from "./actions";
+import { AcornIcon } from "@/components/acorn-icon";
 
 type TemplateKey =
   | "EVENT_START"
@@ -398,8 +399,8 @@ export default function NotificationComposer({
                 {messageType === "PUSH" && (
                   <div className="rounded-2xl bg-neutral-100 border border-neutral-200 p-3 shadow-sm">
                     <div className="flex items-start gap-2">
-                      <div className="h-8 w-8 flex-shrink-0 rounded-lg bg-[#2D5A3D] flex items-center justify-center text-white text-sm">
-                        🌰
+                      <div className="h-8 w-8 flex-shrink-0 rounded-lg bg-[#2D5A3D] flex items-center justify-center text-white">
+                        <AcornIcon size={18} />
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between">

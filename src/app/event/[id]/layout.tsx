@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { WinnerTalkIcon } from "@/components/winner-talk-icon";
+import { AcornIcon } from "@/components/acorn-icon";
 
 export default function EventLayout({
   children,
@@ -35,7 +36,7 @@ async function EventTabBar({ paramsPromise }: { paramsPromise: Promise<{ id: str
           <span className="text-lg">🏆</span><span>숲지기 순위</span>
         </Link>
         <Link href={`/event/${id}/stamps`} className="flex flex-1 flex-col items-center gap-0.5 py-2 text-xs hover:bg-neutral-50">
-          <span className="text-lg">🌰</span><span>도토리</span>
+          <AcornIcon size={18} /><span>도토리</span>
         </Link>
       </div>
     </nav>

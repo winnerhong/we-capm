@@ -1,15 +1,23 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { redirect, notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getParticipant } from "@/lib/participant-session";
 import { ChallengeCard } from "@/components/challenge-card";
+import { AcornIcon } from "@/components/acorn-icon";
 
 export const dynamic = "force-dynamic";
 
-const PAST_CHALLENGES = [
-  { icon: "🌿", title: "지난주 챌린지", desc: "숲길 스탬프 5개 찍기", reward: "🌰 8", status: "완료" },
-  { icon: "🍂", title: "2주 전 챌린지", desc: "토리톡 첫 인사 남기기", reward: "🌰 3", status: "완료" },
-  { icon: "🌾", title: "3주 전 챌린지", desc: "함께한 사진 3장 올리기", reward: "🌰 5", status: "완료" },
+const PAST_CHALLENGES: Array<{
+  icon: string;
+  title: string;
+  desc: string;
+  reward: ReactNode;
+  status: string;
+}> = [
+  { icon: "🌿", title: "지난주 챌린지", desc: "숲길 스탬프 5개 찍기", reward: <><AcornIcon /> 8</>, status: "완료" },
+  { icon: "🍂", title: "2주 전 챌린지", desc: "토리톡 첫 인사 남기기", reward: <><AcornIcon /> 3</>, status: "완료" },
+  { icon: "🌾", title: "3주 전 챌린지", desc: "함께한 사진 3장 올리기", reward: <><AcornIcon /> 5</>, status: "완료" },
 ];
 
 export default async function ChallengesPage({ params }: { params: Promise<{ id: string }> }) {

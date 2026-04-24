@@ -1,13 +1,15 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { InvoiceStatusBadge } from "./invoice-status-badge";
+import { AcornIcon } from "@/components/acorn-icon";
 
 /**
  * 재사용 가능한 청구서 카드. 관리자/파트너/B2B/기관/가족 포털 전부에서 사용.
  * 서버 컴포넌트 호환 (클라이언트 상태 없음).
  */
 
-const CATEGORY_ICON: Record<string, string> = {
-  ACORN_RECHARGE: "🌰",
+const CATEGORY_ICON: Record<string, ReactNode> = {
+  ACORN_RECHARGE: <AcornIcon size={20} />,
   SUBSCRIPTION: "📅",
   EVENT_FEE: "🏕️",
   AD_CAMPAIGN: "📣",

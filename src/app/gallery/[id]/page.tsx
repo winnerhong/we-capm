@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Lightbox } from "./lightbox";
+import { AcornIcon } from "@/components/acorn-icon";
 
 export const dynamic = "force-dynamic";
 
@@ -58,7 +59,8 @@ const PLACEHOLDER_GRADIENTS = [
   "from-[#6B4423] to-[#B5956B]",
   "from-[#1F3D2B] to-[#4A7C59]",
 ];
-const PLACEHOLDER_EMOJIS = ["🌲", "🌳", "🍂", "🌰", "🐿️", "🦋", "🌾", "🌻"];
+// 갤러리 placeholder 이모지. 도토리는 AcornIcon 으로 별도 표기.
+const PLACEHOLDER_EMOJIS = ["🌲", "🌳", "🍂", "🌿", "🐿️", "🦋", "🌾", "🌻"];
 
 export default async function GalleryDetailPage({ params }: PageProps) {
   const { id } = await params;
@@ -161,9 +163,7 @@ export default async function GalleryDetailPage({ params }: PageProps) {
             href="/"
             className="flex items-center gap-2 font-bold text-[#2D5A3D]"
           >
-            <span className="text-lg" aria-hidden>
-              🌰
-            </span>
+            <AcornIcon size={18} />
             <span className="text-sm">토리로</span>
           </Link>
         </div>
@@ -228,8 +228,8 @@ export default async function GalleryDetailPage({ params }: PageProps) {
             <p className="mt-0.5 text-[11px] text-[#6B6560]">평균 만족도</p>
           </div>
           <div className="rounded-2xl border border-[#D4E4BC] bg-[#FFF8F0] p-4 text-center shadow-sm">
-            <div className="text-2xl" aria-hidden>
-              🌰
+            <div className="flex justify-center text-[#2D5A3D]">
+              <AcornIcon size={22} />
             </div>
             <p className="mt-1 text-2xl font-extrabold text-[#2D5A3D]">
               {totalScore.toLocaleString("ko-KR")}

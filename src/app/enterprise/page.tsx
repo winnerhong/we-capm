@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { InquiryForm } from "./inquiry-form";
+import { AcornIcon } from "@/components/acorn-icon";
 
 export const metadata: Metadata = {
   title: "기업 프로그램",
@@ -122,7 +123,7 @@ export default function EnterprisePage() {
       <header className="sticky top-0 z-20 border-b border-[#D4E4BC] bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
           <Link href="/" className="flex items-center gap-2 font-bold text-[#2D5A3D]">
-            <span className="text-xl">🌰</span>
+            <AcornIcon size={20} />
             <span>토리로</span>
             <span className="text-xs font-medium text-[#8B6F47]">for Enterprise</span>
           </Link>
@@ -141,7 +142,7 @@ export default function EnterprisePage() {
           <div className="absolute left-6 top-10 text-7xl">🌲</div>
           <div className="absolute right-10 top-20 text-6xl">🌳</div>
           <div className="absolute bottom-10 left-1/3 text-6xl">🍂</div>
-          <div className="absolute bottom-4 right-1/4 text-5xl">🌰</div>
+          <div className="absolute bottom-4 right-1/4 text-5xl"><AcornIcon size={40} /></div>
         </div>
         <div className="relative z-10 mx-auto max-w-4xl px-4 py-16 md:py-24">
           <p className="text-xs font-semibold tracking-[0.4em] text-[#D4E4BC]">
@@ -341,7 +342,7 @@ export default function EnterprisePage() {
       <footer className="border-t border-[#D4E4BC] bg-white py-8">
         <div className="mx-auto max-w-5xl px-4 text-center text-xs text-[#8B6F47]">
           <p className="flex items-center justify-center gap-1 font-bold text-[#2D5A3D]">
-            <span>🌰</span>
+            <AcornIcon />
             <span>토리로</span>
           </p>
           <p className="mt-2">기업 ESG 팀빌딩 · 가족 참여 이벤트 · 맞춤형 숲길 프로그램</p>

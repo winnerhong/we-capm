@@ -823,5 +823,543 @@ DROP POLICY IF EXISTS "partner_segments_all" ON partner_segments;
 CREATE POLICY "partner_segments_all" ON partner_segments FOR ALL USING (true) WITH CHECK (true);
 
 -- =====================================================
--- 완료! 28개 테이블 생성됨 (partner CRM: partner_orgs, partner_customers, partner_companies, partner_company_contacts, partner_bulk_imports, partner_segments 추가)
+-- Partner Marketing Center: 캠페인/자동화/미디어/외부리뷰/랜딩 (20260427)
+-- =====================================================
+
+-- 1) partner_campaigns (마케팅 캠페인)
+CREATE TABLE IF NOT EXISTS partner_campaigns (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  partner_id uuid NOT NULL REFERENCES partners(id) ON DELETE CASCADE,
+  name text NOT NULL,
+  goal text CHECK (goal IN ('AWARENESS','LEAD','CONVERSION','RETENTION','REVIEW')),
+  target_segment_id uuid,
+  target_filter jsonb DEFAULT '{}'::jsonb,
+  channels text[] DEFAULT '{}',
+  message_title text,
+  message_body text,
+  message_cta_url text,
+  schedule_type text CHECK (schedule_type IN ('IMMEDIATE','SCHEDULED','RECURRING')),
+  scheduled_at timestamptz,
+  recurring_rule jsonb,
+  status text NOT NULL DEFAULT 'DRAFT' CHECK (status IN ('DRAFT','SCHEDULED','SENDING','SENT','PAUSED','FAILED')),
+  sent_count int NOT NULL DEFAULT 0,
+  opened_count int NOT NULL DEFAULT 0,
+  clicked_count int NOT NULL DEFAULT 0,
+  converted_count int NOT NULL DEFAULT 0,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_partner_campaigns_partner ON partner_campaigns(partner_id);
+CREATE INDEX IF NOT EXISTS idx_partner_campaigns_status ON partner_campaigns(status);
+CREATE INDEX IF NOT EXISTS idx_partner_campaigns_scheduled ON partner_campaigns(scheduled_at);
+
+-- 2) partner_automations (자동화 시나리오)
+CREATE TABLE IF NOT EXISTS partner_automations (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  partner_id uuid NOT NULL REFERENCES partners(id) ON DELETE CASCADE,
+  name text NOT NULL,
+  trigger_type text NOT NULL CHECK (trigger_type IN ('SIGNUP','FIRST_PURCHASE','ABANDONED_CART','POST_EVENT','NO_ACTIVITY_30D','REVIEW_REQUEST','BIRTHDAY')),
+  trigger_config jsonb NOT NULL DEFAULT '{}'::jsonb,
+  actions jsonb NOT NULL DEFAULT '[]'::jsonb,
+  is_active boolean NOT NULL DEFAULT false,
+  executed_count int NOT NULL DEFAULT 0,
+  last_executed_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_partner_automations_partner ON partner_automations(partner_id);
+CREATE INDEX IF NOT EXISTS idx_partner_automations_active ON partner_automations(is_active);
+CREATE INDEX IF NOT EXISTS idx_partner_automations_trigger ON partner_automations(trigger_type);
+
+-- 3) partner_media_assets (이미지/영상 자산 라이브러리)
+CREATE TABLE IF NOT EXISTS partner_media_assets (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  partner_id uuid NOT NULL REFERENCES partners(id) ON DELETE CASCADE,
+  asset_type text NOT NULL CHECK (asset_type IN ('IMAGE','VIDEO','AUDIO')),
+  storage_path text NOT NULL,
+  public_url text,
+  file_name text,
+  file_size bigint,
+  mime_type text,
+  width int,
+  height int,
+  duration_sec int,
+  tags text[] NOT NULL DEFAULT '{}',
+  used_in jsonb NOT NULL DEFAULT '[]'::jsonb,
+  uploaded_by uuid,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_partner_media_partner ON partner_media_assets(partner_id);
+CREATE INDEX IF NOT EXISTS idx_partner_media_type ON partner_media_assets(asset_type);
+
+-- 4) partner_external_reviews (외부 플랫폼 리뷰 통합)
+CREATE TABLE IF NOT EXISTS partner_external_reviews (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  partner_id uuid NOT NULL REFERENCES partners(id) ON DELETE CASCADE,
+  program_id uuid REFERENCES partner_programs(id) ON DELETE SET NULL,
+  platform text NOT NULL CHECK (platform IN ('NAVER','GOOGLE','INSTAGRAM','BLOG','KAKAO','MANUAL')),
+  external_id text,
+  author_name text,
+  author_avatar text,
+  rating numeric(2,1),
+  content text,
+  published_at timestamptz,
+  response_text text,
+  response_at timestamptz,
+  sentiment text CHECK (sentiment IN ('POSITIVE','NEUTRAL','NEGATIVE')),
+  is_flagged boolean NOT NULL DEFAULT false,
+  source_url text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_partner_ext_reviews_partner ON partner_external_reviews(partner_id);
+CREATE INDEX IF NOT EXISTS idx_partner_ext_reviews_platform ON partner_external_reviews(platform);
+CREATE INDEX IF NOT EXISTS idx_partner_ext_reviews_program ON partner_external_reviews(program_id);
+CREATE INDEX IF NOT EXISTS idx_partner_ext_reviews_flagged ON partner_external_reviews(is_flagged);
+
+-- 5) partner_landing_pages (랜딩 페이지 빌더 - Phase 1 stub)
+CREATE TABLE IF NOT EXISTS partner_landing_pages (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  partner_id uuid NOT NULL REFERENCES partners(id) ON DELETE CASCADE,
+  slug text NOT NULL,
+  title text NOT NULL,
+  hero_image_url text,
+  hero_headline text,
+  hero_subheadline text,
+  blocks jsonb NOT NULL DEFAULT '[]'::jsonb,
+  theme jsonb NOT NULL DEFAULT '{}'::jsonb,
+  status text NOT NULL DEFAULT 'DRAFT' CHECK (status IN ('DRAFT','PUBLISHED','ARCHIVED')),
+  published_at timestamptz,
+  view_count int NOT NULL DEFAULT 0,
+  conversion_count int NOT NULL DEFAULT 0,
+  meta_title text,
+  meta_description text,
+  og_image_url text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE(partner_id, slug)
+);
+CREATE INDEX IF NOT EXISTS idx_partner_landing_partner ON partner_landing_pages(partner_id);
+CREATE INDEX IF NOT EXISTS idx_partner_landing_status ON partner_landing_pages(status);
+
+ALTER TABLE partner_campaigns ENABLE ROW LEVEL SECURITY;
+ALTER TABLE partner_automations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE partner_media_assets ENABLE ROW LEVEL SECURITY;
+ALTER TABLE partner_external_reviews ENABLE ROW LEVEL SECURITY;
+ALTER TABLE partner_landing_pages ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "partner_campaigns_all" ON partner_campaigns;
+CREATE POLICY "partner_campaigns_all" ON partner_campaigns FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "partner_automations_all" ON partner_automations;
+CREATE POLICY "partner_automations_all" ON partner_automations FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "partner_media_assets_all" ON partner_media_assets;
+CREATE POLICY "partner_media_assets_all" ON partner_media_assets FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "partner_external_reviews_all" ON partner_external_reviews;
+CREATE POLICY "partner_external_reviews_all" ON partner_external_reviews FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "partner_landing_pages_all" ON partner_landing_pages;
+CREATE POLICY "partner_landing_pages_all" ON partner_landing_pages FOR ALL USING (true) WITH CHECK (true);
+
+-- ============================================================
+-- Partner Trails: 나만의 숲길 (QR·미션)
+-- ============================================================
+
+-- 1) partner_trails (숲길 템플릿)
+CREATE TABLE IF NOT EXISTS partner_trails (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  partner_id uuid NOT NULL REFERENCES partners(id) ON DELETE CASCADE,
+  name text NOT NULL,
+  description text,
+  cover_image_url text,
+  difficulty text NOT NULL DEFAULT 'EASY' CHECK (difficulty IN ('EASY','MEDIUM','HARD')),
+  estimated_minutes int,
+  distance_km numeric(4,2),
+  total_slots int NOT NULL DEFAULT 0,
+  theme jsonb NOT NULL DEFAULT '{}'::jsonb,
+  is_public boolean NOT NULL DEFAULT false,
+  slug text,
+  view_count int NOT NULL DEFAULT 0,
+  completion_count int NOT NULL DEFAULT 0,
+  status text NOT NULL DEFAULT 'DRAFT' CHECK (status IN ('DRAFT','PUBLISHED','ARCHIVED')),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE(partner_id, slug)
+);
+CREATE INDEX IF NOT EXISTS idx_partner_trails_partner ON partner_trails(partner_id);
+CREATE INDEX IF NOT EXISTS idx_partner_trails_status ON partner_trails(status);
+
+-- 2) partner_trail_stops (지점/POI)
+CREATE TABLE IF NOT EXISTS partner_trail_stops (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  trail_id uuid NOT NULL REFERENCES partner_trails(id) ON DELETE CASCADE,
+  "order" int NOT NULL DEFAULT 0,
+  name text NOT NULL,
+  description text,
+  location_hint text,
+  lat double precision,
+  lng double precision,
+  photo_url text,
+  qr_code text NOT NULL UNIQUE,
+  mission_type text NOT NULL CHECK (mission_type IN ('PHOTO','QUIZ','LOCATION','CHECKIN')),
+  mission_config jsonb NOT NULL DEFAULT '{}'::jsonb,
+  reward_points int NOT NULL DEFAULT 10,
+  is_active boolean NOT NULL DEFAULT true,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE(trail_id, "order")
+);
+CREATE INDEX IF NOT EXISTS idx_trail_stops_trail ON partner_trail_stops(trail_id);
+CREATE INDEX IF NOT EXISTS idx_trail_stops_qr ON partner_trail_stops(qr_code);
+
+-- 3) partner_trail_completions (완주 기록)
+CREATE TABLE IF NOT EXISTS partner_trail_completions (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  trail_id uuid NOT NULL REFERENCES partner_trails(id) ON DELETE CASCADE,
+  event_id uuid REFERENCES events(id) ON DELETE SET NULL,
+  participant_phone text,
+  participant_name text,
+  stops_cleared text[] NOT NULL DEFAULT '{}',
+  total_score int NOT NULL DEFAULT 0,
+  started_at timestamptz NOT NULL DEFAULT now(),
+  completed_at timestamptz,
+  certificate_url text
+);
+CREATE INDEX IF NOT EXISTS idx_trail_completions_trail ON partner_trail_completions(trail_id);
+CREATE INDEX IF NOT EXISTS idx_trail_completions_phone ON partner_trail_completions(participant_phone);
+CREATE INDEX IF NOT EXISTS idx_trail_completions_event ON partner_trail_completions(event_id);
+
+ALTER TABLE partner_trails ENABLE ROW LEVEL SECURITY;
+ALTER TABLE partner_trail_stops ENABLE ROW LEVEL SECURITY;
+ALTER TABLE partner_trail_completions ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "partner_trails_all" ON partner_trails;
+CREATE POLICY "partner_trails_all" ON partner_trails FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "partner_trail_stops_all" ON partner_trail_stops;
+CREATE POLICY "partner_trail_stops_all" ON partner_trail_stops FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "partner_trail_completions_all" ON partner_trail_completions;
+CREATE POLICY "partner_trail_completions_all" ON partner_trail_completions FOR ALL USING (true) WITH CHECK (true);
+
+-- =====================================================
+-- Org Programs (기관 프로그램 템플릿 활성화)
+-- 기관(partner_orgs)이 partner_programs 카탈로그에서 "활성화" 버튼으로
+-- 스냅샷을 자기 계정에 복제 → 자유 편집 후 이용자에게 공개
+-- =====================================================
+
+CREATE TABLE IF NOT EXISTS org_programs (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  org_id uuid NOT NULL REFERENCES partner_orgs(id) ON DELETE CASCADE,
+  source_program_id uuid REFERENCES partner_programs(id) ON DELETE SET NULL,
+  source_partner_id uuid,
+
+  title text NOT NULL,
+  description text,
+  category text NOT NULL,
+  duration_hours numeric,
+  capacity_min int DEFAULT 5,
+  capacity_max int DEFAULT 30,
+  price_per_person int NOT NULL DEFAULT 0,
+  location_detail text,
+  image_url text,
+  tags text[],
+
+  custom_theme jsonb NOT NULL DEFAULT '{}'::jsonb,
+  custom_notes text,
+
+  status text NOT NULL DEFAULT 'ACTIVATED' CHECK (status IN ('ACTIVATED','CUSTOMIZED','PUBLISHED','PAUSED','ARCHIVED')),
+  is_published boolean NOT NULL DEFAULT false,
+
+  booking_count int NOT NULL DEFAULT 0,
+  view_count int NOT NULL DEFAULT 0,
+
+  activated_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_org_programs_org ON org_programs(org_id);
+CREATE INDEX IF NOT EXISTS idx_org_programs_source ON org_programs(source_program_id);
+CREATE INDEX IF NOT EXISTS idx_org_programs_status ON org_programs(status);
+
+ALTER TABLE org_programs ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "org_programs_all" ON org_programs;
+CREATE POLICY "org_programs_all" ON org_programs FOR ALL USING (true) WITH CHECK (true);
+
+-- =====================================================
+-- Program Distribution (Phase 1)
+-- 선택 배포(visibility) + 기획 필드 확장 + assignments junction
+-- =====================================================
+
+-- partner_programs 확장
+ALTER TABLE partner_programs ADD COLUMN IF NOT EXISTS visibility text NOT NULL DEFAULT 'DRAFT'
+  CHECK (visibility IN ('DRAFT','ALL','SELECTED','ARCHIVED'));
+
+ALTER TABLE partner_programs ADD COLUMN IF NOT EXISTS long_description text;
+ALTER TABLE partner_programs ADD COLUMN IF NOT EXISTS schedule_items jsonb NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE partner_programs ADD COLUMN IF NOT EXISTS required_items text[] NOT NULL DEFAULT '{}';
+ALTER TABLE partner_programs ADD COLUMN IF NOT EXISTS safety_notes text;
+ALTER TABLE partner_programs ADD COLUMN IF NOT EXISTS target_audience text;
+ALTER TABLE partner_programs ADD COLUMN IF NOT EXISTS images text[] NOT NULL DEFAULT '{}';
+ALTER TABLE partner_programs ADD COLUMN IF NOT EXISTS faq jsonb NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE partner_programs ADD COLUMN IF NOT EXISTS linked_trail_id uuid REFERENCES partner_trails(id) ON DELETE SET NULL;
+
+UPDATE partner_programs
+  SET visibility = 'ALL'
+  WHERE is_published = true AND visibility = 'DRAFT';
+
+CREATE INDEX IF NOT EXISTS idx_partner_programs_visibility ON partner_programs(visibility);
+CREATE INDEX IF NOT EXISTS idx_partner_programs_linked_trail ON partner_programs(linked_trail_id);
+
+-- partner_program_assignments (선택 배포 junction)
+CREATE TABLE IF NOT EXISTS partner_program_assignments (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  program_id uuid NOT NULL REFERENCES partner_programs(id) ON DELETE CASCADE,
+  org_id uuid NOT NULL REFERENCES partner_orgs(id) ON DELETE CASCADE,
+  assigned_by uuid,
+  assigned_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE(program_id, org_id)
+);
+CREATE INDEX IF NOT EXISTS idx_assignments_program ON partner_program_assignments(program_id);
+CREATE INDEX IF NOT EXISTS idx_assignments_org ON partner_program_assignments(org_id);
+
+ALTER TABLE partner_program_assignments ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "partner_program_assignments_all" ON partner_program_assignments;
+CREATE POLICY "partner_program_assignments_all" ON partner_program_assignments FOR ALL USING (true) WITH CHECK (true);
+
+-- =====================================================
+-- Trail Distribution (Phase 1)
+-- 선택 배포(visibility) + assignments junction
+-- =====================================================
+
+-- partner_trails에 visibility 컬럼 추가 (status와 공존, 점진 이관)
+ALTER TABLE partner_trails ADD COLUMN IF NOT EXISTS visibility text NOT NULL DEFAULT 'DRAFT'
+  CHECK (visibility IN ('DRAFT','ALL','SELECTED','ARCHIVED'));
+
+UPDATE partner_trails SET visibility = 'ALL'
+  WHERE status = 'PUBLISHED' AND visibility = 'DRAFT';
+UPDATE partner_trails SET visibility = 'ARCHIVED'
+  WHERE status = 'ARCHIVED' AND visibility = 'DRAFT';
+
+CREATE INDEX IF NOT EXISTS idx_partner_trails_visibility ON partner_trails(visibility);
+
+-- partner_trail_assignments (선택 배포 junction)
+CREATE TABLE IF NOT EXISTS partner_trail_assignments (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  trail_id uuid NOT NULL REFERENCES partner_trails(id) ON DELETE CASCADE,
+  org_id uuid NOT NULL REFERENCES partner_orgs(id) ON DELETE CASCADE,
+  assigned_by uuid,
+  assigned_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE(trail_id, org_id)
+);
+CREATE INDEX IF NOT EXISTS idx_trail_assignments_trail ON partner_trail_assignments(trail_id);
+CREATE INDEX IF NOT EXISTS idx_trail_assignments_org ON partner_trail_assignments(org_id);
+
+ALTER TABLE partner_trail_assignments ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "partner_trail_assignments_all" ON partner_trail_assignments;
+CREATE POLICY "partner_trail_assignments_all" ON partner_trail_assignments FOR ALL USING (true) WITH CHECK (true);
+
+-- =====================================================
+-- Reviews Management Phase 1 (MVP)
+-- event_reviews: response_text / response_at / is_flagged 컬럼 추가
+-- =====================================================
+
+ALTER TABLE event_reviews ADD COLUMN IF NOT EXISTS response_text text;
+ALTER TABLE event_reviews ADD COLUMN IF NOT EXISTS response_at timestamptz;
+ALTER TABLE event_reviews ADD COLUMN IF NOT EXISTS is_flagged boolean NOT NULL DEFAULT false;
+
+CREATE INDEX IF NOT EXISTS idx_event_reviews_event ON event_reviews(event_id);
+CREATE INDEX IF NOT EXISTS idx_event_reviews_rating ON event_reviews(rating);
+
+-- =====================================================
+-- Partner Team Members (Phase 1 MVP)
+-- 파트너(지사)별 팀원 계정 — role/status 기반 RBAC
+-- =====================================================
+
+CREATE TABLE IF NOT EXISTS partner_team_members (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  partner_id uuid NOT NULL REFERENCES partners(id) ON DELETE CASCADE,
+  name text NOT NULL,
+  email text,
+  phone text,
+  username text NOT NULL,
+  password_hash text NOT NULL,
+  role text NOT NULL CHECK (role IN ('OWNER','MANAGER','STAFF','FINANCE','VIEWER')),
+  status text NOT NULL DEFAULT 'PENDING'
+    CHECK (status IN ('PENDING','ACTIVE','SUSPENDED','DELETED')),
+  invited_by uuid,
+  invited_at timestamptz NOT NULL DEFAULT now(),
+  activated_at timestamptz,
+  last_login_at timestamptz,
+  suspended_at timestamptz,
+  memo text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE(partner_id, username)
+);
+CREATE INDEX IF NOT EXISTS idx_team_members_partner ON partner_team_members(partner_id);
+CREATE INDEX IF NOT EXISTS idx_team_members_status ON partner_team_members(status);
+CREATE INDEX IF NOT EXISTS idx_team_members_username ON partner_team_members(username);
+
+ALTER TABLE partner_team_members ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "partner_team_members_all" ON partner_team_members;
+CREATE POLICY "partner_team_members_all" ON partner_team_members
+  FOR ALL USING (true) WITH CHECK (true);
+
+-- =====================================================
+-- Event Team Assignments (Phase 1 MVP)
+-- 행사별 팀장/부팀장/지원 팀원 배정
+-- =====================================================
+
+CREATE TABLE IF NOT EXISTS event_team_assignments (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  event_id uuid NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  team_member_id uuid NOT NULL REFERENCES partner_team_members(id) ON DELETE CASCADE,
+  role text NOT NULL DEFAULT 'ASSISTANT'
+    CHECK (role IN ('LEADER','ASSISTANT','SUPPORT')),
+  memo text,
+  assigned_by uuid,
+  assigned_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE(event_id, team_member_id)
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS one_leader_per_event
+  ON event_team_assignments(event_id)
+  WHERE role = 'LEADER';
+
+CREATE INDEX IF NOT EXISTS idx_event_team_event ON event_team_assignments(event_id);
+CREATE INDEX IF NOT EXISTS idx_event_team_member ON event_team_assignments(team_member_id);
+
+ALTER TABLE event_team_assignments ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "event_team_assignments_all" ON event_team_assignments;
+CREATE POLICY "event_team_assignments_all" ON event_team_assignments
+  FOR ALL USING (true) WITH CHECK (true);
+
+-- =====================================================
+-- Partner Documents (Phase 1 MVP)
+-- 파트너 서류 제출/검토: 버전 관리 + 만료 추적
+-- =====================================================
+
+CREATE TABLE IF NOT EXISTS partner_documents (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  partner_id uuid NOT NULL REFERENCES partners(id) ON DELETE CASCADE,
+  doc_type text NOT NULL CHECK (doc_type IN (
+    'BUSINESS_REG','BANKBOOK','CEO_ID','CONTRACT',
+    'INSURANCE','REFUND_POLICY',
+    'FOREST_CERT','CPR_CERT','SAFETY_INSPECT'
+  )),
+  file_url text NOT NULL,
+  file_name text,
+  file_size bigint,
+  mime_type text,
+  status text NOT NULL DEFAULT 'PENDING'
+    CHECK (status IN ('PENDING','APPROVED','REJECTED','EXPIRED')),
+  submitted_at timestamptz NOT NULL DEFAULT now(),
+  reviewed_at timestamptz,
+  reviewed_by uuid,
+  reject_reason text,
+  expires_at timestamptz,
+  version int NOT NULL DEFAULT 1,
+  notes text,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_partner_documents_partner ON partner_documents(partner_id);
+CREATE INDEX IF NOT EXISTS idx_partner_documents_status ON partner_documents(status);
+CREATE INDEX IF NOT EXISTS idx_partner_documents_expires ON partner_documents(expires_at);
+CREATE INDEX IF NOT EXISTS idx_partner_documents_type ON partner_documents(doc_type);
+
+ALTER TABLE partner_documents ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "partner_documents_all" ON partner_documents;
+CREATE POLICY "partner_documents_all" ON partner_documents
+  FOR ALL USING (true) WITH CHECK (true);
+
+-- Storage 버킷 (민감 문서용, 비공개)
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES ('partner-documents', 'partner-documents', false, 5242880,
+  ARRAY['application/pdf','image/jpeg','image/png','image/webp']::text[])
+ON CONFLICT (id) DO UPDATE SET
+  public = excluded.public,
+  file_size_limit = excluded.file_size_limit,
+  allowed_mime_types = excluded.allowed_mime_types;
+
+DROP POLICY IF EXISTS "partner-documents: upload" ON storage.objects;
+CREATE POLICY "partner-documents: upload" ON storage.objects
+  FOR INSERT TO anon, authenticated
+  WITH CHECK (bucket_id = 'partner-documents');
+
+DROP POLICY IF EXISTS "partner-documents: read" ON storage.objects;
+CREATE POLICY "partner-documents: read" ON storage.objects
+  FOR SELECT TO anon, authenticated
+  USING (bucket_id = 'partner-documents');
+
+DROP POLICY IF EXISTS "partner-documents: delete" ON storage.objects;
+CREATE POLICY "partner-documents: delete" ON storage.objects
+  FOR DELETE TO anon, authenticated
+  USING (bucket_id = 'partner-documents');
+
+-- =====================================================
+-- Org Documents (Phase 1 MVP)
+-- 기관(partner_orgs) 서류 관리: 직접 제출 OR 지사 대행
+-- =====================================================
+
+CREATE TABLE IF NOT EXISTS org_documents (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  org_id uuid NOT NULL REFERENCES partner_orgs(id) ON DELETE CASCADE,
+  partner_id uuid REFERENCES partners(id) ON DELETE SET NULL,
+  doc_type text NOT NULL CHECK (doc_type IN (
+    'BUSINESS_REG','BANKBOOK','TAX_CONTRACT',
+    'INSURANCE','FACILITY_CONSENT','PRIVACY_CONSENT'
+  )),
+  file_url text NOT NULL,
+  file_name text,
+  file_size bigint,
+  mime_type text,
+  status text NOT NULL DEFAULT 'PENDING'
+    CHECK (status IN ('PENDING','APPROVED','REJECTED','EXPIRED')),
+  uploaded_by text NOT NULL DEFAULT 'ORG'
+    CHECK (uploaded_by IN ('ORG','PARTNER')),
+  uploaded_by_id uuid,
+  submitted_at timestamptz NOT NULL DEFAULT now(),
+  reviewed_at timestamptz,
+  reviewed_by uuid,
+  reject_reason text,
+  expires_at timestamptz,
+  version int NOT NULL DEFAULT 1,
+  notes text,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_org_documents_org ON org_documents(org_id);
+CREATE INDEX IF NOT EXISTS idx_org_documents_partner ON org_documents(partner_id);
+CREATE INDEX IF NOT EXISTS idx_org_documents_status ON org_documents(status);
+CREATE INDEX IF NOT EXISTS idx_org_documents_type ON org_documents(doc_type);
+
+ALTER TABLE org_documents ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "org_documents_all" ON org_documents;
+CREATE POLICY "org_documents_all" ON org_documents FOR ALL USING (true) WITH CHECK (true);
+
+-- =====================================================
+-- Partner Doc Templates (Phase 2)
+-- 지사 커스텀 서류 템플릿 업로드 (위탁계약서/시설동의서/개인정보동의서)
+-- 한 지사당 doc_type 1개 (UPSERT 덮어쓰기)
+-- =====================================================
+
+CREATE TABLE IF NOT EXISTS partner_doc_templates (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  partner_id uuid NOT NULL REFERENCES partners(id) ON DELETE CASCADE,
+  doc_type text NOT NULL CHECK (doc_type IN (
+    'TAX_CONTRACT','FACILITY_CONSENT','PRIVACY_CONSENT'
+  )),
+  file_url text NOT NULL,
+  file_name text,
+  file_size bigint,
+  mime_type text,
+  version int NOT NULL DEFAULT 1,
+  notes text,
+  uploaded_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE(partner_id, doc_type)
+);
+CREATE INDEX IF NOT EXISTS idx_partner_doc_templates_partner ON partner_doc_templates(partner_id);
+
+ALTER TABLE partner_doc_templates ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "partner_doc_templates_all" ON partner_doc_templates;
+CREATE POLICY "partner_doc_templates_all" ON partner_doc_templates
+  FOR ALL USING (true) WITH CHECK (true);
+
+-- =====================================================
+-- 완료! 44개 테이블 생성됨 (partner_doc_templates 추가)
 -- =====================================================

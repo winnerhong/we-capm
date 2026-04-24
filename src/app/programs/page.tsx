@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { AcornIcon } from "@/components/acorn-icon";
 
 export const metadata: Metadata = {
   title: "프로그램 둘러보기",
@@ -90,12 +91,26 @@ function renderStars(avg: number | null, count: number): string {
 
 async function loadPrograms(): Promise<Program[]> {
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("partner_programs")
+  // visibility=ALL만 공개 (SELECTED는 기관 템플릿 카탈로그에서만 노출)
+  // 구 is_published도 함께 읽어 DB 미마이그레이션 행은 fallback 허용
+  const { data, error } = await (
+    supabase.from("partner_programs") as unknown as {
+      select: (c: string) => {
+        or: (cond: string) => {
+          order: (
+            col: string,
+            opts: { ascending: boolean }
+          ) => {
+            limit: (n: number) => Promise<{ data: Program[] | null; error: unknown }>;
+          };
+        };
+      };
+    }
+  )
     .select(
-      "id,partner_id,title,description,category,duration_hours,capacity_min,capacity_max,price_per_person,b2b_price_per_person,location_region,image_url,tags,rating_avg,rating_count,booking_count,created_at"
+      "id,partner_id,title,description,category,duration_hours,capacity_min,capacity_max,price_per_person,b2b_price_per_person,location_region,image_url,tags,rating_avg,rating_count,booking_count,created_at,visibility,is_published"
     )
-    .eq("is_published", true)
+    .or("visibility.eq.ALL,and(visibility.is.null,is_published.eq.true)")
     .order("booking_count", { ascending: false })
     .limit(60);
   if (error) {
@@ -163,9 +178,7 @@ export default async function ProgramsPage({
       <header className="sticky top-0 z-20 border-b border-[#D4E4BC] bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
           <Link href="/" className="flex items-center gap-2 font-bold text-[#2D5A3D]">
-            <span className="text-xl" aria-hidden>
-              🌰
-            </span>
+            <AcornIcon size={20} />
             <span>토리로</span>
           </Link>
           <Link
@@ -383,7 +396,7 @@ export default async function ProgramsPage({
       <footer className="border-t border-[#D4E4BC] bg-white py-8">
         <div className="mx-auto max-w-6xl px-4 text-center text-xs text-[#8B6F47]">
           <p className="flex items-center justify-center gap-1 font-bold text-[#2D5A3D]">
-            <span aria-hidden>🌰</span>
+            <AcornIcon />
             <span>토리로</span>
           </p>
           <p className="mt-2">

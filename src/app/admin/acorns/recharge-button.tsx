@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { RechargeModal, type PartnerLite } from "./recharge-modal";
+import { AcornIcon } from "@/components/acorn-icon";
 
 /**
  * 관리자 페이지에서 충전 모달을 여는 버튼 + 선택자 묶음.
@@ -33,7 +34,7 @@ export function RechargeButton({ partners }: { partners: PartnerLite[] }) {
             partners.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
-                {p.business_name ? ` (${p.business_name})` : ""} · 🌰{" "}
+                {p.business_name ? ` (${p.business_name})` : ""} · 도토리{" "}
                 {p.acorn_balance.toLocaleString("ko-KR")}
               </option>
             ))
@@ -44,9 +45,9 @@ export function RechargeButton({ partners }: { partners: PartnerLite[] }) {
         type="button"
         onClick={() => setOpen(true)}
         disabled={partners.length === 0}
-        className="whitespace-nowrap rounded-xl bg-[#2D5A3D] px-5 py-3 text-sm font-bold text-white shadow-sm transition-colors hover:bg-[#1F4229] disabled:opacity-50 disabled:cursor-not-allowed sm:self-end"
+        className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl bg-[#2D5A3D] px-5 py-3 text-sm font-bold text-white shadow-sm transition-colors hover:bg-[#1F4229] disabled:opacity-50 disabled:cursor-not-allowed sm:self-end"
       >
-        🌰 충전하기
+        <AcornIcon /> 충전하기
       </button>
 
       <RechargeModal

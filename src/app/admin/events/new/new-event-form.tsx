@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import { createEventAction } from "../actions";
-import { SchoolSelect } from "./school-select";
+import { ManagerPicker, type OrgCandidate } from "./manager-picker";
 import { EventImport } from "./event-import";
+import { AcornIcon } from "@/components/acorn-icon";
 
 interface School { id: number; name: string; username: string; phone: string; district: string }
 interface ExtEvent {
@@ -19,7 +20,7 @@ function toLocalInput(iso: string) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-export function NewEventForm({ schools, externalEvents }: { schools: School[]; externalEvents: ExtEvent[] }) {
+export function NewEventForm({ schools, orgs, externalEvents }: { schools: School[]; orgs: OrgCandidate[]; externalEvents: ExtEvent[] }) {
   const [name, setName] = useState("");
   const [startAt, setStartAt] = useState("");
   const [endAt, setEndAt] = useState("");
@@ -52,10 +53,10 @@ export function NewEventForm({ schools, externalEvents }: { schools: School[]; e
       <form action={createEventAction} className="space-y-4 rounded-2xl border border-[#D4E4BC] bg-white p-6">
         <input type="hidden" name="type" value="FAMILY" />
 
-        <SchoolSelect schools={schools} preSelectedId={selectedSchoolId} />
+        <ManagerPicker schools={schools} orgs={orgs} preSelectedSchoolId={selectedSchoolId} />
 
         <div>
-          <label className="mb-1 block text-sm font-medium text-[#2C2C2C]">🌰 행사명</label>
+          <label className="mb-1 block text-sm font-medium text-[#2C2C2C]"><AcornIcon /> 행사명</label>
           <input name="name" value={name} onChange={(e) => setName(e.target.value)}
             required placeholder="예) 5월 가족 숲길 탐험"
             className="w-full rounded-xl border border-[#D4E4BC] px-3 py-2 outline-none focus:ring-2 focus:ring-[#2D5A3D]" />

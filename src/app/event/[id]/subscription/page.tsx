@@ -1,8 +1,10 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getParticipant } from "@/lib/participant-session";
 import { SubscriptionActions } from "./subscription-actions";
+import { AcornIcon } from "@/components/acorn-icon";
 
 export const dynamic = "force-dynamic";
 
@@ -21,14 +23,14 @@ type SubscriptionRow = {
 
 const TIER_META: Record<
   SubscriptionRow["tier"],
-  { emoji: string; name: string; benefits: string[]; accent: string; cardBg: string }
+  { emoji: string; name: string; benefits: ReactNode[]; accent: string; cardBg: string }
 > = {
   SPROUT: {
     emoji: "🌱",
     name: "새싹 플랜",
     benefits: [
       "월 2회 다람이 참여 가능",
-      "🌰 매월 도토리 500개",
+      <><AcornIcon /> 매월 도토리 500개</>,
       "기본 사진 무료",
       "일반 대비 27% 할인",
     ],
@@ -40,7 +42,7 @@ const TIER_META: Record<
     name: "나무 플랜",
     benefits: [
       "월 4회 다람이 참여 가능",
-      "🌰 매월 도토리 1,200개",
+      <><AcornIcon /> 매월 도토리 1,200개</>,
       "기본 사진 + 영상 무료",
       "우선 예약권",
       "가맹점 쿠폰 월 3장",
@@ -53,7 +55,7 @@ const TIER_META: Record<
     name: "숲 플랜 VIP",
     benefits: [
       "월 무제한 다람이 참여",
-      "🌰 매월 도토리 2,500개",
+      <><AcornIcon /> 매월 도토리 2,500개</>,
       "📦 월간 구독 박스",
       "🎁 오늘 사진 1회 무료",
       "전담 매니저 케어",
@@ -151,8 +153,8 @@ export default async function SubscriptionPage({
 function EmptyState({ eventId }: { eventId: string }) {
   return (
     <section className="rounded-3xl border border-[#E6D3B8] bg-white p-8 text-center shadow-sm">
-      <div className="text-5xl" aria-hidden="true">
-        🌰
+      <div className="text-5xl text-[#C4956A]" aria-hidden="true">
+        <AcornIcon size={48} />
       </div>
       <h2 className="mt-3 text-xl font-bold text-[#2D5A3D]">
         아직 구독하지 않으셨어요
@@ -224,9 +226,9 @@ function CurrentSubscription({
         </div>
 
         <ul className="mt-4 grid gap-2">
-          {meta.benefits.map((b) => (
+          {meta.benefits.map((b, i) => (
             <li
-              key={b}
+              key={i}
               className="flex items-start gap-2 text-sm text-[#3C3731]"
             >
               <span

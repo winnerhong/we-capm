@@ -1,10 +1,11 @@
 "use client";
 import Link from "next/link";
 import { useState } from "react";
+import { AcornIcon } from "@/components/acorn-icon";
 
 type Item = {
   key: string;
-  icon: string;
+  icon: React.ReactNode;
   title: string;
   body: React.ReactNode;
 };
@@ -24,7 +25,7 @@ export function HelpAccordion({ eventId }: { eventId: string }) {
             퀴즈를 풀거나, 장소를 방문하는 등 다양한 형태가 있어요.
           </p>
           <p className="mt-2">
-            한 숲길을 완료하면 <strong>도토리 🌰</strong>를 받아요.
+            한 숲길을 완료하면 <strong>도토리 <AcornIcon /></strong>를 받아요.
           </p>
           <Link
             href={`/event/${eventId}/missions`}
@@ -37,7 +38,7 @@ export function HelpAccordion({ eventId }: { eventId: string }) {
     },
     {
       key: "acorn",
-      icon: "🌰",
+      icon: <AcornIcon size={24} />,
       title: "도토리는 어떻게 모아요?",
       body: (
         <>
@@ -71,7 +72,7 @@ export function HelpAccordion({ eventId }: { eventId: string }) {
               <div key={l.n} className="flex-1">
                 <div className="text-2xl">{l.e}</div>
                 <div className="text-[10px] font-semibold text-[#2D5A3D]">{l.n}</div>
-                <div className="text-[9px] text-[#6B6560]">🌰 {l.m}</div>
+                <div className="text-[9px] text-[#6B6560]"><AcornIcon size={10} /> {l.m}</div>
               </div>
             ))}
           </div>
@@ -127,7 +128,7 @@ export function HelpAccordion({ eventId }: { eventId: string }) {
       body: (
         <>
           <p>
-            모은 도토리 🌰 수를 기준으로 순위가 결정돼요. 동점일 경우 먼저 도달한
+            모은 도토리 <AcornIcon /> 수를 기준으로 순위가 결정돼요. 동점일 경우 먼저 도달한
             사람이 상위에 표시돼요.
           </p>
           <p className="mt-2 text-[#6B6560]">

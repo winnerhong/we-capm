@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useRouter, useParams } from "next/navigation";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { SubscribeCard, type Tier } from "./subscribe-card";
+import { AcornIcon } from "@/components/acorn-icon";
 
 const TIERS: Tier[] = [
   {
@@ -15,7 +16,7 @@ const TIERS: Tier[] = [
     isPopular: false,
     features: [
       "월 2회 다람이 참여 가능",
-      "🌰 매월 도토리 500개",
+      <><AcornIcon /> 매월 도토리 500개</>,
       "기본 사진 무료",
       "일반 대비 27% 할인",
     ],
@@ -29,7 +30,7 @@ const TIERS: Tier[] = [
     isPopular: true,
     features: [
       "월 4회 다람이 참여 가능",
-      "🌰 매월 도토리 1,200개",
+      <><AcornIcon /> 매월 도토리 1,200개</>,
       "기본 사진 + 영상 무료",
       "우선 예약권",
       "가맹점 쿠폰 월 3장",
@@ -45,7 +46,7 @@ const TIERS: Tier[] = [
     isPopular: false,
     features: [
       "월 무제한 다람이 참여",
-      "🌰 매월 도토리 2,500개",
+      <><AcornIcon /> 매월 도토리 2,500개</>,
       "📦 월간 구독 박스 포함",
       "🎁 오늘 사진 1회 무료",
       "모든 행사 우선 예약",
@@ -66,7 +67,7 @@ const COMPARE_ROWS: Array<{ label: string; sprout: string; tree: string; forest:
   { label: "할인율", sprout: "27%", tree: "38%", forest: "50%" },
 ];
 
-const FAQS: Array<{ q: string; a: string }> = [
+const FAQS: Array<{ q: string; a: ReactNode }> = [
   {
     q: "구독은 언제든 해지할 수 있나요?",
     a: "네, 언제든지 마이페이지에서 한 번의 클릭으로 해지하실 수 있어요. 해지 시 다음 결제일부터 자동 결제가 중단되며, 이미 결제한 달은 마지막 날까지 모든 혜택을 계속 이용하실 수 있어요.",
@@ -77,7 +78,13 @@ const FAQS: Array<{ q: string; a: string }> = [
   },
   {
     q: "도토리는 어떻게 쓰나요?",
-    a: "🌰 도토리는 행사 현장에서 간식·기념품으로 바꾸거나, 제휴 가맹점(카페·숙소·체험장)에서 할인에 쓸 수 있어요. 1도토리 = 약 100원 가치예요.",
+    a: (
+      <>
+        <AcornIcon /> 도토리는 행사 현장에서 간식·기념품으로 바꾸거나, 제휴
+        가맹점(카페·숙소·체험장)에서 할인에 쓸 수 있어요. 1도토리 = 약 100원
+        가치예요.
+      </>
+    ),
   },
   {
     q: "환불은 가능한가요?",

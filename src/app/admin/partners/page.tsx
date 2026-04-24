@@ -1,6 +1,11 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { countPendingDocumentsByPartner } from "@/lib/documents/queries";
+import { loadPartnerProfileSnapshot } from "@/lib/profile-completeness/queries";
+import { calcCompleteness } from "@/lib/profile-completeness/calculator";
+import { PARTNER_PROFILE_SCHEMA } from "@/lib/profile-completeness/schemas/partner";
 import { PartnerRowActions } from "./partner-row-actions";
+import { AcornIcon } from "@/components/acorn-icon";
 
 export const dynamic = "force-dynamic";
 
@@ -86,6 +91,35 @@ export default async function AdminPartnersPage() {
     }
   }
 
+  // 파트너별 서류 PENDING 개수 맵 (테이블 미존재 시 빈 맵)
+  let docPendingMap: Map<string, number> = new Map();
+  if (!tableMissing) {
+    try {
+      docPendingMap = await countPendingDocumentsByPartner();
+    } catch {
+      docPendingMap = new Map();
+    }
+  }
+
+  // 파트너별 프로필 완성도 % (병렬 로드)
+  const completenessMap = new Map<string, number>();
+  if (!tableMissing && partners.length > 0) {
+    const results = await Promise.all(
+      partners.map(async (p) => {
+        try {
+          const snap = await loadPartnerProfileSnapshot(p.id);
+          return {
+            id: p.id,
+            percent: calcCompleteness(PARTNER_PROFILE_SCHEMA, snap).percent,
+          };
+        } catch {
+          return { id: p.id, percent: 0 };
+        }
+      })
+    );
+    for (const r of results) completenessMap.set(r.id, r.percent);
+  }
+
   const totalCount = partners.length;
   const activeCount = partners.filter((p) => p.status === "ACTIVE").length;
   const pendingCount = partners.filter((p) => p.status === "PENDING").length;
@@ -93,6 +127,20 @@ export default async function AdminPartnersPage() {
   const avgCommission = totalCount
     ? partners.reduce((acc, p) => acc + (p.commission_rate ?? 0), 0) / totalCount
     : 0;
+
+  // 온보딩 지표
+  const onboardingStats = (() => {
+    if (partners.length === 0) {
+      return { avg: 0, under50: 0, complete: 0 };
+    }
+    const values = partners.map((p) => completenessMap.get(p.id) ?? 0);
+    const sum = values.reduce((a, b) => a + b, 0);
+    return {
+      avg: Math.round(sum / values.length),
+      under50: values.filter((v) => v < 50).length,
+      complete: values.filter((v) => v >= 100).length,
+    };
+  })();
 
   return (
     <div className="space-y-6">
@@ -162,6 +210,48 @@ export default async function AdminPartnersPage() {
         </div>
       </div>
 
+      {/* 🌱 온보딩 현황 위젯 */}
+      {!tableMissing && partners.length > 0 && (
+        <section className="rounded-2xl border border-[#D4E4BC] bg-gradient-to-br from-[#E8F0E4] via-white to-[#FFF8F0] p-4 md:p-5">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h3 className="flex items-center gap-1.5 text-sm font-bold text-[#2D5A3D]">
+                <span>🌱</span>
+                <span>지사 온보딩 현황</span>
+              </h3>
+              <p className="mt-0.5 text-[11px] text-[#6B6560]">
+                프로필 완성도가 낮은 지사는 운영에 문제가 생길 수 있어요.
+              </p>
+            </div>
+            <span className="rounded-full bg-white/60 px-2 py-0.5 text-[10px] font-semibold text-[#2D5A3D]">
+              지사 {totalCount}곳 기준
+            </span>
+          </div>
+          <div className="mt-3 grid grid-cols-3 gap-2">
+            <div className="rounded-xl border border-[#D4E4BC] bg-white p-3">
+              <div className="text-[10px] font-semibold text-[#6B6560]">평균 완성도</div>
+              <div className="mt-0.5 text-2xl font-bold text-[#2D5A3D]">
+                {onboardingStats.avg}%
+              </div>
+            </div>
+            <div className="rounded-xl border border-rose-200 bg-rose-50 p-3">
+              <div className="text-[10px] font-semibold text-rose-700">50% 미만</div>
+              <div className="mt-0.5 text-2xl font-bold text-rose-800">
+                {onboardingStats.under50}
+                <span className="ml-0.5 text-xs font-semibold">곳</span>
+              </div>
+            </div>
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+              <div className="text-[10px] font-semibold text-emerald-700">완료(100%)</div>
+              <div className="mt-0.5 text-2xl font-bold text-emerald-800">
+                {onboardingStats.complete}
+                <span className="ml-0.5 text-xs font-semibold">곳</span>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* 리스트 */}
       <section>
         <h2 className="mb-2 text-sm font-bold text-[#2D5A3D]">🌲 등록된 숲지기</h2>
@@ -214,7 +304,12 @@ export default async function AdminPartnersPage() {
                             {s.label}
                           </span>
                         </div>
-                        <div className="mt-1 truncate font-bold text-[#2C2C2C]">{p.name}</div>
+                        <Link
+                          href={`/admin/partners/${p.id}`}
+                          className="mt-1 block truncate font-bold text-[#2C2C2C] hover:text-[#2D5A3D] hover:underline"
+                        >
+                          {p.name}
+                        </Link>
                         {p.business_name && (
                           <div className="truncate text-xs text-[#6B6560]">{p.business_name}</div>
                         )}
@@ -233,7 +328,7 @@ export default async function AdminPartnersPage() {
                       <div className="rounded-lg bg-[#FFF8F0] p-2">
                         <div className="text-[10px] text-[#8B6F47]">도토리</div>
                         <div className="text-xs font-bold text-[#2D5A3D]">
-                          🌰 {fmtNumber(p.acorn_balance ?? 0)}
+                          <AcornIcon /> {fmtNumber(p.acorn_balance ?? 0)}
                         </div>
                       </div>
                       <div className="rounded-lg bg-[#FFF8F0] p-2">
@@ -243,7 +338,17 @@ export default async function AdminPartnersPage() {
                         </div>
                       </div>
                     </div>
-                    <div className="mt-3">
+                    <div className="mt-3 flex flex-wrap gap-1.5">
+                      <CompletenessMini
+                        percent={completenessMap.get(p.id) ?? 0}
+                        partnerId={p.id}
+                      />
+                      <DocStatusBadge
+                        partnerId={p.id}
+                        pending={docPendingMap.get(p.id) ?? 0}
+                      />
+                    </div>
+                    <div className="mt-2">
                       <PartnerRowActions
                         id={p.id}
                         status={p.status}
@@ -264,9 +369,11 @@ export default async function AdminPartnersPage() {
                     <th className="px-4 py-3 font-semibold">숲지기</th>
                     <th className="px-4 py-3 font-semibold">등급</th>
                     <th className="px-4 py-3 font-semibold">상태</th>
+                    <th className="px-4 py-3 font-semibold">🌱 완성도</th>
                     <th className="px-4 py-3 text-right font-semibold">총매출</th>
                     <th className="px-4 py-3 text-right font-semibold">도토리</th>
                     <th className="px-4 py-3 text-right font-semibold">커미션</th>
+                    <th className="px-4 py-3 font-semibold">📄 서류</th>
                     <th className="px-4 py-3 font-semibold">가입일</th>
                     <th className="px-4 py-3 font-semibold">작업</th>
                   </tr>
@@ -278,7 +385,12 @@ export default async function AdminPartnersPage() {
                     return (
                       <tr key={p.id} className="hover:bg-[#FFF8F0]/40">
                         <td className="px-4 py-3">
-                          <div className="font-semibold text-[#2C2C2C]">{p.name}</div>
+                          <Link
+                            href={`/admin/partners/${p.id}`}
+                            className="font-semibold text-[#2C2C2C] hover:text-[#2D5A3D] hover:underline"
+                          >
+                            {p.name}
+                          </Link>
                           {p.business_name && (
                             <div className="text-xs text-[#6B6560]">{p.business_name}</div>
                           )}
@@ -298,13 +410,25 @@ export default async function AdminPartnersPage() {
                             {s.label}
                           </span>
                         </td>
+                        <td className="px-4 py-3">
+                          <CompletenessMini
+                            percent={completenessMap.get(p.id) ?? 0}
+                            partnerId={p.id}
+                          />
+                        </td>
                         <td className="px-4 py-3 text-right font-semibold text-[#2D5A3D]">
                           {fmtNumber(p.total_sales ?? 0)}원
                         </td>
                         <td className="px-4 py-3 text-right text-[#2D5A3D]">
-                          🌰 {fmtNumber(p.acorn_balance ?? 0)}
+                          <AcornIcon /> {fmtNumber(p.acorn_balance ?? 0)}
                         </td>
                         <td className="px-4 py-3 text-right">{p.commission_rate}%</td>
+                        <td className="px-4 py-3">
+                          <DocStatusBadge
+                            partnerId={p.id}
+                            pending={docPendingMap.get(p.id) ?? 0}
+                          />
+                        </td>
                         <td className="px-4 py-3 text-xs text-[#6B6560]">
                           {fmtDate(p.created_at)}
                         </td>
@@ -338,5 +462,63 @@ export default async function AdminPartnersPage() {
         </p>
       </section>
     </div>
+  );
+}
+
+function CompletenessMini({
+  partnerId,
+  percent,
+}: {
+  partnerId: string;
+  percent: number;
+}) {
+  let tone = "border-rose-200 bg-rose-50 text-rose-700";
+  let icon = "🌱";
+  if (percent >= 100) {
+    tone = "border-emerald-300 bg-emerald-50 text-emerald-800";
+    icon = "🎉";
+  } else if (percent >= 80) {
+    tone = "border-emerald-200 bg-emerald-50 text-emerald-700";
+    icon = "🌳";
+  } else if (percent >= 50) {
+    tone = "border-amber-200 bg-amber-50 text-amber-700";
+    icon = "🌿";
+  }
+  return (
+    <Link
+      href={`/admin/partners/${partnerId}`}
+      className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2 py-0.5 text-[11px] font-semibold hover:opacity-80 ${tone}`}
+      title={`프로필 완성도 ${percent}%`}
+    >
+      <span aria-hidden>{icon}</span>
+      <span>{percent}%</span>
+    </Link>
+  );
+}
+
+function DocStatusBadge({
+  partnerId,
+  pending,
+}: {
+  partnerId: string;
+  pending: number;
+}) {
+  if (pending > 0) {
+    return (
+      <Link
+        href={`/admin/partners/${partnerId}/documents`}
+        className="inline-flex items-center gap-1 whitespace-nowrap rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800 hover:bg-amber-100"
+      >
+        ⏳ 검토중 {pending}건
+      </Link>
+    );
+  }
+  return (
+    <Link
+      href={`/admin/partners/${partnerId}/documents`}
+      className="inline-flex items-center gap-1 whitespace-nowrap rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-800 hover:bg-emerald-100"
+    >
+      ✅ 승인완료
+    </Link>
   );
 }
