@@ -225,16 +225,15 @@ export function QuickAddUser({
         )}
 
         {siblings.length < 9 && (
-          <div className="flex justify-center">
-            <button
-              type="button"
-              onClick={addSibling}
-              disabled={isPending}
-              className="inline-flex items-center gap-1 rounded-lg border border-dashed border-[#6B4423] bg-white px-2.5 py-1.5 text-[11px] font-semibold text-[#6B4423] transition hover:bg-[#FFF8F0] disabled:opacity-50"
-            >
-              + 형제/자매 추가
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={addSibling}
+            disabled={isPending}
+            className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-[#6B4423] bg-white px-4 py-2 text-xs font-semibold text-[#6B4423] transition hover:bg-[#FFF8F0] disabled:opacity-50"
+          >
+            <span aria-hidden>👫</span>
+            <span>+ 형제/자매 추가</span>
+          </button>
         )}
       </form>
 

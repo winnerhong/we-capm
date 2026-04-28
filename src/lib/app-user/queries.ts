@@ -101,6 +101,46 @@ export async function loadAppUserByPhone(
 }
 
 /**
+ * 여러 보호자의 자녀 이름을 한 번에 로드 — userId → 이름 배열.
+ *  - 등록(is_enrolled=true) 된 자녀가 있으면 그 자녀들만 반환
+ *  - 없으면 모든 자녀 이름 반환
+ *  - 자녀가 전혀 없으면 빈 배열
+ */
+export async function loadChildNamesByUserIds(
+  userIds: string[]
+): Promise<Map<string, string[]>> {
+  const map = new Map<string, string[]>();
+  if (userIds.length === 0) return map;
+  const supabase = await createClient();
+  const resp = (await (
+    supabase.from("app_children" as never) as unknown as {
+      select: (c: string) => {
+        in: (
+          k: string,
+          v: string[]
+        ) => Promise<SbResp<AppChildRow>>;
+      };
+    }
+  )
+    .select("*")
+    .in("user_id", userIds)) as SbResp<AppChildRow>;
+  for (const row of resp.data ?? []) {
+    if (!row.name?.trim()) continue;
+    const arr = map.get(row.user_id) ?? [];
+    arr.push({ name: row.name.trim(), enrolled: row.is_enrolled } as never);
+    map.set(row.user_id, arr as never);
+  }
+  // 후처리 — enrolled 있으면 그것만, 없으면 전부
+  const out = new Map<string, string[]>();
+  for (const [uid, raw] of map.entries()) {
+    const list = raw as unknown as { name: string; enrolled: boolean }[];
+    const enrolled = list.filter((x) => x.enrolled).map((x) => x.name);
+    out.set(uid, enrolled.length > 0 ? enrolled : list.map((x) => x.name));
+  }
+  return out;
+}
+
+/**
  * 보호자의 아이 목록 (오래된 순)
  */
 export async function loadChildrenForUser(

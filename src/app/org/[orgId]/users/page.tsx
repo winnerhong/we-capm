@@ -515,7 +515,7 @@ export default async function OrgUsersPage({
         </section>
       )}
 
-      {/* 빠른 원생 추가 — 행사 선택 필수. 전체 모드에서는 안내 메시지만. */}
+      {/* 빠른 원생 추가 — 행사 선택 시 자동 연결, 전체 모드면 기관 전체로 등록. */}
       {selectedEvent ? (
         <div className="rounded-2xl border-l-4 border-emerald-400 bg-emerald-50/60 p-1 shadow-sm">
           <p className="px-3 pb-1 pt-2 text-[11px] font-bold text-emerald-800">
@@ -532,32 +532,50 @@ export default async function OrgUsersPage({
           />
         </div>
       ) : (
-        <section
-          aria-label="행사 선택 필요"
-          className="rounded-2xl border-2 border-dashed border-[#E5D3B8] bg-[#FFFDF8] px-5 py-6 text-center"
-        >
-          <div className="mb-2 text-3xl" aria-hidden>
-            🎪
-          </div>
-          <p className="text-sm font-bold text-[#2D5A3D]">
-            먼저 어느 행사에 등록할지 선택해 주세요
-          </p>
-          <p className="mt-1 text-[11px] text-[#6B6560]">
-            참가자는 <b>행사별로 따로</b> 등록해요. 위쪽{" "}
+        <div className="space-y-2">
+          <p className="px-1 text-[11px] text-[#6B6560]">
+            💡 행사 선택 없이 등록하면 <b className="text-[#2D5A3D]">기관 전체</b>{" "}
+            참가자로 추가돼요. 특정 행사에 묶고 싶으면 위{" "}
             <span className="font-bold text-[#2D5A3D]">🎪 행사별로 보기</span>{" "}
-            영역에서 행사를 클릭하면 빠른 등록 폼이 활성화됩니다.
+            에서 행사를 먼저 클릭해 주세요.
           </p>
-          {events.length === 0 && (
-            <Link
-              href={`/org/${orgId}/events/new`}
-              className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-[#2D5A3D] px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-[#234a30]"
-            >
-              <span aria-hidden>➕</span>
-              <span>먼저 새 행사 만들기</span>
-            </Link>
-          )}
-        </section>
+          <QuickAddUser orgId={orgId} />
+        </div>
       )}
+
+      {/* 📥 엑셀 일괄 등록 — 빠른 추가 폼 바로 아래 안내 카드 */}
+      <Link
+        href={
+          selectedEvent
+            ? `/org/${orgId}/users/bulk-import?event=${selectedEvent.event_id}`
+            : `/org/${orgId}/users/bulk-import`
+        }
+        className="flex items-center gap-3 rounded-2xl border-2 border-dashed border-[#E5D3B8] bg-[#FFFDF8] px-4 py-3 shadow-sm transition hover:border-[#6B4423] hover:bg-[#FFF8F0]"
+      >
+        <span className="text-2xl" aria-hidden>
+          📥
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-bold text-[#6B4423]">
+            엑셀 일괄 등록
+          </p>
+          <p className="mt-0.5 text-[11px] text-[#6B6560]">
+            여러 명을 한 번에 등록하려면 엑셀 / CSV 파일을 올려주세요
+            {selectedEvent && (
+              <>
+                {" · "}
+                <b className="text-emerald-800">
+                  &quot;{selectedEvent.name || "(이름 없음)"}&quot;
+                </b>{" "}
+                행사에 자동 연결
+              </>
+            )}
+          </p>
+        </div>
+        <span className="text-xs font-bold text-[#6B4423]" aria-hidden>
+          →
+        </span>
+      </Link>
 
       {/* 검색 — 행사 필터를 유지. 행사 모드는 emerald 좌측 stripe + 톤. */}
       <form

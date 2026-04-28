@@ -108,13 +108,7 @@ function buildGroups(orgId: string, badges: OrgNavBadges): NavGroup[] {
       icon: "🙋",
       match: [`${base}/users`],
       items: [
-        { label: "참가자 목록", href: `${base}/users`, icon: "📋" },
-        { label: "한 명 등록", href: `${base}/users/new`, icon: "➕" },
-        {
-          label: "엑셀 일괄 등록",
-          href: `${base}/users/bulk-import`,
-          icon: "📥",
-        },
+        { label: "참가자", href: `${base}/users`, icon: "🙋" },
       ],
     },
     // ───── 4단계 ─────
@@ -130,29 +124,23 @@ function buildGroups(orgId: string, badges: OrgNavBadges): NavGroup[] {
         `${base}/trails`,
         `${base}/missions/catalog`,
         `${base}/templates`,
-        `${base}/tori-fm`,
       ],
       badge: unpubBadge,
       items: [
+        { label: "내 프로그램", href: `${base}/programs`, icon: "🗂" },
         {
           label: "스탬프북 관리",
           href: `${base}/quest-packs`,
           icon: "🌲",
           badge: unpubBadge,
         },
-        {
-          label: "토리FM 세션 만들기",
-          href: `${base}/tori-fm`,
-          icon: "📻",
-        },
-        { label: "내 프로그램", href: `${base}/programs`, icon: "🗂" },
         { label: "우리 숲길", href: `${base}/trails`, icon: "🗺" },
         {
           label: "미션 카탈로그",
           href: `${base}/missions/catalog`,
           icon: "🎯",
         },
-        { label: "지사 템플릿", href: `${base}/templates`, icon: "🪜" },
+        { label: "기본 템플릿", href: `${base}/templates`, icon: "🪜" },
       ],
     },
     // ───── 5단계 ─────

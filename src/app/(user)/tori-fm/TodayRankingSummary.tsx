@@ -10,6 +10,7 @@ import {
   loadTopSongs,
   loadTopStories,
 } from "@/lib/tori-fm/queries";
+import { loadChildNamesByUserIds } from "@/lib/app-user/queries";
 import type {
   FmTopArtistRow,
   FmTopChatterRow,
@@ -17,6 +18,23 @@ import type {
   FmTopSongRow,
   FmTopStoryRow,
 } from "@/lib/tori-fm/types";
+
+/** "{원생이름} 가족" / "{이름} 외 {N-1}명 가족" / fallback. */
+function familyLabel(
+  userId: string | null,
+  fallback: string | null,
+  childMap: Map<string, string[]>
+): string {
+  if (userId) {
+    const names = childMap.get(userId);
+    if (names && names.length > 0) {
+      if (names.length === 1) return `${names[0]} 가족`;
+      return `${names[0]} 외 ${names.length - 1}명 가족`;
+    }
+  }
+  if (fallback?.trim()) return `${fallback.trim()} 가족`;
+  return "익명 가족";
+}
 
 type Props = {
   sessionId: string | null;
@@ -170,7 +188,13 @@ function StorySection({ rows }: { rows: FmTopStoryRow[] }) {
   );
 }
 
-function FamilySection({ rows }: { rows: FmTopFamilyRow[] }) {
+function FamilySection({
+  rows,
+  childMap,
+}: {
+  rows: FmTopFamilyRow[];
+  childMap: Map<string, string[]>;
+}) {
   return (
     <div className="rounded-2xl bg-black/25 p-3">
       <SectionHeader>👨‍👩‍👧‍👦 오늘의 사연 가족 TOP 5</SectionHeader>
@@ -184,7 +208,7 @@ function FamilySection({ rows }: { rows: FmTopFamilyRow[] }) {
                 {rankBadge(i)}
               </span>
               <p className="min-w-0 flex-1 truncate text-[12px] font-bold text-white">
-                {f.parent_name || "익명 가족"}
+                {familyLabel(f.user_id, f.parent_name, childMap)}
               </p>
               <p className="flex-none text-[10px] text-white/70">
                 {f.request_count}회 ·{" "}
@@ -198,7 +222,13 @@ function FamilySection({ rows }: { rows: FmTopFamilyRow[] }) {
   );
 }
 
-function ChatterSection({ rows }: { rows: FmTopChatterRow[] }) {
+function ChatterSection({
+  rows,
+  childMap,
+}: {
+  rows: FmTopChatterRow[];
+  childMap: Map<string, string[]>;
+}) {
   return (
     <div className="rounded-2xl bg-black/25 p-3 md:col-span-2">
       <SectionHeader>💬 오늘의 수다왕 TOP 5</SectionHeader>
@@ -212,7 +242,7 @@ function ChatterSection({ rows }: { rows: FmTopChatterRow[] }) {
               className="rounded-full bg-white/10 px-3 py-1 text-[11px] text-white/90"
             >
               <span className="font-semibold">
-                {c.sender_name || "익명"}
+                {familyLabel(c.user_id, c.sender_name, childMap)}
               </span>{" "}
               <span className="text-amber-200/80">
                 {c.message_count}↑
@@ -250,6 +280,19 @@ export async function TodayRankingSummary({ sessionId }: Props) {
       loadTopChatters(sessionId, 5),
     ]);
 
+  // 자녀 이름 매핑 — Family + Chatter 행의 user_id 기준 한 번에 조회
+  const userIds = Array.from(
+    new Set(
+      [
+        ...topFamilies.map((f) => f.user_id),
+        ...topChatters
+          .map((c) => c.user_id)
+          .filter((u): u is string => typeof u === "string" && u.length > 0),
+      ].filter((u): u is string => typeof u === "string" && u.length > 0)
+    )
+  );
+  const childMap = await loadChildNamesByUserIds(userIds);
+
   return (
     <section className="rounded-3xl border border-amber-500/20 bg-gradient-to-br from-[#1B2B3A] via-[#243548] to-[#1B2B3A] p-5 text-white shadow-lg">
       <header>
@@ -265,8 +308,8 @@ export async function TodayRankingSummary({ sessionId }: Props) {
         <SongSection rows={topSongs} />
         <ArtistSection rows={topArtists} />
         <StorySection rows={topStories} />
-        <FamilySection rows={topFamilies} />
-        <ChatterSection rows={topChatters} />
+        <FamilySection rows={topFamilies} childMap={childMap} />
+        <ChatterSection rows={topChatters} childMap={childMap} />
       </div>
     </section>
   );

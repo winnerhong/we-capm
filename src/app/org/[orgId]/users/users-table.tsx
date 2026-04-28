@@ -98,6 +98,8 @@ function formatDateTime(iso: string | null): string {
   }
 }
 
+const PAGE_SIZE = 20;
+
 export function UsersTable({ orgId, rows, todayIso, events }: Props) {
   const router = useRouter();
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -108,9 +110,19 @@ export function UsersTable({ orgId, rows, todayIso, events }: Props) {
   // "행사에 추가" 드롭다운
   const [pickerEventId, setPickerEventId] = useState("");
 
+  // 페이지네이션 — 기본 20개, "더 보기" 누를수록 PAGE_SIZE 만큼 추가, "전체 보기"는 즉시 모두 노출.
+  const [visibleCount, setVisibleCount] = useState<number>(PAGE_SIZE);
+  const visibleRows = useMemo(
+    () => rows.slice(0, visibleCount),
+    [rows, visibleCount]
+  );
+  const hasMore = visibleCount < rows.length;
+  const expanded = visibleCount >= rows.length && rows.length > PAGE_SIZE;
+
   const allSelected = useMemo(
-    () => rows.length > 0 && rows.every((r) => selected.has(r.id)),
-    [rows, selected]
+    () =>
+      visibleRows.length > 0 && visibleRows.every((r) => selected.has(r.id)),
+    [visibleRows, selected]
   );
 
   function toggleOne(id: string): void {
@@ -124,9 +136,19 @@ export function UsersTable({ orgId, rows, todayIso, events }: Props) {
 
   function toggleAll(): void {
     if (allSelected) {
-      setSelected(new Set());
+      // 보이는 행에서 선택 해제 (보이지 않는 행에 대한 선택은 보존)
+      setSelected((prev) => {
+        const next = new Set(prev);
+        for (const r of visibleRows) next.delete(r.id);
+        return next;
+      });
     } else {
-      setSelected(new Set(rows.map((r) => r.id)));
+      // 보이는 행 모두 선택에 추가
+      setSelected((prev) => {
+        const next = new Set(prev);
+        for (const r of visibleRows) next.add(r.id);
+        return next;
+      });
     }
   }
 
@@ -370,7 +392,7 @@ export function UsersTable({ orgId, rows, todayIso, events }: Props) {
               </tr>
             </thead>
             <tbody>
-              {rows.map((r) => {
+              {visibleRows.map((r) => {
                 const status = STATUS_META[r.status] ?? STATUS_META.ACTIVE;
                 const displayName =
                   r.enrolled_names.length > 0
@@ -469,7 +491,7 @@ export function UsersTable({ orgId, rows, todayIso, events }: Props) {
 
       {/* ─── 모바일 카드 ─── */}
       <ul className="space-y-2 md:hidden">
-        {rows.map((r) => {
+        {visibleRows.map((r) => {
           const status = STATUS_META[r.status] ?? STATUS_META.ACTIVE;
           const displayName =
             r.enrolled_names.length > 0
@@ -566,6 +588,49 @@ export function UsersTable({ orgId, rows, todayIso, events }: Props) {
           );
         })}
       </ul>
+
+      {/* ─── 페이지네이션 푸터 — 20개 초과 시에만 노출 ─── */}
+      {rows.length > PAGE_SIZE && (
+        <div className="flex flex-col items-center gap-2 rounded-2xl border border-[#D4E4BC] bg-white px-4 py-3 shadow-sm sm:flex-row sm:justify-between">
+          <p className="text-[11px] font-semibold text-[#6B6560]">
+            <b className="text-[#2D5A3D]">{visibleRows.length}</b>
+            <span className="text-[#8B7F75]"> / </span>
+            <b className="text-[#2D5A3D]">{rows.length}</b>
+            <span className="text-[#8B7F75]"> 명 표시</span>
+          </p>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {hasMore && (
+              <button
+                type="button"
+                onClick={() =>
+                  setVisibleCount((v) => Math.min(rows.length, v + PAGE_SIZE))
+                }
+                className="rounded-xl border border-[#D4E4BC] bg-[#FFF8F0] px-3 py-1.5 text-xs font-bold text-[#2D5A3D] shadow-sm hover:bg-[#F5F1E8]"
+              >
+                ⬇ {PAGE_SIZE}명 더 보기
+              </button>
+            )}
+            {hasMore && (
+              <button
+                type="button"
+                onClick={() => setVisibleCount(rows.length)}
+                className="rounded-xl bg-gradient-to-r from-[#2D5A3D] to-[#3A7A52] px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:from-[#234a30] hover:to-[#2D5A3D]"
+              >
+                📂 전체 {rows.length}명 모두 보기
+              </button>
+            )}
+            {expanded && (
+              <button
+                type="button"
+                onClick={() => setVisibleCount(PAGE_SIZE)}
+                className="rounded-xl border border-[#D4E4BC] bg-white px-3 py-1.5 text-xs font-bold text-[#6B6560] shadow-sm hover:bg-[#F5F1E8]"
+              >
+                ⬆ 처음 {PAGE_SIZE}명만 보기
+              </button>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

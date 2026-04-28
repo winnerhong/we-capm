@@ -11,14 +11,13 @@ import {
 } from "@/lib/missions/queries";
 import type { RadioSubmissionPayload } from "@/lib/missions/types";
 import {
-  loadChatMessages,
   loadOpenSessionRequests,
   loadTopSongs,
 } from "@/lib/tori-fm/queries";
 import { loadOrgFmBrandName } from "@/lib/tori-fm/branding";
+import { loadOrgEventById } from "@/lib/org-events/queries";
 import { LiveFmRefresher } from "./LiveFmRefresher";
 import { MiniStage, type MiniStageNowPlaying } from "./MiniStage";
-import { ChatPanel } from "./ChatPanel";
 import { RequestsWithHearts } from "./RequestsWithHearts";
 import { SubmitRequestDialog } from "./SubmitRequestDialog";
 import { TodayRankingSummary } from "./TodayRankingSummary";
@@ -66,12 +65,19 @@ export default async function ToriFmPage() {
   const sessionLive = !!session?.is_live;
   const sessionId = session?.id ?? "";
 
-  const [chatMessages, requests, topSongs, userHearted] = await Promise.all([
-    session ? loadChatMessages(session.id, 50) : Promise.resolve([]),
+  // 행사 커버 이미지 — 라이브커머스 스타일 풀블리드 배경.
+  const event = session?.event_id
+    ? await loadOrgEventById(session.event_id)
+    : null;
+  const coverImageUrl = event?.cover_image_url ?? null;
+
+  const [requests, topSongs, userHearted] = await Promise.all([
     session ? loadOpenSessionRequests(session.id) : Promise.resolve([]),
     session ? loadTopSongs(session.id, 5) : Promise.resolve([]),
     Promise.resolve([] as string[]),
   ]);
+  // chatMessages — 더 이상 ChatPanel(드로어)이 없어 SSR 에서 받지 않음.
+  // 라이브 채팅은 ScreenEffectsLayer 가 Realtime 으로 바로 받아 DriftUpChat 으로 노출.
 
   const trendingSongs = topSongs.map((s) => ({
     song_title: s.song_title,
@@ -90,12 +96,13 @@ export default async function ToriFmPage() {
         </Link>
       </nav>
 
-      {/* 미니 전광판 — 클라이언트 주도 라이브 무대 (VFX 포함) */}
+      {/* 미니 전광판 — 라이브커머스 스타일 풀블리드 (행사 커버 + VFX + 드리프트 채팅 + 입력바) */}
       <MiniStage
         orgId={user.orgId}
         brandName={brandName}
         initialSession={session}
         initialNowPlaying={initialNowPlaying}
+        coverImageUrl={coverImageUrl}
       />
 
       {/* 사전예약 CTA — LIVE 아닐 때만 스탬프북 미션 연결.
@@ -142,14 +149,6 @@ export default async function ToriFmPage() {
           />
 
           <TodayRankingSummary sessionId={session.id} />
-
-          <ChatPanel
-            sessionId={sessionId}
-            initialMessages={chatMessages}
-            userId={user.id}
-            userLabel={user.parentName || "익명"}
-            isUserLoggedIn={true}
-          />
         </>
       )}
     </div>

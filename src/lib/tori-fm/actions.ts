@@ -11,6 +11,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireAppUser } from "@/lib/user-auth-guard";
 import { requireOrg } from "@/lib/org-auth-guard";
+import { loadChildrenForUser } from "@/lib/app-user/queries";
 import { loadFmSessionById } from "@/lib/missions/queries";
 import type { ReactionEmoji } from "@/lib/tori-fm/types";
 import { REACTION_EMOJIS } from "@/lib/tori-fm/types";
@@ -46,6 +47,25 @@ function clampString(
 /* ========================================================================== */
 
 /**
+ * 보호자의 자녀 이름을 "{이름} 가족" 형태의 표시명으로 변환한다.
+ *  - 원생(is_enrolled=true) 우선, 여러 명이면 "{첫이름} 외 {N-1}명 가족"
+ *  - 자녀 정보가 없으면 부모 이름 + 가족 → 최후 "익명 가족"
+ */
+function deriveDisplayName(
+  children: { name: string; is_enrolled: boolean }[],
+  parentName: string
+): string {
+  const enrolled = children.filter((c) => c.is_enrolled && c.name?.trim());
+  const named = enrolled.length > 0 ? enrolled : children.filter((c) => c.name?.trim());
+  if (named.length === 1) return `${named[0].name.trim()} 가족`;
+  if (named.length >= 2) {
+    return `${named[0].name.trim()} 외 ${named.length - 1}명 가족`;
+  }
+  if (parentName?.trim()) return `${parentName.trim()} 가족`;
+  return "익명 가족";
+}
+
+/**
  * 채팅 메시지 보내기 — 1~300자.
  */
 export async function sendChatMessageAction(
@@ -61,6 +81,13 @@ export async function sendChatMessageAction(
     throw new Error("메시지는 300자까지만 보낼 수 있어요");
   }
 
+  // 자녀 이름을 표시명으로 사용 (없으면 부모 이름 fallback)
+  const children = await loadChildrenForUser(user.id);
+  const displayName = deriveDisplayName(
+    children.map((c) => ({ name: c.name, is_enrolled: c.is_enrolled })),
+    user.parentName
+  );
+
   const supabase = await createClient();
   const resp = (await (
     supabase.from("tori_fm_chat_messages" as never) as unknown as {
@@ -70,7 +97,7 @@ export async function sendChatMessageAction(
     session_id: sessionId,
     user_id: user.id,
     sender_type: "USER",
-    sender_name: user.parentName || "익명",
+    sender_name: displayName,
     message: text,
   } satisfies Row)) as { error: SbErr };
 

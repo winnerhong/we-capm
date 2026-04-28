@@ -6,9 +6,11 @@ import { createFmSessionAction } from "@/lib/missions/review-actions";
 
 type Props = {
   orgId: string;
+  /** 있으면 새 세션이 이 행사에 자동 연결됩니다. */
+  eventId?: string;
 };
 
-export function CreateSessionForm({ orgId }: Props) {
+export function CreateSessionForm({ orgId, eventId }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
@@ -33,6 +35,7 @@ export function CreateSessionForm({ orgId }: Props) {
     fd.set("name", name.trim());
     fd.set("scheduled_start", scheduledStart);
     fd.set("scheduled_end", scheduledEnd);
+    if (eventId) fd.set("event_id", eventId);
 
     startTransition(async () => {
       try {
