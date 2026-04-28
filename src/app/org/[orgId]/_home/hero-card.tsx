@@ -7,14 +7,14 @@ type Props = {
 };
 
 export function HeroCard({ dashboard, orgId }: Props) {
-  const { orgName, managerName, todayStats } = dashboard;
+  const { orgName, todayStats } = dashboard;
 
   return (
     <section className="overflow-hidden rounded-3xl bg-gradient-to-br from-[#2D5A3D] via-[#3A7A52] to-[#4A7C59] p-5 shadow-lg">
       <div className="flex items-start justify-between gap-3">
-        <p className="min-w-0 flex-1 truncate text-sm font-semibold text-[#D4E4BC]">
+        <h1 className="min-w-0 flex-1 truncate text-xl font-bold text-white sm:text-2xl">
           🌲 {orgName}
-        </p>
+        </h1>
         <Link
           href={`/org/${orgId}/settings`}
           className="shrink-0 rounded-full bg-white/15 px-3 py-1.5 text-xs font-bold text-white backdrop-blur-sm transition hover:bg-white/25"
@@ -22,10 +22,6 @@ export function HeroCard({ dashboard, orgId }: Props) {
           설정 →
         </Link>
       </div>
-
-      <h1 className="mt-3 truncate text-xl font-bold text-white sm:text-2xl">
-        👋 {managerName || "기관 관리자"} 선생님
-      </h1>
 
       <div className="mt-4 grid grid-cols-3 gap-2">
         <MiniStat

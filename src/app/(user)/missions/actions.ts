@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAppUser } from "@/lib/user-auth-guard";
 import {
   loadBroadcastById,
@@ -32,6 +33,91 @@ type Row = Record<string, unknown>;
 
 function asStr(v: unknown): string {
   return typeof v === "string" ? v.trim() : "";
+}
+
+/* -------------------------------------------------------------------------- */
+/* uploadMissionPhotoAction — 미션 제출 사진 업로드 (서비스 롤)                 */
+/* -------------------------------------------------------------------------- */
+
+const SUBMISSION_BUCKET = "submission-photos";
+const MAX_UPLOAD_BYTES = 5 * 1024 * 1024; // 5MB
+const ALLOWED_MIME = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/heic",
+]);
+
+/**
+ * 토리로 참가자가 사진 미션에 사진을 업로드한다.
+ *
+ * 토리로 참가자는 Supabase Auth 가 아닌 campnic_user 쿠키 세션을 사용하므로
+ * 클라이언트 storage RLS 를 통과할 수 없다. 인증은 requireAppUser() 로 검증하고
+ * 실제 업로드는 service-role 클라이언트로 수행한다.
+ *
+ * 경로: missions/{org_mission_id}/{user_id}/{ts}-{rand}.{ext}
+ */
+export async function uploadMissionPhotoAction(
+  orgMissionId: string,
+  formData: FormData
+): Promise<{ url: string; path: string }> {
+  const user = await requireAppUser();
+  if (!orgMissionId) throw new Error("미션을 찾을 수 없어요");
+
+  const mission = await loadOrgMissionById(orgMissionId);
+  if (!mission) throw new Error("미션을 찾을 수 없어요");
+  if (mission.org_id !== user.orgId) {
+    throw new Error("다른 기관의 미션에는 업로드할 수 없어요");
+  }
+  if (!mission.is_active) throw new Error("현재 진행할 수 없는 미션이에요");
+
+  const file = formData.get("file");
+  if (!(file instanceof File)) throw new Error("파일이 비어 있어요");
+  if (file.size === 0) throw new Error("빈 파일이에요");
+  if (file.size > MAX_UPLOAD_BYTES) {
+    throw new Error("사진은 5MB 이하만 업로드할 수 있어요");
+  }
+  const mime = file.type || "image/jpeg";
+  if (!ALLOWED_MIME.has(mime)) {
+    throw new Error("이미지 형식만 업로드할 수 있어요 (jpg/png/webp/heic)");
+  }
+
+  const ext =
+    mime === "image/png"
+      ? "png"
+      : mime === "image/webp"
+        ? "webp"
+        : mime === "image/heic"
+          ? "heic"
+          : "jpg";
+  const rand = Math.random().toString(36).slice(2, 10);
+  const path = `missions/${mission.id}/${user.id}/${Date.now()}-${rand}.${ext}`;
+
+  const admin = createAdminClient();
+  const { error: upErr } = await admin.storage
+    .from(SUBMISSION_BUCKET)
+    .upload(path, file, {
+      contentType: mime,
+      upsert: false,
+    });
+  if (upErr) {
+    console.error("[uploadMissionPhoto] failed", { path, msg: upErr.message });
+    throw new Error(`업로드 실패: ${upErr.message}`);
+  }
+
+  // 사설 버킷 — 서명 URL 발급 (24시간). 표시 측에서 만료 시 재요청 패턴.
+  const { data: signed, error: signErr } = await admin.storage
+    .from(SUBMISSION_BUCKET)
+    .createSignedUrl(path, 60 * 60 * 24);
+  if (signErr || !signed?.signedUrl) {
+    console.error("[uploadMissionPhoto] sign failed", {
+      path,
+      msg: signErr?.message,
+    });
+    throw new Error("업로드는 됐지만 URL 발급에 실패했어요");
+  }
+
+  return { url: signed.signedUrl, path };
 }
 
 /* -------------------------------------------------------------------------- */

@@ -1,9 +1,10 @@
-// 토리FM interactive layer 공용 타입 — chat / requests / hearts / polls / reactions.
+// 토리FM interactive layer 공용 타입 — chat / requests / hearts / reactions.
 // DB migration 20260519000000_tori_fm_interactive.sql 과 1:1 대응.
+// (Poll 관련 타입은 투표 기능 제거로 삭제. 마이그레이션의 tori_fm_polls /
+//  tori_fm_poll_votes 테이블은 보존되지만 더 이상 코드에서 참조하지 않음.)
 
 export type ChatSenderType = "USER" | "DJ" | "SYSTEM";
 export type RequestStatus = "PENDING" | "APPROVED" | "PLAYED" | "HIDDEN";
-export type PollStatus = "ACTIVE" | "ENDED" | "CANCELLED";
 // NOTE: "🌱" 는 기존 acorn 리액션을 대체 (acorn 이모지 제거 정책).
 // DB 에 이미 기존 acorn 이모지로 저장된 row 가 있으면 별도 마이그레이션으로 "🌱" 또는 "🌲" 로 정규화해야 합니다.
 export type ReactionEmoji = "❤" | "👏" | "🎉" | "🌲" | "🌱" | "😂";
@@ -40,33 +41,6 @@ export interface FmRequestRow {
   heart_count: number;
   status: RequestStatus;
   queue_id: string | null;
-  created_at: string;
-}
-
-export interface FmPollOption {
-  id: string;
-  label: string;
-  votes: number;
-}
-
-export interface FmPollRow {
-  id: string;
-  session_id: string;
-  question: string;
-  options: FmPollOption[];
-  duration_sec: number;
-  starts_at: string;
-  ends_at: string;
-  status: PollStatus;
-  winner_option_id: string | null;
-  created_at: string;
-}
-
-export interface FmPollVoteRow {
-  id: string;
-  poll_id: string;
-  user_id: string;
-  option_id: string;
   created_at: string;
 }
 

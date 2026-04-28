@@ -331,6 +331,116 @@ export async function loadEventParticipantIds(
 }
 
 /**
+ * 기관 소속 전체 참가자(app_users) — ParticipantsTab 의 selectable 풀.
+ * 자녀수는 별도 카운트 쿼리(원생 is_enrolled).
+ */
+export interface ParticipantOptionRow {
+  id: string;
+  parent_name: string;
+  phone: string;
+  status: "ACTIVE" | "SUSPENDED" | "CLOSED";
+  children_count: number;
+  /** 원생(is_enrolled=true) 이름 — 행 헤더 표시용 */
+  enrolled_child_names: string[];
+  acorn_balance: number;
+  last_login_at: string | null;
+  attendance_status: "PRESENT" | "LATE" | "ABSENT" | null;
+  attendance_date: string | null;
+}
+
+export async function loadParticipantOptionsForOrg(
+  orgId: string
+): Promise<ParticipantOptionRow[]> {
+  if (!orgId) return [];
+  const supabase = await createClient();
+
+  // 1) app_users — 이 기관 소속 전부 (rich fields)
+  type AppUserLite = {
+    id: string;
+    parent_name: string;
+    phone: string;
+    status: "ACTIVE" | "SUSPENDED" | "CLOSED";
+    acorn_balance: number | null;
+    last_login_at: string | null;
+    attendance_status: "PRESENT" | "LATE" | "ABSENT" | null;
+    attendance_date: string | null;
+  };
+  const usersResp = (await (
+    supabase.from("app_users" as never) as unknown as {
+      select: (c: string) => {
+        eq: (k: string, v: string) => {
+          order: (
+            c: string,
+            o: { ascending: boolean }
+          ) => Promise<SbResp<AppUserLite>>;
+        };
+      };
+    }
+  )
+    .select(
+      "id, parent_name, phone, status, acorn_balance, last_login_at, attendance_status, attendance_date"
+    )
+    .eq("org_id", orgId)
+    .order("parent_name", { ascending: true })) as SbResp<AppUserLite>;
+
+  if (usersResp.error) {
+    console.error("[org-events/loadParticipantOptions] users", usersResp.error);
+    return [];
+  }
+  const users = usersResp.data ?? [];
+  if (users.length === 0) return [];
+
+  // 2) 자녀(원생만) — user_id 별 이름 수집
+  type ChildRow = { user_id: string; name: string };
+  const childResp = (await (
+    supabase.from("app_children" as never) as unknown as {
+      select: (c: string) => {
+        in: (k: string, v: string[]) => {
+          eq: (k: string, v: boolean) => {
+            order: (
+              c: string,
+              o: { ascending: boolean }
+            ) => Promise<SbResp<ChildRow>>;
+          };
+        };
+      };
+    }
+  )
+    .select("user_id, name")
+    .in(
+      "user_id",
+      users.map((u) => u.id)
+    )
+    .eq("is_enrolled", true)
+    .order("created_at", { ascending: true })) as SbResp<ChildRow>;
+
+  const namesMap = new Map<string, string[]>();
+  for (const c of childResp.data ?? []) {
+    const list = namesMap.get(c.user_id);
+    const name = (c.name ?? "").trim();
+    if (!name) continue;
+    if (list) list.push(name);
+    else namesMap.set(c.user_id, [name]);
+  }
+
+  return users.map((u) => {
+    const names = namesMap.get(u.id) ?? [];
+    return {
+      id: u.id,
+      parent_name: u.parent_name ?? "",
+      phone: u.phone ?? "",
+      status: u.status,
+      children_count: names.length,
+      enrolled_child_names: names,
+      acorn_balance: u.acorn_balance ?? 0,
+      last_login_at: u.last_login_at,
+      attendance_status: u.attendance_status,
+      attendance_date: u.attendance_date,
+    };
+  });
+}
+
+/**
  * 행사에 연결된 프로그램 ID 들.
  */
 export async function loadEventProgramIds(
@@ -489,14 +599,10 @@ export async function loadActiveEventsForUser(
     return [];
   }
 
-  // 3단계: starts_at / ends_at 기간 체크 (in-memory)
-  const now = Date.now();
-  return (evtResp.data ?? []).filter((e) => {
-    const startsOk =
-      !e.starts_at || new Date(e.starts_at).getTime() <= now;
-    const endsOk = !e.ends_at || new Date(e.ends_at).getTime() >= now;
-    return startsOk && endsOk;
-  });
+  // status=LIVE 가 source of truth — 기간 필터는 사용 안 함.
+  // 이전에는 starts_at <= now <= ends_at 이중 필터였으나, 기관이 수동으로
+  // LIVE 전환했을 때(예정 시각 전) 참가자 화면에서 사라지는 혼란이 있어 제거.
+  return evtResp.data ?? [];
 }
 
 /**

@@ -9,6 +9,7 @@ import {
   createAppUserAccountFromPhone,
   normalizeUserPhone,
 } from "@/lib/app-user/account";
+import { linkUsersToEvent } from "@/lib/app-user/upsert-with-children";
 import type { BulkImportResult, BulkImportRowResult } from "./types";
 
 type ExistingUser = {
@@ -133,9 +134,14 @@ type GroupedRow = {
  *
  * Per-row "fail open" strategy: no DB transaction; each unique phone is its
  * own mini-batch so one bad row never aborts the whole import.
+ *
+ * @param eventId  null 이면 기존 동작(/users 로 redirect).
+ *                 string 이면 import 후 org_event_participants 에 link 하고
+ *                 행사 참가자 탭으로 redirect.
  */
 export async function bulkImportAppUsersAction(
   orgId: string,
+  eventId: string | null,
   formData: FormData
 ): Promise<void> {
   const session = await requireOrg();
@@ -278,8 +284,25 @@ export async function bulkImportAppUsersAction(
 
   const processed = result.success + result.merged;
 
-  // Non-fatal: if only errors, still revalidate+redirect to list w/ ?imported=0
+  // Non-fatal: if only errors, still revalidate+redirect with imported=0
   revalidatePath(`/org/${orgId}/users`);
+
+  // 행사 모드 — 성공한 user 들을 org_event_participants 에 link 후 행사 페이지로
+  if (eventId) {
+    const successUserIds = groupResults
+      .filter((r) => r.status === "CREATED" || r.status === "MERGED")
+      .map((r) => r.userId)
+      .filter((id): id is string => typeof id === "string" && id.length > 0);
+
+    if (successUserIds.length > 0) {
+      await linkUsersToEvent(eventId, successUserIds);
+    }
+
+    revalidatePath(`/org/${orgId}/events/${eventId}`);
+    redirect(
+      `/org/${orgId}/events/${eventId}?tab=participants&imported=${processed}&failed=${result.failed}&merged=${result.merged}`
+    );
+  }
 
   redirect(
     `/org/${orgId}/users?imported=${processed}&failed=${result.failed}&merged=${result.merged}`
@@ -330,6 +353,7 @@ async function processGroup(
         parentName: g.parentName,
         status: "MERGED",
         childrenAdded: added,
+        userId: existing.id,
       };
     }
 
@@ -392,6 +416,7 @@ async function processGroup(
           status: "CREATED",
           childrenAdded: 0,
           error: `자녀 등록 일부 실패: ${childInsert.error.message}`,
+          userId: newUserId,
         };
       }
     }
@@ -402,6 +427,7 @@ async function processGroup(
       parentName: g.parentName,
       status: "CREATED",
       childrenAdded: g.children.length,
+      userId: newUserId,
     };
   } catch (e) {
     return {

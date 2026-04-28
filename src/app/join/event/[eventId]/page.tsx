@@ -31,17 +31,71 @@ type OrgEventLite = {
 
 type OrgNameRow = { org_name: string | null };
 
-function fmtDate(iso: string | null): string {
+const WEEKDAY = ["일", "월", "화", "수", "목", "금", "토"];
+
+function pad2(n: number): string {
+  return n < 10 ? `0${n}` : `${n}`;
+}
+
+/** "2026.05.16(토)" */
+function fmtDateWeekday(iso: string | null): string {
   if (!iso) return "";
-  try {
-    return new Date(iso).toLocaleDateString("ko-KR", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    });
-  } catch {
-    return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return `${d.getFullYear()}.${pad2(d.getMonth() + 1)}.${pad2(d.getDate())}(${WEEKDAY[d.getDay()]})`;
+}
+
+/** "10:00" — 자정은 빈 문자열 */
+function fmtClock(iso: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const h = d.getHours();
+  const m = d.getMinutes();
+  if (h === 0 && m === 0) return "";
+  return `${pad2(h)}:${pad2(m)}`;
+}
+
+/** "3시간" / "1시간 30분" / "2일 3시간" */
+function fmtDurationFromMs(ms: number): string {
+  if (!Number.isFinite(ms) || ms <= 0) return "";
+  const totalMin = Math.round(ms / 60000);
+  const days = Math.floor(totalMin / (60 * 24));
+  const hours = Math.floor((totalMin % (60 * 24)) / 60);
+  const mins = totalMin % 60;
+  const parts: string[] = [];
+  if (days) parts.push(`${days}일`);
+  if (hours) parts.push(`${hours}시간`);
+  if (mins) parts.push(`${mins}분`);
+  return parts.join(" ");
+}
+
+/**
+ * 행사 일정 라벨.
+ *  - 같은 날 + 시간: "2026.05.16(토) 10:00 ~ 13:00 (3시간)"
+ *  - 다른 날 + 시간: "2026.05.16(토) 10:00 ~ 2026.05.18(월) 13:00 (2일 3시간)"
+ *  - 시간 미지정: "2026.05.16(토) ~ 2026.05.16(토)"
+ */
+function fmtRange(starts: string | null, ends: string | null): string {
+  if (!starts && !ends) return "";
+  const sLabel = fmtDateWeekday(starts);
+  const eLabel = fmtDateWeekday(ends);
+  const sClock = fmtClock(starts);
+  const eClock = fmtClock(ends);
+  const sameDay = starts && ends && sLabel === eLabel;
+  const dur =
+    starts && ends
+      ? fmtDurationFromMs(new Date(ends).getTime() - new Date(starts).getTime())
+      : "";
+  const durSuffix = dur ? ` (${dur})` : "";
+
+  if (!sClock && !eClock) {
+    return `${sLabel}${eLabel ? ` ~ ${eLabel}` : ""}`;
   }
+  if (sameDay) {
+    return `${sLabel} ${sClock}${sClock && eClock ? " ~ " : ""}${eClock}${durSuffix}`;
+  }
+  return `${sLabel}${sClock ? ` ${sClock}` : ""} ~ ${eLabel}${eClock ? ` ${eClock}` : ""}${durSuffix}`;
 }
 
 function errorMessageFor(code: string | undefined, orgName: string): string | null {
@@ -169,10 +223,7 @@ function EventPreviewCard({
   event: OrgEventLite;
   orgName: string;
 }) {
-  const dateRange =
-    event.starts_at || event.ends_at
-      ? `${fmtDate(event.starts_at)} ~ ${fmtDate(event.ends_at)}`
-      : "";
+  const dateRange = fmtRange(event.starts_at, event.ends_at);
 
   return (
     <section className="overflow-hidden rounded-3xl border border-[#D4E4BC] bg-white shadow-sm">

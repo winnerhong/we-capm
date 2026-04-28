@@ -19,9 +19,32 @@ export interface OrgEventRow {
    * DB 컬럼: org_events.allow_self_register boolean (병렬 마이그레이션).
    */
   allow_self_register: boolean | null;
+  /** 초대장 짧은 인사말 (1~2줄). */
+  invitation_message: string | null;
+  /** 초대장 본문 안내문 — 줄바꿈 포함 자유 텍스트. */
+  invitation_body: string | null;
+  /** 초대장 장소 안내 (장소명 — 예: "침산공원"). */
+  invitation_location: string | null;
+  /** 초대장 상세 주소 — 도로명/지번 (지도 검색에 사용). */
+  invitation_address: string | null;
+  /** 복장·준비물 안내. */
+  invitation_dress_code: string | null;
+  /** 초대장 주차장 — 최대 5개. */
+  invitation_parkings: ParkingItem[] | null;
+  /** 초대장 발행 시점. null=초안. */
+  invitation_published_at: string | null;
   created_at: string;
   updated_at: string;
 }
+
+/** 초대장 주차장 1개 항목. */
+export interface ParkingItem {
+  name: string;
+  address: string;
+}
+
+/** 초대장 주차장 최대 개수. */
+export const MAX_PARKING_ITEMS = 5;
 
 export interface OrgEventQuestPackRow {
   event_id: string;
@@ -59,6 +82,7 @@ export interface OrgEventSummaryRow {
   status: OrgEventStatus;
   starts_at: string | null;
   ends_at: string | null;
+  cover_image_url: string | null;
   quest_pack_count: number;
   participant_count: number;
   fm_session_count: number;
@@ -74,7 +98,7 @@ export const ORG_EVENT_STATUS_META: Record<
   { label: string; color: string; dot: string }
 > = {
   DRAFT: {
-    label: "초안",
+    label: "예정",
     color: "bg-zinc-50 text-zinc-700 border-zinc-200",
     dot: "bg-zinc-400",
   },

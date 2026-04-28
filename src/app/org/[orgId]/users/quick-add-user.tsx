@@ -15,8 +15,21 @@ function newSiblingId(): string {
  * - 원생명 + 부모님 연락처 2칸만 입력하면 등록
  * - 아이디는 보호자 연락처 자동 사용 (비밀번호 없음)
  * - + 형제/자매 추가 버튼으로 추가 자녀(이름만) 함께 등록 가능
+ *
+ * @param action 폼 제출 시 호출될 server action — partial-applied 형태.
+ *   미전달 시 createSingleAppUserAction(orgId, fd) 로 fallback (기관 전체 등록).
+ *   행사 페이지에서는 createSingleEventParticipantAction.bind(null, orgId, eventId) 같이
+ *   미리 binding 해서 전달.
  */
-export function QuickAddUser({ orgId }: { orgId: string }) {
+export function QuickAddUser({
+  orgId,
+  action,
+  successHint,
+}: {
+  orgId: string;
+  action?: (formData: FormData) => Promise<void>;
+  successHint?: string;
+}) {
   const router = useRouter();
   const [enrolledName, setEnrolledName] = useState("");
   const [phone, setPhone] = useState("");
@@ -83,7 +96,11 @@ export function QuickAddUser({ orgId }: { orgId: string }) {
 
     startTransition(async () => {
       try {
-        await createSingleAppUserAction(orgId, fd);
+        if (action) {
+          await action(fd);
+        } else {
+          await createSingleAppUserAction(orgId, fd);
+        }
         // redirect 발생하지 않는 케이스 대비 (이 플로우는 redirect 함)
       } catch (e) {
         const errMsg = e instanceof Error ? e.message : "등록에 실패했어요";
@@ -93,9 +110,10 @@ export function QuickAddUser({ orgId }: { orgId: string }) {
             validSiblings.length > 0
               ? ` (+형제/자매 ${validSiblings.length}명)`
               : "";
+          const tail = successHint ? ` ${successHint}` : "";
           setMsg({
             kind: "ok",
-            text: `✅ "${trimmed}"${extra} 등록 완료!`,
+            text: `✅ "${trimmed}"${extra} 등록 완료!${tail}`,
           });
           reset();
           router.refresh();

@@ -16,6 +16,11 @@ type Props = {
   userName: string;
   status: UserStatus;
   variant?: Variant;
+  /**
+   * 비활성화/활성화 토글을 숨김. 행사 탭처럼 "행사제외" 가 더 적합한 컨텍스트에서 사용.
+   * 기본 false (기관 전체 /users 페이지에서는 표시).
+   */
+  hideSuspend?: boolean;
 };
 
 export function UserRowActions({
@@ -24,6 +29,7 @@ export function UserRowActions({
   userName,
   status,
   variant = "table",
+  hideSuspend = false,
 }: Props) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -117,7 +123,7 @@ export function UserRowActions({
             🔑 로그인↗
           </a>
         )}
-        {statusButton}
+        {!hideSuspend && statusButton}
         <button
           type="button"
           onClick={onDelete}
@@ -144,7 +150,7 @@ export function UserRowActions({
           🔑 로그인↗
         </a>
       ) : null}
-      {statusButton}
+      {!hideSuspend && statusButton}
       <button
         type="button"
         onClick={onDelete}

@@ -55,7 +55,7 @@ export default async function NewOrgEventPage({
         <p className="font-semibold text-[#8B6F47]">💡 안내</p>
         <ul className="mt-1 list-disc space-y-0.5 pl-4">
           <li>
-            새 행사는 <strong>초안(DRAFT)</strong> 상태로 시작해요. 아이들에게
+            새 행사는 <strong>예정</strong> 상태로 시작해요. 아이들에게
             보이지 않아요.
           </li>
           <li>행사 상세에서 스탬프북과 참가자를 연결한 뒤 시작할 수 있어요.</li>

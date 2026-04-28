@@ -4,7 +4,6 @@
 import { createClient } from "@/lib/supabase/server";
 import type {
   FmChatMessageRow,
-  FmPollRow,
   FmReactionRow,
   FmRequestRow,
   FmTopArtistRow,
@@ -134,67 +133,6 @@ export async function loadPendingRequests(
   sessionId: string
 ): Promise<FmRequestRow[]> {
   return loadSessionRequestsByStatus(sessionId, "PENDING");
-}
-
-/* -------------------------------------------------------------------------- */
-/* Polls                                                                      */
-/* -------------------------------------------------------------------------- */
-
-/**
- * 세션에서 현재 ACTIVE 상태인 투표 1건(가장 최근).
- */
-export async function loadActivePoll(
-  sessionId: string
-): Promise<FmPollRow | null> {
-  if (!sessionId) return null;
-  const supabase = await createClient();
-
-  const resp = (await (
-    supabase.from("tori_fm_polls" as never) as unknown as {
-      select: (c: string) => {
-        eq: (k: string, v: string) => {
-          eq: (k: string, v: string) => {
-            order: (
-              c: string,
-              o: { ascending: boolean }
-            ) => {
-              limit: (n: number) => Promise<SbResp<FmPollRow>>;
-            };
-          };
-        };
-      };
-    }
-  )
-    .select("*")
-    .eq("session_id", sessionId)
-    .eq("status", "ACTIVE")
-    .order("created_at", { ascending: false })
-    .limit(1)) as SbResp<FmPollRow>;
-
-  const rows = resp.data ?? [];
-  return rows[0] ?? null;
-}
-
-export async function loadPollById(
-  pollId: string
-): Promise<FmPollRow | null> {
-  if (!pollId) return null;
-  const supabase = await createClient();
-
-  const resp = (await (
-    supabase.from("tori_fm_polls" as never) as unknown as {
-      select: (c: string) => {
-        eq: (k: string, v: string) => {
-          maybeSingle: () => Promise<SbRespOne<FmPollRow>>;
-        };
-      };
-    }
-  )
-    .select("*")
-    .eq("id", pollId)
-    .maybeSingle()) as SbRespOne<FmPollRow>;
-
-  return resp.data ?? null;
 }
 
 /* -------------------------------------------------------------------------- */

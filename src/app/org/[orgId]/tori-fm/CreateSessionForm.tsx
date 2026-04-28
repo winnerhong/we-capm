@@ -53,7 +53,7 @@ export function CreateSessionForm({ orgId }: Props) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="rounded-xl bg-gradient-to-r from-[#2D5A3D] to-[#3A7A52] px-4 py-2 text-sm font-bold text-white shadow-md transition hover:from-[#234a30] hover:to-[#2D5A3D]"
+        className="rounded-xl bg-amber-400 px-4 py-2 text-sm font-bold text-[#1B2B3A] shadow-md shadow-amber-400/30 transition hover:bg-amber-300"
       >
         + 새 방송 세션 만들기
       </button>
@@ -63,14 +63,14 @@ export function CreateSessionForm({ orgId }: Props) {
   return (
     <form
       onSubmit={onSubmit}
-      className="space-y-3 rounded-2xl border border-[#D4E4BC] bg-white p-4 shadow-sm"
+      className="space-y-3 rounded-2xl border border-white/10 bg-gradient-to-br from-[#1B2B3A] via-[#26394C] to-[#1B2B3A] p-4 text-white shadow-xl"
     >
       <div>
         <label
           htmlFor="fm_name"
-          className="mb-1 block text-xs font-semibold text-[#2D5A3D]"
+          className="mb-1 block text-xs font-semibold text-amber-200/80"
         >
-          세션 이름 <span className="text-rose-600">*</span>
+          세션 이름 <span className="text-rose-300">*</span>
         </label>
         <input
           id="fm_name"
@@ -80,16 +80,16 @@ export function CreateSessionForm({ orgId }: Props) {
           placeholder="예) 점심 라디오"
           autoComplete="off"
           required
-          className="w-full rounded-xl border border-[#D4E4BC] bg-[#FFF8F0] px-3 py-2.5 text-sm text-[#2C2C2C] focus:border-[#3A7A52] focus:outline-none focus:ring-2 focus:ring-[#3A7A52]/30"
+          className="w-full rounded-xl border border-white/15 bg-black/40 px-3 py-2.5 text-sm text-white placeholder:text-white/40 focus:border-amber-300 focus:outline-none focus:ring-2 focus:ring-amber-300/30"
         />
       </div>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         <div>
           <label
             htmlFor="fm_start"
-            className="mb-1 block text-xs font-semibold text-[#2D5A3D]"
+            className="mb-1 block text-xs font-semibold text-amber-200/80"
           >
-            시작 일시 <span className="text-rose-600">*</span>
+            시작 일시 <span className="text-rose-300">*</span>
           </label>
           <input
             id="fm_start"
@@ -97,15 +97,15 @@ export function CreateSessionForm({ orgId }: Props) {
             value={scheduledStart}
             onChange={(e) => setScheduledStart(e.target.value)}
             required
-            className="w-full rounded-xl border border-[#D4E4BC] bg-[#FFF8F0] px-3 py-2.5 text-sm text-[#2C2C2C] focus:border-[#3A7A52] focus:outline-none focus:ring-2 focus:ring-[#3A7A52]/30"
+            className="w-full rounded-xl border border-white/15 bg-black/40 px-3 py-2.5 text-sm text-white focus:border-amber-300 focus:outline-none focus:ring-2 focus:ring-amber-300/30 [color-scheme:dark]"
           />
         </div>
         <div>
           <label
             htmlFor="fm_end"
-            className="mb-1 block text-xs font-semibold text-[#2D5A3D]"
+            className="mb-1 block text-xs font-semibold text-amber-200/80"
           >
-            종료 일시 <span className="text-rose-600">*</span>
+            종료 일시 <span className="text-rose-300">*</span>
           </label>
           <input
             id="fm_end"
@@ -113,12 +113,12 @@ export function CreateSessionForm({ orgId }: Props) {
             value={scheduledEnd}
             onChange={(e) => setScheduledEnd(e.target.value)}
             required
-            className="w-full rounded-xl border border-[#D4E4BC] bg-[#FFF8F0] px-3 py-2.5 text-sm text-[#2C2C2C] focus:border-[#3A7A52] focus:outline-none focus:ring-2 focus:ring-[#3A7A52]/30"
+            className="w-full rounded-xl border border-white/15 bg-black/40 px-3 py-2.5 text-sm text-white focus:border-amber-300 focus:outline-none focus:ring-2 focus:ring-amber-300/30 [color-scheme:dark]"
           />
         </div>
       </div>
       {msg && (
-        <p className="text-xs font-semibold text-rose-700" role="alert">
+        <p className="text-xs font-semibold text-rose-300" role="alert">
           {msg}
         </p>
       )}
@@ -129,14 +129,14 @@ export function CreateSessionForm({ orgId }: Props) {
             setOpen(false);
             setMsg(null);
           }}
-          className="rounded-xl border border-[#D4E4BC] bg-white px-3 py-2 text-xs font-semibold text-[#2D5A3D]"
+          className="rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-xs font-semibold text-white/80 transition hover:bg-white/10"
         >
           취소
         </button>
         <button
           type="submit"
           disabled={isPending}
-          className="rounded-xl bg-gradient-to-r from-[#2D5A3D] to-[#3A7A52] px-4 py-2 text-xs font-bold text-white shadow-md transition hover:from-[#234a30] hover:to-[#2D5A3D] disabled:opacity-50"
+          className="rounded-xl bg-amber-400 px-4 py-2 text-xs font-bold text-[#1B2B3A] shadow-md shadow-amber-400/30 transition hover:bg-amber-300 disabled:opacity-50"
         >
           💾 생성
         </button>

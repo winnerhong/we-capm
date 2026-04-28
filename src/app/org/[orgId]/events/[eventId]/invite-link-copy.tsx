@@ -16,8 +16,8 @@ export function InviteLinkCopy({ eventId, eventName }: Props) {
   }, []);
 
   const url = origin
-    ? `${origin}/join/event/${eventId}`
-    : `/join/event/${eventId}`;
+    ? `${origin}/invitation/${eventId}`
+    : `/invitation/${eventId}`;
 
   async function onCopy() {
     try {
@@ -71,8 +71,8 @@ export function InviteLinkCopy({ eventId, eventName }: Props) {
         </button>
       </div>
       <p className="text-[11px] text-[#6B6560]">
-        이 링크를 공유하면 참가자는 토리로 앱에서 이 행사에 바로 참여할 수
-        있어요.
+        💌 참가자가 받은 링크 → 로그인 → 본인 이름이 들어간 초대장 카드를
+        받아요. (📨 초대장 공유와 같은 링크)
       </p>
     </div>
   );

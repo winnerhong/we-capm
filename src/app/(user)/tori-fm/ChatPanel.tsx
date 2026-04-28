@@ -26,6 +26,8 @@ const MAX_MESSAGE_LEN = 300;
 type Props = {
   sessionId: string;
   initialMessages: FmChatMessageRow[];
+  /** 현재 로그인 유저 ID — 내 메시지 식별용 (우측 배치) */
+  userId?: string | null;
   userLabel: string;
   isUserLoggedIn: boolean;
 };
@@ -49,6 +51,7 @@ function timeLabel(iso: string): string {
 export function ChatPanel({
   sessionId,
   initialMessages,
+  userId = null,
   userLabel,
   isUserLoggedIn,
 }: Props) {
@@ -175,69 +178,160 @@ export function ChatPanel({
             아직 메시지가 없어요. 첫 인사를 보내 보세요!
           </p>
         ) : (
-          <ul className="space-y-2">
-            {messages.map((m) => {
-              const isDj = m.sender_type === "DJ";
-              const isSystem = m.sender_type === "SYSTEM";
-              if (m.is_deleted) {
-                return (
-                  <li
-                    key={m.id}
-                    className="flex items-center gap-2 rounded-lg bg-white/5 px-2 py-1 text-[11px] text-white/40"
-                  >
-                    🚫 삭제된 메시지
-                  </li>
-                );
-              }
+          messages.map((m, idx) => {
+            const isDj = m.sender_type === "DJ";
+            const isSystem = m.sender_type === "SYSTEM";
+            const isMine =
+              !isDj &&
+              !isSystem &&
+              !!userId &&
+              !!m.user_id &&
+              m.user_id === userId;
+
+            // 같은 발신자가 연속으로 보냈는지 — 헤더(이름/아바타) 생략
+            const prev = messages[idx - 1];
+            const isGrouped =
+              !!prev &&
+              !prev.is_deleted &&
+              prev.sender_type === m.sender_type &&
+              prev.user_id === m.user_id &&
+              prev.sender_name === m.sender_name &&
+              !isSystem;
+
+            // 시스템 — 가운데 칩
+            if (isSystem) {
               return (
-                <li
+                <div
                   key={m.id}
-                  className={`flex items-start gap-2 rounded-lg px-2 py-1.5 ${
-                    isDj
-                      ? "border border-amber-400/40 bg-amber-500/10"
-                      : isSystem
-                      ? "bg-white/5"
-                      : "bg-white/5"
-                  }`}
+                  className={`${isGrouped ? "mt-0.5" : "mt-3"} flex justify-center first:mt-0`}
                 >
-                  <span
-                    className={`flex h-7 w-7 flex-none items-center justify-center rounded-full text-[11px] font-bold text-white ${
-                      isDj
-                        ? "bg-amber-500"
-                        : isSystem
-                        ? "bg-zinc-500"
-                        : "bg-emerald-600"
-                    }`}
-                    aria-hidden
-                  >
-                    {senderInitial(m.sender_name)}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5">
-                      <span
-                        className={`truncate text-[11px] font-semibold ${
-                          isDj ? "text-amber-200" : "text-white/80"
-                        }`}
-                      >
-                        {m.sender_name || "익명"}
-                      </span>
-                      {isDj && (
-                        <span className="rounded bg-amber-400 px-1 text-[9px] font-bold text-[#1B2B3A]">
-                          🎙 DJ
-                        </span>
-                      )}
-                      <span className="ml-auto text-[10px] text-white/40">
-                        {timeLabel(m.created_at)}
-                      </span>
-                    </div>
-                    <p className="mt-0.5 whitespace-pre-wrap break-words text-[13px] leading-snug text-white/95">
-                      {m.message}
-                    </p>
+                  <div className="inline-flex items-center gap-1.5 rounded-full bg-sky-500/15 px-3 py-1 text-[11px] text-sky-200 ring-1 ring-sky-400/30">
+                    <span aria-hidden>📢</span>
+                    <span>{m.message}</span>
+                    <time className="text-sky-300/60">
+                      {timeLabel(m.created_at)}
+                    </time>
                   </div>
-                </li>
+                </div>
               );
-            })}
-          </ul>
+            }
+
+            // 삭제된 메시지 — 가운데 작은 알림
+            if (m.is_deleted) {
+              return (
+                <div
+                  key={m.id}
+                  className={`${isGrouped ? "mt-0.5" : "mt-3"} flex justify-center first:mt-0`}
+                >
+                  <div className="inline-flex items-center gap-1.5 rounded-full bg-white/5 px-3 py-1 text-[11px] text-white/40">
+                    <span aria-hidden>🚫</span>
+                    <span>삭제된 메시지</span>
+                  </div>
+                </div>
+              );
+            }
+
+            // 내 메시지 — 우측 정렬, amber 말풍선
+            if (isMine) {
+              return (
+                <div
+                  key={m.id}
+                  className={`${isGrouped ? "mt-0.5" : "mt-3"} flex justify-end gap-2 first:mt-0`}
+                >
+                  <div className="flex max-w-[75%] flex-col items-end">
+                    {!isGrouped && (
+                      <span className="mb-0.5 truncate pr-1 text-[11px] font-semibold text-amber-200">
+                        나
+                      </span>
+                    )}
+                    <div className="flex items-end gap-1.5">
+                      <time className="shrink-0 pb-1 text-[10px] text-white/40">
+                        {timeLabel(m.created_at)}
+                      </time>
+                      <div className="whitespace-pre-wrap break-words rounded-2xl rounded-tr-md bg-amber-400 px-3 py-2 text-[13px] font-medium text-[#1B2B3A] shadow-md shadow-amber-400/20">
+                        {m.message}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            }
+
+            // DJ 메시지 — 좌측, amber 톤 말풍선 + DJ 배지
+            if (isDj) {
+              return (
+                <div
+                  key={m.id}
+                  className={`${isGrouped ? "mt-0.5" : "mt-3"} flex gap-2 first:mt-0`}
+                >
+                  <div className="flex w-8 shrink-0 justify-center pt-1">
+                    {!isGrouped && (
+                      <div
+                        className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-amber-400 to-amber-600 text-[11px] font-bold text-[#1B2B3A] ring-2 ring-amber-300/40"
+                        aria-hidden
+                      >
+                        🎙
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex max-w-[75%] flex-col items-start">
+                    {!isGrouped && (
+                      <div className="mb-0.5 flex items-center gap-1.5 pl-1">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-400/20 px-1.5 py-0.5 text-[10px] font-bold text-amber-200 ring-1 ring-amber-400/40">
+                          DJ
+                        </span>
+                        <span className="truncate text-[11px] font-semibold text-amber-200">
+                          {m.sender_name || "DJ"}
+                        </span>
+                      </div>
+                    )}
+                    <div className="flex items-end gap-1.5">
+                      <div className="whitespace-pre-wrap break-words rounded-2xl rounded-tl-md bg-amber-500/20 px-3 py-2 text-[13px] text-amber-50 shadow-sm ring-1 ring-amber-400/40">
+                        {m.message}
+                      </div>
+                      <time className="shrink-0 pb-1 text-[10px] text-white/40">
+                        {timeLabel(m.created_at)}
+                      </time>
+                    </div>
+                  </div>
+                </div>
+              );
+            }
+
+            // 다른 청취자 — 좌측, 다크 말풍선 + 아바타
+            return (
+              <div
+                key={m.id}
+                className={`${isGrouped ? "mt-0.5" : "mt-3"} flex gap-2 first:mt-0`}
+              >
+                <div className="flex w-8 shrink-0 justify-center pt-1">
+                  {!isGrouped && (
+                    <div
+                      className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500/40 to-sky-500/40 text-[11px] font-bold text-white ring-1 ring-white/10"
+                      aria-hidden
+                    >
+                      {senderInitial(m.sender_name)}
+                    </div>
+                  )}
+                </div>
+                <div className="flex max-w-[75%] flex-col items-start">
+                  {!isGrouped && (
+                    <span className="mb-0.5 truncate pl-1 text-[11px] font-semibold text-white/70">
+                      {m.sender_name || "익명"}
+                    </span>
+                  )}
+                  <div className="flex items-end gap-1.5">
+                    <div className="whitespace-pre-wrap break-words rounded-2xl rounded-tl-md bg-white/10 px-3 py-2 text-[13px] text-white shadow-sm ring-1 ring-white/10">
+                      {m.message}
+                    </div>
+                    <time className="shrink-0 pb-1 text-[10px] text-white/40">
+                      {timeLabel(m.created_at)}
+                    </time>
+                  </div>
+                </div>
+              </div>
+            );
+          })
         )}
       </div>
 

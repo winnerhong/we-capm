@@ -1,3 +1,8 @@
+"use client";
+
+// 'use client' 필요: OrgPresenceCounter 가 render-prop(함수) API 라서
+// 부모도 client 여야 함수가 server→client 경계를 넘지 않는다.
+
 import type { ControlRoomSnapshot } from "@/lib/control-room/types";
 import styles from "../control-room.module.css";
 import { OrgPresenceCounter } from "@/components/presence/org-presence-counter";

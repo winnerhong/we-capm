@@ -2,21 +2,18 @@
 
 import { useCallback, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 import { compressImage } from "@/lib/image-compress";
 import type {
   OrgMissionRow,
   PhotoMissionConfig,
 } from "@/lib/missions/types";
-import { submitMissionAction } from "../../actions";
+import { submitMissionAction, uploadMissionPhotoAction } from "../../actions";
 import { AcornIcon } from "@/components/acorn-icon";
 
 interface Props {
   mission: OrgMissionRow;
   config: PhotoMissionConfig;
 }
-
-const BUCKET = "submission-photos";
 
 export function PhotoRunner({ mission, config }: Props) {
   const router = useRouter();
@@ -49,7 +46,6 @@ export function PhotoRunner({ mission, config }: Props) {
       setUploading(true);
       setErrorMsg(null);
 
-      const supabase = createClient();
       const uploaded: string[] = [];
       let doneCount = 0;
 
@@ -62,17 +58,10 @@ export function PhotoRunner({ mission, config }: Props) {
           setUploadStatus(
             `업로드 중 (${doneCount + 1}/${toProcess.length})...`
           );
-          const rand = Math.random().toString(36).slice(2, 8);
-          const path = `missions/${mission.id}/${Date.now()}-${rand}.jpg`;
-          const { error } = await supabase.storage
-            .from(BUCKET)
-            .upload(path, compressed, {
-              contentType: compressed.type,
-              upsert: false,
-            });
-          if (error) throw error;
-          const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
-          uploaded.push(data.publicUrl);
+          const fd = new FormData();
+          fd.append("file", compressed, compressed.name || "photo.jpg");
+          const { url } = await uploadMissionPhotoAction(mission.id, fd);
+          uploaded.push(url);
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e);
           console.error("[PhotoRunner] upload failed", msg);

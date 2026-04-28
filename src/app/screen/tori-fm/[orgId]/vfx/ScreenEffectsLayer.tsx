@@ -5,15 +5,17 @@ import { FloatingHearts, type HeartEvent } from "./FloatingHearts";
 import { DriftUpChat, type ChatBubble } from "./DriftUpChat";
 import { TopBanner, type BannerEvent } from "./TopBanner";
 import { EmojiRain, type EmojiRainEvent } from "./EmojiRain";
-import { PollPopup, type PollEvent, type PollWinnerEvent } from "./PollPopup";
+import { StorySpotlight, type StorySpotlightEvent } from "./StorySpotlight";
 import { createClient } from "@/lib/supabase/client";
 import type {
   FmChatMessageRow,
-  FmPollOption,
-  FmPollRow,
   FmReactionRow,
   FmRequestRow,
 } from "@/lib/tori-fm/types";
+import type {
+  FmSpotlightEventRow,
+  SpotlightKind,
+} from "@/lib/tori-fm/spotlight";
 
 interface Props {
   /** 디버그용 — 데모 버튼 표시 */
@@ -36,8 +38,8 @@ export function ScreenEffectsLayer({
   const [chats, setChats] = useState<ChatBubble[]>([]);
   const [banners, setBanners] = useState<BannerEvent[]>([]);
   const [emojis, setEmojis] = useState<EmojiRainEvent[]>([]);
-  const [activePoll, setActivePoll] = useState<PollEvent | null>(null);
-  const [winnerEvent, setWinnerEvent] = useState<PollWinnerEvent | null>(null);
+  const [storySpotlight, setStorySpotlight] =
+    useState<StorySpotlightEvent | null>(null);
 
   function emitHearts(count = 8, emoji?: string) {
     const now = Date.now();
@@ -65,15 +67,6 @@ export function ScreenEffectsLayer({
       emoji,
     }));
     setEmojis((prev) => [...prev, ...next].slice(-300));
-  }
-
-  function emitPoll(poll: PollEvent) {
-    setActivePoll(poll);
-  }
-
-  function emitPollWinner(w: PollWinnerEvent) {
-    setWinnerEvent({ ...w });
-    // 재호출을 위해 살짝 딜레이 후 null 복원 (같은 pollId 재노출 방지는 pollId 비교로)
   }
 
   /* ------------------------------------------------------------------------ */
@@ -208,90 +201,85 @@ export function ScreenEffectsLayer({
     };
   }, [sessionId]);
 
-  // 4) tori_fm_polls INSERT/UPDATE → emitPoll / emitPollWinner
+  // 4) fm_spotlight_events INSERT → kind 별 emit 분배
+  //    DJ 콘솔의 SpotlightTriggerBar 가 트리거한 이벤트 수신.
   useEffect(() => {
     if (!sessionId) return;
     const supa = createClient();
 
     type RealtimePayload = {
       eventType?: "INSERT" | "UPDATE" | "DELETE";
-      new?: FmPollRow;
-      old?: FmPollRow;
-    };
-
-    const parseOptions = (raw: unknown): FmPollOption[] => {
-      if (!Array.isArray(raw)) return [];
-      const list: FmPollOption[] = [];
-      for (const item of raw) {
-        if (
-          item &&
-          typeof item === "object" &&
-          typeof (item as { id?: unknown }).id === "string" &&
-          typeof (item as { label?: unknown }).label === "string"
-        ) {
-          const o = item as { id: string; label: string; votes?: unknown };
-          list.push({
-            id: o.id,
-            label: o.label,
-            votes: typeof o.votes === "number" ? o.votes : 0,
-          });
-        }
-      }
-      return list;
+      new?: FmSpotlightEventRow;
+      old?: FmSpotlightEventRow;
     };
 
     const handle = (payload: RealtimePayload) => {
       const row = payload.new;
       if (!row || !row.id) return;
-      const evt = payload.eventType;
+      // dismiss 된 row 는 무시 (overwrite 시 INSERT 직전에 기존 row 가 dismiss 되지만 신규 row 는 dismissed_at NULL 로 들어옴)
+      if (row.dismissed_at) return;
 
-      if (evt === "INSERT") {
-        if (row.status !== "ACTIVE") return;
-        emitPoll({
-          id: row.id,
-          question: row.question,
-          options: parseOptions(row.options),
-          durationSec: row.duration_sec,
-          startedAt: row.starts_at,
-        });
-        return;
-      }
+      const kind: SpotlightKind = row.kind;
+      const p = (row.payload_json ?? {}) as Record<string, unknown>;
 
-      if (evt === "UPDATE") {
-        const oldStatus = payload.old?.status;
-        if (
-          oldStatus === "ACTIVE" &&
-          row.status === "ENDED" &&
-          row.winner_option_id
-        ) {
-          const options = parseOptions(row.options);
-          const winner = options.find((o) => o.id === row.winner_option_id);
-          if (winner) {
-            emitPollWinner({ pollId: row.id, winnerLabel: winner.label });
-          }
+      switch (kind) {
+        case "HEART_RAIN": {
+          const intensity =
+            typeof p.intensity === "string" ? p.intensity : "high";
+          emitHearts(intensity === "high" ? 40 : 15, "❤");
+          break;
         }
-        // 투표 count 변경 등 기타 UPDATE는 skip (다음 라운드 숙제)
+        case "EMOJI_RAIN": {
+          const emoji = typeof p.emoji === "string" ? p.emoji : "🌲";
+          emitEmojiRain(emoji, 30);
+          break;
+        }
+        case "BANNER": {
+          const text = typeof p.text === "string" ? p.text : "";
+          if (text) {
+            emitBanner({
+              title: "🎉 응원",
+              subtitle: text,
+              caption: "",
+            });
+          }
+          break;
+        }
+        case "STORY": {
+          const songTitle =
+            typeof p.song_title === "string" ? p.song_title : "";
+          const artist = typeof p.artist === "string" ? p.artist : "";
+          const story = typeof p.story === "string" ? p.story : "";
+          const childName =
+            typeof p.child_name === "string" ? p.child_name : "";
+          const parentName =
+            typeof p.parent_name === "string" ? p.parent_name : "";
+          // expires_at 까지 노출 (default 30초)
+          const expiresMs = row.expires_at
+            ? new Date(row.expires_at).getTime()
+            : Date.now() + 30_000;
+          setStorySpotlight({
+            id: row.id,
+            songTitle,
+            artist,
+            story,
+            childName,
+            parentName,
+            expiresAtMs: expiresMs,
+          });
+          break;
+        }
       }
     };
 
     const channel = supa
-      .channel(`tori-fm-screen-polls-${sessionId}`)
+      .channel(`tori-fm-screen-spotlight-${sessionId}`)
       .on(
         "postgres_changes" as never,
         {
           event: "INSERT",
           schema: "public",
-          table: "tori_fm_polls",
-          filter: `session_id=eq.${sessionId}`,
-        } as never,
-        handle as never
-      )
-      .on(
-        "postgres_changes" as never,
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "tori_fm_polls",
+          table: "fm_spotlight_events",
           filter: `session_id=eq.${sessionId}`,
         } as never,
         handle as never
@@ -303,13 +291,25 @@ export function ScreenEffectsLayer({
     };
   }, [sessionId]);
 
+  // STORY 자동 종료 타이머
+  useEffect(() => {
+    if (!storySpotlight) return;
+    const remain = storySpotlight.expiresAtMs - Date.now();
+    if (remain <= 0) {
+      setStorySpotlight(null);
+      return;
+    }
+    const t = setTimeout(() => setStorySpotlight(null), remain);
+    return () => clearTimeout(t);
+  }, [storySpotlight]);
+
   return (
     <>
       <FloatingHearts events={hearts} />
       <DriftUpChat messages={chats} />
       <TopBanner events={banners} />
       <EmojiRain events={emojis} />
-      <PollPopup activePoll={activePoll} winnerEvent={winnerEvent} />
+      <StorySpotlight event={storySpotlight} />
 
       {showDemoControls && (
         <div
@@ -391,37 +391,6 @@ export function ScreenEffectsLayer({
             className="rounded-lg bg-fuchsia-500 px-2.5 py-1 font-bold text-white hover:bg-fuchsia-600"
           >
             🌧 이모지비
-          </button>
-          <button
-            type="button"
-            onClick={() =>
-              emitPoll({
-                id: `demo-${Date.now()}`,
-                question: "가장 좋았던 곡은?",
-                options: [
-                  { id: "a", label: "아이유 - 가을 아침", votes: 5 },
-                  { id: "b", label: "폴킴 - 비", votes: 3 },
-                  { id: "c", label: "김광석 - 서른 즈음에", votes: 2 },
-                ],
-                durationSec: 60,
-                startedAt: new Date().toISOString(),
-              })
-            }
-            className="rounded-lg bg-emerald-500 px-2.5 py-1 font-bold text-white hover:bg-emerald-600"
-          >
-            📊 투표
-          </button>
-          <button
-            type="button"
-            onClick={() =>
-              emitPollWinner({
-                pollId: activePoll?.id ?? "demo",
-                winnerLabel: "아이유 - 가을 아침",
-              })
-            }
-            className="rounded-lg bg-yellow-500 px-2.5 py-1 font-bold text-[#1a120a] hover:bg-yellow-400"
-          >
-            🏆 결과
           </button>
         </div>
       )}

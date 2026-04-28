@@ -2,10 +2,10 @@ import Link from "next/link";
 import { requireOrg } from "@/lib/org-auth-guard";
 import { loadOrgEventSummaries } from "@/lib/org-events/queries";
 import {
-  ORG_EVENT_STATUS_META,
   type OrgEventStatus,
   type OrgEventSummaryRow,
 } from "@/lib/org-events/types";
+import { EventStatusToggle } from "./status-toggle";
 
 export const dynamic = "force-dynamic";
 
@@ -13,28 +13,80 @@ type StatusFilter = "ALL" | OrgEventStatus;
 
 const STATUS_TABS: { key: StatusFilter; label: string }[] = [
   { key: "ALL", label: "전체" },
-  { key: "LIVE", label: "진행중" },
   { key: "DRAFT", label: "예정" },
+  { key: "LIVE", label: "진행중" },
   { key: "ENDED", label: "종료" },
   { key: "ARCHIVED", label: "보관" },
 ];
 
-function fmtDate(iso: string | null): string {
-  if (!iso) return "-";
-  try {
-    return new Date(iso).toLocaleDateString("ko-KR", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    });
-  } catch {
-    return iso;
-  }
+const WEEKDAY = ["일", "월", "화", "수", "목", "금", "토"];
+
+function pad2(n: number): string {
+  return n < 10 ? `0${n}` : `${n}`;
 }
 
+/** "2026.05.16(토)" — 날짜 + 요일 한글 약어 */
+function fmtDateWeekday(iso: string | null): string {
+  if (!iso) return "-";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "-";
+  return `${d.getFullYear()}.${pad2(d.getMonth() + 1)}.${pad2(d.getDate())}(${WEEKDAY[d.getDay()]})`;
+}
+
+/** "10:00" — 자정(0:00)은 시간 미지정으로 간주해 빈 문자열 */
+function fmtClock(iso: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const h = d.getHours();
+  const m = d.getMinutes();
+  if (h === 0 && m === 0) return "";
+  return `${pad2(h)}:${pad2(m)}`;
+}
+
+/** "3시간" / "1시간 30분" / "2일 3시간" 식 사람-친화 라벨 */
+function fmtDurationFromMs(ms: number): string {
+  if (!Number.isFinite(ms) || ms <= 0) return "";
+  const totalMin = Math.round(ms / 60000);
+  const days = Math.floor(totalMin / (60 * 24));
+  const hours = Math.floor((totalMin % (60 * 24)) / 60);
+  const mins = totalMin % 60;
+  const parts: string[] = [];
+  if (days) parts.push(`${days}일`);
+  if (hours) parts.push(`${hours}시간`);
+  if (mins) parts.push(`${mins}분`);
+  return parts.join(" ");
+}
+
+/**
+ * 행사 일정 라벨.
+ *  - 같은 날 + 시간: "2026.05.16(토) 10:00 ~ 13:00 (3시간)"
+ *  - 다른 날 + 시간: "2026.05.16(토) 10:00 ~ 2026.05.18(월) 13:00 (2일 3시간)"
+ *  - 시간 미지정: "2026.05.16(토) ~ 2026.05.16(토)"
+ */
 function fmtRange(starts: string | null, ends: string | null): string {
   if (!starts && !ends) return "기간 미정";
-  return `${fmtDate(starts)} ~ ${fmtDate(ends)}`;
+  const sLabel = fmtDateWeekday(starts);
+  const eLabel = fmtDateWeekday(ends);
+  const sClock = fmtClock(starts);
+  const eClock = fmtClock(ends);
+  const sameDay = starts && ends && sLabel === eLabel;
+  const dur =
+    starts && ends ? fmtDurationFromMs(new Date(ends).getTime() - new Date(starts).getTime()) : "";
+  const durSuffix = dur ? ` (${dur})` : "";
+
+  // 시간 미지정 (둘 다 자정 또는 시간 정보 없음) → 날짜만
+  if (!sClock && !eClock) {
+    return `${sLabel} ~ ${eLabel}`;
+  }
+
+  // 같은 날 + 시간
+  if (sameDay) {
+    return `${sLabel} ${sClock}${sClock && eClock ? " ~ " : ""}${eClock}${durSuffix}`;
+  }
+
+  // 다른 날 + 시간
+  return `${sLabel}${sClock ? ` ${sClock}` : ""} ~ ${eLabel}${eClock ? ` ${eClock}` : ""}${durSuffix}`;
 }
 
 export default async function OrgEventsPage({
@@ -42,7 +94,7 @@ export default async function OrgEventsPage({
   searchParams,
 }: {
   params: Promise<{ orgId: string }>;
-  searchParams: Promise<{ status?: string }>;
+  searchParams: Promise<{ status?: string; focus?: string }>;
 }) {
   const { orgId } = await params;
   // layout.tsx 에서 이미 orgId 매칭 검증됨. 세션만 확보.
@@ -56,6 +108,7 @@ export default async function OrgEventsPage({
     sp.status === "ARCHIVED"
       ? sp.status
       : "ALL";
+  const focusTimeline = sp.focus === "timeline";
 
   const all = await loadOrgEventSummaries(orgId);
 
@@ -84,11 +137,17 @@ export default async function OrgEventsPage({
             </p>
             <h1 className="mt-2 flex items-center gap-2 text-2xl font-bold md:text-3xl">
               <span aria-hidden>🎪</span>
-              <span>우리 기관 행사</span>
+              <span>내 행사 관리</span>
             </h1>
             <p className="mt-2 max-w-xl text-sm text-[#E8F0E4]">
               캠프·체험·축제 같은 행사를 만들어 스탬프북·참가자·토리FM을 한
               곳에 묶어 운영하세요.
+            </p>
+            <p className="mt-1 max-w-xl text-[11px] text-[#D4E4BC]">
+              💡 참가자는 <b className="text-white">행사별로 따로</b> 등록해요.
+              아래 행사 카드의{" "}
+              <span className="font-bold text-emerald-200">🙋 참가자 등록</span>{" "}
+              버튼을 눌러 해당 행사의 참가자를 추가하세요.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -102,6 +161,23 @@ export default async function OrgEventsPage({
           </div>
         </div>
       </section>
+
+      {/* 타임테이블 편집 모드 — 안내 배너 */}
+      {focusTimeline && (
+        <section
+          className="rounded-2xl border-2 border-amber-300 bg-amber-50 p-4 shadow-sm"
+          role="status"
+        >
+          <p className="flex items-center gap-2 text-sm font-bold text-amber-900">
+            <span aria-hidden>📅</span>
+            <span>타임테이블을 편집할 행사를 선택해 주세요</span>
+          </p>
+          <p className="mt-1 text-[12px] text-amber-800">
+            아래 행사 카드에서 <span className="font-bold">📅 타임테이블</span>
+            {" "}버튼을 클릭하면 슬롯 추가 화면으로 바로 이동해요.
+          </p>
+        </section>
+      )}
 
       {/* Status tab filters */}
       <section aria-label="상태 필터" className="space-y-2">
@@ -151,7 +227,12 @@ export default async function OrgEventsPage({
       ) : (
         <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {list.map((e) => (
-            <EventCard key={e.event_id} event={e} orgId={orgId} />
+            <EventCard
+              key={e.event_id}
+              event={e}
+              orgId={orgId}
+              highlightTimeline={focusTimeline}
+            />
           ))}
         </ul>
       )}
@@ -162,11 +243,13 @@ export default async function OrgEventsPage({
 function EventCard({
   event,
   orgId,
+  highlightTimeline = false,
 }: {
   event: OrgEventSummaryRow;
   orgId: string;
+  /** 타임테이블 편집 진입점에서 왔을 때 — 타임테이블 버튼 강조 */
+  highlightTimeline?: boolean;
 }) {
-  const statusMeta = ORG_EVENT_STATUS_META[event.status];
   const isLive = event.status === "LIVE";
   return (
     <li
@@ -176,54 +259,94 @@ function EventCard({
           : "border border-[#D4E4BC] hover:border-[#2D5A3D]"
       }`}
     >
-      {/* LIVE 강조 뱃지 */}
+      {/* LIVE 강조 뱃지 — 사진 하단 중앙 (커버-본문 경계 위에 걸침) */}
       {isLive && (
-        <div className="absolute right-2 top-2 z-10 inline-flex items-center gap-1 rounded-full bg-emerald-600 px-2.5 py-1 text-[10px] font-bold text-white shadow-md ring-2 ring-white">
-          <span className="relative inline-flex h-2 w-2" aria-hidden>
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-300 opacity-75" />
-            <span className="relative inline-flex h-2 w-2 rounded-full bg-white" />
+        <div className="pointer-events-none absolute inset-x-0 top-44 z-20 flex -translate-y-1/2 justify-center">
+          <span className="pointer-events-auto inline-flex items-center gap-1 rounded-full bg-emerald-600 px-3 py-1 text-[10px] font-bold text-white shadow-md ring-2 ring-white">
+            <span className="relative inline-flex h-2 w-2" aria-hidden>
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-300 opacity-75" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-white" />
+            </span>
+            <span>🟢 진행중</span>
           </span>
-          <span>🟢 진행중</span>
         </div>
       )}
 
-      {/* 커버 / 플레이스홀더 */}
+      {/* 커버 — 사진 또는 그라디언트 + 제목·기간 오버레이 */}
       <div
-        className={`flex h-28 w-full items-center justify-center ${
+        className={`relative flex h-44 w-full items-end justify-end overflow-hidden ${
           isLive
             ? "bg-gradient-to-br from-emerald-100 via-[#D4E4BC] to-emerald-200"
             : "bg-gradient-to-br from-[#FAE7D0] to-[#E8F0E4]"
         }`}
-        aria-hidden
       >
-        <span className="text-5xl">🎪</span>
-      </div>
+        {/* 사진 — 있을 때만 absolute 로 fill */}
+        {event.cover_image_url && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={event.cover_image_url}
+            alt=""
+            aria-hidden
+            loading="lazy"
+            className="absolute inset-0 h-full w-full object-cover"
+          />
+        )}
 
-      <div className="space-y-2 p-4">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span
-            className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${
-              isLive
-                ? "border-emerald-500 bg-emerald-500 text-white"
-                : statusMeta.color
+        {/* 사진 위 어둡게 그라디언트 오버레이 — 텍스트 가독성 */}
+        {event.cover_image_url && (
+          <div
+            aria-hidden
+            className="absolute inset-0 bg-gradient-to-b from-black/55 via-black/15 to-black/40"
+          />
+        )}
+
+        {/* 좌측 상단 — 제목 + 기간 + 시간 */}
+        <div className="absolute left-4 right-4 top-3 z-[1] max-w-[80%] space-y-1">
+          <h3
+            className={`text-lg font-extrabold leading-snug drop-shadow-md ${
+              event.cover_image_url
+                ? "text-white"
+                : isLive
+                  ? "text-emerald-950"
+                  : "text-[#2C2C2C]"
             }`}
           >
-            {isLive ? "🟢 진행중" : statusMeta.label}
-          </span>
+            {event.name || "(이름 없음)"}
+          </h3>
+          <p
+            className={`flex items-center gap-1 text-[11px] font-semibold drop-shadow-sm ${
+              event.cover_image_url
+                ? "text-white/95"
+                : isLive
+                  ? "text-emerald-900/80"
+                  : "text-[#6B4423]"
+            }`}
+          >
+            <span aria-hidden>📅</span>
+            <span>{fmtRange(event.starts_at, event.ends_at)}</span>
+          </p>
         </div>
-        <h3
-          className={`truncate text-base font-bold ${
-            isLive ? "text-emerald-900" : "text-[#2C2C2C]"
-          }`}
-        >
-          {event.name || "(이름 없음)"}
-        </h3>
-        <p className="text-[11px] text-[#6B6560]">
-          📅 {fmtRange(event.starts_at, event.ends_at)}
-        </p>
+
+        {/* 우측 하단 — 텐트 그래픽 (커버 사진 없을 때만) */}
+        {!event.cover_image_url && (
+          <span
+            aria-hidden
+            className="relative z-[1] mb-2 mr-3 text-6xl drop-shadow-sm opacity-90"
+          >
+            🎪
+          </span>
+        )}
+      </div>
+
+      <div className="space-y-3 p-5">
+        {/* 상태 토글 — 진행중 / 예정 / 종료 / 보관 즉시 전환 */}
+        <EventStatusToggle
+          eventId={event.event_id}
+          initialStatus={event.status}
+        />
 
         {/* 리소스 카운트 칩 */}
-        <div className="flex flex-wrap gap-1 pt-1">
+        <div className="flex flex-wrap gap-1.5 pt-1">
           <CountChip icon="🎯" label={`${event.quest_pack_count}개 스탬프북`} />
           <CountChip icon="🙋" label={`${event.participant_count}명`} />
           <CountChip icon="🎙" label={`${event.fm_session_count} 세션`} />
@@ -235,21 +358,56 @@ function EventCard({
           )}
         </div>
 
-        <div className="mt-1 flex gap-2 pt-2">
+        <div className="mt-2 space-y-2 pt-2">
+          {/* Primary CTA — 카드 가로 100% */}
           <Link
             href={`/org/${orgId}/events/${event.event_id}`}
-            className="inline-flex flex-1 items-center justify-center gap-1 rounded-xl bg-[#2D5A3D] px-3 py-2 text-xs font-bold text-white transition hover:bg-[#234a30]"
+            className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-[#2D5A3D] to-[#3A7A52] px-4 py-3 text-sm font-bold text-white shadow-md transition hover:from-[#234a30] hover:to-[#2D5A3D]"
           >
-            <span aria-hidden>👀</span>
-            <span>상세보기</span>
+            <span aria-hidden className="text-base">🎬</span>
+            <span>행사 진행 관리</span>
+            <span aria-hidden className="text-base">›</span>
           </Link>
+          {/* 참가자 등록 — 부각된 secondary CTA (이 행사에 직접 등록) */}
           <Link
-            href={`/org/${orgId}/events/${event.event_id}/edit`}
-            className="inline-flex items-center justify-center gap-1 rounded-xl border border-[#D4E4BC] bg-white px-3 py-2 text-xs font-bold text-[#2D5A3D] transition hover:bg-[#F5F1E8]"
-            aria-label={`${event.name} 편집`}
+            href={`/org/${orgId}/events/${event.event_id}?tab=participants`}
+            className="flex w-full items-center justify-between gap-1.5 rounded-xl border-2 border-emerald-300 bg-emerald-50 px-4 py-2.5 text-sm font-bold text-emerald-800 shadow-sm transition hover:border-emerald-400 hover:bg-emerald-100"
+            aria-label={`${event.name} 참가자 등록`}
           >
-            <span aria-hidden>✏️</span>
+            <span className="flex items-center gap-1.5">
+              <span aria-hidden>🙋</span>
+              <span>참가자 등록</span>
+              <span className="rounded-full bg-emerald-600/15 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
+                현재 {event.participant_count.toLocaleString("ko-KR")}명
+              </span>
+            </span>
+            <span aria-hidden className="text-base">›</span>
           </Link>
+          {/* 보조 액션 — 작은 버튼 */}
+          <div className="flex gap-2">
+            <Link
+              href={`/org/${orgId}/events/${event.event_id}?tab=timeline`}
+              className={`inline-flex flex-1 items-center justify-center gap-1 rounded-lg px-2 py-1.5 text-[11px] font-semibold transition ${
+                highlightTimeline
+                  ? "border-2 border-amber-400 bg-amber-100 text-amber-900 hover:bg-amber-200"
+                  : "border border-[#D4E4BC] bg-white text-[#2D5A3D] hover:bg-[#F5F1E8]"
+              }`}
+              aria-label={`${event.name} 타임테이블 편집`}
+              title="타임테이블 편집"
+            >
+              <span aria-hidden>📅</span>
+              <span>타임테이블</span>
+            </Link>
+            <Link
+              href={`/org/${orgId}/events/${event.event_id}/edit`}
+              className="inline-flex flex-1 items-center justify-center gap-1 rounded-lg border border-[#D4E4BC] bg-white px-2 py-1.5 text-[11px] font-semibold text-[#2D5A3D] transition hover:bg-[#F5F1E8]"
+              aria-label={`${event.name} 편집`}
+              title="행사 정보 수정"
+            >
+              <span aria-hidden>✏️</span>
+              <span>정보 수정</span>
+            </Link>
+          </div>
         </div>
       </div>
     </li>

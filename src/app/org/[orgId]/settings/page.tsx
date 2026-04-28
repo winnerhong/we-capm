@@ -29,6 +29,7 @@ type OrgRow = {
   class_count: number | null;
   teacher_count: number | null;
   tax_email: string | null;
+  fm_brand_name: string | null;
   commission_rate: number | null;
   discount_rate: number | null;
   contract_start: string | null;
@@ -57,7 +58,7 @@ async function loadOrg(id: string): Promise<OrgRow | null> {
     }
   )
     .select(
-      "id,org_name,org_type,representative_name,representative_phone,email,address,business_number,children_count,class_count,teacher_count,tax_email,commission_rate,discount_rate,contract_start,contract_end"
+      "id,org_name,org_type,representative_name,representative_phone,email,address,business_number,children_count,class_count,teacher_count,tax_email,fm_brand_name,commission_rate,discount_rate,contract_start,contract_end"
     )
     .eq("id", id)
     .maybeSingle();
@@ -351,6 +352,33 @@ export default async function OrgSettingsPage({
             />
             <p className="mt-1 text-[11px] text-[#8B7F75]">
               월정산·세금계산서 발행 시 사용돼요. 비워두면 위 이메일로 발송돼요.
+            </p>
+          </div>
+        </section>
+
+        {/* 토리FM 브랜드 */}
+        <section className="space-y-3 border-t border-[#E8E0D0] pt-4">
+          <h2 className="flex items-center gap-1.5 text-sm font-bold text-[#2D5A3D]">
+            <span>📻</span>
+            <span>토리FM 표시명</span>
+          </h2>
+          <div>
+            <label htmlFor="fm_brand_name" className={LABEL_CLASS}>
+              우리 기관만의 라디오 이름
+            </label>
+            <input
+              id="fm_brand_name"
+              name="fm_brand_name"
+              type="text"
+              maxLength={30}
+              defaultValue={org.fm_brand_name ?? ""}
+              placeholder="예: 별밤지기"
+              className={INPUT_CLASS}
+            />
+            <p className="mt-1 text-[11px] text-[#8B7F75]">
+              참가자 화면 상단에 보여요. 비워두면 기본값{" "}
+              <span className="font-semibold text-[#2D5A3D]">토리FM</span>{" "}
+              으로 표시돼요. (최대 30자)
             </p>
           </div>
         </section>

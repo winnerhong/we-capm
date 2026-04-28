@@ -13,8 +13,8 @@ import { revalidatePath } from "next/cache";
 import { requireOrg } from "@/lib/org-auth-guard";
 import { createClient } from "@/lib/supabase/server";
 import { loadOrgEventById } from "./queries";
-import type { OrgEventStatus } from "./types";
-import { isOrgEventStatus } from "./types";
+import type { OrgEventStatus, ParkingItem } from "./types";
+import { isOrgEventStatus, MAX_PARKING_ITEMS } from "./types";
 
 type Row = Record<string, unknown>;
 type SbErr = { message: string; code?: string } | null;
@@ -69,11 +69,43 @@ function parseIsoOrNull(raw: string | null | undefined): string | null {
 }
 
 /**
+ * 주차장 JSON 문자열 파싱 — 폼에서 input name="invitation_parkings_json" 으로 들어옴.
+ *  - 이름·주소가 모두 비어 있는 행은 제거
+ *  - 이름·주소 각 100자 클램프
+ *  - MAX_PARKING_ITEMS 까지만 잘라서 저장
+ */
+function parseParkingsJson(raw: unknown): ParkingItem[] {
+  const s = typeof raw === "string" ? raw.trim() : "";
+  if (!s) return [];
+  try {
+    const parsed = JSON.parse(s);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .map((row): ParkingItem | null => {
+        if (!row || typeof row !== "object") return null;
+        const o = row as Record<string, unknown>;
+        const name = clampString(String(o.name ?? ""), 100);
+        const address = clampString(String(o.address ?? ""), 200);
+        if (!name && !address) return null;
+        return { name: name ?? "", address: address ?? "" };
+      })
+      .filter((v): v is ParkingItem => v !== null)
+      .slice(0, MAX_PARKING_ITEMS);
+  } catch {
+    return [];
+  }
+}
+
+/**
  * formData 에서 행사 필드 뽑기 — 공통 파서.
  *
  * allow_self_register:
  *  - 체크박스 value = "on" / "true" / "1" 모두 true 로 해석.
  *  - key 자체가 없으면 null (update payload 에서 제외 — 기존 값 보존).
+ *
+ * invitation_parkings:
+ *  - input name="invitation_parkings_json" 에 JSON 문자열로 들어옴.
+ *  - 동적 추가/제거 UI 가 클라이언트에서 직렬화해서 보냄.
  */
 function extractEventFields(formData: FormData): {
   name: string | null;
@@ -83,6 +115,12 @@ function extractEventFields(formData: FormData): {
   cover_image_url: string | null;
   status: OrgEventStatus | null;
   allow_self_register: boolean | null;
+  invitation_message: string | null;
+  invitation_body: string | null;
+  invitation_location: string | null;
+  invitation_address: string | null;
+  invitation_dress_code: string | null;
+  invitation_parkings: ParkingItem[];
 } {
   const rawStatus = String(formData.get("status") ?? "").trim();
   const rawSelfReg = formData.get("allow_self_register");
@@ -106,6 +144,27 @@ function extractEventFields(formData: FormData): {
     ),
     status: isOrgEventStatus(rawStatus) ? rawStatus : null,
     allow_self_register: allowSelfRegister,
+    invitation_message: clampString(
+      String(formData.get("invitation_message") ?? ""),
+      500
+    ),
+    invitation_body: clampString(
+      String(formData.get("invitation_body") ?? ""),
+      3000
+    ),
+    invitation_location: clampString(
+      String(formData.get("invitation_location") ?? ""),
+      200
+    ),
+    invitation_address: clampString(
+      String(formData.get("invitation_address") ?? ""),
+      300
+    ),
+    invitation_dress_code: clampString(
+      String(formData.get("invitation_dress_code") ?? ""),
+      500
+    ),
+    invitation_parkings: parseParkingsJson(formData.get("invitation_parkings_json")),
   };
 }
 
@@ -205,12 +264,56 @@ export async function updateOrgEventAction(
       ...(fields.allow_self_register !== null
         ? { allow_self_register: fields.allow_self_register }
         : {}),
+      invitation_message: fields.invitation_message,
+      invitation_body: fields.invitation_body,
+      invitation_location: fields.invitation_location,
+      invitation_address: fields.invitation_address,
+      invitation_dress_code: fields.invitation_dress_code,
+      invitation_parkings:
+        fields.invitation_parkings.length > 0
+          ? fields.invitation_parkings
+          : null,
     } satisfies Row)
     .eq("id", eventId)) as { error: SbErr };
 
   if (resp.error) {
     console.error("[org-events/update] error", { code: resp.error.code });
     throw new Error("행사 수정에 실패했어요");
+  }
+
+  revalidateEvents(org.orgId, eventId);
+}
+
+/**
+ * 초대장 발행 / 발행취소 — invitation_published_at 토글.
+ * publish=true 면 현재 시각 기록, false 면 NULL.
+ */
+export async function setInvitationPublishedAction(
+  eventId: string,
+  publish: boolean
+): Promise<void> {
+  const org = await requireOrg();
+  if (!eventId) throw new Error("행사를 찾을 수 없어요");
+  await assertEventOwned(eventId, org.orgId);
+
+  const supabase = await createClient();
+  const resp = (await (
+    supabase.from("org_events" as never) as unknown as {
+      update: (p: Row) => {
+        eq: (k: string, v: string) => Promise<{ error: SbErr }>;
+      };
+    }
+  )
+    .update({
+      invitation_published_at: publish ? new Date().toISOString() : null,
+    } satisfies Row)
+    .eq("id", eventId)) as { error: SbErr };
+
+  if (resp.error) {
+    console.error("[org-events/setInvitationPublished] error", {
+      code: resp.error.code,
+    });
+    throw new Error("초대장 발행 상태 변경 실패");
   }
 
   revalidateEvents(org.orgId, eventId);
@@ -554,6 +657,103 @@ export async function setEventTrailsAction(
     }
   }
 
+  revalidateEvents(org.orgId, eventId);
+}
+
+/**
+ * 행사에서 스탬프북 한 개만 제거 — junction 한 줄만 삭제.
+ * 스탬프북 자체는 보존(보존된 채로 다른 행사에 다시 연결 가능).
+ */
+export async function removeQuestPackFromEventAction(
+  eventId: string,
+  questPackId: string
+): Promise<void> {
+  const org = await requireOrg();
+  if (!eventId) throw new Error("행사가 없어요");
+  if (!questPackId) throw new Error("스탬프북이 없어요");
+  await assertEventOwned(eventId, org.orgId);
+
+  const supabase = await createClient();
+  const del = (await (
+    supabase.from("org_event_quest_packs" as never) as unknown as {
+      delete: () => {
+        eq: (k: string, v: string) => {
+          eq: (k: string, v: string) => Promise<{ error: SbErr }>;
+        };
+      };
+    }
+  )
+    .delete()
+    .eq("event_id", eventId)
+    .eq("quest_pack_id", questPackId)) as { error: SbErr };
+  if (del.error) {
+    console.error("[org-events/removeQuestPack]", del.error);
+    throw new Error(`행사제외 실패: ${del.error.message}`);
+  }
+  revalidateEvents(org.orgId, eventId);
+}
+
+/**
+ * 행사에서 프로그램 한 개만 제거.
+ */
+export async function removeProgramFromEventAction(
+  eventId: string,
+  programId: string
+): Promise<void> {
+  const org = await requireOrg();
+  if (!eventId) throw new Error("행사가 없어요");
+  if (!programId) throw new Error("프로그램이 없어요");
+  await assertEventOwned(eventId, org.orgId);
+
+  const supabase = await createClient();
+  const del = (await (
+    supabase.from("org_event_programs" as never) as unknown as {
+      delete: () => {
+        eq: (k: string, v: string) => {
+          eq: (k: string, v: string) => Promise<{ error: SbErr }>;
+        };
+      };
+    }
+  )
+    .delete()
+    .eq("event_id", eventId)
+    .eq("org_program_id", programId)) as { error: SbErr };
+  if (del.error) {
+    console.error("[org-events/removeProgram]", del.error);
+    throw new Error(`행사제외 실패: ${del.error.message}`);
+  }
+  revalidateEvents(org.orgId, eventId);
+}
+
+/**
+ * 행사에서 숲길 한 개만 제거.
+ */
+export async function removeTrailFromEventAction(
+  eventId: string,
+  trailId: string
+): Promise<void> {
+  const org = await requireOrg();
+  if (!eventId) throw new Error("행사가 없어요");
+  if (!trailId) throw new Error("숲길이 없어요");
+  await assertEventOwned(eventId, org.orgId);
+
+  const supabase = await createClient();
+  const del = (await (
+    supabase.from("org_event_trails" as never) as unknown as {
+      delete: () => {
+        eq: (k: string, v: string) => {
+          eq: (k: string, v: string) => Promise<{ error: SbErr }>;
+        };
+      };
+    }
+  )
+    .delete()
+    .eq("event_id", eventId)
+    .eq("trail_id", trailId)) as { error: SbErr };
+  if (del.error) {
+    console.error("[org-events/removeTrail]", del.error);
+    throw new Error(`행사제외 실패: ${del.error.message}`);
+  }
   revalidateEvents(org.orgId, eventId);
 }
 

@@ -8,6 +8,7 @@ import {
   loadRadioQueueItemWithSubmission,
 } from "@/lib/missions/queries";
 import { loadLiveFmSessionForEvent } from "@/lib/org-events/queries";
+import { loadOrgFmBrandName } from "@/lib/tori-fm/branding";
 import type {
   RadioSubmissionPayload,
   ToriFmSessionRow,
@@ -51,9 +52,12 @@ function findUpcoming(
 }
 
 export async function ToriFmCard({ orgId, eventId }: Props) {
-  const session = eventId
-    ? await loadLiveFmSessionForEvent(eventId)
-    : await loadLiveFmSessionForOrg(orgId);
+  const [session, brandName] = await Promise.all([
+    eventId
+      ? loadLiveFmSessionForEvent(eventId)
+      : loadLiveFmSessionForOrg(orgId),
+    loadOrgFmBrandName(orgId),
+  ]);
 
   // LIVE가 아니면 → 예정된 세션 찾아서 대기 카드 표시
   if (!session || !session.is_live) {
@@ -63,7 +67,7 @@ export async function ToriFmCard({ orgId, eventId }: Props) {
     return (
       <Link
         href="/tori-fm"
-        aria-label="토리FM 방송 정보"
+        aria-label={`${brandName} 방송 정보`}
         className="block overflow-hidden rounded-3xl border border-[#D4E4BC] bg-gradient-to-br from-[#2A1F15] via-[#3A2B1E] to-[#2A1F15] p-5 shadow-sm transition hover:shadow-md active:scale-[0.995]"
       >
         <div className="flex items-center gap-2">
@@ -71,8 +75,8 @@ export async function ToriFmCard({ orgId, eventId }: Props) {
           <p className="text-[11px] font-bold uppercase tracking-widest text-amber-200/60">
             OFF AIR
           </p>
-          <span className="ml-auto rounded-full bg-white/5 px-2 py-0.5 text-[10px] font-semibold text-amber-200/70 backdrop-blur-sm">
-            📻 토리FM
+          <span className="ml-auto max-w-[60%] truncate rounded-full bg-white/5 px-2 py-0.5 text-[10px] font-semibold text-amber-200/70 backdrop-blur-sm">
+            📻 {brandName}
           </span>
         </div>
 
@@ -125,7 +129,7 @@ export async function ToriFmCard({ orgId, eventId }: Props) {
   return (
     <Link
       href="/tori-fm"
-      aria-label="토리FM 방송 듣기"
+      aria-label={`${brandName} 방송 듣기`}
       className="block overflow-hidden rounded-3xl border border-amber-500/30 bg-gradient-to-br from-[#1B2B3A] via-[#26394C] to-[#1B2B3A] p-5 shadow-lg transition hover:shadow-xl active:scale-[0.995]"
     >
       {/* ON AIR indicator */}
@@ -137,14 +141,14 @@ export async function ToriFmCard({ orgId, eventId }: Props) {
         <p className="text-[11px] font-bold uppercase tracking-widest text-rose-300">
           ON AIR
         </p>
-        <span className="ml-auto rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold text-amber-200 backdrop-blur-sm">
-          📻 토리FM
+        <span className="ml-auto max-w-[60%] truncate rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold text-amber-200 backdrop-blur-sm">
+          📻 {brandName}
         </span>
       </div>
 
       {/* Title */}
       <h2 className="mt-2 text-lg font-bold text-white">
-        📻 토리FM 방송 중
+        📻 {brandName} 방송 중
       </h2>
       <p className="mt-0.5 text-xs text-amber-200/80">{session.name}</p>
 

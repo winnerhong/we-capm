@@ -11,6 +11,8 @@ export type BulkImportRowResult = {
   status: BulkImportStatus;
   error?: string;
   childrenAdded?: number;
+  /** CREATED/MERGED 일 때만 채워짐 — 행사 link 등 후속 처리에서 사용. */
+  userId?: string;
 };
 
 export type BulkImportResult = {

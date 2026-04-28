@@ -4,26 +4,15 @@
 // USER side: requireAppUser (campnic_user 쿠키)
 // DJ side:   requireOrg    (campnic_org 쿠키)
 //
-// 채팅/리액션/신청곡/하트/투표를 한 파일에 묶음. revalidatePath 는
+// 채팅/리액션/신청곡/하트를 한 파일에 묶음. revalidatePath 는
 // /(user)/tori-fm 와 /org/[orgId]/tori-fm/[sessionId] 양쪽을 찍는다.
-//
-// 주의: options jsonb 는 PG 에서 잠금 없이 read → mutate → update 하므로
-// 동시 투표가 쏠리면 카운트가 덮어써질 수 있음. denormalized cache 로만
-// 취급하고, 실제 집계는 tori_fm_poll_votes 테이블을 source of truth 로 삼는다.
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireAppUser } from "@/lib/user-auth-guard";
 import { requireOrg } from "@/lib/org-auth-guard";
 import { loadFmSessionById } from "@/lib/missions/queries";
-import {
-  loadPollById,
-  loadActivePoll,
-} from "@/lib/tori-fm/queries";
-import type {
-  FmPollOption,
-  ReactionEmoji,
-} from "@/lib/tori-fm/types";
+import type { ReactionEmoji } from "@/lib/tori-fm/types";
 import { REACTION_EMOJIS } from "@/lib/tori-fm/types";
 
 type Row = Record<string, unknown>;
@@ -256,83 +245,6 @@ export async function toggleRequestHeartAction(
   return { hearted: true };
 }
 
-/**
- * 투표 참여 — UNIQUE(poll_id, user_id) 가 중복 차단. options jsonb 캐시도 업데이트.
- *
- * 주의: options[].votes 는 집계 캐시. 동시 투표 시 last-write-wins 로 덮어써질 수
- * 있으므로 UI 는 tori_fm_poll_votes 를 count 로 계산해도 좋다.
- */
-export async function votePollAction(
-  pollId: string,
-  optionId: string
-): Promise<void> {
-  const user = await requireAppUser();
-  if (!pollId) throw new Error("투표를 찾을 수 없어요");
-  if (!optionId) throw new Error("보기를 선택해 주세요");
-
-  const poll = await loadPollById(pollId);
-  if (!poll) throw new Error("투표를 찾을 수 없어요");
-  if (poll.status !== "ACTIVE") {
-    throw new Error("종료된 투표에요");
-  }
-  if (new Date(poll.ends_at).getTime() <= Date.now()) {
-    throw new Error("투표 시간이 끝났어요");
-  }
-  const optionIds = new Set(poll.options.map((o) => o.id));
-  if (!optionIds.has(optionId)) {
-    throw new Error("잘못된 보기에요");
-  }
-
-  const supabase = await createClient();
-
-  // 1) 투표 INSERT — UNIQUE(poll_id, user_id) 충돌은 멱등 처리
-  const voteResp = (await (
-    supabase.from("tori_fm_poll_votes" as never) as unknown as {
-      insert: (r: Row) => Promise<{ error: SbErr }>;
-    }
-  ).insert({
-    poll_id: pollId,
-    user_id: user.id,
-    option_id: optionId,
-  } satisfies Row)) as { error: SbErr };
-
-  if (voteResp.error) {
-    if (voteResp.error.code === "23505") {
-      // 이미 투표 — 조용히 종료
-      revalidateFm(poll.session_id, user.orgId);
-      return;
-    }
-    console.error("[fm/votePoll] insert error", {
-      code: voteResp.error.code,
-    });
-    throw new Error("투표에 실패했어요");
-  }
-
-  // 2) options jsonb cache bump — load → mutate → update
-  const nextOptions: FmPollOption[] = poll.options.map((o) =>
-    o.id === optionId ? { ...o, votes: (o.votes ?? 0) + 1 } : o
-  );
-
-  const updResp = (await (
-    supabase.from("tori_fm_polls" as never) as unknown as {
-      update: (p: Row) => {
-        eq: (k: string, v: string) => Promise<{ error: SbErr }>;
-      };
-    }
-  )
-    .update({ options: nextOptions })
-    .eq("id", pollId)) as { error: SbErr };
-
-  if (updResp.error) {
-    // 캐시 드리프트일 뿐 — 실제 표는 poll_votes 에 박혔음. 로그만 남김.
-    console.error("[fm/votePoll] options cache drift", {
-      code: updResp.error.code,
-    });
-  }
-
-  revalidateFm(poll.session_id, user.orgId);
-}
-
 /* ========================================================================== */
 /* DJ (org) actions                                                           */
 /* ========================================================================== */
@@ -441,152 +353,6 @@ export async function deleteChatMessageAction(
 }
 
 /**
- * 투표 생성 — 기존 ACTIVE 투표가 있으면 자동 종료.
- * options: ["사과","바나나",...] (2~5개).
- */
-export async function createPollAction(
-  sessionId: string,
-  formData: FormData
-): Promise<void> {
-  const org = await requireOrg();
-  if (!sessionId) throw new Error("세션을 찾을 수 없어요");
-
-  await assertSessionOwnedByOrg(sessionId, org.orgId);
-
-  const question = clampString(String(formData.get("question") ?? ""), 200);
-  if (!question) throw new Error("투표 질문을 입력해 주세요");
-
-  // options 는 FormData.getAll("options") 로 다중 추출.
-  const rawOptions = formData.getAll("options");
-  const optionLabels = rawOptions
-    .map((v) => clampString(String(v ?? ""), 100))
-    .filter((s): s is string => !!s);
-
-  if (optionLabels.length < 2) {
-    throw new Error("보기를 2개 이상 입력해 주세요");
-  }
-  if (optionLabels.length > 5) {
-    throw new Error("보기는 최대 5개까지에요");
-  }
-
-  const durationSecRaw = Number(formData.get("duration_sec") ?? 60);
-  const durationSec = Math.max(
-    15,
-    Math.min(600, Number.isFinite(durationSecRaw) ? durationSecRaw : 60)
-  );
-
-  const nowMs = Date.now();
-  const options: FmPollOption[] = optionLabels.map((label, i) => ({
-    id: `opt-${i}`,
-    label,
-    votes: 0,
-  }));
-
-  const supabase = await createClient();
-
-  // 1) 기존 ACTIVE 투표 종료
-  const active = await loadActivePoll(sessionId);
-  if (active) {
-    await endPollInternal(supabase, active.id);
-  }
-
-  // 2) 새 투표 INSERT
-  const insResp = (await (
-    supabase.from("tori_fm_polls" as never) as unknown as {
-      insert: (r: Row) => Promise<{ error: SbErr }>;
-    }
-  ).insert({
-    session_id: sessionId,
-    question,
-    options,
-    duration_sec: durationSec,
-    starts_at: new Date(nowMs).toISOString(),
-    ends_at: new Date(nowMs + durationSec * 1000).toISOString(),
-    status: "ACTIVE",
-  } satisfies Row)) as { error: SbErr };
-
-  if (insResp.error) {
-    console.error("[fm/createPoll] error", { code: insResp.error.code });
-    throw new Error("투표 생성에 실패했어요");
-  }
-
-  revalidateFm(sessionId, org.orgId);
-}
-
-/**
- * 투표 종료 — status=ENDED, winner_option_id 계산. 내부 재사용용.
- */
-async function endPollInternal(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  pollId: string
-): Promise<void> {
-  // 최신 options 재로드 — 투표 캐시 기준.
-  const fresh = (await (
-    supabase.from("tori_fm_polls" as never) as unknown as {
-      select: (c: string) => {
-        eq: (k: string, v: string) => {
-          maybeSingle: () => Promise<
-            SbRespOne<{ id: string; options: FmPollOption[]; status: string }>
-          >;
-        };
-      };
-    }
-  )
-    .select("id, options, status")
-    .eq("id", pollId)
-    .maybeSingle()) as SbRespOne<{
-    id: string;
-    options: FmPollOption[];
-    status: string;
-  }>;
-
-  if (!fresh.data) return;
-  if (fresh.data.status === "ENDED" || fresh.data.status === "CANCELLED") {
-    return; // 멱등
-  }
-
-  // 가장 많은 표를 받은 option — 동률이면 가장 앞쪽.
-  let winner: FmPollOption | null = null;
-  for (const o of fresh.data.options ?? []) {
-    if (!winner || (o.votes ?? 0) > (winner.votes ?? 0)) {
-      winner = o;
-    }
-  }
-
-  const updResp = (await (
-    supabase.from("tori_fm_polls" as never) as unknown as {
-      update: (p: Row) => {
-        eq: (k: string, v: string) => Promise<{ error: SbErr }>;
-      };
-    }
-  )
-    .update({
-      status: "ENDED",
-      winner_option_id: winner?.id ?? null,
-    })
-    .eq("id", pollId)) as { error: SbErr };
-
-  if (updResp.error) {
-    console.error("[fm/endPoll] error", { code: updResp.error.code });
-    throw new Error("투표 종료에 실패했어요");
-  }
-}
-
-export async function endPollAction(pollId: string): Promise<void> {
-  const org = await requireOrg();
-  if (!pollId) throw new Error("투표를 찾을 수 없어요");
-
-  const poll = await loadPollById(pollId);
-  if (!poll) throw new Error("투표를 찾을 수 없어요");
-  await assertSessionOwnedByOrg(poll.session_id, org.orgId);
-
-  const supabase = await createClient();
-  await endPollInternal(supabase, pollId);
-
-  revalidateFm(poll.session_id, org.orgId);
-}
-
-/**
  * 신청곡 상태 전환 공용 — DJ 전용.
  */
 async function setRequestStatus(
@@ -650,4 +416,158 @@ export async function markRequestPlayedAction(
   requestId: string
 ): Promise<void> {
   return setRequestStatus(requestId, "PLAYED");
+}
+
+/* ========================================================================== */
+/* SPOTLIGHT — DJ 콘솔 → 전광판 즉석 푸시                                       */
+/* ========================================================================== */
+
+import {
+  DEFAULT_SPOTLIGHT_DURATION_SEC,
+  type SpotlightKind,
+} from "@/lib/tori-fm/spotlight";
+
+const SPOTLIGHT_KINDS: SpotlightKind[] = [
+  "STORY",
+  "HEART_RAIN",
+  "EMOJI_RAIN",
+  "BANNER",
+];
+
+/**
+ * 전광판에 스포트라이트 이벤트를 트리거.
+ *  - 같은 세션의 동일 kind 활성 row 가 있으면 먼저 dismiss 처리 (overwrite).
+ *  - 새 row INSERT, expires_at = now() + duration (kind 별 기본값, durationSec 로 override 가능).
+ *  - durationSec === 0 또는 default 가 null → expires_at NULL (DJ 명시 dismiss 까지).
+ */
+export async function triggerSpotlightAction(
+  sessionId: string,
+  kind: SpotlightKind,
+  payload: Record<string, unknown> = {},
+  durationSec?: number
+): Promise<void> {
+  const session = await requireOrg();
+  if (!sessionId) throw new Error("세션이 필요해요");
+  if (!SPOTLIGHT_KINDS.includes(kind)) {
+    throw new Error("지원하지 않는 스포트라이트 종류예요");
+  }
+
+  // 세션이 이 기관 소유인지 확인
+  const sessionRow = await loadFmSessionById(sessionId);
+  if (!sessionRow || sessionRow.org_id !== session.orgId) {
+    throw new Error("권한이 없어요");
+  }
+
+  const supabase = await createClient();
+  const nowIso = new Date().toISOString();
+
+  // 1) 기존 동일 kind 활성 row dismiss (앱 레이어 정책 — 한 종류는 한 번에 1개만)
+  const dismissResp = (await (
+    supabase.from("fm_spotlight_events" as never) as unknown as {
+      update: (p: Row) => {
+        eq: (k: string, v: string) => {
+          eq: (k: string, v: string) => {
+            is: (k: string, v: null) => Promise<{ error: SbErr }>;
+          };
+        };
+      };
+    }
+  )
+    .update({ dismissed_at: nowIso })
+    .eq("session_id", sessionId)
+    .eq("kind", kind)
+    .is("dismissed_at", null)) as { error: SbErr };
+
+  if (dismissResp.error) {
+    console.error("[spotlight] dismiss prev failed", {
+      kind,
+      sessionId,
+      message: dismissResp.error.message,
+      code: dismissResp.error.code,
+    });
+    // 테이블이 없거나 권한 문제 — 사용자에게 명확한 메시지로 throw
+    throw new Error(
+      `스포트라이트 테이블 접근 실패: ${dismissResp.error.message ?? "unknown"}. ` +
+        `Supabase 에 마이그레이션(20260605000000_fm_spotlight_events.sql)이 적용됐는지 확인해 주세요.`
+    );
+  }
+
+  // 2) duration 결정
+  const defaultDuration = DEFAULT_SPOTLIGHT_DURATION_SEC[kind];
+  const finalDuration =
+    typeof durationSec === "number" && durationSec > 0
+      ? durationSec
+      : defaultDuration;
+  const expiresIso =
+    finalDuration === null
+      ? null
+      : new Date(Date.now() + finalDuration * 1000).toISOString();
+
+  // 3) 새 row INSERT
+  const insertResp = (await (
+    supabase.from("fm_spotlight_events" as never) as unknown as {
+      insert: (r: Row) => Promise<{ error: SbErr }>;
+    }
+  ).insert({
+    session_id: sessionId,
+    kind,
+    payload_json: payload,
+    triggered_at: nowIso,
+    expires_at: expiresIso,
+    triggered_by_org_id: session.orgId,
+  } satisfies Row)) as { error: SbErr };
+
+  if (insertResp.error) {
+    console.error("[spotlight] insert failed", {
+      kind,
+      sessionId,
+      message: insertResp.error.message,
+      code: insertResp.error.code,
+    });
+    throw new Error(
+      `스포트라이트 INSERT 실패: ${insertResp.error.message ?? "unknown"}. ` +
+        `테이블/RLS 정책 확인 필요.`
+    );
+  }
+
+  console.log("[spotlight] triggered OK", { kind, sessionId, expiresIso });
+  revalidateFm(sessionId, session.orgId);
+}
+
+/**
+ * 활성 스포트라이트를 즉시 종료 (dismiss).
+ *  - kind 단위 dismiss: 같은 session 의 같은 kind 활성 row 모두 dismiss.
+ */
+export async function dismissSpotlightAction(
+  sessionId: string,
+  kind: SpotlightKind
+): Promise<void> {
+  const session = await requireOrg();
+  if (!sessionId) throw new Error("세션이 필요해요");
+
+  const sessionRow = await loadFmSessionById(sessionId);
+  if (!sessionRow || sessionRow.org_id !== session.orgId) {
+    throw new Error("권한이 없어요");
+  }
+
+  const supabase = await createClient();
+  const nowIso = new Date().toISOString();
+
+  await (
+    supabase.from("fm_spotlight_events" as never) as unknown as {
+      update: (p: Row) => {
+        eq: (k: string, v: string) => {
+          eq: (k: string, v: string) => {
+            is: (k: string, v: null) => Promise<{ error: SbErr }>;
+          };
+        };
+      };
+    }
+  )
+    .update({ dismissed_at: nowIso })
+    .eq("session_id", sessionId)
+    .eq("kind", kind)
+    .is("dismissed_at", null);
+
+  revalidateFm(sessionId, session.orgId);
 }

@@ -6,8 +6,10 @@ import {
   loadOrgEventById,
   loadOrgEventSummaryById,
   loadEventQuestPackIds,
+  loadEventParticipantIds,
   loadEventProgramIds,
   loadEventTrailIds,
+  loadParticipantOptionsForOrg,
 } from "@/lib/org-events/queries";
 import {
   ORG_EVENT_STATUS_META,
@@ -30,12 +32,17 @@ import {
   type FmSessionOption,
 } from "./fm-sessions-tab";
 import { AnalyticsTabPanel } from "./analytics-tab";
+import { TimelineTabPanel } from "./timeline-tab";
+import { ParticipantsTab } from "./participants-tab";
 import { InviteLinkCopy } from "./invite-link-copy";
+import { InvitationCardShare } from "./invitation-card-share";
 
 export const dynamic = "force-dynamic";
 
 type TabKey =
   | "overview"
+  | "timeline"
+  | "participants"
   | "questpacks"
   | "fm"
   | "programs"
@@ -44,6 +51,8 @@ type TabKey =
 
 const TABS: { key: TabKey; label: string; icon: string }[] = [
   { key: "overview", label: "개요", icon: "📋" },
+  { key: "timeline", label: "타임테이블", icon: "📅" },
+  { key: "participants", label: "참가자", icon: "🙋" },
   { key: "questpacks", label: "스탬프북", icon: "📚" },
   { key: "fm", label: "토리FM", icon: "🎙" },
   { key: "programs", label: "프로그램", icon: "🗂" },
@@ -53,6 +62,8 @@ const TABS: { key: TabKey; label: string; icon: string }[] = [
 
 function parseTab(v: string | undefined): TabKey {
   if (
+    v === "timeline" ||
+    v === "participants" ||
     v === "questpacks" ||
     v === "fm" ||
     v === "programs" ||
@@ -63,22 +74,71 @@ function parseTab(v: string | undefined): TabKey {
   return "overview";
 }
 
-function fmtDate(iso: string | null): string {
-  if (!iso) return "-";
-  try {
-    return new Date(iso).toLocaleDateString("ko-KR", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    });
-  } catch {
-    return iso;
-  }
+const WEEKDAY = ["일", "월", "화", "수", "목", "금", "토"];
+
+function pad2(n: number): string {
+  return n < 10 ? `0${n}` : `${n}`;
 }
 
+/** "2026.05.16(토)" */
+function fmtDateWeekday(iso: string | null): string {
+  if (!iso) return "-";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "-";
+  return `${d.getFullYear()}.${pad2(d.getMonth() + 1)}.${pad2(d.getDate())}(${WEEKDAY[d.getDay()]})`;
+}
+
+/** "10:00" — 자정은 빈 문자열 */
+function fmtClock(iso: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const h = d.getHours();
+  const m = d.getMinutes();
+  if (h === 0 && m === 0) return "";
+  return `${pad2(h)}:${pad2(m)}`;
+}
+
+/** "3시간" / "1시간 30분" / "2일 3시간" */
+function fmtDurationFromMs(ms: number): string {
+  if (!Number.isFinite(ms) || ms <= 0) return "";
+  const totalMin = Math.round(ms / 60000);
+  const days = Math.floor(totalMin / (60 * 24));
+  const hours = Math.floor((totalMin % (60 * 24)) / 60);
+  const mins = totalMin % 60;
+  const parts: string[] = [];
+  if (days) parts.push(`${days}일`);
+  if (hours) parts.push(`${hours}시간`);
+  if (mins) parts.push(`${mins}분`);
+  return parts.join(" ");
+}
+
+/**
+ * 행사 일정 라벨.
+ *  - 같은 날 + 시간: "2026.05.16(토) 10:00 ~ 13:00 (3시간)"
+ *  - 다른 날 + 시간: "2026.05.16(토) 10:00 ~ 2026.05.18(월) 13:00 (2일 3시간)"
+ *  - 시간 미지정: "2026.05.16(토) ~ 2026.05.16(토)"
+ */
 function fmtRange(starts: string | null, ends: string | null): string {
   if (!starts && !ends) return "기간 미정";
-  return `${fmtDate(starts)} ~ ${fmtDate(ends)}`;
+  const sLabel = fmtDateWeekday(starts);
+  const eLabel = fmtDateWeekday(ends);
+  const sClock = fmtClock(starts);
+  const eClock = fmtClock(ends);
+  const sameDay = starts && ends && sLabel === eLabel;
+  const dur =
+    starts && ends
+      ? fmtDurationFromMs(new Date(ends).getTime() - new Date(starts).getTime())
+      : "";
+  const durSuffix = dur ? ` (${dur})` : "";
+
+  if (!sClock && !eClock) {
+    return `${sLabel} ~ ${eLabel}`;
+  }
+  if (sameDay) {
+    return `${sLabel} ${sClock}${sClock && eClock ? " ~ " : ""}${eClock}${durSuffix}`;
+  }
+  return `${sLabel}${sClock ? ` ${sClock}` : ""} ~ ${eLabel}${eClock ? ` ${eClock}` : ""}${durSuffix}`;
 }
 
 export default async function OrgEventDetailPage({
@@ -189,6 +249,14 @@ export default async function OrgEventDetailPage({
 
             {/* Right CTA group */}
             <div className="flex flex-wrap items-center gap-2">
+              <Link
+                href={`/org/${orgId}/events/${eventId}?tab=participants`}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-[#2D5A3D] px-3.5 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-[#234A31]"
+                title="이 행사에 참가자를 추가하거나 명단을 관리합니다"
+              >
+                <span aria-hidden>➕</span>
+                <span>참가자 등록</span>
+              </Link>
               <a
                 href={`/api/org/${orgId}/events/${eventId}/export/participants`}
                 download
@@ -214,55 +282,94 @@ export default async function OrgEventDetailPage({
         </div>
       </section>
 
-      {/* Tab bar */}
+      {/* Tab bar — 작업 순서 흐름 (steps with > arrows) */}
       <nav
         aria-label="행사 섹션 탭"
-        className="overflow-x-auto rounded-2xl border border-[#D4E4BC] bg-white p-1 shadow-sm"
+        className="overflow-x-auto rounded-2xl border border-[#D4E4BC] bg-gradient-to-r from-white via-[#FFFDF8] to-white px-2 py-2 shadow-sm"
       >
-        <ul className="flex min-w-max gap-1">
-          {TABS.map((t) => {
+        <ol className="flex min-w-max items-center gap-0.5">
+          {TABS.map((t, idx) => {
             const active = t.key === tab;
+            const activeIdx = TABS.findIndex((tab2) => tab2.key === tab);
+            const isPast = activeIdx >= 0 && idx < activeIdx;
             const href =
               t.key === "overview"
                 ? `/org/${orgId}/events/${eventId}`
                 : `/org/${orgId}/events/${eventId}?tab=${t.key}`;
             return (
-              <li key={t.key}>
+              <li key={t.key} className="flex items-center">
                 <Link
                   href={href}
-                  className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold transition ${
+                  aria-current={active ? "page" : undefined}
+                  className={`group inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold transition ${
                     active
-                      ? "bg-[#2D5A3D] text-white shadow-sm"
-                      : "text-[#6B6560] hover:bg-[#F5F1E8] hover:text-[#2D5A3D]"
+                      ? "bg-[#2D5A3D] text-white shadow-sm ring-2 ring-[#2D5A3D]/20"
+                      : isPast
+                        ? "text-[#2D5A3D] hover:bg-[#E8F0E4]"
+                        : "text-[#8B7F75] hover:bg-[#F5F1E8] hover:text-[#2D5A3D]"
                   }`}
                 >
+                  <span
+                    className={`inline-flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
+                      active
+                        ? "bg-white text-[#2D5A3D]"
+                        : isPast
+                          ? "bg-[#2D5A3D] text-white"
+                          : "bg-[#F4EFE8] text-[#8B7F75] group-hover:bg-white"
+                    }`}
+                    aria-hidden
+                  >
+                    {isPast ? "✓" : idx + 1}
+                  </span>
                   <span aria-hidden>{t.icon}</span>
                   <span>{t.label}</span>
                 </Link>
+                {idx < TABS.length - 1 && (
+                  <span
+                    aria-hidden
+                    className={`mx-0.5 select-none text-base font-bold ${
+                      isPast ? "text-[#2D5A3D]" : "text-[#D4C8B8]"
+                    }`}
+                  >
+                    ›
+                  </span>
+                )}
               </li>
             );
           })}
-        </ul>
+        </ol>
       </nav>
 
       {/* Tab panel */}
       <section>
         {tab === "overview" ? (
-          <OverviewPanel
-            orgId={orgId}
-            eventId={eventId}
-            eventName={event.name}
-            status={event.status}
-            startsAt={event.starts_at}
-            endsAt={event.ends_at}
-            counts={{
-              quest_pack_count: summary?.quest_pack_count ?? 0,
-              participant_count: summary?.participant_count ?? 0,
-              fm_session_count: summary?.fm_session_count ?? 0,
-              program_count: summary?.program_count ?? 0,
-              trail_count: summary?.trail_count ?? 0,
-            }}
-          />
+          <>
+            <InvitationCardShare
+              eventId={eventId}
+              eventName={event.name}
+              publishedAt={event.invitation_published_at ?? null}
+            />
+            <div className="h-4" />
+            <OverviewPanel
+              orgId={orgId}
+              eventId={eventId}
+              eventName={event.name}
+              status={event.status}
+              startsAt={event.starts_at}
+              endsAt={event.ends_at}
+              counts={{
+                quest_pack_count: summary?.quest_pack_count ?? 0,
+                participant_count: summary?.participant_count ?? 0,
+                fm_session_count: summary?.fm_session_count ?? 0,
+                program_count: summary?.program_count ?? 0,
+                trail_count: summary?.trail_count ?? 0,
+              }}
+            />
+          </>
+        ) : tab === "timeline" ? (
+          <TimelineTabPanel orgId={orgId} eventId={eventId} />
+        ) : tab === "participants" ? (
+          <ParticipantsTabPanel orgId={orgId} eventId={eventId} />
         ) : tab === "questpacks" ? (
           <QuestPacksTabPanel orgId={orgId} eventId={eventId} />
         ) : tab === "programs" ? (
@@ -392,7 +499,16 @@ function OverviewPanel({
     label: string;
     value: number;
     tab: TabKey;
+    /** 강조 카드 — 참가자처럼 "지금 등록해야 할" 핵심 자원 */
+    highlight?: boolean;
   }> = [
+    {
+      icon: "🙋",
+      label: "참가자",
+      value: counts.participant_count,
+      tab: "participants" as TabKey,
+      highlight: true,
+    },
     {
       icon: "📚",
       label: "스탬프북",
@@ -406,26 +522,52 @@ function OverviewPanel({
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        {items.map((it) => (
-          <Link
-            key={it.tab}
-            href={`/org/${orgId}/events/${eventId}?tab=${it.tab}`}
-            className="rounded-2xl border border-[#D4E4BC] bg-white p-4 shadow-sm transition hover:border-[#2D5A3D] hover:shadow-md"
-          >
-            <div className="flex items-center justify-between">
-              <p className="text-[11px] font-semibold text-[#6B6560]">
-                {it.label}
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+        {items.map((it) => {
+          const isZero = it.value === 0;
+          const isParticipants = it.tab === ("participants" as TabKey);
+          return (
+            <Link
+              key={it.tab}
+              href={`/org/${orgId}/events/${eventId}?tab=${it.tab}`}
+              className={`rounded-2xl border bg-white p-4 shadow-sm transition hover:shadow-md ${
+                it.highlight && isZero
+                  ? "border-amber-400 bg-amber-50 hover:border-amber-500"
+                  : "border-[#D4E4BC] hover:border-[#2D5A3D]"
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <p className="text-[11px] font-semibold text-[#6B6560]">
+                  {it.label}
+                </p>
+                <span className="text-2xl" aria-hidden>
+                  {it.icon}
+                </span>
+              </div>
+              <p
+                className={`mt-1 text-2xl font-extrabold ${
+                  it.highlight && isZero ? "text-amber-700" : "text-[#2D5A3D]"
+                }`}
+              >
+                {it.value.toLocaleString("ko-KR")}
+                {isParticipants && (
+                  <span className="ml-1 text-xs font-semibold text-[#6B6560]">
+                    명
+                  </span>
+                )}
               </p>
-              <span className="text-2xl" aria-hidden>
-                {it.icon}
-              </span>
-            </div>
-            <p className="mt-1 text-2xl font-extrabold text-[#2D5A3D]">
-              {it.value.toLocaleString("ko-KR")}
-            </p>
-          </Link>
-        ))}
+              {isParticipants && (
+                <p
+                  className={`mt-1 text-[11px] font-bold ${
+                    isZero ? "text-amber-700" : "text-[#2D5A3D]"
+                  }`}
+                >
+                  {isZero ? "👉 지금 등록하기" : "+ 등록 / 관리"}
+                </p>
+              )}
+            </Link>
+          );
+        })}
       </div>
 
       <NextStepsPanel
@@ -772,6 +914,27 @@ async function QuestPacksTabPanel({
   );
 }
 
+async function ParticipantsTabPanel({
+  orgId,
+  eventId,
+}: {
+  orgId: string;
+  eventId: string;
+}) {
+  const [allParticipants, selectedIds] = await Promise.all([
+    loadParticipantOptionsForOrg(orgId),
+    loadEventParticipantIds(eventId),
+  ]);
+  return (
+    <ParticipantsTab
+      orgId={orgId}
+      eventId={eventId}
+      allParticipants={allParticipants}
+      initialSelectedIds={selectedIds}
+    />
+  );
+}
+
 async function ProgramsTabPanel({
   orgId,
   eventId,
@@ -998,6 +1161,7 @@ async function loadTrailOptionsForOrg(orgId: string): Promise<TrailOption[]> {
     estimated_minutes: t.estimated_minutes,
     total_slots: t.total_slots,
     cover_image_url: t.cover_image_url,
+    slug: t.slug ?? null,
   }));
 }
 
@@ -1066,6 +1230,16 @@ function Phase2Placeholder({ tab }: { tab: TabKey }) {
     Exclude<TabKey, "overview">,
     { icon: string; title: string; empty: string }
   > = {
+    timeline: {
+      icon: "📅",
+      title: "타임테이블",
+      empty: "아직 슬롯이 없어요.",
+    },
+    participants: {
+      icon: "🙋",
+      title: "참가자",
+      empty: "아직 등록된 참가자가 없어요.",
+    },
     questpacks: {
       icon: "📚",
       title: "스탬프북",

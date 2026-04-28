@@ -40,6 +40,11 @@ export async function updateOwnOrgInfoAction(formData: FormData): Promise<void> 
 
   const tax_email = String(formData.get("tax_email") ?? "").trim() || null;
 
+  // 토리FM 표시명 — 비워두면 null 저장 → 앱이 기본값 "토리FM" 으로 fallback.
+  const fmBrandRaw = String(formData.get("fm_brand_name") ?? "").trim();
+  const fm_brand_name =
+    fmBrandRaw.length > 0 ? fmBrandRaw.slice(0, 30) : null;
+
   const parseCount = (key: string): number => {
     const raw = String(formData.get(key) ?? "").trim();
     if (!raw) return 0;
@@ -77,6 +82,7 @@ export async function updateOwnOrgInfoAction(formData: FormData): Promise<void> 
       class_count,
       teacher_count,
       tax_email,
+      fm_brand_name,
     })
     .eq("id", session.orgId);
 

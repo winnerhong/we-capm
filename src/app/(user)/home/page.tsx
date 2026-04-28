@@ -27,6 +27,8 @@ import type { PackProgress } from "@/lib/missions/progress";
 import { ToriFmCard } from "./tori-fm-card";
 import { BroadcastCard } from "./broadcast-card";
 import { EventSelector } from "./event-selector";
+import { NextUpCard } from "./next-up-card";
+import { loadTimelineSlots } from "@/lib/event-timeline/queries";
 import { StampbookDetail } from "@/components/stampbook-detail";
 import { AcornIcon } from "@/components/acorn-icon";
 
@@ -162,6 +164,11 @@ export default async function UserHomePage({
     selectedEvent?.id ?? null
   );
 
+  // 선택된 행사의 타임라인 슬롯 — 홈 "오늘의 일정" 카드용
+  const timelineSlots = selectedEvent
+    ? await loadTimelineSlots(selectedEvent.id)
+    : [];
+
   // 원생 자녀가 있으면 "{원생이름} 가족" 으로 가족 라벨 표기,
   // 없으면 기존 "{부모이름}님" 유지.
   const enrolledChildren = children.filter((c) => c.is_enrolled);
@@ -187,50 +194,52 @@ export default async function UserHomePage({
 
   return (
     <div className="space-y-4">
-      {/* Hero */}
-      <section className="overflow-hidden rounded-3xl bg-gradient-to-br from-[#2D5A3D] via-[#3A7A52] to-[#4A7C59] p-5 shadow-lg">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold text-[#D4E4BC]">
-              🌲 {user.orgName || "소속 기관"}
-            </p>
-            <h1 className="mt-1 truncate text-xl font-bold text-white">
-              🖼 {familyLabel}
-            </h1>
-          </div>
-          <Link
-            href="/profile"
-            className="shrink-0 rounded-full bg-white/15 px-3 py-1.5 text-xs font-bold text-white backdrop-blur-sm transition hover:bg-white/25"
-          >
-            내 정보 →
-          </Link>
-        </div>
-
-        <div className="mt-4 grid grid-cols-3 gap-2">
-          <MiniStat label="도토리" value={`${acornBalance}`} icon={<AcornIcon size={20} />} />
-          <MiniStat label="자녀" value={`${children.length}`} icon="🪴" />
-          <MiniStat
-            label="스탬프"
-            value={
-              primaryPack
-                ? `${primaryPack.progress.completedSlots}/${primaryPack.progress.totalSlots}`
-                : "-"
-            }
-            icon="🌿"
-            hint={primaryPack ? undefined : "곧 오픈"}
-          />
-        </div>
-      </section>
-
-      {/* 진행 중 스탬프북 — 내 정보 바로 아래 (풀 디테일 뷰) */}
-      {primaryPack && (
+      {primaryPack ? (
+        /* Hero + 진행 중 스탬프북 — 한 카드로 통합 */
         <StampbookDetail
           pack={primaryPack.pack}
           missions={primaryPack.missions}
           submissions={primaryPack.submissions}
           userAcornsInPack={primaryPack.userAcornsInPack}
           progress={primaryPack.progress}
+          familyHeader={{
+            orgName: user.orgName || "소속 기관",
+            familyLabel,
+            profileHref: "/profile",
+            acornBalance,
+            childrenCount: children.length,
+          }}
         />
+      ) : (
+        /* primaryPack 미존재 — Hero 만 단독 표시 (스탬프 자리에는 "곧 오픈") */
+        <section className="overflow-hidden rounded-3xl bg-gradient-to-br from-[#2D5A3D] via-[#3A7A52] to-[#4A7C59] p-5 shadow-lg">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold text-[#D4E4BC]">
+                🌲 {user.orgName || "소속 기관"}
+              </p>
+              <h1 className="mt-1 truncate text-xl font-bold text-white">
+                {familyLabel}
+              </h1>
+            </div>
+            <Link
+              href="/profile"
+              className="shrink-0 rounded-full bg-white/15 px-3 py-1.5 text-xs font-bold text-white backdrop-blur-sm transition hover:bg-white/25"
+            >
+              내 정보 →
+            </Link>
+          </div>
+
+          <div className="mt-4 grid grid-cols-3 gap-2">
+            <MiniStat
+              label="도토리"
+              value={`${acornBalance}`}
+              icon={<AcornIcon size={20} />}
+            />
+            <MiniStat label="자녀" value={`${children.length}`} icon="🪴" />
+            <MiniStat label="스탬프" value="-" icon="🌿" hint="곧 오픈" />
+          </div>
+        </section>
       )}
 
       {/* 행사 배너 / 선택기 */}
@@ -260,6 +269,11 @@ export default async function UserHomePage({
       ) : selectedEvent ? (
         <EventSelector events={activeEvents} selectedId={selectedEvent.id} />
       ) : null}
+
+      {/* 오늘의 일정 — 진행 중 + 다음 슬롯 압축 미리보기 */}
+      {selectedEvent && timelineSlots.length > 0 && (
+        <NextUpCard eventName={selectedEvent.name} slots={timelineSlots} />
+      )}
 
       {/* 온보딩 위저드 — 첫 입장 시 자동 오픈, 미완 시 상단 배너 유지 */}
       <OnboardingWizard

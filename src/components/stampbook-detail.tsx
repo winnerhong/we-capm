@@ -74,6 +74,17 @@ export interface StampbookDetailProps {
   userAcornsInPack: number;
   /** 미리 계산된 progress 를 넘기면 재계산 생략 (옵션) */
   progress?: PackProgress;
+  /**
+   * 카드 상단에 합쳐서 보여줄 가족 헤더. 홈 화면에서 Hero + 스탬프북을 한 카드로
+   * 묶기 위해 사용. 미전달 시 헤더 영역 미렌더 (스탬프북 단독 상세 페이지용).
+   */
+  familyHeader?: {
+    orgName: string;
+    familyLabel: string;
+    profileHref: string;
+    acornBalance: number;
+    childrenCount: number;
+  };
 }
 
 export function StampbookDetail({
@@ -82,6 +93,7 @@ export function StampbookDetail({
   submissions,
   userAcornsInPack,
   progress: passedProgress,
+  familyHeader,
 }: StampbookDetailProps) {
   const progress =
     passedProgress ??
@@ -140,6 +152,34 @@ export function StampbookDetail({
             : undefined
         }
       >
+        {/* 가족 헤더 (옵션) — 홈 화면에서 Hero 와 합칠 때 표시 */}
+        {familyHeader && (
+          <div className="mb-4 flex items-start justify-between gap-3 border-b border-white/15 pb-4">
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-[11px] font-semibold text-[#D4E4BC]">
+                🌲 {familyHeader.orgName}
+              </p>
+              <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+                <h1 className="truncate text-base font-bold text-white">
+                  {familyHeader.familyLabel}
+                </h1>
+                <span className="inline-flex items-center gap-1 rounded-full bg-white/15 px-2 py-0.5 text-[10px] font-semibold tabular-nums text-white backdrop-blur-sm">
+                  <AcornIcon size={11} /> {familyHeader.acornBalance}
+                </span>
+                <span className="inline-flex items-center gap-0.5 rounded-full bg-white/15 px-2 py-0.5 text-[10px] font-semibold tabular-nums text-white backdrop-blur-sm">
+                  🪴 {familyHeader.childrenCount}
+                </span>
+              </div>
+            </div>
+            <Link
+              href={familyHeader.profileHref}
+              className="shrink-0 rounded-full bg-white/15 px-3 py-1.5 text-[11px] font-bold text-white backdrop-blur-sm transition hover:bg-white/25"
+            >
+              내 정보 →
+            </Link>
+          </div>
+        )}
+
         {/* 상단: 제목 + 날짜 */}
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
@@ -148,9 +188,15 @@ export function StampbookDetail({
             >
               {packMeta.label}
             </span>
-            <h1 className="mt-2 text-2xl font-bold leading-tight">
-              🌲 {pack.name}
-            </h1>
+            {familyHeader ? (
+              <h2 className="mt-2 text-xl font-bold leading-tight">
+                🌲 {pack.name}
+              </h2>
+            ) : (
+              <h1 className="mt-2 text-2xl font-bold leading-tight">
+                🌲 {pack.name}
+              </h1>
+            )}
             {pack.description && (
               <p className="mt-1.5 text-xs leading-relaxed text-[#D4E4BC]">
                 {pack.description}

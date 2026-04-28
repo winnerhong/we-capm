@@ -8,6 +8,7 @@ import {
   deleteChildAction,
   toggleChildEnrolledAction,
   updateAppUserAction,
+  updateChildBirthDateAction,
   type UserStatus,
 } from "../../actions";
 
@@ -153,6 +154,26 @@ export function EditUserForm({
     });
   };
 
+  // 인라인 생년월일 편집 — 어떤 child 의 input 이 열려있는지 추적
+  const [editingBirthId, setEditingBirthId] = useState<string | null>(null);
+  const [birthDraft, setBirthDraft] = useState("");
+
+  const onSaveBirth = (childId: string) => {
+    setChildError(null);
+    startChildTransition(async () => {
+      try {
+        await updateChildBirthDateAction(childId, birthDraft || null);
+        setEditingBirthId(null);
+        setBirthDraft("");
+        router.refresh();
+      } catch (e) {
+        setChildError(
+          e instanceof Error ? e.message : "생년월일 수정 실패"
+        );
+      }
+    });
+  };
+
   return (
     <div className="space-y-6">
       {/* 기본 정보 편집 */}
@@ -280,54 +301,105 @@ export function EditUserForm({
           </div>
         ) : (
           <ul className="space-y-2">
-            {children.map((c) => (
-              <li
-                key={c.id}
-                className="flex items-center justify-between rounded-xl border border-[#F0E8D8] bg-[#FFFDF8] px-4 py-3"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="text-lg" aria-hidden>
-                    🧒
-                  </span>
-                  <div>
-                    <div className="font-semibold text-[#2D5A3D]">
-                      {c.name}
-                    </div>
-                    <div className="text-[11px] text-[#6B6560]">
-                      🎂 {formatDate(c.birth_date)}
+            {children.map((c) => {
+              const isEditingBirth = editingBirthId === c.id;
+              return (
+                <li
+                  key={c.id}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[#F0E8D8] bg-[#FFFDF8] px-4 py-3"
+                >
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span className="text-lg" aria-hidden>
+                      🧒
+                    </span>
+                    <div className="min-w-0">
+                      <div className="font-semibold text-[#2D5A3D]">
+                        {c.name}
+                      </div>
+                      {isEditingBirth ? (
+                        <div className="mt-1 flex items-center gap-1.5">
+                          <input
+                            type="date"
+                            value={birthDraft}
+                            onChange={(e) => setBirthDraft(e.target.value)}
+                            max={new Date().toISOString().slice(0, 10)}
+                            disabled={childPending}
+                            className="h-7 rounded-md border border-[#D4E4BC] bg-white px-2 text-[11px] text-[#2D5A3D] focus:border-[#2D5A3D] focus:outline-none focus:ring-1 focus:ring-[#2D5A3D]/40"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => onSaveBirth(c.id)}
+                            disabled={childPending}
+                            className="h-7 rounded-md bg-[#2D5A3D] px-2 text-[10px] font-bold text-white hover:bg-[#234a30] disabled:opacity-50"
+                          >
+                            저장
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingBirthId(null);
+                              setBirthDraft("");
+                            }}
+                            disabled={childPending}
+                            className="h-7 rounded-md border border-[#E5D3B8] bg-white px-2 text-[10px] font-semibold text-[#6B4423] hover:bg-[#FFF8F0] disabled:opacity-50"
+                          >
+                            취소
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingBirthId(c.id);
+                            setBirthDraft(c.birth_date ?? "");
+                          }}
+                          disabled={childPending}
+                          title="클릭해서 생년월일 수정"
+                          className="mt-0.5 inline-flex items-center gap-0.5 rounded-md px-1 text-[11px] text-[#6B6560] underline-offset-2 hover:bg-[#F5F1E8] hover:text-[#2D5A3D] hover:underline disabled:opacity-50"
+                        >
+                          <span aria-hidden>🎂</span>
+                          <span>{formatDate(c.birth_date)}</span>
+                          <span
+                            aria-hidden
+                            className="ml-0.5 text-[9px] text-[#8B7F75]"
+                          >
+                            ✏️
+                          </span>
+                        </button>
+                      )}
                     </div>
                   </div>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => onToggleEnrolled(c.id, !c.is_enrolled)}
-                    disabled={childPending}
-                    aria-pressed={c.is_enrolled}
-                    title={
-                      c.is_enrolled
-                        ? "원생이에요 — 클릭해서 형제/자매로 변경"
-                        : "원생의 형제/자매예요 — 클릭해서 원생으로 변경"
-                    }
-                    className={`inline-flex h-7 items-center gap-1 rounded-md border px-2 text-[11px] font-bold transition disabled:opacity-50 ${
-                      c.is_enrolled
-                        ? "border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
-                        : "border-zinc-300 bg-white text-zinc-600 hover:bg-zinc-50"
-                    }`}
-                  >
-                    {c.is_enrolled ? "🏫 원생" : "👫 형제/자매"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onDeleteChild(c.id, c.name)}
-                    disabled={childPending}
-                    className="inline-flex h-7 items-center rounded-md border border-red-200 bg-white px-2 text-[11px] font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50"
-                  >
-                    삭제
-                  </button>
-                </div>
-              </li>
-            ))}
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => onToggleEnrolled(c.id, !c.is_enrolled)}
+                      disabled={childPending}
+                      aria-pressed={c.is_enrolled}
+                      title={
+                        c.is_enrolled
+                          ? "원생이에요 — 클릭해서 형제/자매로 변경"
+                          : "원생의 형제/자매예요 — 클릭해서 원생으로 변경"
+                      }
+                      className={`inline-flex h-7 items-center gap-1 rounded-md border px-2 text-[11px] font-bold transition disabled:opacity-50 ${
+                        c.is_enrolled
+                          ? "border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
+                          : "border-zinc-300 bg-white text-zinc-600 hover:bg-zinc-50"
+                      }`}
+                    >
+                      {c.is_enrolled ? "🏫 원생" : "👫 형제/자매"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onDeleteChild(c.id, c.name)}
+                      disabled={childPending}
+                      className="inline-flex h-7 items-center rounded-md border border-red-200 bg-white px-2 text-[11px] font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50"
+                    >
+                      삭제
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         )}
 

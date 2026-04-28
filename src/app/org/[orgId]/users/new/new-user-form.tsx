@@ -9,7 +9,23 @@ function newChildId(): string {
   return Math.random().toString(36).slice(2, 8);
 }
 
-export function NewUserForm({ orgId }: { orgId: string }) {
+interface Props {
+  orgId: string;
+  /**
+   * 폼 제출 시 호출될 server action — partial-applied 형태(`(fd) => Promise<void>`).
+   * 미전달 시 기본 createSingleAppUserAction(orgId, fd) 으로 fallback.
+   * 행사별 등록 페이지에서는 `createSingleEventParticipantAction.bind(null, orgId, eventId)` 같이 미리 binding.
+   */
+  action?: (formData: FormData) => Promise<void>;
+  /** 제출 버튼 라벨 (기본 "🌱 참가자 등록") */
+  submitLabel?: string;
+}
+
+export function NewUserForm({
+  orgId,
+  action,
+  submitLabel = "🌱 참가자 등록",
+}: Props) {
   const [enrolledName, setEnrolledName] = useState("");
   const [phone, setPhone] = useState("");
   const [siblings, setSiblings] = useState<Sibling[]>([]);
@@ -65,7 +81,11 @@ export function NewUserForm({ orgId }: { orgId: string }) {
 
     startTransition(async () => {
       try {
-        await createSingleAppUserAction(orgId, fd);
+        if (action) {
+          await action(fd);
+        } else {
+          await createSingleAppUserAction(orgId, fd);
+        }
         // Server action에서 redirect하므로 여기 도달 안 함.
       } catch (e) {
         const msg = e instanceof Error ? e.message : "등록에 실패했어요";
@@ -213,7 +233,11 @@ export function NewUserForm({ orgId }: { orgId: string }) {
           className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-[#2D5A3D] to-[#3A7A52] px-5 py-2.5 text-sm font-bold text-white shadow-md hover:from-[#234a30] hover:to-[#2D5A3D] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2D5A3D]/40 disabled:opacity-60"
         >
           <span aria-hidden>{isPending ? "⏳" : "🌱"}</span>
-          <span>{isPending ? "등록 중..." : "참가자 등록"}</span>
+          <span>
+            {isPending
+              ? "등록 중..."
+              : submitLabel.replace(/^🌱\s*/, "")}
+          </span>
         </button>
       </div>
     </form>

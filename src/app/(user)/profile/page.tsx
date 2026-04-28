@@ -50,11 +50,11 @@ export default async function UserProfilePage() {
             {heroInitial}
           </div>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-lg font-bold text-white">
-              {heroTitle}
-            </p>
-            <p className="mt-0.5 text-xs text-[#D4E4BC]">
+            <p className="truncate text-xs text-[#D4E4BC]">
               {session.orgName || "소속 기관"}
+            </p>
+            <p className="mt-0.5 truncate text-lg font-bold text-white">
+              {heroTitle}
             </p>
             <p className="mt-0.5 font-mono text-xs text-[#D4E4BC]">
               {phoneFull}

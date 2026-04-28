@@ -269,6 +269,82 @@ export async function deleteChildAction(childId: string): Promise<void> {
 }
 
 /**
+ * 자녀 생년월일 수정. 빈 문자열이면 null 로 저장 (생년월일 미입력).
+ * YYYY-MM-DD 형식만 허용.
+ */
+export async function updateChildBirthDateAction(
+  childId: string,
+  birthDate: string | null
+): Promise<void> {
+  const session = await requireOrg();
+  if (!childId) throw new Error("자녀 ID가 없어요");
+
+  const supabase = await createClient();
+
+  // 자녀 → 보호자 → 기관 소유 검증
+  const childResp = (await (
+    supabase.from("app_children" as never) as unknown as {
+      select: (c: string) => {
+        eq: (k: string, v: string) => {
+          maybeSingle: () => Promise<SbOne<{ id: string; user_id: string }>>;
+        };
+      };
+    }
+  )
+    .select("id, user_id")
+    .eq("id", childId)
+    .maybeSingle()) as SbOne<{ id: string; user_id: string }>;
+
+  const child = childResp.data;
+  if (!child) throw new Error("자녀를 찾을 수 없어요");
+
+  const userResp = (await (
+    supabase.from("app_users" as never) as unknown as {
+      select: (c: string) => {
+        eq: (k: string, v: string) => {
+          maybeSingle: () => Promise<SbOne<{ id: string; org_id: string }>>;
+        };
+      };
+    }
+  )
+    .select("id, org_id")
+    .eq("id", child.user_id)
+    .maybeSingle()) as SbOne<{ id: string; org_id: string }>;
+
+  const user = userResp.data;
+  if (!user || user.org_id !== session.orgId) {
+    throw new Error("이 자녀를 수정할 권한이 없어요");
+  }
+
+  // 정규화: 빈 문자열/공백은 null. YYYY-MM-DD 만 허용.
+  let normalized: string | null = null;
+  if (birthDate && birthDate.trim().length > 0) {
+    const trimmed = birthDate.trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+      throw new Error("생년월일은 YYYY-MM-DD 형식이어야 해요");
+    }
+    normalized = trimmed;
+  }
+
+  const upd = (await (
+    supabase.from("app_children" as never) as unknown as {
+      update: (p: { birth_date: string | null }) => {
+        eq: (k: string, v: string) => Promise<{ error: SbErr }>;
+      };
+    }
+  )
+    .update({ birth_date: normalized })
+    .eq("id", childId)) as { error: SbErr };
+
+  if (upd.error) {
+    throw new Error(`생년월일 수정 실패: ${upd.error.message}`);
+  }
+
+  revalidatePath(`/org/${session.orgId}/users/${child.user_id}`);
+  revalidatePath(`/org/${session.orgId}/users/${child.user_id}/edit`);
+}
+
+/**
  * 자녀의 원생/형제자매 여부 토글. 해당 기관 소속 자녀에 대해서만 가능.
  */
 export async function toggleChildEnrolledAction(

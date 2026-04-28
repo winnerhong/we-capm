@@ -76,6 +76,12 @@ export default async function EditOrgEventPage({
           allow_self_register:
             (event as unknown as { allow_self_register?: boolean })
               .allow_self_register ?? false,
+          invitation_message: event.invitation_message ?? "",
+          invitation_body: event.invitation_body ?? "",
+          invitation_location: event.invitation_location ?? "",
+          invitation_address: event.invitation_address ?? "",
+          invitation_dress_code: event.invitation_dress_code ?? "",
+          invitation_parkings: event.invitation_parkings ?? [],
         }}
       />
     </div>

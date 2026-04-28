@@ -81,6 +81,7 @@ export default async function UserLayout({
       >
         <ul className="mx-auto flex max-w-md items-stretch">
           <TabItem href="/home" label="홈" icon="🏠" />
+          <TabItem href="/schedule" label="일정" icon="📅" />
           <TabItem href="/stamps" label="스탬프" icon={<AcornIcon size={20} />} />
           <TabItem href="/tori-talk" label="토리톡" icon={<WinnerTalkIcon size={22} />} />
           <TabItem href="/acorns" label="도토리" icon="🎁" />

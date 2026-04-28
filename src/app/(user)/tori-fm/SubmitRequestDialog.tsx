@@ -14,20 +14,28 @@ type Props = {
   sessionId: string;
   isLive: boolean;
   trendingSongs: TrendingSong[];
+  /**
+   * "OOO 가족" 자동 표시값. 폼이 child_name 으로 hidden 전송.
+   * 비어있으면 child_name 미전송.
+   */
+  familyLabel: string;
 };
 
 export function SubmitRequestDialog({
   sessionId,
   isLive,
   trendingSongs,
+  familyLabel,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [showBanner, setShowBanner] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const formRef = useRef<HTMLFormElement | null>(null);
-  const songInputRef = useRef<HTMLInputElement | null>(null);
-  const artistInputRef = useRef<HTMLInputElement | null>(null);
+  // 인기곡 칩 부스트 상태 — 한 번 누르면 즉시 +1 신청 들어감.
+  const [boostingId, setBoostingId] = useState<string | null>(null);
+  const [boostedIds, setBoostedIds] = useState<Set<string>>(new Set());
+  const [boostFeedback, setBoostFeedback] = useState<string | null>(null);
 
   const handleSubmit = useCallback(
     (e: React.FormEvent<HTMLFormElement>) => {
@@ -61,14 +69,43 @@ export function SubmitRequestDialog({
     [sessionId]
   );
 
-  const fillFromTrending = useCallback((song: TrendingSong) => {
-    if (songInputRef.current) {
-      songInputRef.current.value = song.song_title;
-    }
-    if (artistInputRef.current) {
-      artistInputRef.current.value = song.artist ?? "";
-    }
-  }, []);
+  /**
+   * 인기곡 칩 부스트 — 한 번 클릭 = "나도 이 노래가 듣고싶다!" 동참.
+   * 사연 없이 song_title + artist + child_name(가족) 만으로 즉시 신청 INSERT 발생.
+   * 같은 곡에 신청이 누적되면 trending 순위가 올라간다.
+   */
+  const onBoostSong = useCallback(
+    (song: TrendingSong, idx: number) => {
+      const id = `${song.song_title}-${idx}`;
+      if (boostingId || boostedIds.has(id)) return;
+      setBoostingId(id);
+      setError(null);
+
+      const fd = new FormData();
+      fd.set("song_title", song.song_title);
+      if (song.artist) fd.set("artist", song.artist);
+      if (familyLabel) fd.set("child_name", familyLabel);
+
+      startTransition(async () => {
+        try {
+          await submitSessionRequestAction(sessionId, fd);
+          setBoostedIds((prev) => {
+            const nx = new Set(prev);
+            nx.add(id);
+            return nx;
+          });
+          setBoostFeedback("🔥 나도 듣고 싶어요! 순위가 올라가요");
+          setTimeout(() => setBoostFeedback(null), 2500);
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : "처리에 실패했어요";
+          setError(msg);
+        } finally {
+          setBoostingId(null);
+        }
+      });
+    },
+    [sessionId, familyLabel, boostingId, boostedIds]
+  );
 
   if (!isLive) return null;
 
@@ -83,6 +120,15 @@ export function SubmitRequestDialog({
           🎵 신청 완료! 승인되면 방송에 들려드려요
         </div>
       )}
+      {boostFeedback && (
+        <div
+          className="mb-3 rounded-xl bg-rose-100 p-3 text-center text-sm font-bold text-rose-700"
+          role="status"
+          aria-live="polite"
+        >
+          {boostFeedback}
+        </div>
+      )}
 
       {!open ? (
         <button
@@ -94,6 +140,77 @@ export function SubmitRequestDialog({
         </button>
       ) : (
         <form ref={formRef} onSubmit={handleSubmit} className="space-y-3">
+          {/* 헤더 — 제목 + 우측 접기 버튼 */}
+          <header className="flex items-center justify-between gap-2 border-b border-[#D4E4BC] pb-2">
+            <h3 className="flex items-center gap-1.5 text-sm font-bold text-[#2D5A3D]">
+              <span aria-hidden>🎵</span>
+              <span>신청곡 보내기</span>
+            </h3>
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                setError(null);
+              }}
+              disabled={isPending}
+              aria-label="신청곡 보내기 접기"
+              className="inline-flex items-center gap-1 rounded-lg border border-[#D4E4BC] bg-white px-2 py-1 text-[11px] font-semibold text-[#2D5A3D] transition hover:bg-[#F5F1E8] disabled:opacity-50"
+            >
+              <span aria-hidden>↑</span>
+              <span>접기</span>
+            </button>
+          </header>
+
+          {/* 보내는 이 — 화면에는 노출 안 함. child_name 만 hidden 으로 자동 전송. */}
+          {familyLabel && (
+            <input type="hidden" name="child_name" value={familyLabel} />
+          )}
+
+          {trendingSongs.length > 0 && (
+            <div>
+              <p className="text-[11px] font-bold text-[#2D5A3D]">
+                🔥 오늘 많이 신청된 곡
+              </p>
+              <p className="mt-0.5 text-[10px] text-[#8B7F75]">
+                👇 클릭하면 &ldquo;나도 듣고 싶어요&rdquo; +1 신청이 들어가요
+              </p>
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                {trendingSongs.slice(0, 6).map((s, i) => {
+                  const id = `${s.song_title}-${i}`;
+                  const isBoosting = boostingId === id;
+                  const isBoosted = boostedIds.has(id);
+                  const disabled = isBoosting || isBoosted || isPending;
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => onBoostSong(s, i)}
+                      disabled={disabled}
+                      title={
+                        isBoosted
+                          ? "이미 +1 했어요"
+                          : "나도 이 노래가 듣고 싶어요!"
+                      }
+                      className={`rounded-full border px-3 py-1 text-[11px] font-semibold transition ${
+                        isBoosted
+                          ? "border-emerald-300 bg-emerald-50 text-emerald-700"
+                          : isBoosting
+                            ? "animate-pulse border-violet-300 bg-violet-50 text-violet-700"
+                            : "border-[#D4E4BC] bg-white text-[#2D5A3D] hover:border-rose-400 hover:bg-rose-50 active:scale-[0.97]"
+                      }`}
+                    >
+                      <span aria-hidden className="mr-1">
+                        {isBoosted ? "✅" : isBoosting ? "⏳" : "🔥"}
+                      </span>
+                      {s.song_title}
+                      {s.artist ? ` · ${s.artist}` : ""}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           <div>
             <label
               htmlFor="fm-req-song"
@@ -103,7 +220,6 @@ export function SubmitRequestDialog({
             </label>
             <input
               id="fm-req-song"
-              ref={songInputRef}
               name="song_title"
               type="text"
               required
@@ -123,7 +239,6 @@ export function SubmitRequestDialog({
             </label>
             <input
               id="fm-req-artist"
-              ref={artistInputRef}
               name="artist"
               type="text"
               maxLength={200}
@@ -149,44 +264,6 @@ export function SubmitRequestDialog({
               placeholder="아이와의 추억, 선곡 이유를 들려주세요"
             />
           </div>
-          <div>
-            <label
-              htmlFor="fm-req-child"
-              className="block text-[11px] font-bold text-[#2D5A3D]"
-            >
-              아이 이름 (선택)
-            </label>
-            <input
-              id="fm-req-child"
-              name="child_name"
-              type="text"
-              maxLength={50}
-              autoComplete="off"
-              className="mt-1 block min-h-[44px] w-full rounded-xl border border-[#D4E4BC] bg-white px-3 py-2 text-sm focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/30"
-              placeholder="예: 하늘"
-            />
-          </div>
-
-          {trendingSongs.length > 0 && (
-            <div>
-              <p className="text-[11px] font-bold text-[#2D5A3D]">
-                🔥 오늘 많이 신청된 곡
-              </p>
-              <div className="mt-1.5 flex flex-wrap gap-1.5">
-                {trendingSongs.slice(0, 6).map((s, i) => (
-                  <button
-                    key={`${s.song_title}-${i}`}
-                    type="button"
-                    onClick={() => fillFromTrending(s)}
-                    className="rounded-full border border-[#D4E4BC] bg-white px-3 py-1 text-[11px] text-[#2D5A3D] transition hover:border-violet-400 hover:bg-violet-50"
-                  >
-                    {s.song_title}
-                    {s.artist ? ` · ${s.artist}` : ""}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
 
           {error && (
             <p className="rounded-xl bg-rose-50 p-2 text-xs text-rose-600" role="alert">
@@ -204,7 +281,7 @@ export function SubmitRequestDialog({
               disabled={isPending}
               className="min-h-[44px] flex-1 rounded-xl border border-[#D4E4BC] bg-white px-4 text-sm font-bold text-[#2D5A3D] transition hover:bg-[#FFF8F0] disabled:opacity-50"
             >
-              취소
+              ↑ 접기
             </button>
             <button
               type="submit"

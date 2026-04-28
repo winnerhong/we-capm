@@ -16,7 +16,7 @@ type Props = {
   pollMs?: number;
 };
 
-export function LiveFmRefresher({ orgId, pollMs = 20_000 }: Props) {
+export function LiveFmRefresher({ orgId, pollMs = 8_000 }: Props) {
   const router = useRouter();
 
   useEffect(() => {
