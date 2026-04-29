@@ -84,7 +84,7 @@ export default async function UserLayout({
           <TabItem href="/schedule" label="일정" icon="📅" />
           <TabItem href="/stamps" label="스탬프" icon={<AcornIcon size={20} />} />
           <TabItem href="/tori-talk" label="토리톡" icon={<WinnerTalkIcon size={22} />} />
-          <TabItem href="/acorns" label="도토리" icon="🎁" />
+          <TabItem href="/gifts" label="선물함" icon="🎁" />
           <TabItem href="/profile" label="내 정보" icon="👤" />
         </ul>
       </nav>

@@ -22,6 +22,12 @@ interface Props {
   showDemoControls?: boolean;
   /** 현재 라이브 세션 id — null/undefined면 Realtime 구독 skip */
   sessionId?: string | null;
+  /**
+   * 떠다니는 채팅 풍선(DriftUpChat) 비활성화.
+   *  - 참가자 화면(MiniStage)처럼 LiveChatStream 인라인 채팅이 따로 있는 곳에서
+   *    중복 노출 방지. 전광판(/screen/tori-fm)은 그대로 사용.
+   */
+  disableDriftChat?: boolean;
 }
 
 /**
@@ -33,6 +39,7 @@ interface Props {
 export function ScreenEffectsLayer({
   showDemoControls = false,
   sessionId = null,
+  disableDriftChat = false,
 }: Props) {
   const [hearts, setHearts] = useState<HeartEvent[]>([]);
   const [chats, setChats] = useState<ChatBubble[]>([]);
@@ -306,7 +313,7 @@ export function ScreenEffectsLayer({
   return (
     <>
       <FloatingHearts events={hearts} />
-      <DriftUpChat messages={chats} />
+      {!disableDriftChat && <DriftUpChat messages={chats} />}
       <TopBanner events={banners} />
       <EmojiRain events={emojis} />
       <StorySpotlight event={storySpotlight} />

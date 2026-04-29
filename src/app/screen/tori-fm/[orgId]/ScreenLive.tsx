@@ -26,6 +26,7 @@ import type { ToriFmSessionRow } from "@/lib/missions/types";
 import { ScreenTimer } from "./ScreenTimer";
 import { ListenerPresence } from "@/components/tori-fm/ListenerPresence";
 import { ScreenEffectsLayer } from "./vfx/ScreenEffectsLayer";
+import { ScreenRpsOverlay } from "@/lib/rps/ScreenRpsOverlay";
 
 export interface ScreenNowPlaying {
   song: string;
@@ -247,6 +248,9 @@ export function ScreenLive({
         sessionId={sessionId}
         showDemoControls={showDemoControls}
       />
+
+      {/* 단체 가위바위보 서바이벌 — 활성 RPS 방 발견 시 풀스크린 오버레이 */}
+      <ScreenRpsOverlay fmSessionId={sessionId} />
 
       {/* 상단 HUD: 시각 + 청취 인원 */}
       <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-between p-6 md:p-8">

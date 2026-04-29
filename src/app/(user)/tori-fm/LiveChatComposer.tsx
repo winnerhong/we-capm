@@ -70,7 +70,7 @@ export function LiveChatComposer({ sessionId, isLive }: Props) {
           ⚠ {error}
         </p>
       )}
-      <div className="flex items-center gap-2 rounded-full border border-white/15 bg-black/55 p-1.5 pl-4 backdrop-blur-md">
+      <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.06] p-1.5 pl-4 shadow-lg backdrop-blur-md">
         <input
           ref={inputRef}
           type="text"
@@ -85,8 +85,18 @@ export function LiveChatComposer({ sessionId, isLive }: Props) {
           placeholder={isLive ? "메시지 입력..." : "방송 시작 후 채팅 가능"}
           disabled={!isLive || pending}
           maxLength={MAX_LEN}
+          autoComplete="off"
+          autoCorrect="off"
           aria-label="채팅 메시지 입력"
-          className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-white/45 disabled:opacity-50"
+          // 인라인 스타일로 색상을 강제 — 모바일 브라우저의 -webkit-text-fill-color
+          // (autofill 노란 배경 / 다크모드 강제 텍스트 색) 가 Tailwind text-white 를 덮어쓰는 케이스 방어.
+          style={{
+            backgroundColor: "transparent",
+            color: "rgb(255, 255, 255)",
+            WebkitTextFillColor: "rgb(255, 255, 255)",
+            caretColor: "rgb(252, 211, 77)",
+          }}
+          className="min-w-0 flex-1 border-0 text-sm outline-none placeholder:text-white/45 disabled:opacity-50"
         />
         <button
           type="button"

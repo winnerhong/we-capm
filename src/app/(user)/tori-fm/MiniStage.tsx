@@ -29,8 +29,11 @@ import { createClient } from "@/lib/supabase/client";
 import type { ToriFmSessionRow } from "@/lib/missions/types";
 import { ListenerPresence } from "@/components/tori-fm/ListenerPresence";
 import { ScreenEffectsLayer } from "@/app/screen/tori-fm/[orgId]/vfx/ScreenEffectsLayer";
+import type { FmChatMessageRow } from "@/lib/tori-fm/types";
 import { ReactionBar } from "./ReactionBar";
 import { LiveChatComposer } from "./LiveChatComposer";
+import { LiveChatStream } from "./LiveChatStream";
+import { PlayerRpsModal } from "@/lib/rps/PlayerRpsModal";
 
 export interface MiniStageNowPlaying {
   song: string;
@@ -60,8 +63,10 @@ interface Props {
   brandName: string;
   initialSession: ToriFmSessionRow | null;
   initialNowPlaying: MiniStageNowPlaying | null;
-  /** 행사 커버 이미지 URL — 라이브커머스 스타일 풀블리드 배경. */
-  coverImageUrl?: string | null;
+  /** 초기 채팅 메시지 — LiveChatStream SSR 에서 사용. */
+  initialChatMessages?: FmChatMessageRow[];
+  /** 현재 로그인 유저 — 카톡 스타일에서 본인 메시지 우측 배치. */
+  currentUserId?: string | null;
 }
 
 const POLL_FALLBACK_MS = 5_000;
@@ -96,7 +101,8 @@ export function MiniStage({
   brandName,
   initialSession,
   initialNowPlaying,
-  coverImageUrl,
+  initialChatMessages = [],
+  currentUserId = null,
 }: Props) {
   const [session, setSession] = useState<ToriFmSessionRow | null>(initialSession);
   const [nowPlaying, setNowPlaying] = useState<MiniStageNowPlaying | null>(
@@ -139,6 +145,21 @@ export function MiniStage({
       try {
         await el.requestFullscreen();
         setFullscreen(true);
+        // 화면 회전 잠금 해제 — 디바이스 방향에 자연스럽게 따라가도록.
+        // 일부 모바일 브라우저는 풀스크린 진입 시 landscape 로 강제하는 잔재 lock 이
+        // 남아있을 수 있어 명시적 unlock 호출.
+        const so = (
+          screen as unknown as {
+            orientation?: { unlock?: () => void };
+          }
+        ).orientation;
+        if (so && typeof so.unlock === "function") {
+          try {
+            so.unlock();
+          } catch {
+            /* 미지원 브라우저는 무시 */
+          }
+        }
         return;
       } catch {
         /* iOS Safari 등 미지원 — CSS 폴백 */
@@ -330,35 +351,22 @@ export function MiniStage({
       }`}
       aria-label="토리FM 보이는 라디오"
     >
-      {/* ① 풀블리드 배경 — 행사 커버 또는 그라디언트 */}
-      {coverImageUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={coverImageUrl}
-          alt=""
-          aria-hidden
-          className="absolute inset-0 h-full w-full object-cover"
-        />
-      ) : (
-        <div
-          aria-hidden
-          className="absolute inset-0 bg-gradient-to-br from-[#1B2B3A] via-[#26394C] to-[#1B2B3A]"
-        />
-      )}
-      {/* 가독성을 위한 다크 그라디언트 마스크 — 위·아래 어둡게 */}
+      {/* ① 풀블리드 배경 — 깊은 네이비 그라디언트 (기본값). 위는 거의 검정,
+          아래로 내려올수록 짙은 파랑으로 부드럽게 변화 — 사연/채팅 가독성 ↑. */}
       <div
         aria-hidden
-        className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/20 to-black/85"
+        className="absolute inset-0 bg-gradient-to-b from-[#070C1F] via-[#0B1538] to-[#0F1F4A]"
       />
 
-      {/* ② VFX 오버레이 — 하트/이모지/드리프트 채팅/스토리 */}
-      <ScreenEffectsLayer sessionId={sessionId} />
+      {/* ② VFX 오버레이 — 하트/이모지/스토리.
+          DriftUpChat 은 LiveChatStream 인라인 채팅과 중복 노출되므로 OFF. */}
+      <ScreenEffectsLayer sessionId={sessionId} disableDriftChat />
 
-      {/* ③ 상단 HUD — 좌(브랜드 + LIVE) / 우(청취자 + 채우기) */}
+      {/* ③ 상단 HUD — 좌(브랜드 + LIVE) / 우(청취자 + 채우기) — 글래스 온 네이비 */}
       <div className="relative z-20 flex items-start justify-between gap-2 p-3 sm:p-4">
-        <div className="flex min-w-0 flex-col gap-1">
+        <div className="flex min-w-0 flex-col gap-1.5">
           {/* 브랜드 알약 */}
-          <div className="inline-flex items-center gap-2 self-start rounded-full bg-black/45 px-3 py-1.5 backdrop-blur-md">
+          <div className="inline-flex items-center gap-2 self-start rounded-full border border-white/10 bg-white/[0.06] px-3 py-1.5 backdrop-blur-md">
             <span className="text-base" aria-hidden>
               📻
             </span>
@@ -367,7 +375,7 @@ export function MiniStage({
             </span>
             {sessionLive ? (
               <span
-                className="inline-flex items-center gap-1 rounded-full bg-rose-500 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-widest text-white"
+                className="inline-flex items-center gap-1 rounded-full bg-rose-500 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-widest text-white shadow-md shadow-rose-500/30"
                 aria-label="ON AIR"
               >
                 <span className="relative inline-flex h-1.5 w-1.5" aria-hidden>
@@ -377,7 +385,7 @@ export function MiniStage({
                 LIVE
               </span>
             ) : (
-              <span className="rounded-full bg-zinc-600 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-widest text-white/85">
+              <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-widest text-white/70 ring-1 ring-white/15">
                 OFF AIR
               </span>
             )}
@@ -385,13 +393,13 @@ export function MiniStage({
           {/* 시간대 / 경과 */}
           <div className="flex items-center gap-1.5">
             {sessionLive && elapsed && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-black/45 px-2 py-0.5 font-mono text-[10px] tabular-nums text-amber-200 backdrop-blur-md">
+              <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.05] px-2 py-0.5 font-mono text-[10px] tabular-nums text-amber-200 backdrop-blur-md">
                 <span aria-hidden>⏱</span>
                 {elapsed}
               </span>
             )}
             {timeRange && (
-              <span className="inline-flex items-center rounded-full bg-black/45 px-2 py-0.5 text-[10px] font-semibold text-white/80 backdrop-blur-md">
+              <span className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.05] px-2 py-0.5 text-[10px] font-semibold text-white/70 backdrop-blur-md">
                 {timeRange}
               </span>
             )}
@@ -399,28 +407,28 @@ export function MiniStage({
         </div>
 
         <div className="flex items-center gap-1.5">
-          <div className="rounded-full bg-black/45 px-2 py-1 backdrop-blur-md">
+          <div className="rounded-full border border-white/10 bg-white/[0.06] px-2 py-1 backdrop-blur-md">
             <ListenerPresence orgId={orgId} variant="light" />
           </div>
           <button
             type="button"
             onClick={toggleFullscreen}
             aria-label={fullscreen ? "원래 크기로" : "화면 채우기"}
-            className="inline-flex items-center gap-1 rounded-full bg-black/45 px-2.5 py-1.5 text-[11px] font-bold text-white backdrop-blur-md transition hover:bg-black/65"
+            className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-white/10 bg-white/[0.06] px-2.5 py-1.5 text-[11px] font-bold text-white backdrop-blur-md transition hover:bg-white/15"
           >
             <span aria-hidden>{fullscreen ? "✕" : "⛶"}</span>
-            <span className="hidden sm:inline">
+            <span className="hidden whitespace-nowrap sm:inline">
               {fullscreen ? "닫기" : "채우기"}
             </span>
           </button>
         </div>
       </div>
 
-      {/* ④ 본문 — Now Playing 핀 카드 (가운데 비주얼 영역) */}
+      {/* ④ 본문 — Now Playing 핀 카드 (가운데 비주얼 영역, 글래스 톤) */}
       <div className="relative z-10 flex flex-1 items-center justify-center px-3 py-6 sm:px-6">
         {sessionLive ? (
           nowPlaying ? (
-            <div className="w-full max-w-md rounded-2xl border border-white/15 bg-black/55 p-5 shadow-2xl backdrop-blur-md">
+            <div className="w-full max-w-md rounded-3xl border border-white/10 bg-white/[0.04] p-5 shadow-2xl shadow-black/40 backdrop-blur-md">
               <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-amber-300/90">
                 ♪ Now Playing
               </p>
@@ -428,51 +436,58 @@ export function MiniStage({
                 {nowPlaying.song || "(제목 미입력)"}
               </h2>
               {nowPlaying.artist && (
-                <p className="mt-0.5 text-sm font-semibold text-amber-200/85">
+                <p className="mt-0.5 text-sm font-semibold text-amber-200/80">
                   — {nowPlaying.artist}
                 </p>
               )}
               {nowPlaying.story && (
-                <blockquote className="mt-3 border-l-2 border-amber-300/60 pl-3 text-[13px] leading-relaxed text-white/95">
+                <blockquote className="mt-3 border-l-2 border-amber-300/50 pl-3 text-[13px] leading-relaxed text-white/95">
                   &ldquo;{nowPlaying.story}&rdquo;
                 </blockquote>
               )}
               {nowPlaying.childName && (
-                <p className="mt-2 text-right text-[11px] font-semibold text-amber-200/80">
+                <p className="mt-2 text-right text-[11px] font-semibold text-amber-200/75">
                   — {nowPlaying.childName}
                 </p>
               )}
             </div>
           ) : (
-            <div className="rounded-2xl border border-white/15 bg-black/45 px-5 py-4 text-center backdrop-blur-md">
+            <div className="rounded-3xl border border-white/10 bg-white/[0.04] px-6 py-5 text-center backdrop-blur-md">
               <p className="text-3xl" aria-hidden>
                 🌲
               </p>
               <p className="mt-2 text-sm font-semibold text-amber-200">
                 다음 사연을 준비하고 있어요
               </p>
-              <p className="mt-1 text-[11px] text-white/65">
+              <p className="mt-1 text-[11px] text-white/55">
                 잠시만 기다려 주세요
               </p>
             </div>
           )
         ) : (
-          <div className="rounded-2xl border border-white/15 bg-black/45 px-5 py-4 text-center backdrop-blur-md">
+          <div className="rounded-3xl border border-white/10 bg-white/[0.04] px-6 py-5 text-center backdrop-blur-md">
             <p className="text-3xl" aria-hidden>
               🌲
             </p>
-            <p className="mt-2 text-sm font-semibold text-white/90">
+            <p className="mt-2 text-sm font-semibold text-white/85">
               아직 방송 시작 전이에요
             </p>
-            <p className="mt-1 text-[11px] text-white/65">
+            <p className="mt-1 text-[11px] text-white/55">
               정규 방송 시간에 다시 찾아와 주세요
             </p>
           </div>
         )}
       </div>
 
-      {/* ⑤ 하단 액션 — 리액션 + 채팅 입력 (항상 노출) */}
+      {/* ⑤ 하단 액션 — 채팅 스트림(머무름) + 리액션 + 입력바 (항상 노출) */}
       <div className="relative z-20 mt-auto flex flex-col gap-2 p-3 sm:p-4">
+        {sessionId && (
+          <LiveChatStream
+            sessionId={sessionId}
+            initialMessages={initialChatMessages}
+            currentUserId={currentUserId}
+          />
+        )}
         {sessionId && (
           <ReactionBar
             sessionId={sessionId}
@@ -484,6 +499,15 @@ export function MiniStage({
           <LiveChatComposer sessionId={sessionId} isLive={sessionLive} />
         )}
       </div>
+
+      {/* 단체 가위바위보 서바이벌 — 활성 RPS 방이 있으면 자동 모달로 등장 */}
+      {sessionId && (
+        <PlayerRpsModal
+          fmSessionId={sessionId}
+          isLive={sessionLive}
+          currentUserId={currentUserId}
+        />
+      )}
     </section>
   );
 }

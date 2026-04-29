@@ -15,6 +15,7 @@ import {
   loadPendingRequests,
 } from "@/lib/tori-fm/queries";
 import { loadOrgEventSummaries } from "@/lib/org-events/queries";
+import { loadActiveRpsRoomForFmSession } from "@/lib/rps/queries";
 import { CreateSessionForm } from "./CreateSessionForm";
 import { FmSessionControls } from "./FmSessionControls";
 import { StartBroadcastButton } from "./StartBroadcastButton";
@@ -81,13 +82,17 @@ export default async function OrgToriFmPage({
       : liveSessionRaw;
 
   // 현재 재생 중인 큐 정보 + LIVE 세션 전용 interactive 데이터
-  const [nowPlaying, chatMessages, pendingRequests] = await Promise.all([
-    liveSession?.current_queue_id
-      ? loadRadioQueueItemWithSubmission(liveSession.current_queue_id)
-      : Promise.resolve(null),
-    liveSession ? loadChatMessages(liveSession.id, 50) : Promise.resolve([]),
-    liveSession ? loadPendingRequests(liveSession.id) : Promise.resolve([]),
-  ]);
+  const [nowPlaying, chatMessages, pendingRequests, initialRpsRoom] =
+    await Promise.all([
+      liveSession?.current_queue_id
+        ? loadRadioQueueItemWithSubmission(liveSession.current_queue_id)
+        : Promise.resolve(null),
+      liveSession ? loadChatMessages(liveSession.id, 50) : Promise.resolve([]),
+      liveSession ? loadPendingRequests(liveSession.id) : Promise.resolve([]),
+      liveSession
+        ? loadActiveRpsRoomForFmSession(liveSession.id)
+        : Promise.resolve(null),
+    ]);
 
   const nowSong =
     typeof nowPlaying?.submission.payload_json.song_title === "string"
@@ -267,6 +272,8 @@ export default async function OrgToriFmPage({
             }
             initialChatMessages={chatMessages}
             initialPendingRequests={pendingRequests}
+            eventId={selectedEvent.event_id}
+            initialRpsRoom={initialRpsRoom}
           />
         ) : (
           <section className="rounded-3xl border border-white/10 bg-gradient-to-br from-[#1B2B3A] via-[#26394C] to-[#1B2B3A] p-5 text-center text-white shadow-xl md:p-7">

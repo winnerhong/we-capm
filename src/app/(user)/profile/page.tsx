@@ -1,8 +1,11 @@
+import Link from "next/link";
 import { requireAppUser } from "@/lib/user-auth-guard";
 import {
+  getAcornBalance,
   loadAppUserById,
   loadChildrenForUser,
 } from "@/lib/app-user/queries";
+import { AcornIcon } from "@/components/acorn-icon";
 import { ChildrenSection } from "./children-section";
 
 export const dynamic = "force-dynamic";
@@ -21,9 +24,10 @@ function initialOf(name: string): string {
 
 export default async function UserProfilePage() {
   const session = await requireAppUser();
-  const [detail, children] = await Promise.all([
+  const [detail, children, acornBalance] = await Promise.all([
     loadAppUserById(session.id),
     loadChildrenForUser(session.id),
+    getAcornBalance(session.id),
   ]);
 
   const parentName = detail?.parent_name ?? session.parentName;
@@ -61,6 +65,64 @@ export default async function UserProfilePage() {
             </p>
           </div>
         </div>
+      </section>
+
+      {/* 도토리 / 선물함 바로가기 */}
+      <section className="grid grid-cols-2 gap-3">
+        <Link
+          href="/acorns"
+          className="group rounded-3xl border border-[#D4E4BC] bg-white p-4 shadow-sm transition hover:border-[#3A7A52] hover:shadow-md active:scale-[0.99]"
+        >
+          <div className="flex items-center justify-between">
+            <span
+              className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#FAE7D0] text-2xl"
+              aria-hidden
+            >
+              <AcornIcon size={24} />
+            </span>
+            <span
+              className="text-[10px] font-bold text-[#8B7F75] transition group-hover:text-[#2D5A3D]"
+              aria-hidden
+            >
+              →
+            </span>
+          </div>
+          <p className="mt-3 text-[11px] font-bold text-[#6B6560]">
+            내 도토리
+          </p>
+          <p className="mt-0.5 flex items-baseline gap-1 font-mono text-2xl font-black tabular-nums text-[#2D5A3D]">
+            {acornBalance}
+            <span className="text-[11px] font-bold text-[#8B7F75]">개</span>
+          </p>
+          <p className="mt-1 text-[10px] text-[#8B7F75]">내역 보기 →</p>
+        </Link>
+
+        <Link
+          href="/gifts"
+          className="group rounded-3xl border border-[#D4E4BC] bg-white p-4 shadow-sm transition hover:border-[#3A7A52] hover:shadow-md active:scale-[0.99]"
+        >
+          <div className="flex items-center justify-between">
+            <span
+              className="flex h-10 w-10 items-center justify-center rounded-2xl bg-amber-100 text-2xl"
+              aria-hidden
+            >
+              🎁
+            </span>
+            <span
+              className="text-[10px] font-bold text-[#8B7F75] transition group-hover:text-[#2D5A3D]"
+              aria-hidden
+            >
+              →
+            </span>
+          </div>
+          <p className="mt-3 text-[11px] font-bold text-[#6B6560]">
+            선물함
+          </p>
+          <p className="mt-0.5 text-base font-bold text-[#2D5A3D]">
+            받은 선물 모아보기
+          </p>
+          <p className="mt-1 text-[10px] text-[#8B7F75]">QR 수령 →</p>
+        </Link>
       </section>
 
       {/* 우리 아이들 */}

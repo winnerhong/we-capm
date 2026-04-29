@@ -11,11 +11,11 @@ import {
 } from "@/lib/missions/queries";
 import type { RadioSubmissionPayload } from "@/lib/missions/types";
 import {
+  loadChatMessages,
   loadOpenSessionRequests,
   loadTopSongs,
 } from "@/lib/tori-fm/queries";
 import { loadOrgFmBrandName } from "@/lib/tori-fm/branding";
-import { loadOrgEventById } from "@/lib/org-events/queries";
 import { LiveFmRefresher } from "./LiveFmRefresher";
 import { MiniStage, type MiniStageNowPlaying } from "./MiniStage";
 import { RequestsWithHearts } from "./RequestsWithHearts";
@@ -65,19 +65,12 @@ export default async function ToriFmPage() {
   const sessionLive = !!session?.is_live;
   const sessionId = session?.id ?? "";
 
-  // 행사 커버 이미지 — 라이브커머스 스타일 풀블리드 배경.
-  const event = session?.event_id
-    ? await loadOrgEventById(session.event_id)
-    : null;
-  const coverImageUrl = event?.cover_image_url ?? null;
-
-  const [requests, topSongs, userHearted] = await Promise.all([
+  const [chatMessages, requests, topSongs, userHearted] = await Promise.all([
+    session ? loadChatMessages(session.id, 30) : Promise.resolve([]),
     session ? loadOpenSessionRequests(session.id) : Promise.resolve([]),
     session ? loadTopSongs(session.id, 5) : Promise.resolve([]),
     Promise.resolve([] as string[]),
   ]);
-  // chatMessages — 더 이상 ChatPanel(드로어)이 없어 SSR 에서 받지 않음.
-  // 라이브 채팅은 ScreenEffectsLayer 가 Realtime 으로 바로 받아 DriftUpChat 으로 노출.
 
   const trendingSongs = topSongs.map((s) => ({
     song_title: s.song_title,
@@ -102,7 +95,8 @@ export default async function ToriFmPage() {
         brandName={brandName}
         initialSession={session}
         initialNowPlaying={initialNowPlaying}
-        coverImageUrl={coverImageUrl}
+        initialChatMessages={chatMessages}
+        currentUserId={user.id}
       />
 
       {/* 사전예약 CTA — LIVE 아닐 때만 스탬프북 미션 연결.

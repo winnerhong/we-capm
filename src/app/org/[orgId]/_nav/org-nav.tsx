@@ -154,6 +154,7 @@ function buildGroups(orgId: string, badges: OrgNavBadges): NavGroup[] {
         `${base}/missions/broadcast`,
         `${base}/missions/review`,
         `${base}/missions/radio`,
+        `${base}/gifts`,
       ],
       badge: fmBadge ?? reviewBadge,
       items: [
@@ -178,6 +179,11 @@ function buildGroups(orgId: string, badges: OrgNavBadges): NavGroup[] {
           href: `${base}/missions/review`,
           icon: "✅",
           badge: reviewBadge,
+        },
+        {
+          label: "선물 수령",
+          href: `${base}/gifts/redeem`,
+          icon: "🎁",
         },
       ],
     },

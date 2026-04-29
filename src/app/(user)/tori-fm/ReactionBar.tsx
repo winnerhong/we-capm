@@ -79,22 +79,26 @@ export function ReactionBar({
 
   // tone tokens — variant 별 색상
   const wrapperCls = isEmbedded
-    ? "border-t border-white/10 pt-3"
+    ? ""
     : "rounded-3xl border border-[#D4E4BC] bg-[#FFF8F0] p-3 shadow-sm";
   const labelCls = isEmbedded
-    ? "px-1 text-[11px] font-semibold text-amber-200/80"
+    ? "hidden"
     : "px-1 text-[11px] font-semibold text-[#2D5A3D]";
   const buttonCls = isEmbedded
-    ? "group relative flex min-h-14 items-center justify-center rounded-2xl border border-white/10 bg-black/30 text-2xl backdrop-blur-sm transition hover:border-amber-300/40 hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-amber-300/50 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
+    ? "group relative flex h-10 items-center justify-center rounded-full bg-white/5 text-xl ring-1 ring-white/10 transition hover:bg-white/15 hover:ring-amber-300/40 focus:outline-none focus:ring-2 focus:ring-amber-300/60 active:scale-90 disabled:cursor-not-allowed disabled:opacity-40 sm:h-11 sm:text-2xl"
     : "group relative flex min-h-14 items-center justify-center rounded-2xl border border-transparent bg-white text-2xl transition hover:border-[#2D5A3D]/30 hover:bg-[#D4E4BC]/40 focus:outline-none focus:ring-2 focus:ring-[#2D5A3D]/50 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40";
   const offlineCls = isEmbedded
-    ? "mt-2 text-center text-[10px] text-white/50"
+    ? "mt-1 text-center text-[10px] text-white/50"
     : "mt-2 text-center text-[10px] text-[#6B6560]";
 
   return (
     <section className={`relative ${wrapperCls}`} aria-label="이모지 반응">
       <p className={labelCls}>방송에 반응 보내기</p>
-      <div className="relative mt-2 grid grid-cols-6 gap-1.5">
+      <div
+        className={`relative grid grid-cols-6 ${
+          isEmbedded ? "gap-1.5" : "mt-2 gap-1.5"
+        }`}
+      >
         {REACTION_EMOJIS.map((emoji, col) => {
           const bounceKey = bouncing[emoji] ?? 0;
           return (
