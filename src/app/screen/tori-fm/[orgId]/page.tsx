@@ -19,6 +19,8 @@ import {
   loadRadioQueueItemWithSubmission,
 } from "@/lib/missions/queries";
 import { loadOrgFmBrandName } from "@/lib/tori-fm/branding";
+import { loadPlayingGroup } from "@/lib/tori-fm/queries";
+import { anonLabelFromUserId } from "@/lib/tori-fm/types";
 import { LiveFmRefresher } from "@/app/(user)/tori-fm/LiveFmRefresher";
 import { ForestBackdrop } from "./ForestBackdrop";
 import { ScreenLive, type ScreenNowPlaying } from "./ScreenLive";
@@ -66,30 +68,59 @@ export default async function ToriFmScreenPage({
 
   if (!orgName) notFound();
 
-  const nowPlayingItem = liveSession?.current_queue_id
-    ? await loadRadioQueueItemWithSubmission(liveSession.current_queue_id)
-    : null;
+  // PLAYING 묶음 우선 — 신규 큐 시스템(같은 song_normalized 의 사연 N건이 함께 PLAYING).
+  const playingGroup = liveSession
+    ? await loadPlayingGroup(liveSession.id)
+    : [];
+  const playingHead = playingGroup[0] ?? null;
 
-  const initialNowPlaying: ScreenNowPlaying | null = nowPlayingItem
+  const nowPlayingItem =
+    !playingHead && liveSession?.current_queue_id
+      ? await loadRadioQueueItemWithSubmission(liveSession.current_queue_id)
+      : null;
+
+  const initialNowPlaying: ScreenNowPlaying | null = playingHead
     ? {
-        song:
-          typeof nowPlayingItem.submission.payload_json.song_title === "string"
-            ? (nowPlayingItem.submission.payload_json.song_title as string)
-            : "",
-        artist:
-          typeof nowPlayingItem.submission.payload_json.artist === "string"
-            ? (nowPlayingItem.submission.payload_json.artist as string)
-            : "",
-        story:
-          typeof nowPlayingItem.submission.payload_json.story_text === "string"
-            ? (nowPlayingItem.submission.payload_json.story_text as string)
-            : "",
-        childName:
-          typeof nowPlayingItem.submission.payload_json.child_name === "string"
-            ? (nowPlayingItem.submission.payload_json.child_name as string)
-            : "",
+        song: playingHead.song_title?.trim() || "(사연만)",
+        artist: playingHead.artist ?? "",
+        story: playingHead.story ?? "",
+        childName: playingHead.is_anonymous
+          ? anonLabelFromUserId(playingHead.user_id)
+          : (playingHead.child_name ?? ""),
+        kind: playingHead.kind,
+        isAnonymous: playingHead.is_anonymous,
+        storyItems: playingGroup.map((r) => ({
+          id: r.id,
+          story: r.story,
+          authorLabel: r.is_anonymous
+            ? anonLabelFromUserId(r.user_id)
+            : (r.child_name?.trim() ?? ""),
+          createdAt: r.created_at,
+        })),
       }
-    : null;
+    : nowPlayingItem
+      ? {
+          song:
+            typeof nowPlayingItem.submission.payload_json.song_title === "string"
+              ? (nowPlayingItem.submission.payload_json.song_title as string)
+              : "",
+          artist:
+            typeof nowPlayingItem.submission.payload_json.artist === "string"
+              ? (nowPlayingItem.submission.payload_json.artist as string)
+              : "",
+          story:
+            typeof nowPlayingItem.submission.payload_json.story_text === "string"
+              ? (nowPlayingItem.submission.payload_json.story_text as string)
+              : "",
+          childName:
+            typeof nowPlayingItem.submission.payload_json.child_name === "string"
+              ? (nowPlayingItem.submission.payload_json.child_name as string)
+              : "",
+          kind: "song_request",
+          isAnonymous: false,
+          storyItems: [],
+        }
+      : null;
 
   return (
     <div

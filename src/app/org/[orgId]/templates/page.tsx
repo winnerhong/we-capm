@@ -204,7 +204,6 @@ export default async function TemplatesCatalogPage({
                     </p>
                   )}
                   <div className="mt-1 space-y-0.5 text-[11px] text-[#6B6560]">
-                    <div>💰 {formatWon(t.price_per_person)}</div>
                     <div>
                       👥 {t.capacity_min ?? "-"} ~ {t.capacity_max ?? "-"}명
                     </div>

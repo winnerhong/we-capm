@@ -6,6 +6,10 @@ import { createClient } from "@/lib/supabase/server";
 import { requireOrg } from "@/lib/org-auth-guard";
 import { hashPassword, verifyPassword } from "@/lib/password";
 import type { OrgProgramStatus } from "@/lib/org-programs/types";
+import {
+  parseParkingLots,
+  parseMeetingPoint,
+} from "@/lib/program-extras/parse";
 
 const ORG_TYPES = new Set([
   "DAYCARE",
@@ -168,6 +172,8 @@ type PartnerProgramRow = {
   location_detail: string | null;
   image_url: string | null;
   tags: string[] | null;
+  parking_lots: unknown;
+  meeting_point: unknown;
 };
 
 type OrgProgramOwnerRow = {
@@ -199,7 +205,7 @@ export async function activateTemplateAction(sourceProgramId: string) {
     };
   })
     .select(
-      "id, partner_id, title, description, category, duration_hours, capacity_min, capacity_max, price_per_person, location_detail, image_url, tags, visibility, is_published"
+      "id, partner_id, title, description, category, duration_hours, capacity_min, capacity_max, price_per_person, location_detail, image_url, tags, visibility, is_published, parking_lots, meeting_point"
     )
     .eq("id", sourceProgramId)
     .maybeSingle();
@@ -219,6 +225,8 @@ export async function activateTemplateAction(sourceProgramId: string) {
   }
 
   // 2. org_programs에 스냅샷 insert
+  // 주차장/집결장소도 함께 복제 — 이후 기관이 자유롭게 수정·삭제 가능 (스냅샷 패턴).
+  // src.parking_lots / meeting_point 가 jsonb 라 그대로 전달, 빈/잘못된 값은 안전한 기본값.
   const payload = {
     org_id: session.orgId,
     source_program_id: src.id,
@@ -233,6 +241,11 @@ export async function activateTemplateAction(sourceProgramId: string) {
     location_detail: src.location_detail,
     image_url: src.image_url,
     tags: src.tags,
+    parking_lots: Array.isArray(src.parking_lots) ? src.parking_lots : [],
+    meeting_point:
+      src.meeting_point && typeof src.meeting_point === "object"
+        ? src.meeting_point
+        : null,
     custom_theme: {},
     status: "ACTIVATED" as OrgProgramStatus,
     is_published: false,
@@ -278,21 +291,34 @@ export async function updateOrgProgramAction(id: string, formData: FormData) {
   const title = String(formData.get("title") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim() || null;
   const category = String(formData.get("category") ?? "").trim();
-  const priceRaw = formData.get("price_per_person");
-  const durationRaw = formData.get("duration_hours");
+  // 가격 입력은 제거됨(2026-05-06) — DB 의 기존 price_per_person 값은 그대로 보존.
+  // 입력 UX 는 분(minutes) 단위지만 DB 컬럼 duration_hours 는 그대로 유지 →
+  // 여기서 분을 시간으로 변환(÷60). null/빈문자열은 그대로 null.
+  const durationMinutesRaw = formData.get("duration_hours");
   const imageUrl = String(formData.get("image_url") ?? "").trim() || null;
   const customNotes = String(formData.get("custom_notes") ?? "").trim() || null;
 
   if (!title) return { ok: false, message: "제목을 입력하세요" };
   if (!category) return { ok: false, message: "카테고리를 선택하세요" };
 
-  const price = priceRaw ? Number(priceRaw) : 0;
-  const duration = durationRaw ? Number(durationRaw) : null;
+  const durationMinutes = durationMinutesRaw
+    ? Number(durationMinutesRaw)
+    : null;
 
-  if (Number.isNaN(price) || price < 0) return { ok: false, message: "가격이 올바르지 않습니다" };
-  if (duration !== null && (Number.isNaN(duration) || duration < 0)) {
+  if (
+    durationMinutes !== null &&
+    (Number.isNaN(durationMinutes) || durationMinutes < 0)
+  ) {
     return { ok: false, message: "진행 시간이 올바르지 않습니다" };
   }
+
+  // 분 → 시간 (DB 컬럼은 hours 그대로)
+  const duration =
+    durationMinutes !== null ? durationMinutes / 60 : null;
+
+  // 주차장 / 집결장소 — hidden input(JSON) 파싱
+  const parking_lots = parseParkingLots(formData.get("parking_lots"));
+  const meeting_point = parseMeetingPoint(formData.get("meeting_point"));
 
   const { error } = await (supabase.from("org_programs" as never) as unknown as {
     update: (p: unknown) => {
@@ -303,10 +329,11 @@ export async function updateOrgProgramAction(id: string, formData: FormData) {
       title,
       description,
       category,
-      price_per_person: price,
       duration_hours: duration,
       image_url: imageUrl,
       custom_notes: customNotes,
+      parking_lots,
+      meeting_point,
       status: "CUSTOMIZED" as OrgProgramStatus,
       updated_at: new Date().toISOString(),
     })

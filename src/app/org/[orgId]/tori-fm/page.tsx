@@ -12,15 +12,18 @@ import type {
 } from "@/lib/missions/types";
 import {
   loadChatMessages,
+  loadOpenSessionRequests,
   loadPendingRequests,
+  loadPlayingGroup,
+  loadQueuedRequests,
 } from "@/lib/tori-fm/queries";
+import { anonLabelFromUserId } from "@/lib/tori-fm/types";
 import { loadOrgEventSummaries } from "@/lib/org-events/queries";
 import { loadActiveRpsRoomForFmSession } from "@/lib/rps/queries";
-import { CreateSessionForm } from "./CreateSessionForm";
 import { FmSessionControls } from "./FmSessionControls";
-import { StartBroadcastButton } from "./StartBroadcastButton";
 import { LiveStudioConsole } from "./LiveStudioConsole";
 import { LinkFmToEventButton } from "./link-fm-to-event-button";
+import { QuickStartLiveButton } from "./QuickStartLiveButton";
 
 export const dynamic = "force-dynamic";
 
@@ -81,31 +84,88 @@ export default async function OrgToriFmPage({
       ? null
       : liveSessionRaw;
 
-  // 현재 재생 중인 큐 정보 + LIVE 세션 전용 interactive 데이터
-  const [nowPlaying, chatMessages, pendingRequests, initialRpsRoom] =
-    await Promise.all([
-      liveSession?.current_queue_id
-        ? loadRadioQueueItemWithSubmission(liveSession.current_queue_id)
-        : Promise.resolve(null),
-      liveSession ? loadChatMessages(liveSession.id, 50) : Promise.resolve([]),
-      liveSession ? loadPendingRequests(liveSession.id) : Promise.resolve([]),
-      liveSession
-        ? loadActiveRpsRoomForFmSession(liveSession.id)
-        : Promise.resolve(null),
-    ]);
+  // OFF 상태 fallback 세션 — selectedEvent 의 가장 최근 세션 (LIVE 시작 전이라도
+  // 누적된 신청곡/사연/랭킹을 호스트가 미리 볼 수 있게 함).
+  const fallbackSession = !liveSession
+    ? sessions[0] ?? null
+    : null;
 
-  const nowSong =
-    typeof nowPlaying?.submission.payload_json.song_title === "string"
+  // 현재 재생 중인 큐 정보 + LIVE 세션 전용 interactive 데이터
+  // + OFF 상태 fallback 세션의 신청곡(미리보기)
+  const [
+    nowPlaying,
+    chatMessages,
+    pendingRequests,
+    queuedRequests,
+    playingGroup,
+    initialRpsRoom,
+    offAirRequests,
+    liveAllRequests,
+  ] = await Promise.all([
+    liveSession?.current_queue_id
+      ? loadRadioQueueItemWithSubmission(liveSession.current_queue_id)
+      : Promise.resolve(null),
+    liveSession ? loadChatMessages(liveSession.id, 50) : Promise.resolve([]),
+    liveSession ? loadPendingRequests(liveSession.id) : Promise.resolve([]),
+    liveSession ? loadQueuedRequests(liveSession.id) : Promise.resolve([]),
+    liveSession ? loadPlayingGroup(liveSession.id) : Promise.resolve([]),
+    liveSession
+      ? loadActiveRpsRoomForFmSession(liveSession.id)
+      : Promise.resolve(null),
+    fallbackSession
+      ? loadOpenSessionRequests(fallbackSession.id)
+      : Promise.resolve([]),
+    // RequestsWithHearts(통합) 용 — OPEN 신청곡 + 사연 모두.
+    liveSession
+      ? loadOpenSessionRequests(liveSession.id)
+      : Promise.resolve([]),
+  ]);
+
+  // PLAYING 묶음의 첫 row 가 head — NOW PLAYING 의 곡명/아티스트/사연 head 결정.
+  const playingRequest = playingGroup[0] ?? null;
+
+  // NOW PLAYING fallback — PLAYING request 우선, 없으면 current_queue_id 기반
+  const nowSong = playingRequest?.song_title
+    ? playingRequest.song_title
+    : typeof nowPlaying?.submission.payload_json.song_title === "string"
       ? (nowPlaying.submission.payload_json.song_title as string)
       : "";
-  const nowArtist =
-    typeof nowPlaying?.submission.payload_json.artist === "string"
+  const nowArtist = playingRequest
+    ? (playingRequest.artist ?? "")
+    : typeof nowPlaying?.submission.payload_json.artist === "string"
       ? (nowPlaying.submission.payload_json.artist as string)
       : "";
-  const nowStory =
-    typeof nowPlaying?.submission.payload_json.story_text === "string"
+  const nowStory = playingRequest
+    ? (playingRequest.story ?? "")
+    : typeof nowPlaying?.submission.payload_json.story_text === "string"
       ? (nowPlaying.submission.payload_json.story_text as string)
       : "";
+  // 작성자 표시 — PLAYING request 가 익명이면 anonLabel, 아니면 child_name 우선
+  const nowParentName = playingRequest
+    ? playingRequest.is_anonymous
+      ? anonLabelFromUserId(playingRequest.user_id)
+      : (playingRequest.child_name ?? null)
+    : (nowPlaying?.user?.parent_name ?? null);
+
+  // StoryQueueCard 용 — 익명 사연 중 active(PENDING/APPROVED/QUEUED) 만.
+  const initialStoryRequests = liveAllRequests.filter(
+    (r) =>
+      r.kind === "story_only" &&
+      (r.status === "PENDING" ||
+        r.status === "APPROVED" ||
+        r.status === "QUEUED")
+  );
+
+  // 같은 곡 묶음 사연 — 작성자 라벨은 서버에서 익명/실명 분기.
+  // (호스트 NOW PLAYING 카드와 BroadcastQueueCard 양쪽이 사용)
+  const playingStoryItems = playingGroup.map((r) => ({
+    id: r.id,
+    story: r.story,
+    authorLabel: r.is_anonymous
+      ? anonLabelFromUserId(r.user_id)
+      : (r.child_name?.trim() ?? ""),
+    createdAt: r.created_at,
+  }));
 
   const upcoming = sessions.filter((s) => categorizeSession(s) === "UPCOMING");
   const live = sessions.filter((s) => s.is_live);
@@ -114,33 +174,33 @@ export default async function OrgToriFmPage({
   const publicUrl = `/screen/tori-fm/${orgId}`;
 
   return (
-    <div className="min-h-screen bg-[#0a141d]">
-      <div className="mx-auto max-w-6xl space-y-6 px-4 py-6">
-        <nav aria-label="breadcrumb" className="text-xs text-white/50">
-          <Link href={`/org/${orgId}`} className="hover:text-amber-200">
+    <div className="min-h-screen bg-[#FFF8F0]">
+      <div className="mx-auto max-w-7xl space-y-6 px-4 py-4 md:py-6">
+        <nav aria-label="breadcrumb" className="text-xs text-[#6B6560]">
+          <Link href={`/org/${orgId}`} className="hover:text-amber-700">
             기관홈
           </Link>
           <span className="mx-2">/</span>
-          <span className="font-semibold text-amber-200">
-            토리FM 제어실
+          <span className="font-semibold text-[#1B2B3A]">
+            토리FM 라이브 스튜디오
           </span>
           {selectedEvent && (
             <>
               <span className="mx-2">/</span>
-              <span className="font-semibold text-amber-200">
+              <span className="font-semibold text-amber-700">
                 🎪 {selectedEvent.name || "(이름 없음)"}
               </span>
             </>
           )}
         </nav>
 
-        {/* 행사별 필터 — 참가자 페이지와 동일한 패턴 */}
+        {/* 행사별 필터 — 라이트 베이지 카드 톤 */}
         {events.length > 0 && (
           <section
             aria-label="행사별 보기"
-            className="rounded-3xl border border-white/10 bg-black/30 p-3 backdrop-blur-sm"
+            className="rounded-3xl border border-amber-200/60 bg-white/80 p-3 shadow-sm backdrop-blur-sm"
           >
-            <p className="mb-2 px-1 text-[11px] font-bold text-amber-200">
+            <p className="mb-2 px-1 text-[11px] font-bold text-amber-700">
               🎪 행사별로 보기
             </p>
             <div className="flex flex-wrap gap-2">
@@ -148,15 +208,15 @@ export default async function OrgToriFmPage({
                 href={`/org/${orgId}/tori-fm`}
                 className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-[11px] font-bold transition ${
                   !selectedEvent
-                    ? "border-amber-300 bg-amber-300 text-[#1B2B3A] shadow-md"
-                    : "border-white/20 bg-white/5 text-white/70 hover:bg-white/10"
+                    ? "border-amber-400 bg-amber-400 text-[#1B2B3A] shadow-md"
+                    : "border-amber-200/70 bg-white text-[#6B6560] hover:bg-amber-50"
                 }`}
               >
                 <span aria-hidden>📋</span>
                 <span>전체</span>
                 <span
                   className={`rounded-full px-1.5 py-0.5 text-[10px] ${
-                    !selectedEvent ? "bg-[#1B2B3A]/15" : "bg-white/10"
+                    !selectedEvent ? "bg-[#1B2B3A]/15" : "bg-amber-100"
                   }`}
                 >
                   {allSessions.length}
@@ -174,8 +234,8 @@ export default async function OrgToriFmPage({
                     href={`/org/${orgId}/tori-fm?event=${e.event_id}`}
                     className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-[11px] font-bold transition ${
                       active
-                        ? "border-amber-300 bg-amber-300 text-[#1B2B3A] shadow-md"
-                        : "border-white/20 bg-white/5 text-white/70 hover:bg-white/10"
+                        ? "border-amber-400 bg-amber-400 text-[#1B2B3A] shadow-md"
+                        : "border-amber-200/70 bg-white text-[#6B6560] hover:bg-amber-50"
                     }`}
                   >
                     {isLive && (
@@ -194,7 +254,7 @@ export default async function OrgToriFmPage({
                     </span>
                     <span
                       className={`rounded-full px-1.5 py-0.5 text-[10px] ${
-                        active ? "bg-[#1B2B3A]/15" : "bg-white/10"
+                        active ? "bg-[#1B2B3A]/15" : "bg-amber-100"
                       }`}
                     >
                       {count}
@@ -204,9 +264,9 @@ export default async function OrgToriFmPage({
               })}
             </div>
             {selectedEvent && (
-              <p className="mt-2 px-1 text-[11px] text-amber-100/70">
+              <p className="mt-2 px-1 text-[11px] text-amber-700/80">
                 💡 아래 세션 만들기 폼에서 만드는 신규 세션은{" "}
-                <b className="text-amber-200">
+                <b className="text-amber-800">
                   &quot;{selectedEvent.name || "(이름 없음)"}&quot;
                 </b>{" "}
                 행사에 자동 연결돼요.
@@ -215,26 +275,44 @@ export default async function OrgToriFmPage({
           </section>
         )}
 
-      <header className="rounded-3xl border border-white/10 bg-gradient-to-br from-[#1B2B3A] via-[#26394C] to-[#1B2B3A] p-5 text-white shadow-xl md:p-7">
+      <header className="rounded-3xl border border-amber-200/70 bg-white/90 p-5 shadow-sm backdrop-blur-sm md:p-6">
         <div className="flex flex-wrap items-center gap-3">
           <span
-            className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-white/20 text-3xl backdrop-blur"
+            className="relative flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#070C1F] via-[#0B1538] to-[#0F1F4A] text-3xl text-amber-100 shadow-md"
             aria-hidden
           >
-            📻
+            {/* LIVE 일 때 라디오 아이콘 둘레 파동 */}
+            {liveSession && (
+              <span className="absolute -inset-1 animate-ping rounded-2xl bg-rose-400/40" />
+            )}
+            <span className="relative">🎙</span>
           </span>
           <div className="min-w-0 flex-1">
-            <h1 className="text-lg font-bold text-amber-100 md:text-xl">토리FM 제어실</h1>
-            <p className="text-xs text-amber-200/70">
+            <h1 className="flex flex-wrap items-center gap-2 text-lg font-bold text-[#1B2B3A] md:text-xl">
+              토리FM 라이브 스튜디오
+              {liveSession && (
+                <span
+                  className="inline-flex items-center gap-1 rounded-full bg-rose-500/95 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-widest text-white shadow-md shadow-rose-500/40"
+                  aria-label="ON AIR"
+                >
+                  <span className="relative inline-flex h-1.5 w-1.5">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white opacity-75" />
+                    <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-white" />
+                  </span>
+                  ON AIR
+                </span>
+              )}
+            </h1>
+            <p className="text-xs text-[#6B6560]">
               방송 세션을 만들고 신청곡을 편성하세요
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
             <Link
               href={`/org/${orgId}/missions/radio`}
-              className="rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-xs font-bold text-white backdrop-blur transition hover:bg-white/20"
+              className="rounded-xl border border-amber-300/70 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800 shadow-sm transition hover:bg-amber-100"
             >
-              🎙 모더레이션
+              📋 모더레이션
             </Link>
             <Link
               href={publicUrl}
@@ -242,7 +320,7 @@ export default async function OrgToriFmPage({
               rel="noopener noreferrer"
               className="rounded-xl bg-amber-400 px-3 py-2 text-xs font-bold text-[#1B2B3A] shadow-md shadow-amber-400/30 transition hover:bg-amber-300"
             >
-              🖥 전광판 열기
+              📺 전광판 열기
             </Link>
           </div>
         </div>
@@ -261,22 +339,30 @@ export default async function OrgToriFmPage({
             song={nowSong || null}
             artist={nowArtist || null}
             story={nowStory || null}
-            parentName={nowPlaying?.user?.parent_name ?? null}
+            parentName={nowParentName}
+            nowPlayingKind={playingRequest?.kind ?? null}
+            isAnonymous={playingRequest?.is_anonymous ?? false}
+            playingStoryItems={playingStoryItems}
             controls={
               <FmSessionControls
                 sessionId={liveSession.id}
                 isLive={liveSession.is_live}
-                currentQueueId={liveSession.current_queue_id}
-                approvedQueueIds={approvedQueue.map((q) => q.id)}
+                queuedCount={queuedRequests.length}
+                playingCount={playingGroup.length}
               />
             }
             initialChatMessages={chatMessages}
             initialPendingRequests={pendingRequests}
+            initialQueuedRequests={queuedRequests}
+            initialPlayingRequest={playingRequest}
+            initialPlayingGroup={playingGroup}
+            initialOpenRequests={liveAllRequests}
+            initialStoryRequests={initialStoryRequests}
             eventId={selectedEvent.event_id}
             initialRpsRoom={initialRpsRoom}
           />
         ) : (
-          <section className="rounded-3xl border border-white/10 bg-gradient-to-br from-[#1B2B3A] via-[#26394C] to-[#1B2B3A] p-5 text-center text-white shadow-xl md:p-7">
+          <section className="rounded-3xl border border-white/10 bg-gradient-to-b from-[#070C1F] via-[#0B1538] to-[#0F1F4A] p-5 text-center text-white shadow-xl backdrop-blur-md md:p-7">
             <p className="text-3xl" aria-hidden>
               📻
             </p>
@@ -318,44 +404,29 @@ export default async function OrgToriFmPage({
                 </div>
               )}
 
-            {upcoming.length > 0 ? (
-              <>
-                <p className="mt-4 text-xs text-white/60">
-                  다음 예정 방송을 지금 바로 시작해보세요.
-                </p>
-                <div className="mt-2 flex flex-col items-center gap-2">
-                  <p className="text-sm font-bold text-amber-200">
-                    🟢 {upcoming[0].name}
-                  </p>
-                  <p className="text-[11px] text-white/50">
-                    예정: {fmtDateTime(upcoming[0].scheduled_start)} ~{" "}
-                    {fmtDateTime(upcoming[0].scheduled_end)}
-                  </p>
-                  <StartBroadcastButton
-                    sessionId={upcoming[0].id}
-                    sessionName={upcoming[0].name}
-                    variant="full"
-                  />
-                </div>
-              </>
-            ) : !liveSessionRaw ? (
-              <p className="mt-1 text-xs text-white/60">
-                먼저 아래에서 이 행사용 방송 세션을 만들어 주세요.
-              </p>
-            ) : null}
+            {!liveSessionRaw && (
+              <div className="mx-auto mt-5 max-w-sm">
+                <QuickStartLiveButton
+                  orgId={orgId}
+                  eventId={selectedEvent.event_id}
+                  defaultName={`${selectedEvent.name || "토리FM"} 라이브`}
+                />
+              </div>
+            )}
+
           </section>
         )
       ) : (
-        <section className="rounded-3xl border border-white/10 bg-black/30 p-5 text-center text-white/80 backdrop-blur-sm md:p-7">
+        <section className="rounded-3xl border border-white/10 bg-gradient-to-b from-[#070C1F] via-[#0B1538] to-[#0F1F4A] p-5 text-center text-white shadow-xl backdrop-blur-md md:p-7">
           <p className="text-3xl" aria-hidden>
             🎪
           </p>
           <p className="mt-2 text-sm font-bold text-amber-100">
             먼저 어느 행사의 방송을 다룰지 선택해 주세요
           </p>
-          <p className="mt-1 text-xs text-white/60">
+          <p className="mt-1 text-xs text-white/70">
             위쪽 <span className="font-bold text-amber-200">🎪 행사별로 보기</span>{" "}
-            칩을 클릭하면 그 행사의 LIVE 콘솔과 세션 목록이 열립니다.
+            칩을 클릭하면 그 행사의 LIVE 콘솔이 열립니다.
           </p>
           {liveSessionRaw && (
             <div className="mt-4 inline-flex flex-col items-center gap-2 rounded-2xl border border-rose-500/40 bg-rose-500/10 px-4 py-3">
@@ -382,181 +453,8 @@ export default async function OrgToriFmPage({
         </section>
       )}
 
-      {/* 세션 목록 */}
-      <section className="space-y-3">
-        <div className="flex items-center justify-between gap-2">
-          <h2 className="flex items-center gap-2 text-base font-bold text-amber-100">
-            <span aria-hidden>🗓</span>
-            <span>방송 세션</span>
-          </h2>
-        </div>
-        <CreateSessionForm
-          orgId={orgId}
-          eventId={selectedEvent?.event_id}
-        />
-
-        {sessions.length === 0 ? (
-          <p className="rounded-2xl border border-white/10 bg-black/30 p-4 text-xs text-white/60 backdrop-blur-sm">
-            아직 만들어진 세션이 없어요.
-          </p>
-        ) : (
-          <div className="space-y-3">
-            {live.length > 0 && (
-              <SessionGroup
-                orgId={orgId}
-                title="📻 LIVE"
-                items={live}
-                accent="rose"
-              />
-            )}
-            {upcoming.length > 0 && (
-              <SessionGroup
-                orgId={orgId}
-                title="🟢 예정"
-                items={upcoming}
-                accent="green"
-              />
-            )}
-            {past.length > 0 && (
-              <SessionGroup
-                orgId={orgId}
-                title="🕓 지난 방송"
-                items={past}
-                accent="gray"
-              />
-            )}
-          </div>
-        )}
-      </section>
-
-      {/* 승인된 큐 */}
-      <section>
-        <h2 className="mb-3 flex items-center gap-2 text-base font-bold text-amber-100">
-          <span aria-hidden>📋</span>
-          <span>방송 대기 큐 ({approvedQueue.length})</span>
-        </h2>
-        {approvedQueue.length === 0 ? (
-          <p className="rounded-2xl border border-white/10 bg-black/30 p-4 text-xs text-white/60 backdrop-blur-sm">
-            승인된 사연이 없어요.{" "}
-            <Link
-              href={`/org/${orgId}/missions/radio`}
-              className="font-semibold text-amber-300 underline"
-            >
-              모더레이션으로 이동
-            </Link>
-          </p>
-        ) : (
-          <ul className="space-y-2">
-            {approvedQueue.map((q, idx) => {
-              const song =
-                typeof q.submission_payload.song_title === "string"
-                  ? q.submission_payload.song_title
-                  : "";
-              const story =
-                typeof q.submission_payload.story_text === "string"
-                  ? q.submission_payload.story_text
-                  : "";
-              const isCurrent = liveSession?.current_queue_id === q.id;
-              return (
-                <li
-                  key={q.id}
-                  className={`rounded-2xl border bg-black/30 p-3 backdrop-blur-sm ${
-                    isCurrent
-                      ? "border-rose-400/60 ring-2 ring-rose-400/30"
-                      : "border-white/10"
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-amber-400/20 text-xs font-bold text-amber-200 ring-1 ring-amber-400/30">
-                      {idx + 1}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-bold text-white">
-                        🎵 {song || "(제목 미입력)"}
-                      </p>
-                      {story && (
-                        <p className="truncate text-[11px] text-white/60">
-                          {story}
-                        </p>
-                      )}
-                    </div>
-                    {isCurrent && (
-                      <span className="shrink-0 rounded-full bg-rose-500 px-2 py-0.5 text-[10px] font-bold text-white shadow-md shadow-rose-500/40">
-                        재생 중
-                      </span>
-                    )}
-                    {q.played_at && !isCurrent && (
-                      <span className="shrink-0 rounded-full bg-sky-500/20 px-2 py-0.5 text-[10px] font-semibold text-sky-200 ring-1 ring-sky-400/30">
-                        방송됨
-                      </span>
-                    )}
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </section>
-
       </div>
     </div>
   );
 }
 
-function SessionGroup({
-  orgId,
-  title,
-  items,
-  accent,
-}: {
-  orgId: string;
-  title: string;
-  items: ToriFmSessionRow[];
-  accent: "rose" | "green" | "gray";
-}) {
-  const borderCls =
-    accent === "rose"
-      ? "border-rose-400/40"
-      : accent === "green"
-        ? "border-emerald-400/30"
-        : "border-white/10";
-  return (
-    <div>
-      <p className="mb-1.5 text-xs font-semibold text-amber-200/70">{title}</p>
-      <ul className="space-y-2">
-        {items.map((s) => (
-          <li
-            key={s.id}
-            className={`rounded-2xl border bg-black/30 p-3 text-white backdrop-blur-sm ${borderCls}`}
-          >
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-bold text-white">
-                  {s.name}
-                </p>
-                <p className="text-[11px] text-white/60">
-                  🕐 {fmtDateTime(s.scheduled_start)} ~{" "}
-                  {fmtDateTime(s.scheduled_end)}
-                </p>
-              </div>
-              <div className="flex shrink-0 items-center gap-1.5">
-                {accent === "green" && !s.is_live && (
-                  <StartBroadcastButton
-                    sessionId={s.id}
-                    sessionName={s.name}
-                  />
-                )}
-                <Link
-                  href={`/org/${orgId}/tori-fm/${s.id}`}
-                  className="rounded-xl border border-amber-300/40 bg-amber-400/10 px-3 py-1.5 text-xs font-bold text-amber-200 transition hover:bg-amber-400/20"
-                >
-                  편집
-                </Link>
-              </div>
-            </div>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}

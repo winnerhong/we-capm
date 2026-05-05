@@ -1,7 +1,25 @@
 "use client";
 
+// LIVE 스튜디오 패널 (DJ 콘솔 메인 카드)
+// 참가자 MiniStage 톤(다크 네이비 그라디언트 + 글래스 카드)을 차용해 시각 언어 통일.
+//   - 좌상: ON AIR · 세션명
+//   - 우상: 청취자 · 경과 · 남은 시간 · STUDIO · 벽시계 (참가자와 동일 모노스페이스)
+//   - 메인: NOW PLAYING 글래스 카드 + 비주얼라이저 (그린/앰버/핑크 막대)
+//   - 하단: 컨트롤 (props)
+
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ListenerPresence } from "@/components/tori-fm/ListenerPresence";
+
+/**
+ * 같은 곡(song_normalized)에 묶인 PLAYING 사연 1건.
+ * 작성자 라벨(`authorLabel`)은 page.tsx 에서 익명/실명 분기 후 결정해 넘긴다.
+ */
+export interface PlayingItem {
+  id: string;
+  story: string | null;
+  authorLabel: string;
+  createdAt: string;
+}
 
 interface Props {
   sessionName: string;
@@ -14,15 +32,17 @@ interface Props {
   parentName: string | null;
   orgId: string;
   controls: ReactNode;
+  /** NOW PLAYING 의 종류 — 'story_only' 면 사연 리더 모드(워름톤). */
+  nowPlayingKind?: "song_request" | "story_only" | null;
+  /** PLAYING request 가 익명 작성이었는지 — 사연 리더 모드 라벨에 영향. */
+  isAnonymous?: boolean;
+  /**
+   * 같은 곡(song_normalized) 묶음 사연 — 비어있거나 1건이면 단일 모드 그대로,
+   * 2건 이상이면 곡명 한 번 + 사연 리스트(시간순) 렌더.
+   */
+  storyItems?: PlayingItem[];
 }
 
-/**
- * 실시간 방송국 느낌의 LIVE 패널.
- *  - 3 타이머: 경과 · 남은 시간 · 벽시계
- *  - ON AIR 펄스
- *  - VU 미터 애니메이션 (가짜 — 분위기용)
- *  - YouTube 검색 바로 열기 (운영자가 현장 스피커로 재생)
- */
 export function LiveStudioPanel({
   sessionName,
   scheduledStart,
@@ -34,10 +54,21 @@ export function LiveStudioPanel({
   parentName,
   orgId,
   controls,
+  nowPlayingKind = null,
+  isAnonymous = false,
+  storyItems = [],
 }: Props) {
-  const [now, setNow] = useState(() => Date.now());
+  // 빈 사연(null/공백)은 묶음 카드에서 제외 — 곡 묶음 모드 판정의 기준.
+  const filledStoryItems = useMemo(
+    () => storyItems.filter((it) => (it.story ?? "").trim().length > 0),
+    [storyItems]
+  );
+  const isBundleMode = filledStoryItems.length >= 2;
+  // SSR/CSR hydration mismatch 방지 — 첫 렌더는 null 로 두고 마운트 후 초깃값을 set.
+  const [now, setNow] = useState<number | null>(null);
 
   useEffect(() => {
+    setNow(Date.now());
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
   }, []);
@@ -53,21 +84,22 @@ export function LiveStudioPanel({
     return Number.isNaN(t) ? null : t;
   }, [scheduledEnd]);
 
-  const elapsedSec = startedMs ? Math.max(0, Math.floor((now - startedMs) / 1000)) : 0;
-  const remainingSec = endMs ? Math.max(0, Math.floor((endMs - now) / 1000)) : 0;
+  const elapsedSec =
+    now !== null && startedMs ? Math.max(0, Math.floor((now - startedMs) / 1000)) : 0;
+  const remainingSec =
+    now !== null && endMs ? Math.max(0, Math.floor((endMs - now) / 1000)) : 0;
   const isEndingSoon = remainingSec > 0 && remainingSec <= 300; // 5분
   const isCritical = remainingSec > 0 && remainingSec <= 60; // 1분
 
-  const clockText = useMemo(
-    () =>
-      new Date(now).toLocaleTimeString("ko-KR", {
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-        hour12: false,
-      }),
-    [now]
-  );
+  const clockText = useMemo(() => {
+    if (now === null) return "--:--:--";
+    return new Date(now).toLocaleTimeString("ko-KR", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+    });
+  }, [now]);
 
   const youtubeUrl = useMemo(() => {
     if (!song) return null;
@@ -75,110 +107,240 @@ export function LiveStudioPanel({
     return `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`;
   }, [song, artist]);
 
+  // 사연 모드 — Hero 외곽 글로우 색 분기
+  const isStoryHero =
+    nowPlayingKind === "story_only" || (!song && !!story);
+  const heroShadow = isStoryHero
+    ? "shadow-2xl shadow-violet-500/20"
+    : "shadow-2xl shadow-amber-500/15";
+
   return (
-    <section className="overflow-hidden rounded-3xl border border-rose-400/40 bg-gradient-to-br from-[#1B2B3A] via-[#26394C] to-[#1B2B3A] p-5 text-white shadow-xl md:p-6">
-      {/* 상단: ON AIR · 제목 · 벽시계 */}
-      <header className="flex flex-wrap items-start justify-between gap-3 border-b border-white/10 pb-4">
-        <div className="flex items-center gap-3">
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-600 px-3 py-1 text-xs font-bold text-white shadow-lg shadow-rose-500/40">
-            <span className="relative inline-flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white/80" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-white" />
+    <section
+      className={`relative isolate flex h-full flex-col overflow-hidden rounded-[2rem] border-l-[5px] ${
+        isStoryHero
+          ? "border-l-violet-300/70"
+          : "border-l-amber-300/70"
+      } border-y border-y-white/10 border-r border-r-white/10 text-white ${heroShadow} backdrop-blur-md transition-shadow duration-300 hover:-translate-y-0.5 hover:shadow-2xl`}
+    >
+      {/* Hero 외곽 글로우 — 음악(amber) / 사연(rose+violet 합성) */}
+      <div
+        aria-hidden
+        className={`pointer-events-none absolute -inset-2 -z-10 blur-3xl ${
+          isStoryHero
+            ? "bg-gradient-to-br from-rose-500/10 via-violet-500/15 to-amber-500/8"
+            : "bg-amber-500/[0.10]"
+        }`}
+      />
+      {/* 풀블리드 배경 — 참가자 MiniStage 와 동일한 깊은 네이비 그라디언트 */}
+      <div
+        aria-hidden
+        className="absolute inset-0 bg-gradient-to-b from-[#070C1F] via-[#0B1538] to-[#0F1F4A]"
+      />
+
+      <div className="relative z-10 flex flex-1 flex-col p-5 md:p-6">
+        {/* 상단 HUD */}
+        <header className="flex flex-wrap items-start justify-between gap-3 border-b border-white/10 pb-4">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <span
+              className="inline-flex items-center gap-1.5 rounded-full bg-rose-500/95 px-3 py-1 text-[11px] font-extrabold uppercase tracking-widest text-white shadow-lg shadow-rose-500/50 drop-shadow-[0_0_8px_rgba(244,63,94,0.55)]"
+              aria-label="ON AIR"
+            >
+              <span className="relative inline-flex h-2 w-2" aria-hidden>
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white opacity-75" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-white" />
+              </span>
+              ON AIR
             </span>
-            ON AIR
-          </span>
-          <h2 className="text-base font-bold text-white md:text-lg">
-            {sessionName}
-          </h2>
-        </div>
-        <div className="flex flex-wrap items-center gap-3 font-mono text-sm text-amber-200">
-          <ListenerPresence orgId={orgId} variant="light" />
-          <span className="flex items-center gap-1 text-[10px] uppercase tracking-widest text-amber-200/60">
-            📻 STUDIO
-          </span>
-          <time
-            aria-live="polite"
-            className="tabular-nums text-amber-100"
-            suppressHydrationWarning
-          >
-            🕐 {clockText}
-          </time>
-        </div>
-      </header>
+            <h2 className="truncate text-base font-extrabold tracking-tight text-amber-100 md:text-lg">
+              {sessionName}
+            </h2>
+          </div>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="rounded-full border border-white/10 bg-white/[0.06] px-2 py-1 backdrop-blur-md">
+              <ListenerPresence orgId={orgId} variant="light" />
+            </span>
+            <span
+              className={`inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.05] px-2 py-0.5 font-mono text-[10px] tabular-nums backdrop-blur-md ${
+                startedMs ? "text-emerald-300" : "text-white/50"
+              }`}
+            >
+              <span aria-hidden>⏱</span>
+              {formatHMS(elapsedSec)}
+            </span>
+            <span
+              className={`inline-flex items-center gap-1 rounded-full border bg-white/[0.05] px-2 py-0.5 font-mono text-[10px] tabular-nums backdrop-blur-md ${
+                isCritical
+                  ? "border-rose-400/50 text-rose-300 animate-pulse"
+                  : isEndingSoon
+                    ? "border-amber-400/50 text-amber-300"
+                    : "border-white/10 text-sky-300"
+              }`}
+            >
+              <span aria-hidden>{isCritical ? "⚠" : "⏳"}</span>
+              {formatHMS(remainingSec)}
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.05] px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-widest text-amber-200/80 backdrop-blur-md">
+              📻 STUDIO
+            </span>
+            <time
+              aria-live="polite"
+              className="rounded-full border border-white/10 bg-white/[0.05] px-2 py-0.5 font-mono text-[10px] tabular-nums text-amber-100 backdrop-blur-md"
+              suppressHydrationWarning
+            >
+              🕐 {clockText}
+            </time>
+          </div>
+        </header>
 
-      {/* 타이머 2개: 경과 · 남은 시간 */}
-      <div className="mt-4 grid grid-cols-2 gap-3">
-        <TimerTile
-          label="경과"
-          value={formatHMS(elapsedSec)}
-          accent="emerald"
-          icon="⏱"
-        />
-        <TimerTile
-          label="남은 시간"
-          value={formatHMS(remainingSec)}
-          accent={isCritical ? "rose" : isEndingSoon ? "amber" : "sky"}
-          icon={isCritical ? "⚠️" : "⏳"}
-          pulse={isCritical}
-        />
-      </div>
+        {/* 메인: NOW PLAYING + 비주얼라이저
+            ─ 음악 모드(song_request) — 비주얼라이저 함께 표시
+            ─ 사연 리더 모드(story_only 또는 song 비어있고 story 만 있을 때) —
+              warm gradient 카드, 비주얼라이저 숨김(음악 아닐 때 어색) */}
+        {(() => {
+          const isStoryMode =
+            nowPlayingKind === "story_only" || (!song && !!story);
 
-      {/* 메인: 현재 곡 + VU 미터 */}
-      <div className="mt-5 grid gap-4 md:grid-cols-[1fr_auto]">
-        <div className="rounded-2xl border border-white/10 bg-black/25 p-4 backdrop-blur-sm">
-          <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-amber-200/80">
-            ♪ NOW PLAYING
-          </p>
-          {song ? (
-            <>
-              <p className="mt-1.5 truncate text-xl font-extrabold tracking-tight text-white">
-                {song}
-              </p>
-              {artist && (
-                <p className="text-sm font-semibold text-amber-200/80">
-                  — {artist}
+          if (isStoryMode) {
+            return (
+              <div className="mt-5">
+                <div className="relative rounded-2xl border border-amber-300/30 bg-gradient-to-br from-violet-900/40 via-purple-900/30 to-amber-900/40 p-5 shadow-2xl shadow-amber-500/10 backdrop-blur-md md:p-6">
+                  {/* 컨트롤 — 카드 우상단 절대 위치 */}
+                  <div className="absolute right-3 top-3 z-10">{controls}</div>
+
+                  <p className="pr-32 text-xs font-bold uppercase tracking-[0.3em] text-violet-100 drop-shadow-[0_0_8px_rgba(167,139,250,0.55)] md:pr-40">
+                    💌 사연 읽는 중
+                  </p>
+                  {story ? (
+                    <blockquote className="mt-3 border-l-4 border-amber-300/50 pl-5 text-2xl font-semibold leading-relaxed text-amber-100 md:text-3xl">
+                      <span aria-hidden className="mr-1 text-amber-300/70">
+                        ❝
+                      </span>
+                      {story}
+                    </blockquote>
+                  ) : (
+                    <p className="mt-3 text-amber-200/70">사연을 불러오는 중…</p>
+                  )}
+                  {parentName && (
+                    <p className="mt-4 text-right text-sm text-amber-200/80">
+                      — {parentName}
+                      {isAnonymous && (
+                        <span className="ml-1 text-[10px] text-amber-200/60">
+                          (익명)
+                        </span>
+                      )}
+                    </p>
+                  )}
+                </div>
+              </div>
+            );
+          }
+
+          return (
+            <div className="mt-5 grid gap-4 md:grid-cols-[1fr_auto]">
+              <div className="relative rounded-2xl border border-white/10 bg-white/[0.04] p-4 backdrop-blur-md">
+                {/* 컨트롤 — 카드 우상단 절대 위치 (방송 종료 / 다음 곡) */}
+                <div className="absolute right-3 top-3 z-10">{controls}</div>
+
+                <p className="pr-32 text-xs font-bold uppercase tracking-[0.3em] text-amber-200 drop-shadow-[0_0_8px_rgba(251,191,36,0.5)] md:pr-40">
+                  ♪ NOW PLAYING
+                  {isBundleMode && (
+                    <span className="ml-2 rounded-full bg-amber-400/20 px-2 py-0.5 text-[9px] font-extrabold tracking-wider text-amber-200 ring-1 ring-amber-300/40">
+                      사연 {filledStoryItems.length}건 묶음
+                    </span>
+                  )}
                 </p>
-              )}
-              {story && (
-                <blockquote className="mt-3 border-l-2 border-amber-300/60 pl-3 text-[13px] leading-relaxed text-white/85">
-                  “{story}”
-                </blockquote>
-              )}
-              {parentName && (
-                <p className="mt-2 text-right text-[11px] font-semibold text-amber-200/80">
-                  — {parentName}
-                </p>
-              )}
-              {youtubeUrl && (
-                <a
-                  href={youtubeUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-amber-400 px-3 py-1.5 text-xs font-bold text-[#1B2B3A] shadow-md transition hover:bg-amber-300"
-                >
-                  ▶ YouTube에서 음원 재생
-                </a>
-              )}
-            </>
-          ) : (
-            <p className="mt-2 text-sm text-white/60">
-              재생 중인 사연이 없어요. &ldquo;다음 곡&rdquo;을 눌러 시작하세요.
-            </p>
-          )}
-        </div>
+                {song ? (
+                  <>
+                    <p className="mt-1.5 break-words text-2xl font-extrabold tracking-tight text-amber-100 md:text-3xl">
+                      {song}
+                    </p>
+                    {artist && (
+                      <p className="mt-0.5 text-sm font-semibold text-amber-200/80">
+                        — {artist}
+                      </p>
+                    )}
+                    {/* 곡 묶음 모드 — 사연 카드 N개 (created_at ASC).
+                        5개 넘으면 자연 스크롤. */}
+                    {isBundleMode ? (
+                      <ul className="mt-3 max-h-64 space-y-2 overflow-y-auto pr-1
+                        [&::-webkit-scrollbar]:w-1.5
+                        [&::-webkit-scrollbar-track]:bg-transparent
+                        [&::-webkit-scrollbar-thumb]:rounded-full
+                        [&::-webkit-scrollbar-thumb]:bg-white/15">
+                        {filledStoryItems.map((it) => (
+                          <li
+                            key={it.id}
+                            className="border-l-2 border-amber-300/40 pl-3"
+                          >
+                            <p className="text-sm leading-relaxed text-white/95">
+                              <span aria-hidden className="mr-0.5 text-amber-300/70">
+                                ❝
+                              </span>
+                              {it.story}
+                              <span aria-hidden className="ml-0.5 text-amber-300/70">
+                                ❞
+                              </span>
+                            </p>
+                            <p className="mt-1 text-[11px] text-amber-200/70">
+                              — {it.authorLabel || "익명의 청취자"}
+                              <span className="ml-1.5 text-amber-200/50">
+                                · {fmtRelative(it.createdAt)}
+                              </span>
+                            </p>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <>
+                        {story && (
+                          <blockquote className="mt-3 border-l-2 border-amber-300/50 pl-3 text-[13px] leading-relaxed text-white/95">
+                            &ldquo;{story}&rdquo;
+                          </blockquote>
+                        )}
+                        {parentName && (
+                          <p className="mt-2 text-right text-[11px] font-semibold text-amber-200/75">
+                            — {parentName}
+                          </p>
+                        )}
+                      </>
+                    )}
+                    {youtubeUrl && (
+                      <a
+                        href={youtubeUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-amber-400 px-3 py-1.5 text-xs font-bold text-[#0B1538] shadow-md shadow-amber-400/30 transition hover:bg-amber-300"
+                      >
+                        ▶ YouTube에서 음원 재생
+                      </a>
+                    )}
+                  </>
+                ) : (
+                  <div className="mt-3 text-center">
+                    <p className="text-3xl" aria-hidden>
+                      🌲
+                    </p>
+                    <p className="mt-2 text-sm font-semibold text-amber-200">
+                      다음 사연을 준비하고 있어요
+                    </p>
+                    <p className="mt-1 text-[11px] text-white/55">
+                      아래 컨트롤에서 &ldquo;다음 곡&rdquo;을 눌러 시작하세요
+                    </p>
+                  </div>
+                )}
+              </div>
 
-        {/* VU 미터 */}
-        <VuMeter playing={!!song} />
+              <Visualizer playing={!!song} />
+            </div>
+          );
+        })()}
+
+        {/* 시간 정보 푸터 */}
+        <footer className="mt-3 flex flex-wrap items-center justify-between gap-2 text-[11px] text-amber-200/60">
+          <span>📅 예정: {fmtShort(scheduledStart)} ~ {fmtShort(scheduledEnd)}</span>
+          {startedAt && <span>🎙 방송 시작: {fmtShort(startedAt)}</span>}
+        </footer>
       </div>
-
-      {/* 컨트롤 */}
-      <div className="mt-5 border-t border-white/10 pt-4">{controls}</div>
-
-      {/* 시간 정보 푸터 */}
-      <footer className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-white/10 pt-3 text-[11px] text-amber-200/60">
-        <span>📅 예정: {fmtShort(scheduledStart)} ~ {fmtShort(scheduledEnd)}</span>
-        {startedAt && <span>🎙 방송 시작: {fmtShort(startedAt)}</span>}
-      </footer>
     </section>
   );
 }
@@ -206,56 +368,36 @@ function fmtShort(iso: string | null): string {
   });
 }
 
-function TimerTile({
-  label,
-  value,
-  accent,
-  icon,
-  pulse,
-}: {
-  label: string;
-  value: string;
-  accent: "emerald" | "sky" | "amber" | "rose";
-  icon: string;
-  pulse?: boolean;
-}) {
-  const color: Record<typeof accent, string> = {
-    emerald: "text-emerald-300 border-emerald-400/30",
-    sky: "text-sky-300 border-sky-400/30",
-    amber: "text-amber-300 border-amber-400/40",
-    rose: "text-rose-300 border-rose-400/50",
-  };
-  return (
-    <div
-      className={`rounded-2xl border bg-black/30 p-3 backdrop-blur-sm ${color[accent]} ${pulse ? "animate-pulse" : ""}`}
-    >
-      <p className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-white/60">
-        <span aria-hidden>{icon}</span>
-        <span>{label}</span>
-      </p>
-      <p
-        className="mt-1 font-mono text-2xl font-extrabold tabular-nums"
-        suppressHydrationWarning
-      >
-        {value}
-      </p>
-    </div>
-  );
+/** "5분 전" / "방금 전" — created_at 기준 한국어 상대 시간. */
+function fmtRelative(iso: string): string {
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return "";
+  const diffSec = Math.max(0, Math.floor((Date.now() - t) / 1000));
+  if (diffSec < 30) return "방금 전";
+  if (diffSec < 60) return `${diffSec}초 전`;
+  const m = Math.floor(diffSec / 60);
+  if (m < 60) return `${m}분 전`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}시간 전`;
+  return new Date(iso).toLocaleDateString("ko-KR", {
+    month: "2-digit",
+    day: "2-digit",
+  });
 }
 
-/** CSS 기반 가짜 VU 미터 — 실제 오디오 분석 아닌 분위기용 */
-function VuMeter({ playing }: { playing: boolean }) {
+/** 비주얼라이저 — CSS 기반, 참가자 화면 스피릿(그린/앰버/핑크 막대) */
+function Visualizer({ playing }: { playing: boolean }) {
   const bars = 14;
   return (
-    <div className="flex items-end gap-2 rounded-2xl border border-white/10 bg-black/30 p-3 backdrop-blur-sm">
+    <div className="flex items-end gap-2 rounded-2xl border border-white/10 bg-white/[0.04] p-3 backdrop-blur-md">
       {[0, 1].map((ch) => (
         <div key={ch} className="flex flex-col items-center gap-1">
-          <span className="text-[9px] font-bold tracking-widest text-white/50">
+          <span className="font-mono text-[9px] font-bold tracking-widest text-white/45">
             {ch === 0 ? "L" : "R"}
           </span>
           <div className="flex h-24 items-end gap-[2px]">
             {Array.from({ length: bars }).map((_, i) => (
-              <VuBar key={i} index={i} total={bars} playing={playing} />
+              <VisualizerBar key={i} index={i} total={bars} playing={playing} />
             ))}
           </div>
         </div>
@@ -264,7 +406,7 @@ function VuMeter({ playing }: { playing: boolean }) {
   );
 }
 
-function VuBar({
+function VisualizerBar({
   index,
   total,
   playing,
@@ -283,7 +425,6 @@ function VuBar({
         last = t;
         const el = ref.current;
         if (el) {
-          // 하위 bar 는 항상 높음, 위쪽은 랜덤
           const base = playing
             ? 0.3 + ((total - index) / total) * 0.4
             : 0.05 + ((total - index) / total) * 0.1;

@@ -15,6 +15,7 @@ export type PartnerLoginResult =
 type PartnerRow = {
   id: string;
   name: string;
+  business_name: string | null;
   username: string;
   password: string;
   status: string;
@@ -68,7 +69,7 @@ export async function partnerLoginAction(
 
   const { data: partner } = await queryAny
     .from("partners")
-    .select("id, name, username, password, status")
+    .select("id, name, business_name, username, password, status")
     .eq("username", username)
     .maybeSingle();
 
@@ -97,6 +98,7 @@ export async function partnerLoginAction(
           id: partner.id,
           teamMemberId: null,
           name: partner.name,
+          business_name: partner.business_name ?? null,
           username: partner.username,
           role: "OWNER" as TeamRole,
           loginAt: new Date().toISOString(),
@@ -175,7 +177,7 @@ export async function partnerLoginAction(
     // 소속 partner 조회
     const { data: ownerPartner } = await queryAny
       .from("partners")
-      .select("id, name, username, password, status")
+      .select("id, name, business_name, username, password, status")
       .eq("id", member.partner_id)
       .maybeSingle();
 
@@ -209,7 +211,9 @@ export async function partnerLoginAction(
       JSON.stringify({
         id: ownerPartner.id,
         teamMemberId: member.id,
-        name: member.name,
+        // 팀원 로그인 시 표시는 소속 지사의 이름을 우선 노출. 본인 이름은 name fallback.
+        name: ownerPartner.name || member.name,
+        business_name: ownerPartner.business_name ?? null,
         username: member.username,
         role: member.role,
         loginAt: nowIso,

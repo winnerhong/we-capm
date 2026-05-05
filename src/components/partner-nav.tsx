@@ -34,8 +34,16 @@ const NAV_GROUPS: NavGroup[] = [
       "/partner/trails",
       "/partner/missions",
       "/partner/stampbook-presets",
+      "/partner/features",
+      "/partner/event-templates",
     ],
     items: [
+      {
+        label: "행사 템플릿",
+        href: "/partner/event-templates",
+        icon: "📦",
+        allowedRoles: ["OWNER", "MANAGER"],
+      },
       {
         label: "프로그램 관리",
         href: "/partner/programs",
@@ -43,10 +51,10 @@ const NAV_GROUPS: NavGroup[] = [
         allowedRoles: ALL_ROLES,
       },
       {
-        label: "➕ 새 프로그램",
-        href: "/partner/programs/new",
-        icon: "➕",
-        allowedRoles: ["OWNER", "MANAGER", "STAFF"],
+        label: "기능 카탈로그",
+        href: "/partner/features",
+        icon: "🛍️",
+        allowedRoles: ALL_ROLES,
       },
       {
         label: "나만의 숲길 (QR·미션)",
@@ -61,19 +69,19 @@ const NAV_GROUPS: NavGroup[] = [
         allowedRoles: ["OWNER", "MANAGER", "STAFF"],
       },
       {
-        label: "📊 미션 통계",
+        label: "미션 통계",
         href: "/partner/missions/stats",
         icon: "📊",
         allowedRoles: ["OWNER", "MANAGER", "STAFF", "VIEWER"],
       },
       {
-        label: "📚 스탬프북 프리셋",
+        label: "스탬프북 프리셋",
         href: "/partner/stampbook-presets",
         icon: "📚",
         allowedRoles: ["OWNER", "MANAGER", "STAFF"],
       },
       {
-        label: "💌 기관 제안",
+        label: "기관 제안",
         href: "/partner/missions/contributions",
         icon: "💌",
         allowedRoles: ["OWNER", "MANAGER", "STAFF"],
@@ -294,9 +302,19 @@ export function PartnerNav({
     <header className="sticky top-0 z-40 border-b border-[#D4E4BC] bg-white shadow-sm">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-2" ref={navRef}>
         <div className="flex items-center gap-4 lg:gap-6 min-w-0">
-          <Link href="/partner/dashboard" className="flex items-center gap-2 font-bold text-[#2D5A3D] flex-shrink-0">
+          <Link
+            href="/partner/dashboard"
+            className="flex items-center gap-2 font-bold text-[#2D5A3D] flex-shrink-0"
+          >
             <span className="text-xl">🏡</span>
-            <span className="hidden sm:inline">숲지기</span>
+            <span className="hidden flex-col items-end leading-tight sm:flex">
+              <span className="max-w-[14rem] truncate text-sm">
+                {partnerName}
+              </span>
+              <span className="text-[10px] font-semibold tracking-wide text-[#6B6560]">
+                [토리로] 행사프로그램
+              </span>
+            </span>
           </Link>
 
           {/* 데스크탑 네비 */}

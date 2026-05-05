@@ -13,7 +13,7 @@ import {
   sumAcornsForPack,
 } from "@/lib/missions/queries";
 import {
-  loadActiveEventsForUser,
+  loadActiveAndUpcomingEventsForUser,
   loadLiveQuestPacksForEvent,
 } from "@/lib/org-events/queries";
 import { computePackProgress } from "@/lib/missions/progress";
@@ -92,6 +92,31 @@ async function pickPrimaryLivePackForEvent(
   return incomplete ?? enriched[0] ?? null;
 }
 
+const WEEKDAY_KO = ["일", "월", "화", "수", "목", "금", "토"];
+
+function pad2(n: number): string {
+  return n < 10 ? `0${n}` : `${n}`;
+}
+
+function fmtFullDate(iso: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return `${d.getFullYear()}.${pad2(d.getMonth() + 1)}.${pad2(d.getDate())} (${WEEKDAY_KO[d.getDay()]})`;
+}
+
+function fmtClock(iso: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const h = d.getHours();
+  const m = d.getMinutes();
+  if (h === 0 && m === 0) return "";
+  const period = h < 12 ? "오전" : "오후";
+  const hh = h === 0 ? 12 : h > 12 ? h - 12 : h;
+  return `${period} ${hh}:${pad2(m)}`;
+}
+
 function fmtDate(iso: string | null): string {
   if (!iso) return "";
   try {
@@ -144,17 +169,20 @@ export default async function UserHomePage({
     [
       getAcornBalance(user.id),
       loadChildrenForUser(user.id),
-      loadActiveEventsForUser(user.id),
+      loadActiveAndUpcomingEventsForUser(user.id),
       loadAppUserById(user.id),
     ]
   );
 
   // 선택 규칙:
   //   - URL ?event_id= 가 activeEvents 에 있으면 그걸 사용
-  //   - 아니면 최신 created_at DESC 첫 번째 자동 선택
+  //   - 아니면 LIVE 행사 우선 (DRAFT/예정 보다 진행 중 먼저)
+  //   - 둘 다 없으면 첫 번째 (DRAFT)
   //   - activeEvents 비면 null
+  const liveEvents = activeEvents.filter((e) => e.status === "LIVE");
   const selectedEvent: OrgEventRow | null =
     (urlEventId && activeEvents.find((e) => e.id === urlEventId)) ||
+    liveEvents[0] ||
     activeEvents[0] ||
     null;
 
@@ -191,6 +219,118 @@ export default async function UserHomePage({
         )
       )
     : 100;
+
+  // 선택된 행사가 DRAFT(예정) 상태면 — 참가자 포털은 초대장만 노출.
+  // 스탬프북·미션·FM·온보딩 등은 행사가 LIVE 가 된 뒤에 활성화됨.
+  if (selectedEvent && selectedEvent.status === "DRAFT") {
+    return (
+      <div className="space-y-4">
+        {/* 가족 헤더 */}
+        <section className="overflow-hidden rounded-3xl bg-gradient-to-br from-[#2D5A3D] via-[#3A7A52] to-[#4A7C59] p-5 shadow-lg">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold text-[#D4E4BC]">
+                🌲 {user.orgName || "소속 기관"}
+              </p>
+              <h1 className="mt-1 truncate text-xl font-bold text-white">
+                {familyLabel}
+              </h1>
+            </div>
+            <Link
+              href="/profile"
+              className="shrink-0 rounded-full bg-white/15 px-3 py-1.5 text-xs font-bold text-white backdrop-blur-sm transition hover:bg-white/25"
+            >
+              내 정보 →
+            </Link>
+          </div>
+        </section>
+
+        {/* 다른 진행 중 행사가 있으면 선택 가능 */}
+        {activeEvents.length > 1 && (
+          <EventSelector
+            events={activeEvents}
+            selectedId={selectedEvent.id}
+          />
+        )}
+
+        {/* 초대장 카드 — 메인 CTA */}
+        <section className="space-y-4 rounded-3xl border-2 border-[#E5D3B8] bg-gradient-to-br from-[#FFFDF8] to-[#FFF8F0] p-6 shadow-sm text-center">
+          <div className="text-5xl" aria-hidden>
+            💌
+          </div>
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-wider text-[#8B6F47]">
+              곧 만나요
+            </p>
+            <h2 className="mt-1 text-lg font-bold text-[#2D5A3D] md:text-xl">
+              {selectedEvent.name || "(이름 없음)"}
+            </h2>
+          </div>
+
+          {/* 일정·시간·장소 정보 */}
+          <ul className="space-y-2 rounded-xl bg-white/70 px-4 py-3 text-left text-sm text-[#2D5A3D]">
+            {selectedEvent.starts_at && (
+              <li className="flex items-start gap-2">
+                <span className="shrink-0" aria-hidden>
+                  📅
+                </span>
+                <div className="min-w-0 flex-1">
+                  <span className="font-semibold">
+                    {fmtFullDate(selectedEvent.starts_at)}
+                  </span>
+                  {(() => {
+                    const startClock = fmtClock(selectedEvent.starts_at);
+                    const endClock = fmtClock(selectedEvent.ends_at);
+                    if (!startClock && !endClock) return null;
+                    return (
+                      <span className="ml-1 text-[#6B6560]">
+                        {startClock}
+                        {endClock ? ` ~ ${endClock}` : ""}
+                      </span>
+                    );
+                  })()}
+                </div>
+              </li>
+            )}
+            {(selectedEvent.invitation_location ||
+              selectedEvent.invitation_address) && (
+              <li className="flex items-start gap-2">
+                <span className="shrink-0" aria-hidden>
+                  📍
+                </span>
+                <div className="min-w-0 flex-1">
+                  {selectedEvent.invitation_location && (
+                    <p className="font-semibold">
+                      {selectedEvent.invitation_location}
+                    </p>
+                  )}
+                  {selectedEvent.invitation_address && (
+                    <p className="text-xs text-[#6B6560]">
+                      {selectedEvent.invitation_address}
+                    </p>
+                  )}
+                </div>
+              </li>
+            )}
+          </ul>
+
+          <p className="rounded-xl bg-amber-50/80 px-4 py-2.5 text-[11px] text-amber-900">
+            행사가 시작되면 스탬프북·미션·라이브 방송이 활성화돼요. 그 전까지는
+            초대장으로 행사 정보를 확인하세요.
+          </p>
+
+          <Link
+            href={`/invitation/${selectedEvent.id}`}
+            className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-[#6B4423] to-[#8B6F47] px-6 py-3 text-base font-bold text-white shadow-md transition hover:from-[#5a3a1e] hover:to-[#6B4423]"
+          >
+            <span aria-hidden>💌</span>
+            <span>초대장 자세히 보기</span>
+            <span aria-hidden>→</span>
+          </Link>
+        </section>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">

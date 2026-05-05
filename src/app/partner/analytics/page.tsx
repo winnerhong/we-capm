@@ -22,6 +22,7 @@ type ProgramRow = {
 type PartnerRow = {
   id: string;
   name: string;
+  business_name: string | null;
   acorn_balance: number;
   avg_rating: number | null;
   total_sales: number;
@@ -57,7 +58,7 @@ async function resolvePartnerId(): Promise<PartnerRow | null> {
         };
       }
     )
-      .select("id,name,acorn_balance,avg_rating,total_sales")
+      .select("id,name,business_name,acorn_balance,avg_rating,total_sales")
       .eq("id", session.id)
       .maybeSingle();
 
@@ -74,7 +75,7 @@ async function resolvePartnerId(): Promise<PartnerRow | null> {
       };
     }
   )
-    .select("id,name,acorn_balance,avg_rating,total_sales")
+    .select("id,name,business_name,acorn_balance,avg_rating,total_sales")
     .limit(1)
     .maybeSingle();
 
@@ -202,7 +203,7 @@ export default async function PartnerAnalyticsPage({
             </h1>
             <p className="mt-1 text-xs text-[#6B6560] md:text-sm">
               내 프로그램의 성과를 확인해요
-              {partner ? ` · ${partner.name} 숲지기` : ""}
+              {partner ? ` · ${partner.business_name?.trim() || partner.name}` : ""}
             </p>
           </div>
         </div>

@@ -5,6 +5,7 @@ import { countPendingTeamMembers } from "@/lib/team/event-team-queries";
 import { loadPartnerProfileSnapshot } from "@/lib/profile-completeness/queries";
 import { calcCompleteness } from "@/lib/profile-completeness/calculator";
 import { PARTNER_PROFILE_SCHEMA } from "@/lib/profile-completeness/schemas/partner";
+import { createClient } from "@/lib/supabase/server";
 
 async function safeCountPending(partnerId: string): Promise<number> {
   try {
@@ -24,6 +25,37 @@ async function safeProfilePercent(partnerId: string): Promise<number | null> {
   }
 }
 
+/**
+ * 파트너의 회사명(business_name) 을 DB 에서 로드.
+ * 쿠키 세션은 표시용 `name` 만 들고 있어서, 실제 사업자명은 별도 조회가 필요.
+ * 실패하거나 비어있으면 null 반환 → PartnerNav 가 name 으로 fallback.
+ */
+async function safeBusinessName(partnerId: string): Promise<string | null> {
+  try {
+    const supabase = await createClient();
+    const resp = (await (
+      supabase.from("partners" as never) as unknown as {
+        select: (c: string) => {
+          eq: (k: string, v: string) => {
+            maybeSingle: () => Promise<{
+              data: { business_name: string | null } | null;
+            }>;
+          };
+        };
+      }
+    )
+      .select("business_name")
+      .eq("id", partnerId)
+      .maybeSingle()) as {
+      data: { business_name: string | null } | null;
+    };
+    const v = resp.data?.business_name?.trim();
+    return v && v.length > 0 ? v : null;
+  } catch {
+    return null;
+  }
+}
+
 export default async function PartnerLayout({
   children,
 }: {
@@ -33,14 +65,15 @@ export default async function PartnerLayout({
   // 세션에 role이 없으면 (구버전 쿠키) OWNER로 폴백 — auth-guard의 normalize에서도 처리됨
   const partnerRole = partner?.role ?? null;
 
-  const [pendingCount, profilePercent] = partner
+  const [pendingCount, profilePercent, businessName] = partner
     ? await Promise.all([
         partner.role === "OWNER" || partner.role === "MANAGER"
           ? safeCountPending(partner.id)
           : Promise.resolve(0),
         safeProfilePercent(partner.id),
+        safeBusinessName(partner.id),
       ])
-    : [0, null as number | null];
+    : [0, null as number | null, null as string | null];
 
   return (
     <div className="min-h-dvh bg-[#FFF8F0]">
@@ -52,7 +85,10 @@ export default async function PartnerLayout({
       {/* 로그인 안 한 상태면 심플 헤더, 로그인 되어 있으면 풀 네비 */}
       {partner ? (
         <PartnerNav
-          partnerName={partner.name}
+          /* business_name 우선 — DB 매번 다시 조회한 값(businessName) → 세션 쿠키(partner.businessName) → display name(partner.name) 순. */
+          partnerName={
+            businessName ?? partner.businessName ?? partner.name
+          }
           role={partnerRole}
           pendingCount={pendingCount}
           profilePercent={profilePercent}

@@ -16,6 +16,7 @@ import {
   CustomerGroupCard,
   type CustomerItem,
 } from "./customer-group-card";
+import { PartnerFeaturesPanel } from "@/components/admin/partner-features-panel";
 
 export const dynamic = "force-dynamic";
 
@@ -636,6 +637,9 @@ export default async function AdminPartnerDetailPage({ params }: PageProps) {
           )}
         </article>
       </section>
+
+      {/* 보유 기능 */}
+      <PartnerFeaturesPanel partnerId={partner.id} />
 
       {/* 미완료 리스트 */}
       <MissingList result={completeness} id="missing" />

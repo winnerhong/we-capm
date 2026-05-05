@@ -64,14 +64,17 @@ export function OrgAccountMenu({
   }
 
   return (
-    <div ref={wrapRef} className="relative flex items-center gap-1.5">
+    <div
+      ref={wrapRef}
+      className="relative flex shrink-0 items-center gap-1.5"
+    >
       {/* 참가자 링크 복사 */}
       <button
         type="button"
         onClick={onCopyParticipantLink}
         aria-label="참가자 링크 복사"
         title="참가자 앱 링크를 클립보드에 복사"
-        className={`relative inline-flex h-9 items-center gap-1 rounded-full border px-3 text-xs font-semibold transition ${
+        className={`relative inline-flex h-9 shrink-0 items-center gap-1 whitespace-nowrap rounded-full border px-3 text-xs font-semibold transition ${
           copied
             ? "border-emerald-300 bg-emerald-50 text-emerald-800"
             : "border-[#D4E4BC] bg-white text-[#2D5A3D] hover:bg-[#F5F1E8]"

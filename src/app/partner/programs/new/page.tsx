@@ -8,6 +8,9 @@ import {
   type ProgramCategory,
 } from "../actions";
 import { CategoryPicker } from "@/components/category-picker";
+import { ImageUploader } from "@/components/image-uploader";
+import { ProgramExtrasSection } from "@/components/program-extras-section";
+import { CollapsibleSection } from "@/components/collapsible-section";
 
 type ProgramRow = {
   id: string;
@@ -136,12 +139,7 @@ export default async function NewProgramPage({
 
       <form action={action} className="space-y-6">
         {/* Section 1: 기본 정보 */}
-        <section className="rounded-2xl border border-[#D4E4BC] bg-white p-5 shadow-sm md:p-6">
-          <h2 className="mb-4 flex items-center gap-2 text-sm font-bold text-[#2D5A3D]">
-            <span aria-hidden>📝</span>
-            <span>기본 정보</span>
-          </h2>
-
+        <CollapsibleSection icon="📝" title="기본 정보" defaultOpen>
           <div className="space-y-4">
             <div>
               <label
@@ -216,36 +214,27 @@ export default async function NewProgramPage({
             </div>
 
             <div>
-              <label
-                htmlFor="image_url"
-                className="mb-1 block text-xs font-semibold text-[#2D5A3D]"
-              >
-                대표 이미지 URL
+              <label className="mb-1 block text-xs font-semibold text-[#2D5A3D]">
+                대표 이미지
               </label>
-              <input
-                id="image_url"
+              <ImageUploader
                 name="image_url"
-                type="url"
-                inputMode="url"
                 defaultValue={existing?.image_url ?? ""}
-                autoComplete="off"
-                placeholder="https://..."
-                className="w-full rounded-xl border border-[#D4E4BC] bg-[#FFF8F0] px-3 py-2.5 text-sm text-[#2C2C2C] focus:border-[#3A7A52] focus:outline-none focus:ring-2 focus:ring-[#3A7A52]/30"
+                folder="programs"
+                maxKb={500}
               />
               <p className="mt-1 text-[11px] text-[#8B7F75]">
-                비워두면 카테고리 이모지가 표시됩니다.
+                사진 클릭·드래그·붙여넣기(Ctrl+V) 가능. 비우면 카테고리 이모지가 표시됩니다.
               </p>
             </div>
           </div>
-        </section>
+        </CollapsibleSection>
+
+        {/* Section 1.5: 주차장 + 집결장소 (선택) */}
+        <ProgramExtrasSection />
 
         {/* Section 2: 운영 정보 */}
-        <section className="rounded-2xl border border-[#D4E4BC] bg-white p-5 shadow-sm md:p-6">
-          <h2 className="mb-4 flex items-center gap-2 text-sm font-bold text-[#2D5A3D]">
-            <span aria-hidden>⚙️</span>
-            <span>운영 정보</span>
-          </h2>
-
+        <CollapsibleSection icon="⚙️" title="운영 정보" defaultOpen>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
               <label
@@ -340,15 +329,10 @@ export default async function NewProgramPage({
               />
             </div>
           </div>
-        </section>
+        </CollapsibleSection>
 
         {/* Section 3: 가격 정보 */}
-        <section className="rounded-2xl border border-[#D4E4BC] bg-white p-5 shadow-sm md:p-6">
-          <h2 className="mb-4 flex items-center gap-2 text-sm font-bold text-[#2D5A3D]">
-            <span aria-hidden>💰</span>
-            <span>가격 정보</span>
-          </h2>
-
+        <CollapsibleSection icon="💰" title="가격 정보" defaultOpen>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
               <label
@@ -408,7 +392,7 @@ export default async function NewProgramPage({
               </p>
             </div>
           </div>
-        </section>
+        </CollapsibleSection>
 
         {/* 액션 버튼 */}
         <div className="flex flex-wrap items-center justify-end gap-2">

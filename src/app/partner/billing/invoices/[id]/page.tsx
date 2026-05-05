@@ -266,7 +266,8 @@ export default async function PartnerInvoiceDetailPage({
                 <CopyButton text={inv.bank_account} label="계좌 복사" />
               </div>
               <p className="mt-2 text-[11px] text-[#8B6F47]">
-                입금자명은 반드시 <b>{inv.target_name ?? partner.name}</b> 으로
+                입금자명은 반드시{" "}
+                <b>{inv.target_name ?? partner.businessName ?? partner.name}</b> 으로
                 부탁드려요.
               </p>
             </div>

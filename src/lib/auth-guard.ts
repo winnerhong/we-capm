@@ -5,7 +5,10 @@ import type { TeamRole } from "@/lib/team/types";
 export type PartnerSession = {
   id: string;
   teamMemberId: string | null;
+  /** display name (예: "위너 숲지기") — 레거시 호환용. 표시는 businessName 우선. */
   name: string;
+  /** 사업자명 (예: "(주)위너사업자"). 모든 표시명의 1순위. 없으면 name 으로 fallback. */
+  businessName: string | null;
   username: string;
   role: TeamRole;
   loginAt: string;
@@ -15,6 +18,8 @@ type RawPartnerCookie = {
   id?: string;
   teamMemberId?: string | null;
   name?: string;
+  business_name?: string | null;
+  businessName?: string | null;
   username?: string;
   role?: string;
   loginAt?: string;
@@ -22,14 +27,37 @@ type RawPartnerCookie = {
 
 function normalizePartnerSession(raw: RawPartnerCookie): PartnerSession {
   const role = (raw.role as TeamRole | undefined) ?? "OWNER"; // 하위 호환
+  // business_name 또는 businessName 둘 다 허용 (구 쿠키 호환)
+  const bizRaw =
+    typeof raw.businessName === "string"
+      ? raw.businessName
+      : typeof raw.business_name === "string"
+        ? raw.business_name
+        : null;
+  const businessName =
+    bizRaw && bizRaw.trim().length > 0 ? bizRaw.trim() : null;
   return {
     id: String(raw.id ?? ""),
     teamMemberId: raw.teamMemberId ?? null,
     name: String(raw.name ?? ""),
+    businessName,
     username: String(raw.username ?? ""),
     role,
     loginAt: String(raw.loginAt ?? ""),
   };
+}
+
+/**
+ * 파트너 표시명 — 모든 UI 노출 표면에서 사용해야 하는 단일 진입점.
+ * 우선순위: businessName(사업자명) > name(레거시 display name) > "지사"
+ */
+export function partnerDisplayName(session: PartnerSession | null): string {
+  if (!session) return "지사";
+  return (
+    session.businessName?.trim() ||
+    session.name?.trim() ||
+    "지사"
+  );
 }
 
 export async function requirePartner(): Promise<PartnerSession> {

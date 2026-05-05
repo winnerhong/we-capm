@@ -308,10 +308,12 @@ export default async function AdminPartnersPage() {
                           href={`/admin/partners/${p.id}`}
                           className="mt-1 block truncate font-bold text-[#2C2C2C] hover:text-[#2D5A3D] hover:underline"
                         >
-                          {p.name}
+                          {p.business_name?.trim() || p.name}
                         </Link>
-                        {p.business_name && (
-                          <div className="truncate text-xs text-[#6B6560]">{p.business_name}</div>
+                        {p.business_name?.trim() && p.name && (
+                          <div className="truncate text-xs text-[#6B6560]">
+                            {p.name}
+                          </div>
                         )}
                         <div className="mt-1 text-[11px] text-[#8B6F47]">
                           @{p.username} · {p.phone ?? "연락처 미등록"}
@@ -389,10 +391,12 @@ export default async function AdminPartnersPage() {
                             href={`/admin/partners/${p.id}`}
                             className="font-semibold text-[#2C2C2C] hover:text-[#2D5A3D] hover:underline"
                           >
-                            {p.name}
+                            {p.business_name?.trim() || p.name}
                           </Link>
-                          {p.business_name && (
-                            <div className="text-xs text-[#6B6560]">{p.business_name}</div>
+                          {p.business_name?.trim() && p.name && (
+                            <div className="text-xs text-[#6B6560]">
+                              {p.name}
+                            </div>
                           )}
                           <div className="text-[11px] text-[#8B6F47]">
                             @{p.username}

@@ -95,7 +95,7 @@ export function ActivateButton({ sourceProgramId }: { sourceProgramId: string })
       aria-busy={pending}
       className="w-full rounded-xl bg-gradient-to-r from-[#2D5A3D] to-[#4A7C59] px-3 py-2 text-xs font-bold text-white shadow-sm transition-opacity hover:opacity-90 disabled:opacity-60"
     >
-      {pending ? "활성화 중..." : "✨ 활성화"}
+      {pending ? "가져오는 중..." : "✨ 내 행사로 가져오기"}
     </button>
   );
 }

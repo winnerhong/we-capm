@@ -438,30 +438,61 @@ async function loadRecentParticipantsAndTodayCount(
       return { recent: [], addedToday: todaySet.size };
     }
 
-    // 3) app_users.parent_name 조인
+    // 3) 부모명 + 원생(is_enrolled=true) 자녀 이름 조인
     const userIds = recentCandidates.map((c) => c.userId);
-    const usersResp = (await (
-      supabase.from("app_users" as never) as unknown as {
-        select: (c: string) => {
-          in: (
-            k: string,
-            v: string[]
-          ) => Promise<
-            SbResp<{ id: string; parent_name: string | null }>
-          >;
-        };
-      }
-    )
-      .select("id, parent_name")
-      .in("id", userIds)) as SbResp<{
-      id: string;
-      parent_name: string | null;
-    }>;
 
-    const nameMap = new Map<string, string>();
+    const [usersResp, childrenResp] = await Promise.all([
+      (
+        supabase.from("app_users" as never) as unknown as {
+          select: (c: string) => {
+            in: (
+              k: string,
+              v: string[]
+            ) => Promise<
+              SbResp<{ id: string; parent_name: string | null }>
+            >;
+          };
+        }
+      )
+        .select("id, parent_name")
+        .in("id", userIds) as Promise<
+        SbResp<{ id: string; parent_name: string | null }>
+      >,
+      (
+        supabase.from("app_children" as never) as unknown as {
+          select: (c: string) => {
+            in: (
+              k: string,
+              v: string[]
+            ) => {
+              eq: (k: string, v: boolean) => {
+                order: (
+                  c: string,
+                  o: { ascending: boolean }
+                ) => Promise<
+                  SbResp<{
+                    user_id: string;
+                    name: string;
+                    is_enrolled: boolean;
+                  }>
+                >;
+              };
+            };
+          };
+        }
+      )
+        .select("user_id, name, is_enrolled")
+        .in("user_id", userIds)
+        .eq("is_enrolled", true)
+        .order("created_at", { ascending: true }) as Promise<
+        SbResp<{ user_id: string; name: string; is_enrolled: boolean }>
+      >,
+    ]);
+
+    const parentMap = new Map<string, string>();
     if (!usersResp.error) {
       for (const u of usersResp.data ?? []) {
-        if (u.parent_name) nameMap.set(u.id, u.parent_name);
+        if (u.parent_name) parentMap.set(u.id, u.parent_name);
       }
     } else {
       console.error(
@@ -470,14 +501,42 @@ async function loadRecentParticipantsAndTodayCount(
       );
     }
 
+    // userId → 원생 자녀 이름 배열 (가입 순서 유지)
+    const enrolledMap = new Map<string, string[]>();
+    if (!childrenResp.error) {
+      for (const c of childrenResp.data ?? []) {
+        const trimmed = c.name?.trim();
+        if (!trimmed) continue;
+        const list = enrolledMap.get(c.user_id) ?? [];
+        list.push(trimmed);
+        enrolledMap.set(c.user_id, list);
+      }
+    }
+
     const recent: OrgHomeRecentParticipant[] = recentCandidates.map((c) => {
-      const parentName = nameMap.get(c.userId);
-      const trimmed = parentName?.trim() || "";
+      const enrolled = enrolledMap.get(c.userId) ?? [];
+      const parentName = (parentMap.get(c.userId) ?? "").trim();
+
+      // 원생 자녀가 있으면 자녀 이름 우선, 없으면 부모명 fallback
+      let displayName: string;
+      let avatarInitial: string;
+      if (enrolled.length > 0) {
+        const joined = enrolled.join("·");
+        displayName = `${joined} 가족`;
+        avatarInitial = enrolled[0].charAt(0);
+      } else if (parentName) {
+        displayName = `${parentName} 가족`;
+        avatarInitial = parentName.charAt(0);
+      } else {
+        displayName = "보호자 가족";
+        avatarInitial = "🌱";
+      }
+
       return {
         userId: c.userId,
-        displayName: trimmed ? `${trimmed} 가족` : "보호자 가족",
+        displayName,
         joinedAt: c.joinedAt,
-        avatarInitial: trimmed ? trimmed.charAt(0) : "🌱",
+        avatarInitial,
       };
     });
 

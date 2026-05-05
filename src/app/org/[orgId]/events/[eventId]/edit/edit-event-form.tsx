@@ -201,14 +201,15 @@ export function EditEventForm({
         `되돌릴 수 없어요. 계속할까요?`
     );
     if (!ok1) return;
-    // 2차 확인 — 이름 입력으로 휴먼 체크
-    const expected = (initial.name || "").trim();
+    // 2차 확인 — 이름 앞 5글자 입력으로 휴먼 체크
+    const fullName = (initial.name || "").trim();
+    const expected = fullName.slice(0, 5);
     const typed = window.prompt(
-      `정말 확실한가요?\n\n다시 한 번 확인하기 위해 행사 이름을 입력해 주세요:\n\n${expected}`
+      `정말 확실한가요?\n\n확인을 위해 행사 이름 앞 5글자를 입력해 주세요:\n\n${expected}`
     );
     if (typed === null) return;
     if (typed.trim() !== expected) {
-      setDeleteError("입력한 행사 이름이 일치하지 않아요. 삭제 취소됨.");
+      setDeleteError("입력한 글자가 일치하지 않아요. 삭제 취소됨.");
       return;
     }
     startDeleteTransition(async () => {
@@ -692,7 +693,7 @@ export function EditEventForm({
               />
               <div className="min-w-0">
                 <p className="text-sm font-bold text-[#2D5A3D]">
-                  🌐 초대링크 자체 가입 허용
+                  🌐 사전등록하지 않은 참가자 입장 허용
                 </p>
                 <p className="mt-0.5 text-[11px] leading-relaxed text-[#6B6560]">
                   켜면 사전 등록되지 않은 참가자도 초대링크를 받으면 이름만 입력해 바로 참여할 수 있어요.

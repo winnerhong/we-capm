@@ -82,6 +82,15 @@ const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
+    label: "기능",
+    icon: "🧩",
+    match: ["/admin/features"],
+    items: [
+      { label: "기능 카탈로그", href: "/admin/features", icon: "🧩" },
+      { label: "+ 새 기능", href: "/admin/features/new", icon: "➕" },
+    ],
+  },
+  {
     label: "설정",
     icon: "⚙️",
     match: ["/admin/settings"],

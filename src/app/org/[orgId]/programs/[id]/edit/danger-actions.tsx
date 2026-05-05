@@ -1,6 +1,7 @@
 "use client";
 
 import { useTransition } from "react";
+import { useRouter } from "next/navigation";
 import {
   toggleOrgProgramPublishAction,
   deleteOrgProgramAction,
@@ -8,17 +9,25 @@ import {
 
 export function DangerActions({
   programId,
+  orgId,
   isPublished,
 }: {
   programId: string;
+  orgId: string;
   isPublished: boolean;
 }) {
+  const router = useRouter();
   const [togglePending, startToggle] = useTransition();
   const [deletePending, startDelete] = useTransition();
 
   const onToggle = () => {
     startToggle(async () => {
-      await toggleOrgProgramPublishAction(programId, !isPublished);
+      const res = await toggleOrgProgramPublishAction(programId, !isPublished);
+      if (res && res.ok === false) {
+        alert(`공개 전환 실패: ${res.message ?? "알 수 없는 오류"}`);
+        return;
+      }
+      router.refresh();
     });
   };
 
@@ -28,7 +37,14 @@ export function DangerActions({
     );
     if (!ok) return;
     startDelete(async () => {
-      await deleteOrgProgramAction(programId);
+      const res = await deleteOrgProgramAction(programId);
+      if (res && res.ok === false) {
+        alert(`삭제 실패: ${res.message ?? "알 수 없는 오류"}`);
+        return;
+      }
+      // 삭제 성공 — 편집 페이지(이미 사라진 row 를 보려는 곳)에서 프로그램 목록으로 이동
+      router.push(`/org/${orgId}/programs`);
+      router.refresh();
     });
   };
 

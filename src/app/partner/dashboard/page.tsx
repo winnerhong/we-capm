@@ -477,7 +477,7 @@ export default async function PartnerDashboardPage() {
               Today · 오늘의 숲지기 현황
             </p>
             <h1 className="mt-2 text-2xl font-bold md:text-3xl">
-              안녕하세요, {partner.name} 숲지기님 🌲
+              안녕하세요, {partner.businessName ?? partner.name} 🌲
             </h1>
             <p className="mt-1 text-sm text-[#E8F0E4]">
               오늘도 숲길을 가꾸어주셔서 감사해요.

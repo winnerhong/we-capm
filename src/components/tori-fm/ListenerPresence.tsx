@@ -73,12 +73,14 @@ export function ListenerPresence({
 
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold backdrop-blur-sm md:text-sm ${colors}`}
+      className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1 text-xs font-semibold backdrop-blur-sm md:text-sm ${colors}`}
       aria-live="polite"
     >
       <span aria-hidden>👂</span>
       <span className="tabular-nums">{count}</span>
-      <span className="text-[10px] opacity-70 md:text-[11px]">청취 중</span>
+      <span className="whitespace-nowrap text-[10px] opacity-70 md:text-[11px]">
+        청취 중
+      </span>
     </span>
   );
 }

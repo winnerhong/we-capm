@@ -149,6 +149,34 @@ textarea::placeholder {
   animation: slide-in 0.2s ease-out;
 }
 
+/* ============================================================== */
+/* 토리FM 호스트 콘솔 — INSERT 글로우 (Realtime new row 1.5초 강조)  */
+/* ============================================================== */
+@keyframes flashGlowAmber {
+  0%   { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.0); }
+  20%  { box-shadow: 0 0 24px 6px rgba(251, 191, 36, 0.45); }
+  100% { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0); }
+}
+@keyframes flashGlowRose {
+  0%   { box-shadow: 0 0 0 0 rgba(244, 63, 94, 0.0); }
+  20%  { box-shadow: 0 0 24px 6px rgba(244, 63, 94, 0.45); }
+  100% { box-shadow: 0 0 0 0 rgba(244, 63, 94, 0); }
+}
+@keyframes flashGlowSky {
+  0%   { box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.0); }
+  20%  { box-shadow: 0 0 24px 6px rgba(56, 189, 248, 0.45); }
+  100% { box-shadow: 0 0 0 0 rgba(56, 189, 248, 0); }
+}
+@keyframes flashGlowIndigo {
+  0%   { box-shadow: 0 0 0 0 rgba(129, 140, 248, 0.0); }
+  20%  { box-shadow: 0 0 24px 6px rgba(129, 140, 248, 0.45); }
+  100% { box-shadow: 0 0 0 0 rgba(129, 140, 248, 0); }
+}
+.flash-glow-amber  { animation: flashGlowAmber 1.5s ease-out forwards; }
+.flash-glow-rose   { animation: flashGlowRose 1.5s ease-out forwards; }
+.flash-glow-sky    { animation: flashGlowSky 1.5s ease-out forwards; }
+.flash-glow-indigo { animation: flashGlowIndigo 1.5s ease-out forwards; }
+
 /* ======================================================= */
 /* 토리FM 전광판 VFX (Phase A)                              */
 /* ======================================================= */
@@ -391,6 +419,19 @@ textarea::placeholder {
     transform: translate(0, 110vh) rotate(var(--rot-final, 360deg));
     opacity: 0;
   }
+}
+
+/* ===== 토리FM 공지사항 마퀴 (PinnedNoticeBanner) ===== */
+/* 글자가 좌측 화면 밖에서 등장 → 우측 화면 밖으로 사라짐 (좌→우). */
+.fm-notice-marquee {
+  display: inline-block;
+  white-space: nowrap;
+  will-change: transform;
+  animation: fm-notice-marquee var(--marquee-dur, 18s) linear infinite;
+}
+@keyframes fm-notice-marquee {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
 }
 
 /* Poll Popup */

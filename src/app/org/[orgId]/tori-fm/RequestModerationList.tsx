@@ -17,10 +17,9 @@ import { createClient } from "@/lib/supabase/client";
 import {
   approveRequestAction,
   hideRequestAction,
-  markRequestPlayedAction,
+  queueRequestAction,
 } from "@/lib/tori-fm/actions";
 import type { FmRequestRow } from "@/lib/tori-fm/types";
-import { usePanelExpand, PanelExpandButton } from "./use-panel-expand";
 
 interface Props {
   sessionId: string;
@@ -54,7 +53,6 @@ export function RequestModerationList({
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [, startTransition] = useTransition();
   const [now, setNow] = useState<number>(() => Date.now());
-  const { expanded, toggle, panelClassName } = usePanelExpand();
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 15_000);
@@ -131,23 +129,33 @@ export function RequestModerationList({
   const hotCounts = useMemo(() => {
     const map = new Map<string, number>();
     for (const r of items) {
-      const key = normalize(r.song_title);
+      const key = normalize(r.song_title ?? "");
       if (!key) continue;
       map.set(key, (map.get(key) ?? 0) + 1);
     }
     return map;
   }, [items]);
 
+  // 정렬 — 하트 많은 순 우선, 같은 하트면 최신 순. (DJ 가 인기 순으로 처리하기 쉽게)
+  const sortedItems = useMemo(() => {
+    return [...items].sort((a, b) => {
+      if (b.heart_count !== a.heart_count) return b.heart_count - a.heart_count;
+      return (
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+    });
+  }, [items]);
+
   const onAction = useCallback(
     (
       id: string,
-      kind: "APPROVE" | "HIDE" | "PLAY",
+      kind: "APPROVE" | "HIDE" | "QUEUE",
       needConfirm: boolean = false
     ) => {
       if (needConfirm) {
         const ok = window.confirm(
           kind === "HIDE"
-            ? "이 신청곡을 숨길까요? 전광판과 앱에서 사라져요."
+            ? "이 신청곡을 삭제할까요? 전광판과 앱에서 사라져요."
             : "진행할까요?"
         );
         if (!ok) return;
@@ -157,7 +165,7 @@ export function RequestModerationList({
         try {
           if (kind === "APPROVE") await approveRequestAction(id);
           else if (kind === "HIDE") await hideRequestAction(id);
-          else await markRequestPlayedAction(id);
+          else await queueRequestAction(id);
           // Realtime UPDATE 가 리스트에서 제거 처리
           setItems((prev) => prev.filter((r) => r.id !== id));
         } catch (e) {
@@ -173,32 +181,41 @@ export function RequestModerationList({
   return (
     <section
       aria-label="신청곡 모더레이션 큐"
-      className={`flex flex-col rounded-3xl border border-white/10 bg-gradient-to-br from-[#1B2B3A] via-[#26394C] to-[#1B2B3A] p-4 text-white shadow-xl md:p-5 ${panelClassName}`}
+      className="relative isolate flex h-full flex-col rounded-2xl border-l-[6px] border-l-rose-400/80 border-y border-y-white/10 border-r border-r-white/10 bg-rose-950/30 p-4 text-white shadow-xl shadow-rose-500/15 backdrop-blur-md transition-shadow duration-200 ease-out hover:-translate-y-0.5 hover:shadow-2xl hover:shadow-rose-500/25 md:p-5"
     >
+      {/* 외곽 글로우 — 결정 필요 카드라 살짝 더 강하게 */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -inset-1 -z-10 rounded-3xl bg-rose-500/[0.08] blur-2xl"
+      />
       <header className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="flex items-center gap-2 text-base font-bold text-amber-100">
+        <h2 className="flex items-center gap-2 text-base font-bold text-rose-100">
           <span aria-hidden>🎵</span>
           <span>즉석 신청곡</span>
-          <span className="rounded-full bg-rose-500/20 px-2 py-0.5 text-[10px] font-bold text-rose-300 ring-1 ring-rose-400/40">
-            대기 {items.length}
+          <span className="rounded-full bg-rose-500/25 px-2 py-0.5 text-[10px] font-bold text-rose-100 ring-1 ring-rose-400/50">
+            결정 필요 {items.length}
           </span>
         </h2>
-        <div className="flex items-center gap-2">
-          <p className="hidden text-[11px] text-amber-200/60 sm:block">
-            승인하면 대기 큐로, 숨기면 사라져요
-          </p>
-          <PanelExpandButton expanded={expanded} onToggle={toggle} tone="rose" />
-        </div>
+        <p className="hidden text-[11px] text-rose-200/70 sm:block">
+          승인하면 대기 큐로, 삭제하면 사라져요
+        </p>
       </header>
 
       {items.length === 0 ? (
-        <p className="rounded-2xl border border-white/5 bg-black/30 p-4 text-center text-xs text-white/50 backdrop-blur-sm">
+        <p className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-center text-xs text-white/55 backdrop-blur-md">
           아직 접수된 신청곡이 없어요
         </p>
       ) : (
-        <ul className="space-y-2">
-          {items.map((r) => {
-            const key = normalize(r.song_title);
+        <ul
+          aria-description="3개 분량 까지 전부 노출 + 4번째부터 스크롤 (한 항목 ≈ 175px 기준)"
+          className="max-h-[34rem] w-full flex-1 space-y-2 overflow-y-auto pr-1
+          [&::-webkit-scrollbar]:w-1.5
+          [&::-webkit-scrollbar-track]:bg-transparent
+          [&::-webkit-scrollbar-thumb]:rounded-full
+          [&::-webkit-scrollbar-thumb]:bg-white/20"
+        >
+          {sortedItems.map((r) => {
+            const key = normalize(r.song_title ?? "");
             const count = hotCounts.get(key) ?? 0;
             const isHot = count >= HOT_THRESHOLD;
             const isPulse = pulseIds.has(r.id);
@@ -208,22 +225,22 @@ export function RequestModerationList({
             return (
               <li
                 key={r.id}
-                className={`rounded-2xl border p-3 backdrop-blur-sm transition ${
+                className={`block w-full rounded-2xl border p-3 backdrop-blur-md transition ${
                   isPulse
                     ? "animate-pulse border-amber-400/60 bg-amber-500/15"
                     : isHot
                       ? "border-rose-400/40 bg-rose-500/10"
-                      : "border-white/10 bg-black/30"
+                      : "border-white/10 bg-white/[0.03]"
                 }`}
               >
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-1.5">
-                      <span className="truncate text-sm font-bold text-white">
+                      <span className="truncate text-sm font-bold text-white/95">
                         🎵 {r.song_title}
                       </span>
                       {r.artist && (
-                        <span className="text-[12px] text-amber-200/70">
+                        <span className="text-[12px] text-amber-200/80">
                           — {r.artist}
                         </span>
                       )}
@@ -234,12 +251,12 @@ export function RequestModerationList({
                       )}
                     </div>
                     {storyPrefix && (
-                      <p className="mt-0.5 line-clamp-2 text-[12px] text-white/70">
+                      <p className="mt-0.5 line-clamp-2 text-[12px] text-white/75">
                         &ldquo;{storyPrefix}
                         {(r.story?.length ?? 0) > 50 ? "…" : ""}&rdquo;
                       </p>
                     )}
-                    <p className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-white/50">
+                    <p className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-white/55">
                       {r.child_name && (
                         <span className="rounded-full bg-emerald-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-200 ring-1 ring-emerald-400/30">
                           👶 {r.child_name}
@@ -266,11 +283,11 @@ export function RequestModerationList({
                   </button>
                   <button
                     type="button"
-                    onClick={() => onAction(r.id, "PLAY")}
+                    onClick={() => onAction(r.id, "QUEUE")}
                     disabled={isBusy}
-                    className="rounded-xl bg-amber-400 px-3 py-1.5 text-xs font-bold text-[#1B2B3A] shadow-md shadow-amber-400/30 transition hover:bg-amber-300 disabled:opacity-50"
+                    className="rounded-xl bg-amber-400 px-3 py-1.5 text-xs font-bold text-[#0B1538] shadow-md shadow-amber-400/30 transition hover:bg-amber-300 disabled:opacity-50"
                   >
-                    ▶ 방송에 올리기
+                    📥 방송 큐에 추가
                   </button>
                   <button
                     type="button"
@@ -278,7 +295,7 @@ export function RequestModerationList({
                     disabled={isBusy}
                     className="rounded-xl border border-rose-400/40 bg-rose-500/10 px-3 py-1.5 text-xs font-bold text-rose-200 transition hover:bg-rose-500/20 disabled:opacity-50"
                   >
-                    🙈 숨김
+                    🗑 삭제
                   </button>
                 </div>
               </li>

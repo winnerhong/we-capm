@@ -180,7 +180,6 @@ export default async function MyProgramsPage({
                     {p.title}
                   </h3>
                   <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-[#6B6560]">
-                    <span>💰 {formatWon(p.price_per_person)}</span>
                     <span>
                       👥 {p.capacity_min ?? "-"} ~ {p.capacity_max ?? "-"}명
                     </span>

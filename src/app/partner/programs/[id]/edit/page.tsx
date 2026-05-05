@@ -4,6 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import { requirePartner } from "@/lib/auth-guard";
 import { ImageUploader } from "@/components/image-uploader";
 import { CategoryPicker } from "@/components/category-picker";
+import { ProgramExtrasSection } from "@/components/program-extras-section";
+import { CollapsibleSection } from "@/components/collapsible-section";
 import { updateProgramAction, type ProgramCategory } from "../../actions";
 import type {
   FaqItem,
@@ -117,6 +119,10 @@ async function loadProgram(id: string): Promise<PartnerProgramRow | null> {
     rating_avg: (r.rating_avg as number | null) ?? null,
     rating_count: Number(r.rating_count ?? 0),
     booking_count: Number(r.booking_count ?? 0),
+    parking_lots: Array.isArray(r.parking_lots)
+      ? (r.parking_lots as PartnerProgramRow["parking_lots"])
+      : [],
+    meeting_point: (r.meeting_point as PartnerProgramRow["meeting_point"]) ?? null,
     created_at: String(r.created_at ?? ""),
   };
 }
@@ -297,12 +303,7 @@ export default async function EditProgramPage({
 
       <form action={action} className="space-y-6">
         {/* 1. 기본 정보 */}
-        <section className="rounded-2xl border border-[#D4E4BC] bg-white p-5 shadow-sm md:p-6">
-          <h2 className="mb-4 flex items-center gap-2 text-sm font-bold text-[#2D5A3D]">
-            <span aria-hidden>📝</span>
-            <span>기본 정보</span>
-          </h2>
-
+        <CollapsibleSection icon="📝" title="기본 정보" defaultOpen>
           <div className="space-y-4">
             <div>
               <label
@@ -540,15 +541,16 @@ export default async function EditProgramPage({
               </p>
             </div>
           </div>
-        </section>
+        </CollapsibleSection>
+
+        {/* 1.5 주차장 + 집결장소 (선택) */}
+        <ProgramExtrasSection
+          initialParkingLots={program.parking_lots}
+          initialMeetingPoint={program.meeting_point}
+        />
 
         {/* 2. 상세 기획 */}
-        <section className="rounded-2xl border border-[#D4E4BC] bg-white p-5 shadow-sm md:p-6">
-          <h2 className="mb-4 flex items-center gap-2 text-sm font-bold text-[#2D5A3D]">
-            <span aria-hidden>📋</span>
-            <span>상세 기획</span>
-          </h2>
-
+        <CollapsibleSection icon="📋" title="상세 기획" defaultOpen={false}>
           <div className="space-y-5">
             {/* 2-1 long_description */}
             <div>
@@ -635,14 +637,15 @@ export default async function EditProgramPage({
               />
             </div>
           </div>
-        </section>
+        </CollapsibleSection>
 
         {/* 3. 추가 이미지 갤러리 */}
-        <section className="rounded-2xl border border-[#D4E4BC] bg-white p-5 shadow-sm md:p-6">
-          <h2 className="mb-1 flex items-center gap-2 text-sm font-bold text-[#2D5A3D]">
-            <span aria-hidden>🖼️</span>
-            <span>추가 이미지 갤러리</span>
-          </h2>
+        <CollapsibleSection
+          icon="🖼️"
+          title="추가 이미지 갤러리"
+          hint={`(최대 ${IMAGE_SLOTS}장)`}
+          defaultOpen={false}
+        >
           <p className="mb-4 text-[11px] text-[#6B6560]">
             대표 이미지 외 추가로 노출할 사진 최대 {IMAGE_SLOTS}장. 빈 슬롯은
             저장 시 자동으로 건너뜁니다.
@@ -666,26 +669,18 @@ export default async function EditProgramPage({
               </div>
             ))}
           </div>
-        </section>
+        </CollapsibleSection>
 
         {/* 4. FAQ */}
-        <section className="rounded-2xl border border-[#D4E4BC] bg-white p-5 shadow-sm md:p-6">
-          <h2 className="mb-1 flex items-center gap-2 text-sm font-bold text-[#2D5A3D]">
-            <span aria-hidden>❓</span>
-            <span>자주 묻는 질문 (FAQ)</span>
-          </h2>
+        <CollapsibleSection icon="❓" title="자주 묻는 질문 (FAQ)" defaultOpen={false}>
           <p className="mb-4 text-[11px] text-[#6B6560]">
             참여자·기관이 자주 궁금해하는 내용을 미리 정리해 두세요.
           </p>
           <FaqEditor defaultValue={program.faq} />
-        </section>
+        </CollapsibleSection>
 
         {/* 5. 연계 숲길 */}
-        <section className="rounded-2xl border border-[#D4E4BC] bg-white p-5 shadow-sm md:p-6">
-          <h2 className="mb-1 flex items-center gap-2 text-sm font-bold text-[#2D5A3D]">
-            <span aria-hidden>🗺️</span>
-            <span>연계 숲길</span>
-          </h2>
+        <CollapsibleSection icon="🗺️" title="연계 숲길" defaultOpen={false}>
           <p className="mb-4 text-[11px] text-[#6B6560]">
             QR·미션 숲길을 연계하면 기관이 이 프로그램 활성화 시 숲길도 함께
             받아가요.
@@ -721,7 +716,7 @@ export default async function EditProgramPage({
               </Link>
             </p>
           )}
-        </section>
+        </CollapsibleSection>
 
         {/* 6. 배포 대상 */}
         <VisibilitySection

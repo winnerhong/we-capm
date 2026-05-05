@@ -17,6 +17,15 @@ export const CATEGORY_META = {
   ART: { label: "예술", icon: "🎨" },
 } as const;
 
+export type {
+  ParkingLot,
+  MeetingPoint,
+} from "@/lib/partner-programs/types";
+import type {
+  ParkingLot,
+  MeetingPoint,
+} from "@/lib/partner-programs/types";
+
 export interface OrgProgramRow {
   id: string;
   org_id: string;
@@ -38,6 +47,8 @@ export interface OrgProgramRow {
   is_published: boolean;
   booking_count: number;
   view_count: number;
+  parking_lots: ParkingLot[];
+  meeting_point: MeetingPoint | null;
   activated_at: string;
   updated_at: string;
 }

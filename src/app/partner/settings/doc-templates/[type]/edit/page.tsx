@@ -21,13 +21,20 @@ type PageProps = {
 function buildPreviewData(partner: {
   id: string;
   name: string;
+  businessName: string | null;
   username: string;
 }): TemplateData {
   const now = new Date();
   const today = `${now.getFullYear()}년 ${now.getMonth() + 1}월 ${now.getDate()}일`;
+  // business_name 우선, 없으면 name 으로 fallback (기존 호환)
+  const bizName =
+    partner.businessName?.trim() ||
+    partner.name ||
+    partner.username ||
+    "_______________";
   return {
     partner: {
-      business_name: partner.name || partner.username || "_______________",
+      business_name: bizName,
       business_number: "_______________",
       representative_name: partner.name || "_______________",
       address: "_______________",

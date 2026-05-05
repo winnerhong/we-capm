@@ -132,7 +132,7 @@ export default async function ReviewRequestPage({
           <span>발송 예시 문구</span>
         </h2>
         <blockquote className="mt-2 rounded-xl border border-[#E5D3B8] bg-white/80 p-3 text-xs text-[#6B4423]">
-          [토리로] {partner.name} 숲 방문 감사드려요 🌳 소중한 후기를 남겨주시면
+          [토리로] {partner.businessName ?? partner.name} 방문 감사드려요 🌳 소중한 후기를 남겨주시면
           다음 방문 때 사용할 수 있는 쿠폰을 드려요. [링크]
         </blockquote>
       </section>

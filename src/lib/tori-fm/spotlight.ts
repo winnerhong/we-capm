@@ -5,7 +5,7 @@
 //   STORY            : 사연 풀스크린 (DJ 가 선택한 사연을 큰 화면에 띄움)
 //   HEART_RAIN       : 떠오르는 하트 폭우 (5~10초)
 //   EMOJI_RAIN       : 자연·식물 이모지 비 (5~10초)
-//   BANNER           : 가로 슬라이드 응원 배너 (3~5초)
+//   BANNER           : 공지사항 (참가자 포털 상단 고정. LIVE 종료 또는 DJ 가 끌 때까지)
 
 import { createClient } from "@/lib/supabase/server";
 
@@ -29,7 +29,7 @@ export const DEFAULT_SPOTLIGHT_DURATION_SEC: Record<SpotlightKind, number | null
   STORY: 30, // 30초 후 자동 dismiss (DJ 가 길게 두고 싶으면 다시 트리거)
   HEART_RAIN: 6,
   EMOJI_RAIN: 6,
-  BANNER: 4,
+  BANNER: null, // 공지사항 — LIVE 종료 또는 DJ 가 [끄기] 누를 때까지 참가자 포털 상단 고정
 };
 
 /**

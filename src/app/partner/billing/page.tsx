@@ -212,7 +212,7 @@ export default async function PartnerBillingPage() {
           <span>결제 &amp; 정산</span>
         </h1>
         <p className="mt-1 text-sm text-[#E8F0E4]">
-          {partner.name} 숲지기님의 청구서, 정산, 도토리 충전을 한 곳에서 관리해요.
+          {partner.businessName ?? partner.name}의 청구서, 정산, 도토리 충전을 한 곳에서 관리해요.
         </p>
       </section>
 

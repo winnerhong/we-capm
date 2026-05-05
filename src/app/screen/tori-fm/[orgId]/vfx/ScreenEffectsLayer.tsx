@@ -242,14 +242,8 @@ export function ScreenEffectsLayer({
           break;
         }
         case "BANNER": {
-          const text = typeof p.text === "string" ? p.text : "";
-          if (text) {
-            emitBanner({
-              title: "🎉 응원",
-              subtitle: text,
-              caption: "",
-            });
-          }
+          // 공지사항은 (user)/PinnedNoticeBanner 가 상단 고정 마퀴로 전담.
+          // 여기서는 오버레이를 띄우지 않음 — 중복 노출 방지.
           break;
         }
         case "STORY": {

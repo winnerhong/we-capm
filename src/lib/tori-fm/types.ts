@@ -4,7 +4,22 @@
 //  tori_fm_poll_votes 테이블은 보존되지만 더 이상 코드에서 참조하지 않음.)
 
 export type ChatSenderType = "USER" | "DJ" | "SYSTEM";
-export type RequestStatus = "PENDING" | "APPROVED" | "PLAYED" | "HIDDEN";
+/**
+ * 신청곡 상태 머신.
+ *  - PENDING  : 청취자 신청 직후 (호스트 모더레이션 대기)
+ *  - APPROVED : 호스트가 승인했지만 큐엔 안 올림 (인정만)
+ *  - QUEUED   : 방송 대기 큐에 올림 (queue_position 순서로 재생 대기)
+ *  - PLAYING  : 현재 NOW PLAYING (세션당 1개)
+ *  - PLAYED   : 재생 완료
+ *  - HIDDEN   : 부적절·중복 등 숨김
+ */
+export type RequestStatus =
+  | "PENDING"
+  | "APPROVED"
+  | "QUEUED"
+  | "PLAYING"
+  | "PLAYED"
+  | "HIDDEN";
 // NOTE: "🌱" 는 기존 acorn 리액션을 대체 (acorn 이모지 제거 정책).
 // DB 에 이미 기존 acorn 이모지로 저장된 row 가 있으면 별도 마이그레이션으로 "🌱" 또는 "🌲" 로 정규화해야 합니다.
 export type ReactionEmoji = "❤" | "👏" | "🎉" | "🌲" | "🌱" | "😂";
@@ -29,11 +44,19 @@ export interface FmChatMessageRow {
   created_at: string;
 }
 
+/**
+ * 신청 종류:
+ *  - song_request : 신청곡 + 사연 (기존 동작, 작성자 표시)
+ *  - story_only   : 사연만, 익명 표시 (곡명 없음)
+ */
+export type FmRequestKind = "song_request" | "story_only";
+
 export interface FmRequestRow {
   id: string;
   session_id: string;
   user_id: string;
-  song_title: string;
+  /** story_only 일 때 NULL */
+  song_title: string | null;
   artist: string | null;
   story: string | null;
   child_name: string | null;
@@ -41,7 +64,28 @@ export interface FmRequestRow {
   heart_count: number;
   status: RequestStatus;
   queue_id: string | null;
+  /** QUEUED 일 때 큐 순서 (작을수록 먼저 재생). 그 외엔 NULL. */
+  queue_position: number | null;
+  kind: FmRequestKind;
+  is_anonymous: boolean;
   created_at: string;
+}
+
+/**
+ * 익명 표시 라벨 — user_id 해시 4글자로 같은 사람의 여러 사연을 묶음.
+ * "익명의 청취자 #A1B2" 형태.
+ */
+export function anonLabelFromUserId(userId: string): string {
+  if (!userId) return "익명의 청취자";
+  // 단순 해시 — user_id 의 hex/숫자 문자만 추출해서 4글자 코드 생성.
+  // (uuid 라면 마지막 4글자 사용; 아니면 char code 합으로 fallback)
+  const cleaned = userId.replace(/-/g, "");
+  if (cleaned.length >= 4) {
+    return `익명의 청취자 #${cleaned.slice(-4).toUpperCase()}`;
+  }
+  let sum = 0;
+  for (let i = 0; i < userId.length; i++) sum += userId.charCodeAt(i);
+  return `익명의 청취자 #${sum.toString(16).toUpperCase().slice(-4).padStart(4, "0")}`;
 }
 
 export interface FmReactionRow {

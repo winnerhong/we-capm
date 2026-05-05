@@ -49,6 +49,27 @@ export default async function NewOrgEventPage({
         </div>
       </header>
 
+      {/* 템플릿 가져오기 진입점 */}
+      <Link
+        href={`/org/${orgId}/event-templates`}
+        className="flex items-center justify-between gap-3 rounded-2xl border border-dashed border-[#D4E4BC] bg-white px-4 py-3 text-sm transition hover:bg-[#FFF8F0]"
+      >
+        <div className="flex items-center gap-2">
+          <span className="text-2xl" aria-hidden>
+            📦
+          </span>
+          <div>
+            <div className="font-bold text-[#2D5A3D]">
+              지사 템플릿에서 가져오기
+            </div>
+            <div className="text-[11px] text-[#6B6560]">
+              프로그램·구성품이 미리 묶인 패키지를 선택해 빠르게 시작
+            </div>
+          </div>
+        </div>
+        <span className="text-[#8B7F75]">→</span>
+      </Link>
+
       <NewEventForm orgId={orgId} />
 
       <div className="rounded-2xl border border-[#E5D3B8] bg-[#FFF8F0] p-4 text-[11px] text-[#6B6560]">

@@ -1,63 +1,36 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
 import {
   TRAIL_VISIBILITY_META,
   TRAIL_VISIBILITY_OPTIONS,
   type TrailVisibility,
 } from "@/lib/trails/types";
 import {
-  setTrailAssignmentsAction,
-  updateTrailVisibilityAction,
-} from "../actions";
-import {
   TrailAssignmentsPicker,
   type TrailOrgOption,
 } from "./trail-assignments-picker";
 
 interface Props {
-  trailId: string;
   defaultVisibility: TrailVisibility;
   orgs: TrailOrgOption[];
   defaultAssignedOrgIds: string[];
 }
 
+/**
+ * 배포 대상(공개 범위 + 지정 기관) — 서버 form 안에 포함될 때 hidden input
+ * 으로 값 전송. 자체 저장 버튼 없음 (상위 form 의 통합 저장에 위임).
+ */
 export function TrailVisibilitySection({
-  trailId,
   defaultVisibility,
   orgs,
   defaultAssignedOrgIds,
 }: Props) {
-  const router = useRouter();
   const [visibility, setVisibility] =
     useState<TrailVisibility>(defaultVisibility);
   const [selectedOrgIds, setSelectedOrgIds] = useState<string[]>(
     defaultAssignedOrgIds
   );
-  const [isPending, startTransition] = useTransition();
-  const [msg, setMsg] = useState<
-    { type: "ok" | "err"; text: string } | null
-  >(null);
-
-  const onSave = () => {
-    setMsg(null);
-    startTransition(async () => {
-      try {
-        await updateTrailVisibilityAction(trailId, visibility);
-        if (visibility === "SELECTED") {
-          await setTrailAssignmentsAction(trailId, selectedOrgIds);
-        }
-        setMsg({ type: "ok", text: "✅ 배포 설정이 저장되었어요." });
-        router.refresh();
-      } catch (e) {
-        setMsg({
-          type: "err",
-          text: e instanceof Error ? e.message : "저장 실패",
-        });
-      }
-    });
-  };
 
   return (
     <section className="rounded-2xl border border-[#D4E4BC] bg-white p-5 shadow-sm md:p-6">
@@ -68,7 +41,8 @@ export function TrailVisibilitySection({
         </h2>
       </div>
       <p className="mb-4 text-[11px] text-[#6B6560]">
-        이 숲길을 어떤 기관에게 노출할지 선택하세요.
+        이 숲길을 어떤 기관에게 노출할지 선택하세요. 아래 ‘전체 저장’ 버튼으로
+        함께 저장됩니다.
       </p>
 
       <div
@@ -86,15 +60,14 @@ export function TrailVisibilitySection({
                 checked
                   ? "border-[#2D5A3D] bg-[#E8F0E4] ring-2 ring-[#2D5A3D]/20"
                   : "border-[#D4E4BC] bg-[#FFF8F0] hover:border-[#3A7A52]"
-              } ${isPending ? "pointer-events-none opacity-70" : ""}`}
+              }`}
             >
               <input
                 type="radio"
-                name="trail_visibility"
+                name="trail_visibility_radio"
                 value={opt}
                 checked={checked}
                 onChange={() => setVisibility(opt)}
-                disabled={isPending}
                 className="mt-1 h-4 w-4 flex-none accent-[#2D5A3D]"
                 aria-label={meta.label}
               />
@@ -114,7 +87,6 @@ export function TrailVisibilitySection({
         })}
       </div>
 
-      {/* SELECTED일 때만 기관 선택 노출 */}
       {visibility === "SELECTED" && (
         <div className="mt-5 rounded-xl border border-[#D4E4BC] bg-[#FFFDF8] p-4">
           <h3 className="mb-1 flex items-center gap-1.5 text-xs font-bold text-[#2D5A3D]">
@@ -122,14 +94,12 @@ export function TrailVisibilitySection({
             <span>노출할 기관 선택</span>
           </h3>
           <p className="mb-3 text-[11px] text-[#6B6560]">
-            체크된 기관에만 이 숲길이 노출됩니다. 기관 포털에서 바로 확인할 수
-            있어요.
+            체크된 기관에만 이 숲길이 노출됩니다.
           </p>
           <TrailAssignmentsPicker
             orgs={orgs}
             selected={selectedOrgIds}
             onChange={setSelectedOrgIds}
-            disabled={isPending}
           />
         </div>
       )}
@@ -152,30 +122,13 @@ export function TrailVisibilitySection({
         </p>
       )}
 
-      {msg && (
-        <p
-          className={`mt-4 rounded-xl border px-3 py-2 text-[11px] ${
-            msg.type === "ok"
-              ? "border-emerald-200 bg-emerald-50 text-emerald-900"
-              : "border-rose-200 bg-rose-50 text-rose-900"
-          }`}
-          role="status"
-          aria-live="polite"
-        >
-          {msg.text}
-        </p>
-      )}
-
-      <div className="mt-5 flex items-center justify-end gap-2">
-        <button
-          type="button"
-          onClick={onSave}
-          disabled={isPending}
-          className="rounded-xl bg-[#2D5A3D] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#4A7C59] disabled:opacity-60"
-        >
-          {isPending ? "저장 중…" : "💾 저장"}
-        </button>
-      </div>
+      {/* 통합 저장에 함께 전송될 hidden inputs */}
+      <input type="hidden" name="visibility" value={visibility} />
+      <input
+        type="hidden"
+        name="assigned_org_ids"
+        value={selectedOrgIds.join(",")}
+      />
     </section>
   );
 }

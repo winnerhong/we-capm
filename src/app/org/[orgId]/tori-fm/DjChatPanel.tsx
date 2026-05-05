@@ -1,65 +1,53 @@
 "use client";
 
-// DJ 채팅 패널 (기관 관점)
-//  - 세션의 채팅 메시지 리스트 (오래된 → 최신 아래)
-//  - DJ 입력창으로 sendDjMessageAction 호출 (2초 throttle)
-//  - 각 유저 메시지에 삭제 버튼 (soft delete)
-//  - Realtime: tori_fm_chat_messages session_id=? 구독
-//  - Forest palette — LIVE 패널과 분리된 컨트롤룸 카드
+// DJ 채팅 패널 (기관 콘솔)
+//   - 본문은 참가자 LiveChatStream 그대로 임포트해서 렌더 (호스트는 currentUserId=null)
+//   - 그 아래 DJ 전용 입력 박스 (sendDjMessageAction 호출, 1초 throttle)
+//   - 카드 톤: 글래스 (bg-white/[0.04] border-white/10 rounded-2xl)
+//   - 헤더: "💬 라이브 채팅"
 
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  useTransition,
-} from "react";
-import { createClient } from "@/lib/supabase/client";
-import {
-  sendDjMessageAction,
-  deleteChatMessageAction,
-} from "@/lib/tori-fm/actions";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { sendDjMessageAction } from "@/lib/tori-fm/actions";
 import type { FmChatMessageRow } from "@/lib/tori-fm/types";
-import { usePanelExpand, PanelExpandButton } from "./use-panel-expand";
+import { LiveChatStream } from "@/app/(user)/tori-fm/LiveChatStream";
+import { createClient } from "@/lib/supabase/client";
+import { SpotlightTriggerBar } from "./SpotlightTriggerBar";
 
 interface Props {
   sessionId: string;
   initialMessages: FmChatMessageRow[];
+  /**
+   * SpotlightTriggerBar 통합 — 사연 풀스크린 트리거에 사용.
+   * null/undefined 면 사연 트리거 버튼은 비활성, 다른 트리거는 그대로 작동.
+   */
+  currentStory?: {
+    requestId?: string;
+    songTitle: string | null;
+    artist: string | null;
+    story: string | null;
+    childName: string | null;
+    parentName: string | null;
+  } | null;
 }
 
-const THROTTLE_MS = 2000;
 const MAX_LEN = 300;
+const THROTTLE_MS = 1_000;
+const FLASH_MS = 1500;
 
-function fmtTime(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleTimeString("ko-KR", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-export function DjChatPanel({ sessionId, initialMessages }: Props) {
-  const [messages, setMessages] = useState<FmChatMessageRow[]>(initialMessages);
+export function DjChatPanel({ sessionId, initialMessages, currentStory = null }: Props) {
   const [input, setInput] = useState("");
-  const [err, setErr] = useState<string | null>(null);
-  const [lastSentAt, setLastSentAt] = useState<number>(0);
-  const [sendPending, startSendTransition] = useTransition();
-  const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [deletePending, startDeleteTransition] = useTransition();
-  const { expanded, toggle, panelClassName } = usePanelExpand();
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+  const [flashKey, setFlashKey] = useState(0);
+  const lastSentRef = useRef(0);
+  const inputRef = useRef<HTMLInputElement | null>(null);
 
-  const bottomRef = useRef<HTMLDivElement | null>(null);
-  const listRef = useRef<HTMLDivElement | null>(null);
-
-  // Realtime 구독
+  // Realtime — 새 채팅 INSERT 가 들어오면 카드 외곽에 sky 글로우 1.5초 발사
   useEffect(() => {
     if (!sessionId) return;
     const supa = createClient();
-
     const ch = supa
-      .channel(`dj-chat-${sessionId}`)
+      .channel(`dj-chat-glow-${sessionId}`)
       .on(
         "postgres_changes" as never,
         {
@@ -68,308 +56,147 @@ export function DjChatPanel({ sessionId, initialMessages }: Props) {
           table: "tori_fm_chat_messages",
           filter: `session_id=eq.${sessionId}`,
         } as never,
-        ((payload: { new: FmChatMessageRow }) => {
-          setMessages((prev) => {
-            if (prev.some((m) => m.id === payload.new.id)) return prev;
-            return [...prev, payload.new];
-          });
-        }) as never
-      )
-      .on(
-        "postgres_changes" as never,
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "tori_fm_chat_messages",
-          filter: `session_id=eq.${sessionId}`,
-        } as never,
-        ((payload: { new: FmChatMessageRow }) => {
-          setMessages((prev) =>
-            prev.map((m) => (m.id === payload.new.id ? payload.new : m))
-          );
+        (() => {
+          setFlashKey((k) => k + 1);
         }) as never
       )
       .subscribe();
-
     return () => {
-      supa.removeChannel(ch);
+      void supa.removeChannel(ch);
     };
   }, [sessionId]);
 
-  // 스크롤을 아래로
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [messages.length]);
+  // flashKey 가 바뀌면 React 가 key prop 변화로 인해 카드를 재마운트 → animation 재생.
+  // 1.5초 후 자동 종료는 CSS 의 `animation: ... forwards` 가 처리하므로 별도 cleanup 불필요.
+  // FLASH_MS 는 상수 일관성 차원에서 보존.
+  void FLASH_MS;
 
-  const now = Date.now();
-  const throttleRemaining = Math.max(0, lastSentAt + THROTTLE_MS - now);
-  const canSend =
-    !sendPending && input.trim().length > 0 && throttleRemaining === 0;
-
-  const [throttleNow, setThrottleNow] = useState<number>(now);
-  useEffect(() => {
-    if (throttleRemaining === 0) return;
-    const t = setInterval(() => setThrottleNow(Date.now()), 200);
-    return () => clearInterval(t);
-  }, [throttleRemaining]);
-  void throttleNow;
-
-  const onSend = useCallback(() => {
-    setErr(null);
+  const handleSend = useCallback(() => {
+    setError(null);
     const text = input.trim();
     if (!text) return;
     if (text.length > MAX_LEN) {
-      setErr(`메시지는 ${MAX_LEN}자까지만 보낼 수 있어요`);
+      setError(`최대 ${MAX_LEN}자`);
       return;
     }
-    if (Date.now() - lastSentAt < THROTTLE_MS) return;
-
-    startSendTransition(async () => {
+    const now = Date.now();
+    if (now - lastSentRef.current < THROTTLE_MS) {
+      setError("잠깐 쉬었다 보내 주세요");
+      return;
+    }
+    lastSentRef.current = now;
+    setInput("");
+    startTransition(async () => {
       try {
         await sendDjMessageAction(sessionId, text);
-        setInput("");
-        setLastSentAt(Date.now());
       } catch (e) {
-        setErr(e instanceof Error ? e.message : "전송에 실패했어요");
+        setError(e instanceof Error ? e.message : "전송 실패");
+        setInput(text);
       }
     });
-  }, [input, lastSentAt, sessionId]);
-
-  const onDelete = useCallback((messageId: string) => {
-    const ok = window.confirm(
-      "이 메시지를 숨길까요? 전광판과 앱에서 사라져요."
-    );
-    if (!ok) return;
-    setDeletingId(messageId);
-    startDeleteTransition(async () => {
-      try {
-        await deleteChatMessageAction(messageId);
-        // Realtime UPDATE 가 is_deleted 반영을 처리하므로 별도 setMessages 불필요
-      } catch (e) {
-        alert(e instanceof Error ? e.message : "숨기기에 실패했어요");
-      } finally {
-        setDeletingId(null);
-      }
-    });
-  }, []);
-
-  const visibleMessages = useMemo(() => messages, [messages]);
+  }, [input, sessionId]);
 
   return (
     <section
-      aria-label="DJ 채팅 패널"
-      className={`flex flex-col rounded-3xl border border-white/10 bg-gradient-to-br from-[#1B2B3A] via-[#26394C] to-[#1B2B3A] p-4 text-white shadow-xl md:p-5 ${panelClassName}`}
+      key={flashKey}
+      aria-label="라이브 채팅"
+      className={`relative isolate flex h-full flex-col rounded-2xl border-l-[5px] border-l-sky-300/70 border-y border-y-white/10 border-r border-r-white/10 bg-sky-950/25 p-4 text-white shadow-xl shadow-sky-500/10 backdrop-blur-md transition-shadow duration-200 ease-out hover:-translate-y-0.5 hover:shadow-2xl hover:shadow-sky-500/20 md:p-5 ${
+        flashKey > 0 ? "flash-glow-sky" : ""
+      }`}
     >
-      <header className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="flex items-center gap-2 text-base font-bold text-amber-100">
+      {/* 외곽 글로우 */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -inset-1 -z-10 rounded-3xl bg-sky-500/[0.06] blur-2xl"
+      />
+      <header className="mb-3 flex items-center justify-between gap-2">
+        <h2 className="flex items-center gap-2 text-base font-bold text-sky-100">
           <span aria-hidden>💬</span>
-          <span>실시간 채팅</span>
-          <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-semibold text-emerald-200 ring-1 ring-emerald-400/30">
-            {visibleMessages.filter((m) => !m.is_deleted).length}
-          </span>
+          <span>라이브 채팅</span>
         </h2>
-        <div className="flex items-center gap-2">
-          <p className="hidden text-[11px] text-amber-200/60 sm:block">
-            DJ로 메시지를 보내면 전광판과 앱에 바로 떠요
-          </p>
-          <PanelExpandButton expanded={expanded} onToggle={toggle} tone="emerald" />
-        </div>
+        <p className="hidden text-[11px] text-sky-200/70 sm:block">
+          🎙 DJ로 보내면 전광판/앱에 즉시 반영
+        </p>
       </header>
 
-      <div
-        ref={listRef}
-        className={`overflow-y-auto rounded-2xl border border-white/5 bg-black/30 p-3 backdrop-blur-sm ${
-          expanded ? "min-h-0 flex-1" : "max-h-72"
-        }`}
-      >
-        {visibleMessages.length === 0 ? (
-          <p className="py-6 text-center text-xs text-white/50">
-            아직 메시지가 없어요. 먼저 인사해볼까요?
-          </p>
-        ) : (
-          visibleMessages.map((m, idx) => {
-            const isDj = m.sender_type === "DJ";
-            const isSystem = m.sender_type === "SYSTEM";
-            const isDeleted = m.is_deleted;
-            const canDelete = !isDeleted && !isSystem;
-
-            // 같은 발신자가 연속으로 보냈는지 — 헤더(이름/아바타) 생략
-            const prev = visibleMessages[idx - 1];
-            const isGrouped =
-              !!prev &&
-              !prev.is_deleted &&
-              prev.sender_type === m.sender_type &&
-              prev.user_id === m.user_id &&
-              prev.sender_name === m.sender_name &&
-              !isSystem;
-
-            // 시스템 메시지 — 가운데 정렬 칩
-            if (isSystem) {
-              return (
-                <div
-                  key={m.id}
-                  className={`${isGrouped ? "mt-0.5" : "mt-3"} flex justify-center first:mt-0`}
-                >
-                  <div className="inline-flex items-center gap-1.5 rounded-full bg-sky-500/15 px-3 py-1 text-[11px] text-sky-200 ring-1 ring-sky-400/30">
-                    <span aria-hidden>📢</span>
-                    <span>{m.message}</span>
-                    <time className="text-sky-300/60">
-                      {fmtTime(m.created_at)}
-                    </time>
-                  </div>
-                </div>
-              );
-            }
-
-            // 삭제된 메시지 — 가운데 정렬 작은 알림
-            if (isDeleted) {
-              return (
-                <div
-                  key={m.id}
-                  className={`${isGrouped ? "mt-0.5" : "mt-3"} flex justify-center first:mt-0`}
-                >
-                  <div className="inline-flex items-center gap-1.5 rounded-full bg-white/5 px-3 py-1 text-[11px] text-white/40">
-                    <span aria-hidden>🚫</span>
-                    <span>{m.sender_name}의 메시지가 삭제됨</span>
-                  </div>
-                </div>
-              );
-            }
-
-            // DJ 메시지 — 우측 정렬, amber 말풍선
-            if (isDj) {
-              return (
-                <div
-                  key={m.id}
-                  className={`${isGrouped ? "mt-0.5" : "mt-3"} flex justify-end gap-2 first:mt-0`}
-                >
-                  <div className="flex max-w-[75%] flex-col items-end">
-                    {!isGrouped && (
-                      <div className="mb-0.5 flex items-center gap-1.5 pr-1">
-                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-400/20 px-1.5 py-0.5 text-[10px] font-bold text-amber-200 ring-1 ring-amber-400/40">
-                          <span aria-hidden>🎙</span>
-                          <span>DJ</span>
-                        </span>
-                        <span className="truncate text-[11px] font-semibold text-amber-200">
-                          {m.sender_name}
-                        </span>
-                      </div>
-                    )}
-                    <div className="group/msg flex items-end gap-1.5">
-                      {canDelete && (
-                        <button
-                          type="button"
-                          onClick={() => onDelete(m.id)}
-                          disabled={deletePending && deletingId === m.id}
-                          aria-label={`${m.sender_name} 메시지 숨기기`}
-                          className="self-end rounded-md p-1 text-[11px] text-rose-300/0 opacity-0 transition group-hover/msg:opacity-100 hover:bg-rose-500/20 hover:text-rose-300 disabled:opacity-50"
-                        >
-                          {deletePending && deletingId === m.id ? "…" : "🗑"}
-                        </button>
-                      )}
-                      <time className="shrink-0 pb-1 text-[10px] text-white/40">
-                        {fmtTime(m.created_at)}
-                      </time>
-                      <div
-                        className={`whitespace-pre-wrap break-words rounded-2xl bg-amber-400 px-3 py-2 text-[13px] font-medium text-[#1B2B3A] shadow-md shadow-amber-400/20 ${
-                          isGrouped ? "rounded-tr-md" : "rounded-tr-md"
-                        }`}
-                      >
-                        {m.message}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            }
-
-            // USER 메시지 — 좌측 정렬, 다크 말풍선 + 아바타
-            return (
-              <div
-                key={m.id}
-                className={`${isGrouped ? "mt-0.5" : "mt-3"} flex gap-2 first:mt-0`}
-              >
-                <div className="flex w-8 shrink-0 justify-center pt-1">
-                  {!isGrouped ? (
-                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500/40 to-sky-500/40 text-[11px] font-bold text-white ring-1 ring-white/10">
-                      {(m.sender_name ?? "?").trim().charAt(0) || "?"}
-                    </div>
-                  ) : null}
-                </div>
-                <div className="flex max-w-[75%] flex-col items-start">
-                  {!isGrouped && (
-                    <span className="mb-0.5 truncate pl-1 text-[11px] font-semibold text-white/70">
-                      {m.sender_name}
-                    </span>
-                  )}
-                  <div className="group/msg flex items-end gap-1.5">
-                    <div
-                      className={`whitespace-pre-wrap break-words rounded-2xl bg-white/10 px-3 py-2 text-[13px] text-white shadow-sm ring-1 ring-white/10 ${
-                        isGrouped ? "rounded-tl-md" : "rounded-tl-md"
-                      }`}
-                    >
-                      {m.message}
-                    </div>
-                    <time className="shrink-0 pb-1 text-[10px] text-white/40">
-                      {fmtTime(m.created_at)}
-                    </time>
-                    {canDelete && (
-                      <button
-                        type="button"
-                        onClick={() => onDelete(m.id)}
-                        disabled={deletePending && deletingId === m.id}
-                        aria-label={`${m.sender_name} 메시지 숨기기`}
-                        className="self-end rounded-md p-1 text-[11px] text-rose-300/0 opacity-0 transition group-hover/msg:opacity-100 hover:bg-rose-500/20 hover:text-rose-300 disabled:opacity-50"
-                      >
-                        {deletePending && deletingId === m.id ? "…" : "🗑"}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            );
-          })
-        )}
-        <div ref={bottomRef} />
+      {/* 전광판 스포트라이트 — 채팅 카드 안에 인라인 통합 (embedded 외관) */}
+      <div className="mb-3">
+        <SpotlightTriggerBar
+          sessionId={sessionId}
+          currentStory={
+            currentStory
+              ? {
+                  requestId: currentStory.requestId ?? null,
+                  songTitle: currentStory.songTitle,
+                  artist: currentStory.artist,
+                  story: currentStory.story,
+                  childName: currentStory.childName,
+                  parentName: currentStory.parentName,
+                }
+              : null
+          }
+          embedded
+        />
       </div>
 
-      <div className="mt-3 space-y-2">
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <textarea
+      {/* 채팅 스트림 — 참가자 컴포넌트 재활용. viewerRole='DJ' 로 본인(DJ) 메시지 우측 정렬. */}
+      <div className="flex-1">
+        <LiveChatStream
+          sessionId={sessionId}
+          initialMessages={initialMessages}
+          currentUserId={null}
+          viewerRole="DJ"
+        />
+      </div>
+
+      {/* DJ 입력 박스 */}
+      <div className="mt-3 space-y-1">
+        {error && (
+          <p className="px-3 text-[10px] font-semibold text-rose-300">
+            ⚠ {error}
+          </p>
+        )}
+        <div className="flex items-center gap-2 rounded-full border border-rose-300/30 bg-white/[0.06] p-1.5 pl-3 shadow-lg backdrop-blur-md">
+          <span className="inline-flex items-center gap-1 rounded-full bg-rose-500/20 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-widest text-rose-200 ring-1 ring-rose-400/40">
+            <span aria-hidden>🎙</span>
+            <span>DJ</span>
+          </span>
+          <input
+            ref={inputRef}
+            type="text"
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={(e) => setInput(e.target.value.slice(0, MAX_LEN))}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+              if (e.key === "Enter" && !e.nativeEvent.isComposing) {
                 e.preventDefault();
-                onSend();
+                handleSend();
               }
             }}
-            placeholder="DJ 메시지를 입력하세요 (Enter 로 전송, Shift+Enter 줄바꿈)"
+            placeholder="DJ로 메시지 입력..."
+            disabled={pending}
             maxLength={MAX_LEN}
-            rows={2}
-            aria-label="DJ 메시지"
-            className="min-h-[2.75rem] flex-1 resize-none rounded-xl border border-white/15 bg-black/40 px-3 py-2 text-sm text-white outline-none placeholder:text-white/40 focus:border-amber-300 focus:ring-2 focus:ring-amber-300/30"
+            autoComplete="off"
+            aria-label="DJ 메시지 입력"
+            style={{
+              backgroundColor: "transparent",
+              color: "rgb(255, 255, 255)",
+              WebkitTextFillColor: "rgb(255, 255, 255)",
+              caretColor: "rgb(252, 211, 77)",
+            }}
+            className="min-w-0 flex-1 border-0 text-sm outline-none placeholder:text-white/45 disabled:opacity-50"
           />
+          <span className="hidden font-mono text-[10px] tabular-nums text-white/40 sm:inline">
+            {input.length}/{MAX_LEN}
+          </span>
           <button
             type="button"
-            onClick={onSend}
-            disabled={!canSend}
-            className="shrink-0 self-end rounded-xl bg-amber-400 px-4 py-2 text-sm font-bold text-[#1B2B3A] shadow-md shadow-amber-400/30 transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-50 sm:self-stretch"
+            onClick={handleSend}
+            disabled={pending || !input.trim()}
+            aria-label="전송"
+            className="shrink-0 rounded-full bg-amber-400 px-3 py-1.5 text-xs font-bold text-[#0B1538] shadow-md transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            {sendPending
-              ? "전송 중…"
-              : throttleRemaining > 0
-                ? `⏳ ${Math.ceil(throttleRemaining / 1000)}초`
-                : "📤 전송"}
+            {pending ? "..." : "전송"}
           </button>
-        </div>
-        <div className="flex items-center justify-between gap-2 text-[11px] text-white/50">
-          <span aria-live="polite" className="text-rose-300">
-            {err ?? " "}
-          </span>
-          <span className="tabular-nums">
-            {input.length} / {MAX_LEN}
-          </span>
         </div>
       </div>
     </section>

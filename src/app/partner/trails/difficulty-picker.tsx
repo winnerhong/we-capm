@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   createDifficultyAction,
@@ -60,6 +60,41 @@ export function DifficultyPicker({
   const [creating, setCreating] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+
+  // 생성/편집 미니 폼은 부모 trail-form 안에 들어가므로 <form> 중첩이 불가능.
+  // 대신 ref 로 input/select 값을 읽어서 FormData 를 만들어 액션에 넘긴다.
+  const createIconRef = useRef<HTMLSelectElement | null>(null);
+  const createLabelRef = useRef<HTMLInputElement | null>(null);
+  const createDescRef = useRef<HTMLInputElement | null>(null);
+  const editIconRef = useRef<HTMLSelectElement | null>(null);
+  const editLabelRef = useRef<HTMLInputElement | null>(null);
+  const editDescRef = useRef<HTMLInputElement | null>(null);
+
+  const submitCreate = () => {
+    const label = (createLabelRef.current?.value ?? "").trim();
+    if (!label) {
+      createLabelRef.current?.focus();
+      return;
+    }
+    const fd = new FormData();
+    fd.set("icon", createIconRef.current?.value ?? "🌿");
+    fd.set("label", label);
+    fd.set("description", createDescRef.current?.value ?? "");
+    handleCreate(fd);
+  };
+
+  const submitEdit = (id: string) => {
+    const label = (editLabelRef.current?.value ?? "").trim();
+    if (!label) {
+      editLabelRef.current?.focus();
+      return;
+    }
+    const fd = new FormData();
+    fd.set("icon", editIconRef.current?.value ?? "🌿");
+    fd.set("label", label);
+    fd.set("description", editDescRef.current?.value ?? "");
+    handleUpdate(id, fd);
+  };
 
   const all: Array<BuiltInDifficulty | CustomDifficulty> = [
     ...BUILT_IN,
@@ -198,15 +233,13 @@ export function DifficultyPicker({
         </button>
       </div>
 
-      {/* 생성 폼 (그리드 아래 풀폭) */}
+      {/* 생성 폼 (그리드 아래 풀폭) — 부모 <form> 중첩 방지를 위해 div + ref 패턴.
+          input 의 Enter 키로 제출, [➕ 추가] 버튼은 type=button 로 명시. */}
       {creating && (
-        <form
-          action={handleCreate}
-          className="mt-3 rounded-xl border border-sky-400 bg-sky-50 p-3"
-        >
+        <div className="mt-3 rounded-xl border border-sky-400 bg-sky-50 p-3">
           <div className="flex flex-wrap items-center gap-2">
             <select
-              name="icon"
+              ref={createIconRef}
               defaultValue="🌿"
               className="rounded-lg border border-[#D4E4BC] bg-white px-2 py-2 text-lg"
               aria-label="아이콘 선택"
@@ -218,16 +251,27 @@ export function DifficultyPicker({
               ))}
             </select>
             <input
-              name="label"
+              ref={createLabelRef}
               maxLength={30}
-              required
               autoFocus
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  submitCreate();
+                }
+              }}
               className="min-w-[140px] flex-1 rounded-lg border border-[#D4E4BC] bg-white px-3 py-2 text-sm focus:border-[#2D5A3D] focus:outline-none"
               placeholder="난이도 이름 (예: 매우 쉬움)"
             />
             <input
-              name="description"
+              ref={createDescRef}
               maxLength={60}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  submitCreate();
+                }
+              }}
               className="min-w-[140px] flex-1 rounded-lg border border-[#D4E4BC] bg-white px-3 py-2 text-sm focus:border-[#2D5A3D] focus:outline-none"
               placeholder="간단 설명 (선택)"
             />
@@ -241,7 +285,8 @@ export function DifficultyPicker({
                 취소
               </button>
               <button
-                type="submit"
+                type="button"
+                onClick={submitCreate}
                 disabled={pending}
                 className="rounded-lg bg-[#2D5A3D] px-3 py-2 text-xs font-bold text-white hover:bg-[#3A7A52] disabled:opacity-50"
               >
@@ -249,25 +294,22 @@ export function DifficultyPicker({
               </button>
             </div>
           </div>
-        </form>
+        </div>
       )}
 
-      {/* 편집 폼 (그리드 아래 풀폭) */}
+      {/* 편집 폼 (그리드 아래 풀폭) — 동일하게 div + ref 패턴 */}
       {editingId &&
         (() => {
           const target = customDifficulties.find((c) => c.id === editingId);
           if (!target) return null;
           return (
-            <form
-              action={(fd) => handleUpdate(target.id, fd)}
-              className="mt-3 rounded-xl border border-amber-400 bg-amber-50 p-3"
-            >
+            <div className="mt-3 rounded-xl border border-amber-400 bg-amber-50 p-3">
               <p className="mb-2 text-[11px] font-semibold text-amber-900">
                 ✏️ 난이도 수정 — {target.label}
               </p>
               <div className="flex flex-wrap items-center gap-2">
                 <select
-                  name="icon"
+                  ref={editIconRef}
                   defaultValue={target.icon ?? "🌿"}
                   className="rounded-lg border border-[#D4E4BC] bg-white px-2 py-2 text-lg"
                   aria-label="아이콘 선택"
@@ -279,17 +321,28 @@ export function DifficultyPicker({
                   ))}
                 </select>
                 <input
-                  name="label"
+                  ref={editLabelRef}
                   defaultValue={target.label}
                   maxLength={30}
-                  required
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      submitEdit(target.id);
+                    }
+                  }}
                   className="min-w-[140px] flex-1 rounded-lg border border-[#D4E4BC] bg-white px-3 py-2 text-sm focus:border-[#2D5A3D] focus:outline-none"
                   placeholder="난이도 이름"
                 />
                 <input
-                  name="description"
+                  ref={editDescRef}
                   defaultValue={target.description ?? ""}
                   maxLength={60}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      submitEdit(target.id);
+                    }
+                  }}
                   className="min-w-[140px] flex-1 rounded-lg border border-[#D4E4BC] bg-white px-3 py-2 text-sm focus:border-[#2D5A3D] focus:outline-none"
                   placeholder="간단 설명 (선택)"
                 />
@@ -303,7 +356,8 @@ export function DifficultyPicker({
                     취소
                   </button>
                   <button
-                    type="submit"
+                    type="button"
+                    onClick={() => submitEdit(target.id)}
                     disabled={pending}
                     className="rounded-lg bg-[#2D5A3D] px-3 py-2 text-xs font-bold text-white hover:bg-[#3A7A52] disabled:opacity-50"
                   >
@@ -311,7 +365,7 @@ export function DifficultyPicker({
                   </button>
                 </div>
               </div>
-            </form>
+            </div>
           );
         })()}
     </div>

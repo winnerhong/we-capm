@@ -388,6 +388,102 @@ export async function createFmSessionAction(
 }
 
 /* -------------------------------------------------------------------------- */
+/* 6-2) quickStartLiveAction — 자동 세션 생성 + 즉시 LIVE 시작                  */
+/*       호스트가 [▶ 라이브 시작] 한번 누르면 끝나도록 단순화.                  */
+/* -------------------------------------------------------------------------- */
+
+export async function quickStartLiveAction(
+  orgId: string,
+  eventId: string | null,
+  defaultName: string
+): Promise<{ sessionId: string }> {
+  const org = await requireOrg();
+  if (orgId !== org.orgId) {
+    throw new Error("다른 기관의 세션은 만들 수 없어요");
+  }
+
+  const name = (defaultName ?? "").trim() || "토리FM 라이브";
+  const start = new Date();
+  const end = new Date(start.getTime() + 3 * 60 * 60 * 1000); // +3시간
+
+  const supabase = await createClient();
+  const insResp = (await (
+    supabase.from("tori_fm_sessions" as never) as unknown as {
+      insert: (r: Row) => {
+        select: (c: string) => {
+          maybeSingle: () => Promise<{
+            data: { id: string } | null;
+            error: SbErr;
+          }>;
+        };
+      };
+    }
+  )
+    .insert({
+      org_id: org.orgId,
+      name,
+      scheduled_start: start.toISOString(),
+      scheduled_end: end.toISOString(),
+      is_live: false,
+      event_id: eventId || null,
+    } satisfies Row)
+    .select("id")
+    .maybeSingle()) as {
+    data: { id: string } | null;
+    error: SbErr;
+  };
+
+  if (insResp.error || !insResp.data?.id) {
+    throw new Error(
+      `세션 생성 실패: ${insResp.error?.message ?? "unknown"}`
+    );
+  }
+
+  const sessionId = insResp.data.id;
+
+  // 라이브 시작 전 OFF 상태에서 청취자가 미리 보낸 신청곡·사연을 새 세션으로 이관.
+  // 같은 org 의 다른 세션에 묶여있던 PENDING 항목을 새 세션 ID 로 UPDATE.
+  // (사연이 사라지지 않고 새 라이브의 모더레이션 큐로 자연스럽게 합류)
+  const orgSessionsResp = (await (
+    supabase.from("tori_fm_sessions" as never) as unknown as {
+      select: (c: string) => {
+        eq: (k: string, v: string) => Promise<{
+          data: Array<{ id: string }> | null;
+          error: SbErr;
+        }>;
+      };
+    }
+  )
+    .select("id")
+    .eq("org_id", org.orgId)) as {
+    data: Array<{ id: string }> | null;
+    error: SbErr;
+  };
+
+  const otherSessionIds = (orgSessionsResp.data ?? [])
+    .map((s) => s.id)
+    .filter((id) => id !== sessionId);
+
+  if (otherSessionIds.length > 0) {
+    await (
+      supabase.from("tori_fm_requests" as never) as unknown as {
+        update: (p: Row) => {
+          eq: (k: string, v: string) => {
+            in: (k: string, v: string[]) => Promise<{ error: SbErr }>;
+          };
+        };
+      }
+    )
+      .update({ session_id: sessionId })
+      .eq("status", "PENDING")
+      .in("session_id", otherSessionIds);
+  }
+
+  await startFmBroadcastAction(sessionId);
+  return { sessionId };
+}
+
+/* -------------------------------------------------------------------------- */
 /* 7) startFmBroadcastAction                                                  */
 /* -------------------------------------------------------------------------- */
 

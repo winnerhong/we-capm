@@ -16,6 +16,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { OrgAccountMenu } from "../org-account-menu";
+import { QuickNoticeButton } from "./QuickNoticeButton";
 import type { OrgNavBadges } from "@/lib/org-nav/badges";
 
 type BadgeTone = "rose" | "amber" | "emerald" | "violet";
@@ -45,8 +46,13 @@ interface NavGroup {
   badge?: BadgeSpec;
 }
 
-function buildGroups(orgId: string, badges: OrgNavBadges): NavGroup[] {
+function buildGroups(
+  orgId: string,
+  badges: OrgNavBadges,
+  partnerName?: string
+): NavGroup[] {
   const base = `/org/${orgId}`;
+  const templateLabel = partnerName ? `${partnerName} 프로그램` : "지사 프로그램";
 
   const draftBadge: BadgeSpec | undefined =
     badges.draftEvents > 0
@@ -65,23 +71,23 @@ function buildGroups(orgId: string, badges: OrgNavBadges): NavGroup[] {
     : undefined;
 
   return [
-    // ───── 1단계 ─────
+    // ───── 초대장 ─────
     {
-      key: "create",
+      key: "invitations",
       step: 1,
-      label: "+ 새 행사",
-      shortLabel: "+ 새 행사",
-      icon: "🎪",
-      match: [`${base}/events/new`],
+      label: "+ 초대장",
+      shortLabel: "+ 초대장",
+      icon: "💌",
+      match: [`${base}/invitations`],
       items: [
         {
-          label: "새 행사 만들기",
-          href: `${base}/events/new`,
-          icon: "➕",
+          label: "초대장 모음",
+          href: `${base}/invitations`,
+          icon: "💌",
         },
       ],
     },
-    // ───── 2단계 ─────
+    // ───── 1단계 ─────
     {
       key: "schedule",
       step: 2,
@@ -103,12 +109,12 @@ function buildGroups(orgId: string, badges: OrgNavBadges): NavGroup[] {
     {
       key: "participants",
       step: 3,
-      label: "참가자",
-      shortLabel: "참가자",
+      label: "+ 참가자",
+      shortLabel: "+ 참가자",
       icon: "🙋",
       match: [`${base}/users`],
       items: [
-        { label: "참가자", href: `${base}/users`, icon: "🙋" },
+        { label: "+ 참가자", href: `${base}/users`, icon: "🙋" },
       ],
     },
     // ───── 4단계 ─────
@@ -140,7 +146,7 @@ function buildGroups(orgId: string, badges: OrgNavBadges): NavGroup[] {
           href: `${base}/missions/catalog`,
           icon: "🎯",
         },
-        { label: "기본 템플릿", href: `${base}/templates`, icon: "🪜" },
+        { label: templateLabel, href: `${base}/templates`, icon: "🪜" },
       ],
     },
     // ───── 5단계 ─────
@@ -256,15 +262,20 @@ interface Props {
   orgId: string;
   orgName: string;
   badges: OrgNavBadges;
+  /** 소속 지사 표시명 — "기본 템플릿" 메뉴를 "{지사명} 프로그램" 으로 라벨링. */
+  partnerName?: string;
 }
 
-export function OrgNav({ orgId, orgName, badges }: Props) {
+export function OrgNav({ orgId, orgName, badges, partnerName }: Props) {
   const pathname = usePathname() ?? "";
   const [openKey, setOpenKey] = useState<string | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
 
-  const groups = useMemo(() => buildGroups(orgId, badges), [orgId, badges]);
+  const groups = useMemo(
+    () => buildGroups(orgId, badges, partnerName),
+    [orgId, badges, partnerName]
+  );
   const controlRoomHref = `/org/${orgId}/control-room`;
   const controlRoomActive = isActiveHref(controlRoomHref, pathname);
 
@@ -329,7 +340,7 @@ export function OrgNav({ orgId, orgName, badges }: Props) {
           {groups.map((group, idx) => {
             const active = idx === activeIdx;
             const open = openKey === group.key;
-            const linkClass = `inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold transition ${
+            const linkClass = `inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-xl px-2.5 py-2 text-sm font-semibold transition ${
               active
                 ? "bg-[#E8F0E4] text-[#2D5A3D]"
                 : "text-[#2D5A3D] hover:bg-[#F5F1E8]"
@@ -411,7 +422,7 @@ export function OrgNav({ orgId, orgName, badges }: Props) {
           {/* 관제실 단독 강조 */}
           <Link
             href={controlRoomHref}
-            className={`ml-2 inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-semibold transition ${
+            className={`ml-2 inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl border px-3 py-2 text-xs font-semibold transition ${
               controlRoomActive
                 ? "border-[#0891A8] bg-[#E6FAFB] text-[#0891A8]"
                 : "border-[#5EE9F0]/40 text-[#0891A8] hover:bg-[#E6FAFB]"
@@ -427,6 +438,9 @@ export function OrgNav({ orgId, orgName, badges }: Props) {
               </span>
             )}
           </Link>
+
+          {/* 공지사항 빠른 게시 — LIVE FM 세션의 BANNER spotlight 트리거 */}
+          <QuickNoticeButton liveFmSessionId={badges.liveFmSessionId} />
         </nav>
 
         {/* 우: 영구 액션 — 알림 + 계정 */}
@@ -492,6 +506,10 @@ export function OrgNav({ orgId, orgName, badges }: Props) {
                     </span>
                   )}
                 </Link>
+              </li>
+              {/* 공지사항 빠른 게시 — drawer 안에서도 동일 컴포넌트 (palette 만 라이트) */}
+              <li>
+                <QuickNoticeButton liveFmSessionId={badges.liveFmSessionId} />
               </li>
             </ul>
           </nav>

@@ -9,6 +9,10 @@ import type {
   ProgramVisibility,
   ScheduleItem,
 } from "@/lib/partner-programs/types";
+import {
+  parseParkingLots,
+  parseMeetingPoint,
+} from "@/lib/program-extras/parse";
 
 export type ProgramCategory = "FOREST" | "CAMPING" | "KIDS" | "FAMILY" | "TEAM" | "ART";
 
@@ -221,6 +225,10 @@ export async function createProgramAction(formData: FormData) {
 
   const visibility: ProgramVisibility = ext.visibility ?? "DRAFT";
 
+  // 주차장 / 집결장소 — 하단 hidden input(JSON) 에서 파싱·검증.
+  const parking_lots = parseParkingLots(formData.get("parking_lots"));
+  const meeting_point = parseMeetingPoint(formData.get("meeting_point"));
+
   const payload: Record<string, unknown> = {
     ...base,
     partner_id,
@@ -233,6 +241,8 @@ export async function createProgramAction(formData: FormData) {
     images: ext.images,
     linked_trail_id: ext.linked_trail_id,
     visibility,
+    parking_lots,
+    meeting_point,
   };
 
   const { error } = await (
@@ -252,6 +262,10 @@ export async function updateProgramAction(id: string, formData: FormData) {
   const base = parseForm(formData);
   const ext = parseExtended(formData);
 
+  // 주차장 / 집결장소 — 하단 hidden input(JSON) 에서 파싱·검증.
+  const parking_lots = parseParkingLots(formData.get("parking_lots"));
+  const meeting_point = parseMeetingPoint(formData.get("meeting_point"));
+
   // visibility 저장 포함 — 값 있을 때만 반영 (폼에서 항상 hidden으로 넣도록 UI 처리)
   const payload: Record<string, unknown> = {
     ...base,
@@ -263,6 +277,8 @@ export async function updateProgramAction(id: string, formData: FormData) {
     required_items: ext.required_items,
     images: ext.images,
     linked_trail_id: ext.linked_trail_id,
+    parking_lots,
+    meeting_point,
   };
   if (ext.visibility) {
     payload.visibility = ext.visibility;

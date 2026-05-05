@@ -9,6 +9,7 @@ import {
   type OrgProgramStatus,
 } from "@/lib/org-programs/types";
 import { ImageUploader } from "@/components/image-uploader";
+import { ProgramExtrasSection } from "@/components/program-extras-section";
 import { updateOrgProgramAction } from "../../../actions";
 import { DangerActions } from "./danger-actions";
 
@@ -79,6 +80,7 @@ export default async function EditOrgProgramPage({
           </span>
           <DangerActions
             programId={program.id}
+            orgId={orgId}
             isPublished={program.is_published}
           />
         </div>
@@ -153,16 +155,23 @@ export default async function EditOrgProgramPage({
                   htmlFor="duration_hours"
                   className="mb-1 block text-xs font-semibold text-[#2D5A3D]"
                 >
-                  소요 시간 (시간)
+                  소요 시간 (분)
                 </label>
                 <input
                   id="duration_hours"
                   name="duration_hours"
                   type="number"
-                  step="0.5"
+                  step="5"
                   min="0"
-                  inputMode="decimal"
-                  defaultValue={program.duration_hours ?? ""}
+                  inputMode="numeric"
+                  /* DB 컬럼은 시간(hours) 그대로지만 입력 UX 는 분(minutes) 단위.
+                     로드 시 ×60, 저장 액션(updateOrgProgramAction) 에서 ÷60 변환. */
+                  defaultValue={
+                    program.duration_hours != null
+                      ? Math.round(program.duration_hours * 60)
+                      : ""
+                  }
+                  placeholder="예: 150 (= 2시간 30분)"
                   className="w-full rounded-xl border border-[#D4E4BC] bg-white px-3 py-2.5 text-sm text-[#2C2C2C] outline-none focus:border-[#2D5A3D] focus:ring-2 focus:ring-[#2D5A3D]/20"
                 />
               </div>
@@ -204,47 +213,25 @@ export default async function EditOrgProgramPage({
           </div>
         </section>
 
-        {/* Section 2: Price & Location */}
+        {/* Section 2: Location only — 가격 항목 제거 (기관 정책상 노출 안 함) */}
         <section className="rounded-2xl border border-[#D4E4BC] bg-white p-5 shadow-sm">
-          <h2 className="mb-4 text-sm font-bold text-[#2D5A3D]">
-            💰 가격 & 위치
-          </h2>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div>
-              <label
-                htmlFor="price_per_person"
-                className="mb-1 block text-xs font-semibold text-[#2D5A3D]"
-              >
-                1인당 가격 (원)
-              </label>
-              <input
-                id="price_per_person"
-                name="price_per_person"
-                type="number"
-                min="0"
-                step="100"
-                inputMode="numeric"
-                defaultValue={program.price_per_person}
-                className="w-full rounded-xl border border-[#D4E4BC] bg-white px-3 py-2.5 text-sm text-[#2C2C2C] outline-none focus:border-[#2D5A3D] focus:ring-2 focus:ring-[#2D5A3D]/20"
-              />
-            </div>
-            <div>
-              <label
-                htmlFor="location_detail"
-                className="mb-1 block text-xs font-semibold text-[#2D5A3D]"
-              >
-                세부 장소
-              </label>
-              <input
-                id="location_detail"
-                name="location_detail"
-                type="text"
-                defaultValue={program.location_detail ?? ""}
-                autoComplete="off"
-                placeholder="예: 본관 2층 숲체험실"
-                className="w-full rounded-xl border border-[#D4E4BC] bg-white px-3 py-2.5 text-sm text-[#2C2C2C] outline-none focus:border-[#2D5A3D] focus:ring-2 focus:ring-[#2D5A3D]/20"
-              />
-            </div>
+          <h2 className="mb-4 text-sm font-bold text-[#2D5A3D]">📍 위치</h2>
+          <div>
+            <label
+              htmlFor="location_detail"
+              className="mb-1 block text-xs font-semibold text-[#2D5A3D]"
+            >
+              세부 장소
+            </label>
+            <input
+              id="location_detail"
+              name="location_detail"
+              type="text"
+              defaultValue={program.location_detail ?? ""}
+              autoComplete="off"
+              placeholder="예: 본관 2층 숲체험실"
+              className="w-full rounded-xl border border-[#D4E4BC] bg-white px-3 py-2.5 text-sm text-[#2C2C2C] outline-none focus:border-[#2D5A3D] focus:ring-2 focus:ring-[#2D5A3D]/20"
+            />
           </div>
         </section>
 
@@ -261,6 +248,12 @@ export default async function EditOrgProgramPage({
             label="대표 이미지"
           />
         </section>
+
+        {/* Section 3.5: 주차장 + 집결장소 (선택) */}
+        <ProgramExtrasSection
+          initialParkingLots={program.parking_lots ?? []}
+          initialMeetingPoint={program.meeting_point ?? null}
+        />
 
         {/* Section 4: Customizing */}
         <section className="rounded-2xl border border-[#D4E4BC] bg-white p-5 shadow-sm">

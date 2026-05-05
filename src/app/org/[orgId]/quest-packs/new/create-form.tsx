@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { createQuestPackAction } from "../../missions/actions";
 import type { LayoutMode, StampIconSet } from "@/lib/missions/types";
+import { CoverImagePicker } from "@/components/cover-image-picker";
 
 type Props = {
   orgId: string;
@@ -149,20 +150,12 @@ export function CreateQuestPackForm({ orgId }: Props) {
             </Field>
           </div>
 
-          <Field label="커버 이미지 URL (선택)" htmlFor="cover_image_url">
-            <input
-              id="cover_image_url"
-              type="url"
+          <Field label="커버 이미지 (선택)" htmlFor="cover_image_url">
+            <CoverImagePicker
               value={coverUrl}
-              onChange={(e) => setCoverUrl(e.target.value)}
-              placeholder="https://..."
-              className={inputCls}
-              autoComplete="off"
-              inputMode="url"
+              onChange={(url) => setCoverUrl(url)}
+              pathPrefix="quest-packs"
             />
-            <p className="mt-1 text-[11px] text-[#8B7F75]">
-              Phase 1은 URL 붙여넣기만 지원해요. 파일 업로드는 Phase 2에서!
-            </p>
           </Field>
         </div>
       </section>

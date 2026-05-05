@@ -34,6 +34,11 @@ interface Props {
   placeholder?: string;
   /** label 위쪽 영역에 추가로 표시할 보조 텍스트. */
   hint?: string;
+  /**
+   * compact=true: 미리보기/드롭존을 작게 (max-w 제한 + 4:3 비율).
+   * 부수 사진(집결장소, 주차장 등) 용. 기본 false (행사 커버용 큰 사이즈).
+   */
+  compact?: boolean;
 }
 
 export function CoverImagePicker({
@@ -44,11 +49,14 @@ export function CoverImagePicker({
   name,
   placeholder = "https://...",
   hint = "PNG / JPG / WEBP · 500KB 이하 자동 압축",
+  compact = false,
 }: Props) {
   const [uploading, setUploading] = useState(false);
   const [showUrlInput, setShowUrlInput] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
+  // 페이지에 picker 가 여러 개 있을 때 paste 이벤트 중복 처리 방지용 hover 상태.
+  const [hovered, setHovered] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
@@ -129,8 +137,14 @@ export function CoverImagePicker({
       ) {
         return;
       }
-      // wrapper 가 화면에 보이는지 확인 (간단 체크: wrapper 가 마운트됐는가)
       if (!wrapperRef.current) return;
+
+      // 페이지에 picker 인스턴스가 여러 개 있을 때 N개 모두 동시 업로드되는
+      // 버그 방지 — 마우스가 이 wrapper 위에 있거나 키보드 focus 가 안에 있을
+      // 때만 paste 처리. (둘 다 아니면 어느 picker 도 안 받아 → 중복 0)
+      const focused = wrapperRef.current.contains(document.activeElement);
+      if (!hovered && !focused) return;
+
       // 클립보드에서 이미지 추출
       const items = e.clipboardData?.items;
       if (!items) return;
@@ -147,25 +161,37 @@ export function CoverImagePicker({
     };
     document.addEventListener("paste", handler);
     return () => document.removeEventListener("paste", handler);
-  }, [upload]);
+  }, [upload, hovered]);
 
   /* ------------------------------------------------------------------------ */
   /* Render                                                                    */
   /* ------------------------------------------------------------------------ */
 
   return (
-    <div ref={wrapperRef} className="space-y-2">
+    <div
+      ref={wrapperRef}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      className="space-y-2"
+    >
       {/* hidden input 으로 form 에 url 전송 */}
       {name && <input type="hidden" name={name} value={value} />}
 
       {value ? (
         // ─── 미리보기 ─────────────────────────────────────────────
-        <div className="relative overflow-hidden rounded-2xl border border-[#D4E4BC] bg-white">
+        // compact: 좁은 폭(max-w-sm) + 4:3 비율 / 일반: 풀폭 + 16:9
+        <div
+          className={`relative overflow-hidden rounded-2xl border border-[#D4E4BC] bg-white ${
+            compact ? "max-w-sm" : ""
+          }`}
+        >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={value}
             alt="커버 이미지 미리보기"
-            className="aspect-[16/9] w-full object-cover"
+            className={`w-full object-cover ${
+              compact ? "aspect-[4/3]" : "aspect-[16/9]"
+            }`}
           />
           <div className="absolute right-2 top-2 flex gap-1">
             <button
@@ -195,7 +221,9 @@ export function CoverImagePicker({
           onDragLeave={() => setDragOver(false)}
           onDrop={onDrop}
           onClick={() => fileInputRef.current?.click()}
-          className={`flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed bg-[#FFF8F0] p-6 text-center transition ${
+          className={`flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed bg-[#FFF8F0] text-center transition ${
+            compact ? "max-w-sm p-4" : "p-6"
+          } ${
             dragOver
               ? "border-[#2D5A3D] bg-[#E8F0E4]"
               : "border-[#D4E4BC] hover:border-[#2D5A3D] hover:bg-[#F5F1E8]"
@@ -204,10 +232,14 @@ export function CoverImagePicker({
           tabIndex={0}
           aria-label="커버 이미지 업로드"
         >
-          <span aria-hidden className="text-3xl">
+          <span aria-hidden className={compact ? "text-2xl" : "text-3xl"}>
             🖼
           </span>
-          <span className="mt-2 text-sm font-bold text-[#2D5A3D]">
+          <span
+            className={`mt-1 font-bold text-[#2D5A3D] ${
+              compact ? "text-xs" : "mt-2 text-sm"
+            }`}
+          >
             {uploading
               ? "업로드 중…"
               : "클릭 / 드래그 / Ctrl+V 로 이미지 추가"}

@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { requireOrg } from "@/lib/org-auth-guard";
 import { createClient } from "@/lib/supabase/server";
 import { loadOrgNavBadges } from "@/lib/org-nav/badges";
+import { loadPartnerDisplayNameForOrg } from "@/lib/org-partner";
 import { OrgNav } from "./_nav/org-nav";
 
 type OrgRow = { id: string; org_name: string };
@@ -37,11 +38,19 @@ export default async function OrgLayout({
   const orgName: string = orgRow?.org_name ?? org.orgName ?? "기관";
 
   // 5 그룹 dropdown 의 실시간 신호 배지 (검수 대기 / FM LIVE / 서류 미완료)
-  const badges = await loadOrgNavBadges(orgId);
+  const [badges, partnerName] = await Promise.all([
+    loadOrgNavBadges(orgId),
+    loadPartnerDisplayNameForOrg(orgId).catch(() => "지사"),
+  ]);
 
   return (
     <div className="min-h-dvh bg-[#FFF8F0]">
-      <OrgNav orgId={orgId} orgName={orgName} badges={badges} />
+      <OrgNav
+        orgId={orgId}
+        orgName={orgName}
+        badges={badges}
+        partnerName={partnerName}
+      />
       <main>{children}</main>
     </div>
   );

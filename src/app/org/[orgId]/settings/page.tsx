@@ -445,16 +445,29 @@ export default async function OrgSettingsPage({
         <header className="px-1">
           <h2 className="flex items-center gap-1.5 text-sm font-bold text-[#2D5A3D]">
             <span>🔐</span>
-            <span>비밀번호 변경</span>
+            <span>로그인 정보</span>
           </h2>
           <p className="mt-0.5 text-[11px] text-[#8B7F75]">
-            주기적으로 변경하세요. 최소 6자.
+            아이디는 변경할 수 없어요. 비밀번호는 주기적으로 변경하세요. 최소 6자.
           </p>
         </header>
         <form
           action={changeOrgPasswordAction}
           className="space-y-3 rounded-2xl border border-[#D4E4BC] bg-white p-5 shadow-sm md:p-6"
         >
+          <div>
+            <label htmlFor="org_username" className={LABEL_CLASS}>
+              🪪 로그인 아이디
+            </label>
+            <input
+              id="org_username"
+              type="text"
+              value={session.managerId}
+              readOnly
+              disabled
+              className={`${INPUT_CLASS} cursor-not-allowed bg-[#F5F1E8] font-mono text-[#6B6560]`}
+            />
+          </div>
           <div>
             <label htmlFor="current_password" className={LABEL_CLASS}>
               현재 비밀번호

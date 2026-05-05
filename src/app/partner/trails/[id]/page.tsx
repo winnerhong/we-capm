@@ -5,17 +5,15 @@ import { createClient } from "@/lib/supabase/server";
 import {
   DIFFICULTY_META,
   STATUS_META,
-  MISSION_TYPE_META,
   type TrailRow,
   type TrailStopRow,
   type TrailDifficulty,
   type TrailStatus,
-  type MissionType,
 } from "@/lib/trails/types";
 import { updateTrailAction } from "../actions";
 import { TrailActionButtons } from "./action-buttons";
 import { AddStopForm } from "./add-stop-form";
-import { StopRowActions } from "./stop-row-actions";
+import { StopsList } from "./stops-list";
 import { ImageUploader } from "@/components/image-uploader";
 import { MultiImageUploader } from "@/components/multi-image-uploader";
 import { TrailVisibilitySection } from "./trail-visibility-section";
@@ -40,13 +38,6 @@ const STATUS_ICON: Record<TrailStatus, string> = {
   DRAFT: "📝",
   PUBLISHED: "🌳",
   ARCHIVED: "📦",
-};
-
-const MISSION_STYLE: Record<MissionType, string> = {
-  PHOTO: "bg-sky-50 text-sky-800 border-sky-200",
-  QUIZ: "bg-violet-50 text-violet-800 border-violet-200",
-  LOCATION: "bg-emerald-50 text-emerald-800 border-emerald-200",
-  CHECKIN: "bg-[#F5F1E8] text-[#2D5A3D] border-[#D4E4BC]",
 };
 
 async function loadTrail(id: string): Promise<TrailRow | null> {
@@ -481,24 +472,23 @@ export default async function TrailDetailPage({
             </div>
           </div>
 
+          {/* 배포 대상 — 같은 form 안에 포함되어 통합 저장됨 */}
+          <TrailVisibilitySection
+            defaultVisibility={trail.visibility ?? "DRAFT"}
+            orgs={orgs}
+            defaultAssignedOrgIds={assignedOrgIds}
+          />
+
           <div className="flex justify-end">
             <button
               type="submit"
-              className="rounded-xl bg-[#2D5A3D] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#4A7C59]"
+              className="rounded-xl bg-[#2D5A3D] px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[#4A7C59]"
             >
-              💾 저장
+              💾 전체 저장
             </button>
           </div>
         </form>
       </section>
-
-      {/* 배포 대상 */}
-      <TrailVisibilitySection
-        trailId={trail.id}
-        defaultVisibility={trail.visibility ?? "DRAFT"}
-        orgs={orgs}
-        defaultAssignedOrgIds={assignedOrgIds}
-      />
 
       {/* 지점 관리 */}
       <section>
@@ -523,60 +513,7 @@ export default async function TrailDetailPage({
             </p>
           </div>
         ) : (
-          <div className="mb-3 overflow-hidden rounded-2xl border border-[#D4E4BC] bg-white shadow-sm">
-            <div className="hidden grid-cols-[48px_1fr_120px_80px_110px_110px] items-center gap-2 border-b border-[#D4E4BC] bg-[#F5F1E8] px-4 py-2 text-[10px] font-bold uppercase tracking-wide text-[#6B6560] md:grid">
-              <div>#</div>
-              <div>이름</div>
-              <div>미션</div>
-              <div className="text-right">점수</div>
-              <div>QR</div>
-              <div className="text-right">작업</div>
-            </div>
-            <ul className="divide-y divide-[#E8F0E4]">
-              {stops.map((s) => {
-                const m = MISSION_TYPE_META[s.mission_type];
-                return (
-                  <li
-                    key={s.id}
-                    className="grid grid-cols-1 gap-2 px-4 py-3 md:grid-cols-[48px_1fr_120px_80px_110px_110px] md:items-center"
-                  >
-                    <div className="text-sm font-bold text-[#2D5A3D]">
-                      #{s.order}
-                    </div>
-                    <div className="min-w-0">
-                      <Link
-                        href={`/partner/trails/${id}/stops/${s.id}/edit`}
-                        className="text-sm font-semibold text-[#2C2C2C] hover:text-[#2D5A3D] hover:underline"
-                      >
-                        {s.name}
-                      </Link>
-                      {s.location_hint && (
-                        <div className="mt-0.5 line-clamp-1 text-[11px] text-[#6B6560]">
-                          📌 {s.location_hint}
-                        </div>
-                      )}
-                    </div>
-                    <div>
-                      <span
-                        className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${MISSION_STYLE[s.mission_type]}`}
-                      >
-                        {m.icon} {m.label}
-                      </span>
-                    </div>
-                    <div className="text-sm font-bold text-[#2D5A3D] md:text-right">
-                      {s.reward_points}점
-                    </div>
-                    <div>
-                      <code className="inline-flex items-center rounded-md border border-[#D4E4BC] bg-[#F5F1E8] px-1.5 py-0.5 font-mono text-[10px] text-[#6B6560]">
-                        {String(s.qr_code).slice(0, 10)}…
-                      </code>
-                    </div>
-                    <StopRowActions stopId={s.id} trailId={id} />
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
+          <StopsList trailId={id} initialStops={stops} />
         )}
 
         <AddStopForm trailId={id} nextOrder={stops.length + 1} />

@@ -363,7 +363,6 @@ export function ProgramsTab({
                     </p>
                   )}
                   <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-[#6B6560]">
-                    <span>💰 {formatWon(p.price_per_person)}</span>
                     {p.duration_hours != null && (
                       <span>⏱ {p.duration_hours}시간</span>
                     )}
@@ -513,11 +512,11 @@ export function ProgramsTab({
                             <p className="mt-1 truncate text-xs font-bold text-[#2D5A3D]">
                               {p.title || "(이름 없음)"}
                             </p>
-                            <p className="mt-0.5 text-[10px] text-[#6B6560]">
-                              💰 {formatWon(p.price_per_person)}
-                              {p.duration_hours != null &&
-                                ` · ⏱ ${p.duration_hours}시간`}
-                            </p>
+                            {p.duration_hours != null && (
+                              <p className="mt-0.5 text-[10px] text-[#6B6560]">
+                                ⏱ {p.duration_hours}시간
+                              </p>
+                            )}
                           </div>
                         </label>
                       </li>

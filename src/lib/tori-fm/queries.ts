@@ -135,6 +135,109 @@ export async function loadPendingRequests(
   return loadSessionRequestsByStatus(sessionId, "PENDING");
 }
 
+/**
+ * QUEUED 방송 대기 큐 — queue_position ASC.
+ */
+export async function loadQueuedRequests(
+  sessionId: string
+): Promise<FmRequestRow[]> {
+  if (!sessionId) return [];
+  const supabase = await createClient();
+  const resp = (await (
+    supabase.from("tori_fm_requests" as never) as unknown as {
+      select: (c: string) => {
+        eq: (k: string, v: string) => {
+          eq: (k: string, v: string) => {
+            order: (
+              c: string,
+              o: { ascending: boolean; nullsFirst?: boolean }
+            ) => Promise<SbResp<FmRequestRow>>;
+          };
+        };
+      };
+    }
+  )
+    .select("*")
+    .eq("session_id", sessionId)
+    .eq("status", "QUEUED")
+    .order("queue_position", { ascending: true, nullsFirst: false })) as SbResp<FmRequestRow>;
+  return resp.data ?? [];
+}
+
+/**
+ * 현재 PLAYING 중인 신청곡 묶음 — 같은 곡(song_normalized) 의 사연이 여러 건일 수 있음.
+ * created_at ASC 로 정렬되어 먼저 신청한 사람의 사연이 위에 옴.
+ */
+export async function loadPlayingGroup(
+  sessionId: string
+): Promise<FmRequestRow[]> {
+  if (!sessionId) return [];
+  const supabase = await createClient();
+  const resp = (await (
+    supabase.from("tori_fm_requests" as never) as unknown as {
+      select: (c: string) => {
+        eq: (k: string, v: string) => {
+          eq: (k: string, v: string) => {
+            order: (
+              c: string,
+              o: { ascending: boolean }
+            ) => Promise<SbResp<FmRequestRow>>;
+          };
+        };
+      };
+    }
+  )
+    .select("*")
+    .eq("session_id", sessionId)
+    .eq("status", "PLAYING")
+    .order("created_at", { ascending: true })) as SbResp<FmRequestRow>;
+  return resp.data ?? [];
+}
+
+/**
+ * 현재 PLAYING 묶음의 첫 항목(또는 null) — 호환용 헬퍼.
+ * (이전 코드가 단일 row 만 가정했던 곳에서 사용)
+ */
+export async function loadPlayingRequest(
+  sessionId: string
+): Promise<FmRequestRow | null> {
+  const group = await loadPlayingGroup(sessionId);
+  return group[0] ?? null;
+}
+
+/**
+ * 세션 내 인기 신청곡 TOP — heart_count 내림차순, PENDING/APPROVED/QUEUED만 (방송됨 제외).
+ */
+export async function loadTopHeartedRequests(
+  sessionId: string,
+  limit: number = 5
+): Promise<FmRequestRow[]> {
+  if (!sessionId) return [];
+  const supabase = await createClient();
+  const resp = (await (
+    supabase.from("tori_fm_requests" as never) as unknown as {
+      select: (c: string) => {
+        eq: (k: string, v: string) => {
+          in: (k: string, v: string[]) => {
+            order: (
+              c: string,
+              o: { ascending: boolean }
+            ) => {
+              limit: (n: number) => Promise<SbResp<FmRequestRow>>;
+            };
+          };
+        };
+      };
+    }
+  )
+    .select("*")
+    .eq("session_id", sessionId)
+    .in("status", ["PENDING", "APPROVED", "QUEUED"])
+    .order("heart_count", { ascending: false })
+    .limit(Math.max(1, Math.min(limit, 20)))) as SbResp<FmRequestRow>;
+  return (resp.data ?? []).filter((r) => r.heart_count > 0);
+}
+
 /* -------------------------------------------------------------------------- */
 /* Reactions                                                                  */
 /* -------------------------------------------------------------------------- */

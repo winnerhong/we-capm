@@ -29,17 +29,38 @@ import { createClient } from "@/lib/supabase/client";
 import type { ToriFmSessionRow } from "@/lib/missions/types";
 import { ListenerPresence } from "@/components/tori-fm/ListenerPresence";
 import { ScreenEffectsLayer } from "@/app/screen/tori-fm/[orgId]/vfx/ScreenEffectsLayer";
-import type { FmChatMessageRow } from "@/lib/tori-fm/types";
+import {
+  anonLabelFromUserId,
+  type FmChatMessageRow,
+  type FmRequestRow,
+} from "@/lib/tori-fm/types";
 import { ReactionBar } from "./ReactionBar";
 import { LiveChatComposer } from "./LiveChatComposer";
 import { LiveChatStream } from "./LiveChatStream";
 import { PlayerRpsModal } from "@/lib/rps/PlayerRpsModal";
+
+/** 같은 곡 묶음 사연 1건 (작성자 라벨은 서버에서 결정해 넘김). */
+export interface MiniStagePlayingItem {
+  id: string;
+  story: string | null;
+  authorLabel: string;
+  createdAt: string;
+}
 
 export interface MiniStageNowPlaying {
   song: string;
   artist: string;
   story: string;
   childName: string;
+  /** 신청 종류 — 'story_only' 면 사연 리더 모드(워름톤) 카드. */
+  kind?: "song_request" | "story_only" | null;
+  /** 작성자가 익명 옵션을 선택했는지. */
+  isAnonymous?: boolean;
+  /**
+   * 같은 곡(song_normalized) 묶음 사연 N건 — 비어있거나 1건이면 단일 모드(기존 호환).
+   * 2건 이상이면 곡명 한 번 + 사연 리스트(시간순) 렌더.
+   */
+  storyItems?: MiniStagePlayingItem[];
 }
 
 interface QueueItemRow {
@@ -83,6 +104,23 @@ function fmtElapsed(startedAt: string | null, nowMs: number): string {
   return h > 0 ? `${pad(h)}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
 }
 
+/** "5분 전" / "방금 전" — created_at 기준 한국어 상대 시간. */
+function fmtRelative(iso: string): string {
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return "";
+  const diffSec = Math.max(0, Math.floor((Date.now() - t) / 1000));
+  if (diffSec < 30) return "방금 전";
+  if (diffSec < 60) return `${diffSec}초 전`;
+  const m = Math.floor(diffSec / 60);
+  if (m < 60) return `${m}분 전`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}시간 전`;
+  return new Date(iso).toLocaleDateString("ko-KR", {
+    month: "2-digit",
+    day: "2-digit",
+  });
+}
+
 function fmtTimeRange(start: string, end: string): string {
   try {
     const fmt = (iso: string) =>
@@ -108,7 +146,9 @@ export function MiniStage({
   const [nowPlaying, setNowPlaying] = useState<MiniStageNowPlaying | null>(
     initialNowPlaying
   );
-  const [now, setNow] = useState(() => Date.now());
+  // SSR/CSR 간 시각 불일치로 hydration mismatch 가 발생하지 않도록
+  // 초기값은 null. 마운트 후 useEffect 에서 Date.now() 로 채우고 1초 간격 갱신.
+  const [now, setNow] = useState<number | null>(null);
   const lastQueueIdRef = useRef<string | null>(
     initialSession?.current_queue_id ?? null
   );
@@ -207,7 +247,59 @@ export function MiniStage({
     const newSession = sessionResp.data;
     setSession(newSession);
 
+    const newSessionId = newSession?.id ?? null;
     const queueId = newSession?.current_queue_id ?? null;
+
+    // 1) tori_fm_requests PLAYING 우선 — 신규 큐 시스템(kind/is_anonymous 포함).
+    //    같은 song_normalized 의 PLAYING row 가 여러 건일 수 있어 묶음으로 조회.
+    if (newSessionId) {
+      const playingGroupResp = (await (
+        supa.from("tori_fm_requests" as never) as unknown as {
+          select: (c: string) => {
+            eq: (k: string, v: string) => {
+              eq: (k: string, v: string) => {
+                order: (
+                  c: string,
+                  o: { ascending: boolean }
+                ) => Promise<{ data: FmRequestRow[] | null }>;
+              };
+            };
+          };
+        }
+      )
+        .select("*")
+        .eq("session_id", newSessionId)
+        .eq("status", "PLAYING")
+        .order("created_at", { ascending: true })) as {
+        data: FmRequestRow[] | null;
+      };
+
+      const group = playingGroupResp.data ?? [];
+      const head = group[0] ?? null;
+      if (head) {
+        lastQueueIdRef.current = queueId;
+        const storyItems = group.map((r) => ({
+          id: r.id,
+          story: r.story,
+          authorLabel: r.is_anonymous
+            ? anonLabelFromUserId(r.user_id)
+            : (r.child_name?.trim() ?? ""),
+          createdAt: r.created_at,
+        }));
+        setNowPlaying({
+          song: head.song_title?.trim() || "(사연만)",
+          artist: head.artist ?? "",
+          story: head.story ?? "",
+          childName: head.is_anonymous
+            ? anonLabelFromUserId(head.user_id)
+            : (head.child_name ?? ""),
+          kind: head.kind,
+          isAnonymous: head.is_anonymous,
+          storyItems,
+        });
+        return;
+      }
+    }
 
     if (queueId && queueId === lastQueueIdRef.current && nowPlaying) return;
 
@@ -217,6 +309,7 @@ export function MiniStage({
       return;
     }
 
+    // 2) 레거시 mission_radio_queue 경로 (kind 없음) — fallback.
     const queueResp = (await (
       supa.from("mission_radio_queue" as never) as unknown as {
         select: (c: string) => {
@@ -259,6 +352,9 @@ export function MiniStage({
       artist: typeof p.artist === "string" ? p.artist : "",
       story: typeof p.story_text === "string" ? p.story_text : "",
       childName: typeof p.child_name === "string" ? p.child_name : "",
+      kind: "song_request",
+      isAnonymous: false,
+      storyItems: [],
     });
   }, [orgId, nowPlaying]);
 
@@ -298,6 +394,19 @@ export function MiniStage({
         } as never,
         handle as never
       )
+      // tori_fm_requests UPDATE 가 status='PLAYING' 으로 바뀌면 즉시 반영.
+      // (org_id 기준으로 필터 불가 — 세션 ID 가 안정 후 별도 구독은 비용 큼.
+      // 폴링과 함께 다른 두 구독이 거의 항상 잡아주지만, * UPDATE 도 hook
+      // 으로 받아 빠른 반영 보장. RLS 가 있어 비싸진 않음.)
+      .on(
+        "postgres_changes" as never,
+        {
+          event: "*",
+          schema: "public",
+          table: "tori_fm_requests",
+        } as never,
+        handle as never
+      )
       .subscribe();
 
     const poll = setInterval(handle, POLL_FALLBACK_MS);
@@ -315,6 +424,7 @@ export function MiniStage({
 
   useEffect(() => {
     if (!session?.is_live || !session.started_at) return;
+    setNow(Date.now()); // 마운트 즉시 한 번 — null 상태로 머무는 깜빡임 최소화
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
   }, [session?.is_live, session?.started_at]);
@@ -326,7 +436,7 @@ export function MiniStage({
   const sessionLive = !!session?.is_live;
   const sessionId = session?.id ?? null;
   const elapsed = useMemo(
-    () => fmtElapsed(session?.started_at ?? null, now),
+    () => (now == null ? "" : fmtElapsed(session?.started_at ?? null, now)),
     [session?.started_at, now]
   );
   const timeRange = useMemo(
@@ -390,16 +500,16 @@ export function MiniStage({
               </span>
             )}
           </div>
-          {/* 시간대 / 경과 */}
+          {/* 시간대 / 경과 — 한 줄 유지 (좁아져도 줄바꿈 X) */}
           <div className="flex items-center gap-1.5">
             {sessionLive && elapsed && (
-              <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.05] px-2 py-0.5 font-mono text-[10px] tabular-nums text-amber-200 backdrop-blur-md">
+              <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-white/10 bg-white/[0.05] px-2 py-0.5 font-mono text-[10px] tabular-nums text-amber-200 backdrop-blur-md">
                 <span aria-hidden>⏱</span>
                 {elapsed}
               </span>
             )}
             {timeRange && (
-              <span className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.05] px-2 py-0.5 text-[10px] font-semibold text-white/70 backdrop-blur-md">
+              <span className="inline-flex shrink-0 items-center whitespace-nowrap rounded-full border border-white/10 bg-white/[0.05] px-2 py-0.5 text-[10px] font-semibold text-white/70 backdrop-blur-md">
                 {timeRange}
               </span>
             )}
@@ -424,33 +534,111 @@ export function MiniStage({
         </div>
       </div>
 
-      {/* ④ 본문 — Now Playing 핀 카드 (가운데 비주얼 영역, 글래스 톤) */}
+      {/* ④ 본문 — Now Playing 핀 카드 (가운데 비주얼 영역, 글래스 톤).
+          kind === 'story_only' 또는 (song 비고 story 있음) 이면 사연 리더 모드 카드. */}
       <div className="relative z-10 flex flex-1 items-center justify-center px-3 py-6 sm:px-6">
         {sessionLive ? (
           nowPlaying ? (
-            <div className="w-full max-w-md rounded-3xl border border-white/10 bg-white/[0.04] p-5 shadow-2xl shadow-black/40 backdrop-blur-md">
-              <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-amber-300/90">
-                ♪ Now Playing
-              </p>
-              <h2 className="mt-2 break-words text-2xl font-extrabold tracking-tight text-amber-100 md:text-3xl">
-                {nowPlaying.song || "(제목 미입력)"}
-              </h2>
-              {nowPlaying.artist && (
-                <p className="mt-0.5 text-sm font-semibold text-amber-200/80">
-                  — {nowPlaying.artist}
-                </p>
-              )}
-              {nowPlaying.story && (
-                <blockquote className="mt-3 border-l-2 border-amber-300/50 pl-3 text-[13px] leading-relaxed text-white/95">
-                  &ldquo;{nowPlaying.story}&rdquo;
-                </blockquote>
-              )}
-              {nowPlaying.childName && (
-                <p className="mt-2 text-right text-[11px] font-semibold text-amber-200/75">
-                  — {nowPlaying.childName}
-                </p>
-              )}
-            </div>
+            (() => {
+              const isStoryMode =
+                nowPlaying.kind === "story_only" ||
+                (!nowPlaying.song.trim() && !!nowPlaying.story.trim()) ||
+                nowPlaying.song.trim() === "(사연만)";
+
+              if (isStoryMode) {
+                return (
+                  <div className="w-full max-w-md rounded-3xl border border-amber-300/30 bg-gradient-to-br from-violet-900/40 via-purple-900/30 to-amber-900/40 p-5 shadow-2xl shadow-amber-500/20 backdrop-blur-md md:p-6">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-amber-200/90">
+                      💌 사연 읽는 중
+                    </p>
+                    {nowPlaying.story ? (
+                      <blockquote className="mt-3 border-l-4 border-amber-300/50 pl-4 text-xl font-semibold leading-relaxed text-amber-100 md:text-2xl">
+                        <span aria-hidden className="mr-1 text-amber-300/70">
+                          ❝
+                        </span>
+                        {nowPlaying.story}
+                      </blockquote>
+                    ) : (
+                      <p className="mt-3 text-amber-200/70">사연 준비 중…</p>
+                    )}
+                    {nowPlaying.childName && (
+                      <p className="mt-4 text-right text-sm text-amber-200/80">
+                        — {nowPlaying.childName}
+                      </p>
+                    )}
+                  </div>
+                );
+              }
+
+              const filledItems = (nowPlaying.storyItems ?? []).filter(
+                (it) => (it.story ?? "").trim().length > 0
+              );
+              const isBundle = filledItems.length >= 2;
+
+              return (
+                <div className="w-full max-w-md rounded-3xl border border-white/10 bg-white/[0.04] p-5 shadow-2xl shadow-black/40 backdrop-blur-md">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-amber-300/90">
+                    ♪ Now Playing
+                    {isBundle && (
+                      <span className="ml-2 rounded-full bg-amber-400/20 px-2 py-0.5 text-[9px] font-extrabold tracking-wider text-amber-200 ring-1 ring-amber-300/40">
+                        사연 {filledItems.length}건
+                      </span>
+                    )}
+                  </p>
+                  <h2 className="mt-2 break-words text-2xl font-extrabold tracking-tight text-amber-100 md:text-3xl">
+                    {nowPlaying.song || "(제목 미입력)"}
+                  </h2>
+                  {nowPlaying.artist && (
+                    <p className="mt-0.5 text-sm font-semibold text-amber-200/80">
+                      — {nowPlaying.artist}
+                    </p>
+                  )}
+                  {isBundle ? (
+                    <ul className="mt-3 max-h-64 space-y-2 overflow-y-auto pr-1
+                      [&::-webkit-scrollbar]:w-1.5
+                      [&::-webkit-scrollbar-track]:bg-transparent
+                      [&::-webkit-scrollbar-thumb]:rounded-full
+                      [&::-webkit-scrollbar-thumb]:bg-white/15">
+                      {filledItems.map((it) => (
+                        <li
+                          key={it.id}
+                          className="border-l-2 border-amber-300/40 pl-3"
+                        >
+                          <p className="text-sm leading-relaxed text-white/95">
+                            <span aria-hidden className="mr-0.5 text-amber-300/70">
+                              ❝
+                            </span>
+                            {it.story}
+                            <span aria-hidden className="ml-0.5 text-amber-300/70">
+                              ❞
+                            </span>
+                          </p>
+                          <p className="mt-1 text-[11px] text-amber-200/70">
+                            — {it.authorLabel || "익명의 청취자"}
+                            <span className="ml-1.5 text-amber-200/50">
+                              · {fmtRelative(it.createdAt)}
+                            </span>
+                          </p>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <>
+                      {nowPlaying.story && (
+                        <blockquote className="mt-3 border-l-2 border-amber-300/50 pl-3 text-[13px] leading-relaxed text-white/95">
+                          &ldquo;{nowPlaying.story}&rdquo;
+                        </blockquote>
+                      )}
+                      {nowPlaying.childName && (
+                        <p className="mt-2 text-right text-[11px] font-semibold text-amber-200/75">
+                          — {nowPlaying.childName}
+                        </p>
+                      )}
+                    </>
+                  )}
+                </div>
+              );
+            })()
           ) : (
             <div className="rounded-3xl border border-white/10 bg-white/[0.04] px-6 py-5 text-center backdrop-blur-md">
               <p className="text-3xl" aria-hidden>

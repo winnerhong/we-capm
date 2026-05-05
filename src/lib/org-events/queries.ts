@@ -606,6 +606,69 @@ export async function loadActiveEventsForUser(
 }
 
 /**
+ * 참가자가 참여 중인 LIVE + DRAFT(예정) 행사 목록.
+ * - DRAFT 행사는 참가자 포털에서 "초대장만" 노출하기 위해 필요.
+ * - 참가자가 본인 등록을 확인하고 D-day 카운트다운을 볼 수 있게 함.
+ */
+export async function loadActiveAndUpcomingEventsForUser(
+  userId: string
+): Promise<OrgEventRow[]> {
+  if (!userId) return [];
+  const supabase = await createClient();
+
+  const partResp = (await (
+    supabase.from("org_event_participants" as never) as unknown as {
+      select: (c: string) => {
+        eq: (k: string, v: string) => Promise<SbResp<{ event_id: string }>>;
+      };
+    }
+  )
+    .select("event_id")
+    .eq("user_id", userId)) as SbResp<{ event_id: string }>;
+
+  if (partResp.error) {
+    console.error(
+      "[org-events/loadActiveAndUpcomingEventsForUser] part error",
+      partResp.error
+    );
+    return [];
+  }
+  const eventIds = Array.from(
+    new Set((partResp.data ?? []).map((r) => r.event_id).filter(Boolean))
+  );
+  if (eventIds.length === 0) return [];
+
+  const evtResp = (await (
+    supabase.from("org_events" as never) as unknown as {
+      select: (c: string) => {
+        in: (k: string, v: string[]) => {
+          in: (k: string, v: string[]) => {
+            order: (
+              c: string,
+              o: { ascending: boolean }
+            ) => Promise<SbResp<OrgEventRow>>;
+          };
+        };
+      };
+    }
+  )
+    .select("*")
+    .in("id", eventIds)
+    .in("status", ["LIVE", "DRAFT"])
+    .order("created_at", { ascending: false })) as SbResp<OrgEventRow>;
+
+  if (evtResp.error) {
+    console.error(
+      "[org-events/loadActiveAndUpcomingEventsForUser] evt error",
+      evtResp.error
+    );
+    return [];
+  }
+
+  return evtResp.data ?? [];
+}
+
+/**
  * 행사에 연결된 LIVE 상태 스탬프북 목록.
  * 2단계 쿼리: quest_pack_id 수집 → org_quest_packs.in + status='LIVE'.
  */

@@ -4,6 +4,7 @@ import { getAcornBalance } from "@/lib/app-user/queries";
 import { AcornIcon } from "@/components/acorn-icon";
 import { WinnerTalkIcon } from "@/components/winner-talk-icon";
 import { OrgPresenceTracker } from "@/components/presence/org-presence-tracker";
+import { PinnedNoticeBanner } from "./PinnedNoticeBanner";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +21,9 @@ export default async function UserLayout({
 
   return (
     <div className="min-h-dvh bg-gradient-to-b from-[#FFF8F0] via-[#F5F1E8] to-[#E8F0E4]">
+      {/* 호스트 공지사항 — 활성 LIVE 세션의 BANNER spotlight 가 있으면 상단 고정 노출 */}
+      <PinnedNoticeBanner orgId={user.orgId} />
+
       {/* Top bar */}
       <header className="sticky top-0 z-30 border-b border-[#D4E4BC]/60 bg-white/85 backdrop-blur-md">
         <div className="mx-auto flex max-w-md items-center gap-2 px-4 py-3">

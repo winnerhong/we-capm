@@ -400,6 +400,20 @@ export function HostRpsModal({
     });
   }
 
+  function handleCancelRoom() {
+    if (!room) return;
+    if (!confirm("이 방을 취소할까요? 참가자 화면에서도 사라져요.")) return;
+    setError(null);
+    startResolving(async () => {
+      try {
+        await cancelRoomAction(room.id);
+        onClose();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "방 취소 실패");
+      }
+    });
+  }
+
   function handleSendGifts() {
     if (!room) return;
     setError(null);
@@ -660,8 +674,8 @@ export function HostRpsModal({
               />
             )}
 
-            {/* 강제 종료 버튼 */}
-            {(phase === "lobby" || phase === "running" || phase === "round_result") &&
+            {/* 라운드 진행 중·결과 단계 — 강제 종료(생존자 모두 우승 처리) */}
+            {(phase === "running" || phase === "round_result") &&
               room.status !== "finished" && (
                 <button
                   type="button"
@@ -671,6 +685,17 @@ export function HostRpsModal({
                   ⏹ 지금 종료하고 현 생존자 모두 우승 처리
                 </button>
               )}
+
+            {/* lobby 단계 — 게임 시작 전 방 취소 */}
+            {phase === "lobby" && (
+              <button
+                type="button"
+                onClick={handleCancelRoom}
+                className="w-full rounded-xl border border-rose-400/30 bg-rose-500/10 px-3 py-2 text-xs font-bold text-rose-200 transition hover:bg-rose-500/20"
+              >
+                🚫 방 취소
+              </button>
+            )}
           </div>
         )}
 

@@ -34,7 +34,6 @@ import {
 import { AnalyticsTabPanel } from "./analytics-tab";
 import { TimelineTabPanel } from "./timeline-tab";
 import { ParticipantsTab } from "./participants-tab";
-import { InviteLinkCopy } from "./invite-link-copy";
 import { InvitationCardShare } from "./invitation-card-share";
 
 export const dynamic = "force-dynamic";
@@ -752,18 +751,9 @@ function LiveNextSteps({
 }) {
   return (
     <div className="space-y-3">
-      <section className="rounded-2xl border-2 border-emerald-200 bg-emerald-50/60 p-5 shadow-sm">
-        <p className="flex items-center gap-2 text-sm font-bold text-emerald-800">
-          <span aria-hidden>🔗</span>
-          <span>참가자 초대 링크</span>
-        </p>
-        <p className="mt-1 text-[11px] text-emerald-800/80">
-          이 링크를 카카오톡·문자로 공유하세요.
-        </p>
-        <div className="mt-3">
-          <InviteLinkCopy eventId={eventId} eventName={eventName} />
-        </div>
-      </section>
+      {/* 참가자 초대 링크 카드는 상단 [📨 초대장 공유] 카드와 동일한 URL 을 노출해
+          중복이라 제거됨 (2026-05-06). 발행 토글·복사·공유·미리보기는 모두
+          [InvitationCardShare] 가 담당한다. */}
 
       <section className="rounded-2xl border border-[#D4E4BC] bg-white p-5 shadow-sm">
         <p className="flex items-center gap-2 text-sm font-bold text-[#2D5A3D]">

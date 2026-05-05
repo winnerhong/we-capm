@@ -110,6 +110,140 @@ export async function sendChatMessageAction(
 }
 
 /**
+ * 본인 채팅 메시지 수정 — 작성자(user_id) 본인만 가능.
+ *  - is_deleted=true 메시지는 수정 불가
+ *  - 1~300자 제약
+ */
+export async function editOwnChatMessageAction(
+  messageId: string,
+  newText: string
+): Promise<void> {
+  const user = await requireAppUser();
+  if (!messageId) throw new Error("메시지를 찾을 수 없어요");
+
+  const text = (newText ?? "").trim();
+  if (!text) throw new Error("메시지를 입력해 주세요");
+  if (text.length > 300) {
+    throw new Error("메시지는 300자까지만 보낼 수 있어요");
+  }
+
+  const supabase = await createClient();
+
+  // 소유 검증 — 메시지가 이 user 의 것인지.
+  const msgResp = (await (
+    supabase.from("tori_fm_chat_messages" as never) as unknown as {
+      select: (c: string) => {
+        eq: (k: string, v: string) => {
+          maybeSingle: () => Promise<
+            SbRespOne<{
+              id: string;
+              user_id: string | null;
+              session_id: string;
+              is_deleted: boolean;
+            }>
+          >;
+        };
+      };
+    }
+  )
+    .select("id, user_id, session_id, is_deleted")
+    .eq("id", messageId)
+    .maybeSingle()) as SbRespOne<{
+    id: string;
+    user_id: string | null;
+    session_id: string;
+    is_deleted: boolean;
+  }>;
+
+  if (!msgResp.data) throw new Error("메시지를 찾을 수 없어요");
+  if (msgResp.data.user_id !== user.id) {
+    throw new Error("본인이 보낸 메시지만 수정할 수 있어요");
+  }
+  if (msgResp.data.is_deleted) {
+    throw new Error("이미 삭제된 메시지에요");
+  }
+
+  const updResp = (await (
+    supabase.from("tori_fm_chat_messages" as never) as unknown as {
+      update: (p: Row) => {
+        eq: (k: string, v: string) => Promise<{ error: SbErr }>;
+      };
+    }
+  )
+    .update({ message: text })
+    .eq("id", messageId)) as { error: SbErr };
+
+  if (updResp.error) {
+    console.error("[fm/editOwnChatMessage] error", {
+      code: updResp.error.code,
+    });
+    throw new Error("메시지 수정에 실패했어요");
+  }
+
+  revalidateFm(msgResp.data.session_id, user.orgId);
+}
+
+/**
+ * 본인 채팅 메시지 삭제 (soft) — 작성자(user_id) 본인만 가능.
+ *  - is_deleted=true 로 표시. 다른 client 는 Realtime UPDATE 로 즉시 사라짐.
+ */
+export async function deleteOwnChatMessageAction(
+  messageId: string
+): Promise<void> {
+  const user = await requireAppUser();
+  if (!messageId) throw new Error("메시지를 찾을 수 없어요");
+
+  const supabase = await createClient();
+
+  const msgResp = (await (
+    supabase.from("tori_fm_chat_messages" as never) as unknown as {
+      select: (c: string) => {
+        eq: (k: string, v: string) => {
+          maybeSingle: () => Promise<
+            SbRespOne<{
+              id: string;
+              user_id: string | null;
+              session_id: string;
+            }>
+          >;
+        };
+      };
+    }
+  )
+    .select("id, user_id, session_id")
+    .eq("id", messageId)
+    .maybeSingle()) as SbRespOne<{
+    id: string;
+    user_id: string | null;
+    session_id: string;
+  }>;
+
+  if (!msgResp.data) throw new Error("메시지를 찾을 수 없어요");
+  if (msgResp.data.user_id !== user.id) {
+    throw new Error("본인이 보낸 메시지만 삭제할 수 있어요");
+  }
+
+  const updResp = (await (
+    supabase.from("tori_fm_chat_messages" as never) as unknown as {
+      update: (p: Row) => {
+        eq: (k: string, v: string) => Promise<{ error: SbErr }>;
+      };
+    }
+  )
+    .update({ is_deleted: true })
+    .eq("id", messageId)) as { error: SbErr };
+
+  if (updResp.error) {
+    console.error("[fm/deleteOwnChatMessage] error", {
+      code: updResp.error.code,
+    });
+    throw new Error("메시지 삭제에 실패했어요");
+  }
+
+  revalidateFm(msgResp.data.session_id, user.orgId);
+}
+
+/**
  * 이모지 리액션 — 6종 중 하나. targetRequestId 지정 시 해당 신청곡 위로 떠오름.
  */
 export async function sendReactionAction(
@@ -154,26 +288,33 @@ export async function submitSessionRequestAction(
   const user = await requireAppUser();
   if (!sessionId) throw new Error("세션을 찾을 수 없어요");
 
-  const songTitle = clampString(
-    String(formData.get("song_title") ?? ""),
-    200
-  );
-  if (!songTitle) throw new Error("노래 제목을 입력해 주세요");
+  // kind 판정 — story_only 면 곡명 없이 사연만 + 익명 처리.
+  const kindRaw = String(formData.get("kind") ?? "song_request");
+  const kind: "song_request" | "story_only" =
+    kindRaw === "story_only" ? "story_only" : "song_request";
 
+  const songTitleRaw = clampString(String(formData.get("song_title") ?? ""), 200);
   const artist = clampString(String(formData.get("artist") ?? ""), 200);
   const story = clampString(String(formData.get("story") ?? ""), 500);
-  const childName = clampString(
-    String(formData.get("child_name") ?? ""),
-    50
-  );
+  const childName = clampString(String(formData.get("child_name") ?? ""), 50);
+
+  // 분기 검증
+  if (kind === "song_request") {
+    if (!songTitleRaw) throw new Error("노래 제목을 입력해 주세요");
+  } else {
+    if (!story) throw new Error("사연을 입력해 주세요");
+  }
+
+  const songTitle = kind === "song_request" ? songTitleRaw : null;
 
   const session = await loadFmSessionById(sessionId);
   if (!session) throw new Error("세션을 찾을 수 없어요");
   if (session.org_id !== user.orgId) {
     throw new Error("다른 기관의 방송에는 신청할 수 없어요");
   }
+  // LIVE 인 세션에만 신청 가능 — 방송 전 미리 받기는 운영상 혼란을 일으켜 비활성.
   if (!session.is_live) {
-    throw new Error("방송 중이 아닐 때는 신청 못해요");
+    throw new Error("방송 중일 때만 신청할 수 있어요");
   }
 
   const supabase = await createClient();
@@ -185,11 +326,14 @@ export async function submitSessionRequestAction(
     session_id: sessionId,
     user_id: user.id,
     song_title: songTitle,
-    artist,
+    // story_only 도 작성자 표시 — child_name 은 항상 저장.
+    artist: kind === "song_request" ? artist : null,
     story,
-    child_name: childName,
+    child_name: childName || null,
     heart_count: 0,
     status: "PENDING",
+    kind,
+    is_anonymous: false,
   } satisfies Row)) as { error: SbErr };
 
   if (resp.error) {
@@ -443,6 +587,375 @@ export async function markRequestPlayedAction(
   requestId: string
 ): Promise<void> {
   return setRequestStatus(requestId, "PLAYED");
+}
+
+/* ========================================================================== */
+/* BROADCAST QUEUE — 방송 대기 큐 + 재생 컨트롤                                  */
+/* ========================================================================== */
+
+/**
+ * "방송에 올리기" — 신청곡을 방송 대기 큐 끝에 추가.
+ *  - status='QUEUED', queue_position = 같은 세션 QUEUED 의 max+1
+ *  - 같은 세션의 다른 호스트와 동시 클릭 시 충돌 가능성 낮음 (LIVE 1명 운영)
+ */
+export async function queueRequestAction(requestId: string): Promise<void> {
+  const org = await requireOrg();
+  if (!requestId) throw new Error("신청곡을 찾을 수 없어요");
+
+  const supabase = await createClient();
+  const reqResp = (await (
+    supabase.from("tori_fm_requests" as never) as unknown as {
+      select: (c: string) => {
+        eq: (k: string, v: string) => {
+          maybeSingle: () => Promise<
+            SbRespOne<{ id: string; session_id: string; status: string }>
+          >;
+        };
+      };
+    }
+  )
+    .select("id, session_id, status")
+    .eq("id", requestId)
+    .maybeSingle()) as SbRespOne<{
+    id: string;
+    session_id: string;
+    status: string;
+  }>;
+
+  if (!reqResp.data) throw new Error("신청곡을 찾을 수 없어요");
+  if (reqResp.data.status === "PLAYING" || reqResp.data.status === "PLAYED") {
+    throw new Error("이미 방송된 곡이에요");
+  }
+  await assertSessionOwnedByOrg(reqResp.data.session_id, org.orgId);
+
+  // 같은 세션 QUEUED 의 max position + 1
+  const maxResp = (await (
+    supabase.from("tori_fm_requests" as never) as unknown as {
+      select: (c: string) => {
+        eq: (k: string, v: string) => {
+          eq: (k: string, v: string) => {
+            order: (
+              c: string,
+              o: { ascending: boolean; nullsFirst?: boolean }
+            ) => {
+              limit: (n: number) => Promise<{
+                data: Array<{ queue_position: number | null }> | null;
+              }>;
+            };
+          };
+        };
+      };
+    }
+  )
+    .select("queue_position")
+    .eq("session_id", reqResp.data.session_id)
+    .eq("status", "QUEUED")
+    .order("queue_position", { ascending: false, nullsFirst: false })
+    .limit(1)) as { data: Array<{ queue_position: number | null }> | null };
+
+  const maxPos = maxResp.data?.[0]?.queue_position ?? 0;
+  const nextPos = maxPos + 1;
+
+  const updResp = (await (
+    supabase.from("tori_fm_requests" as never) as unknown as {
+      update: (p: Row) => {
+        eq: (k: string, v: string) => Promise<{ error: SbErr }>;
+      };
+    }
+  )
+    .update({ status: "QUEUED", queue_position: nextPos })
+    .eq("id", requestId)) as { error: SbErr };
+
+  if (updResp.error) {
+    console.error("[fm/queueRequest] error", { code: updResp.error.code });
+    throw new Error("큐에 올리지 못했어요");
+  }
+
+  revalidateFm(reqResp.data.session_id, org.orgId);
+}
+
+/**
+ * 큐에서 빼기 — APPROVED 로 되돌림. queue_position NULL.
+ */
+export async function unqueueRequestAction(requestId: string): Promise<void> {
+  const org = await requireOrg();
+  if (!requestId) throw new Error("신청곡을 찾을 수 없어요");
+
+  const supabase = await createClient();
+  const reqResp = (await (
+    supabase.from("tori_fm_requests" as never) as unknown as {
+      select: (c: string) => {
+        eq: (k: string, v: string) => {
+          maybeSingle: () => Promise<
+            SbRespOne<{ id: string; session_id: string }>
+          >;
+        };
+      };
+    }
+  )
+    .select("id, session_id")
+    .eq("id", requestId)
+    .maybeSingle()) as SbRespOne<{ id: string; session_id: string }>;
+
+  if (!reqResp.data) throw new Error("신청곡을 찾을 수 없어요");
+  await assertSessionOwnedByOrg(reqResp.data.session_id, org.orgId);
+
+  await (
+    supabase.from("tori_fm_requests" as never) as unknown as {
+      update: (p: Row) => {
+        eq: (k: string, v: string) => Promise<{ error: SbErr }>;
+      };
+    }
+  )
+    .update({ status: "APPROVED", queue_position: null })
+    .eq("id", requestId);
+
+  revalidateFm(reqResp.data.session_id, org.orgId);
+}
+
+/**
+ * 큐 항목 위/아래 이동 — 같은 세션 인접 항목과 queue_position 스왑.
+ */
+export async function reorderQueueAction(
+  requestId: string,
+  direction: "up" | "down"
+): Promise<void> {
+  const org = await requireOrg();
+  if (!requestId) throw new Error("신청곡을 찾을 수 없어요");
+
+  const supabase = await createClient();
+  const reqResp = (await (
+    supabase.from("tori_fm_requests" as never) as unknown as {
+      select: (c: string) => {
+        eq: (k: string, v: string) => {
+          maybeSingle: () => Promise<
+            SbRespOne<{
+              id: string;
+              session_id: string;
+              status: string;
+              queue_position: number | null;
+            }>
+          >;
+        };
+      };
+    }
+  )
+    .select("id, session_id, status, queue_position")
+    .eq("id", requestId)
+    .maybeSingle()) as SbRespOne<{
+    id: string;
+    session_id: string;
+    status: string;
+    queue_position: number | null;
+  }>;
+
+  if (!reqResp.data) throw new Error("신청곡을 찾을 수 없어요");
+  if (reqResp.data.status !== "QUEUED" || reqResp.data.queue_position == null) {
+    throw new Error("큐에 올라간 항목만 이동할 수 있어요");
+  }
+  await assertSessionOwnedByOrg(reqResp.data.session_id, org.orgId);
+
+  const myPos = reqResp.data.queue_position;
+  const sessionId = reqResp.data.session_id;
+
+  // 인접 항목 찾기
+  const neighborResp = (await (
+    supabase.from("tori_fm_requests" as never) as unknown as {
+      select: (c: string) => {
+        eq: (k: string, v: string) => {
+          eq: (k: string, v: string) => {
+            order: (
+              c: string,
+              o: { ascending: boolean }
+            ) => {
+              limit: (n: number) => Promise<{
+                data: Array<{ id: string; queue_position: number | null }> | null;
+              }>;
+            };
+          };
+        };
+      };
+    }
+  )
+    .select("id, queue_position")
+    .eq("session_id", sessionId)
+    .eq("status", "QUEUED")
+    .order("queue_position", { ascending: direction === "up" })
+    .limit(20)) as {
+    data: Array<{ id: string; queue_position: number | null }> | null;
+  };
+
+  // direction='up' 이면 myPos 보다 작은 가장 큰 항목,
+  // direction='down' 이면 myPos 보다 큰 가장 작은 항목.
+  const neighbor = (neighborResp.data ?? []).find((r) => {
+    if (r.id === requestId || r.queue_position == null) return false;
+    return direction === "up"
+      ? r.queue_position < myPos
+      : r.queue_position > myPos;
+  });
+
+  if (!neighbor || neighbor.queue_position == null) {
+    return; // 끝점이라 이동 불가
+  }
+
+  // 두 항목 position 스왑
+  await (
+    supabase.from("tori_fm_requests" as never) as unknown as {
+      update: (p: Row) => {
+        eq: (k: string, v: string) => Promise<{ error: SbErr }>;
+      };
+    }
+  )
+    .update({ queue_position: neighbor.queue_position })
+    .eq("id", requestId);
+  await (
+    supabase.from("tori_fm_requests" as never) as unknown as {
+      update: (p: Row) => {
+        eq: (k: string, v: string) => Promise<{ error: SbErr }>;
+      };
+    }
+  )
+    .update({ queue_position: myPos })
+    .eq("id", neighbor.id);
+
+  revalidateFm(sessionId, org.orgId);
+}
+
+/**
+ * [▶ 다음 곡] — 현재 PLAYING 묶음 → PLAYED, 큐 첫 항목과 같은 곡(song_normalized)
+ * 사연들을 함께 PLAYING 으로 묶음 처리.
+ *  - 같은 song_normalized 의 PENDING/APPROVED/QUEUED 항목 모두 묶어 PLAYING.
+ *  - story_only(곡명 없음) 는 묶음 X — 한 row 만 PLAYING.
+ *  - 큐 비어있으면 단순히 PLAYING → PLAYED.
+ */
+export async function playNextFromQueueAction(
+  sessionId: string
+): Promise<{ playingId: string | null }> {
+  const org = await requireOrg();
+  if (!sessionId) throw new Error("세션을 찾을 수 없어요");
+  await assertSessionOwnedByOrg(sessionId, org.orgId);
+
+  const supabase = await createClient();
+
+  // 1) 현재 PLAYING 묶음 → PLAYED
+  await (
+    supabase.from("tori_fm_requests" as never) as unknown as {
+      update: (p: Row) => {
+        eq: (k: string, v: string) => {
+          eq: (k: string, v: string) => Promise<{ error: SbErr }>;
+        };
+      };
+    }
+  )
+    .update({ status: "PLAYED", queue_position: null })
+    .eq("session_id", sessionId)
+    .eq("status", "PLAYING");
+
+  // 2) 큐 첫 항목 (queue_position ASC) 조회 — kind/song_normalized 필요
+  const nextResp = (await (
+    supabase.from("tori_fm_requests" as never) as unknown as {
+      select: (c: string) => {
+        eq: (k: string, v: string) => {
+          eq: (k: string, v: string) => {
+            order: (
+              c: string,
+              o: { ascending: boolean; nullsFirst?: boolean }
+            ) => {
+              limit: (n: number) => {
+                maybeSingle: () => Promise<
+                  SbRespOne<{
+                    id: string;
+                    kind: string | null;
+                    song_normalized: string | null;
+                  }>
+                >;
+              };
+            };
+          };
+        };
+      };
+    }
+  )
+    .select("id, kind, song_normalized")
+    .eq("session_id", sessionId)
+    .eq("status", "QUEUED")
+    .order("queue_position", { ascending: true, nullsFirst: false })
+    .limit(1)
+    .maybeSingle()) as SbRespOne<{
+    id: string;
+    kind: string | null;
+    song_normalized: string | null;
+  }>;
+
+  if (!nextResp.data?.id) {
+    revalidateFm(sessionId, org.orgId);
+    return { playingId: null };
+  }
+
+  const next = nextResp.data;
+
+  // 3a) song_request + song_normalized 가 있으면 같은 곡 묶음 PLAYING
+  //     (PENDING/APPROVED/QUEUED 중 같은 song_normalized 모두 한번에)
+  const isBundleable =
+    (next.kind === "song_request" || next.kind === null) &&
+    !!next.song_normalized;
+
+  if (isBundleable) {
+    await (
+      supabase.from("tori_fm_requests" as never) as unknown as {
+        update: (p: Row) => {
+          eq: (k: string, v: string) => {
+            eq: (k: string, v: string) => {
+              in: (k: string, v: string[]) => Promise<{ error: SbErr }>;
+            };
+          };
+        };
+      }
+    )
+      .update({ status: "PLAYING", queue_position: null })
+      .eq("session_id", sessionId)
+      .eq("song_normalized", next.song_normalized as string)
+      .in("status", ["PENDING", "APPROVED", "QUEUED"]);
+  } else {
+    // 3b) story_only 또는 song_normalized 비어있는 경우 — 단일 row 만 PLAYING
+    await (
+      supabase.from("tori_fm_requests" as never) as unknown as {
+        update: (p: Row) => {
+          eq: (k: string, v: string) => Promise<{ error: SbErr }>;
+        };
+      }
+    )
+      .update({ status: "PLAYING", queue_position: null })
+      .eq("id", next.id);
+  }
+
+  revalidateFm(sessionId, org.orgId);
+  return { playingId: next.id };
+}
+
+/**
+ * [⏹ 정지] — 현재 PLAYING 을 PLAYED 로 (다음 곡 자동 X).
+ */
+export async function stopPlayingAction(sessionId: string): Promise<void> {
+  const org = await requireOrg();
+  if (!sessionId) throw new Error("세션을 찾을 수 없어요");
+  await assertSessionOwnedByOrg(sessionId, org.orgId);
+
+  const supabase = await createClient();
+  await (
+    supabase.from("tori_fm_requests" as never) as unknown as {
+      update: (p: Row) => {
+        eq: (k: string, v: string) => {
+          eq: (k: string, v: string) => Promise<{ error: SbErr }>;
+        };
+      };
+    }
+  )
+    .update({ status: "PLAYED", queue_position: null })
+    .eq("session_id", sessionId)
+    .eq("status", "PLAYING");
+
+  revalidateFm(sessionId, org.orgId);
 }
 
 /* ========================================================================== */

@@ -18,6 +18,8 @@ export interface OrgNavBadges {
   unpublishedPacks: number;
   pendingReview: number;
   fmLive: boolean;
+  /** 활성 LIVE 토리FM 세션 ID — QuickNoticeButton 이 BANNER spotlight 게시에 사용. */
+  liveFmSessionId: string | null;
   missingDocs: number;
 }
 
@@ -119,12 +121,15 @@ async function countUnpublishedPacks(orgId: string): Promise<number> {
   }
 }
 
-async function checkFmLive(orgId: string): Promise<boolean> {
+async function checkFmLive(
+  orgId: string
+): Promise<{ live: boolean; sessionId: string | null }> {
   try {
     const session = await loadLiveFmSessionForOrg(orgId);
-    return !!session?.is_live;
+    if (!session?.is_live) return { live: false, sessionId: null };
+    return { live: true, sessionId: session.id };
   } catch {
-    return false;
+    return { live: false, sessionId: null };
   }
 }
 
@@ -138,7 +143,7 @@ async function countMissingDocs(orgId: string): Promise<number> {
 }
 
 export async function loadOrgNavBadges(orgId: string): Promise<OrgNavBadges> {
-  const [draftEvents, unpublishedPacks, pendingReview, fmLive, missingDocs] =
+  const [draftEvents, unpublishedPacks, pendingReview, fm, missingDocs] =
     await Promise.all([
       countDraftEvents(orgId),
       countUnpublishedPacks(orgId),
@@ -150,7 +155,8 @@ export async function loadOrgNavBadges(orgId: string): Promise<OrgNavBadges> {
     draftEvents,
     unpublishedPacks,
     pendingReview,
-    fmLive,
+    fmLive: fm.live,
+    liveFmSessionId: fm.sessionId,
     missingDocs,
   };
 }

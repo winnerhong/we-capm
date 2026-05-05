@@ -15,6 +15,7 @@ import {
   type OrgQuestPackRow,
   type StampIconSet,
 } from "@/lib/missions/types";
+import { CoverImagePicker } from "@/components/cover-image-picker";
 
 type Props = {
   pack: OrgQuestPackRow;
@@ -226,6 +227,21 @@ export function PackInfoEditor({ pack, missionCount }: Props) {
 
           {/* 상태 전환 */}
           <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={onSave}
+              disabled={isPending || !dirty}
+              title={dirty ? "변경사항 저장" : "변경사항 없음"}
+              className={`inline-flex items-center gap-1 rounded-xl px-3 py-2 text-xs font-bold text-white shadow-sm transition disabled:cursor-not-allowed disabled:opacity-40 ${
+                dirty
+                  ? "bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-700 hover:to-rose-600 ring-2 ring-rose-400/40 animate-pulse"
+                  : "bg-rose-400"
+              }`}
+            >
+              <span aria-hidden>💾</span>
+              <span>{isPending ? "저장 중..." : "저장"}</span>
+            </button>
+
             {pack.status === "DRAFT" && (
               <button
                 type="button"
@@ -403,33 +419,16 @@ export function PackInfoEditor({ pack, missionCount }: Props) {
             </div>
           </Field>
 
-          <Field label="커버 이미지 URL (선택)" htmlFor="cover_image_url">
-            <input
-              id="cover_image_url"
-              type="url"
+          <Field label="커버 이미지 (선택)" htmlFor="cover_image_url">
+            <CoverImagePicker
               value={coverUrl}
-              onChange={(e) => {
-                setCoverUrl(e.target.value);
+              onChange={(url) => {
+                setCoverUrl(url);
                 markDirty();
               }}
-              placeholder="https://..."
-              className={inputCls}
-              autoComplete="off"
-              inputMode="url"
+              pathPrefix="quest-packs"
             />
           </Field>
-
-          <div className="pt-1">
-            <button
-              type="button"
-              onClick={onSave}
-              disabled={isPending}
-              className="inline-flex items-center gap-1 rounded-xl border border-[#D4E4BC] bg-white px-4 py-2.5 text-sm font-bold text-[#2D5A3D] transition hover:bg-[#F5F1E8] disabled:opacity-50"
-            >
-              <span aria-hidden>💾</span>
-              <span>저장</span>
-            </button>
-          </div>
         </div>
       </section>
     </div>

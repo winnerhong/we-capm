@@ -160,7 +160,7 @@ export async function createTrailAction(formData: FormData) {
     .map((v) => String(v).trim())
     .filter(Boolean);
 
-  const row: Row = {
+  const fullRow: Row = {
     partner_id: partner.id,
     name,
     description,
@@ -182,21 +182,58 @@ export async function createTrailAction(formData: FormData) {
     images,
   };
 
-  const { data, error } = await (
-    supabase.from("partner_trails" as never) as unknown as {
-      insert: (r: Row) => {
-        select: (c: string) => {
-          single: () => Promise<{
-            data: { id: string } | null;
-            error: { message: string } | null;
-          }>;
+  // 마이그레이션 20260505000000_trail_extra_fields.sql 가 적용되지 않은
+  // 환경에서도 동작하도록 — extra 컬럼이 없으면 빼고 재시도.
+  const EXTRA_COLS: (keyof Row)[] = [
+    "venue_name",
+    "venue_address",
+    "external_link",
+    "notes",
+    "images",
+  ];
+
+  const insertOnce = async (row: Row) =>
+    (
+      supabase.from("partner_trails" as never) as unknown as {
+        insert: (r: Row) => {
+          select: (c: string) => {
+            single: () => Promise<{
+              data: { id: string } | null;
+              error: { message: string; code?: string } | null;
+            }>;
+          };
         };
-      };
+      }
+    )
+      .insert(row)
+      .select("id")
+      .single();
+
+  let { data, error } = await insertOnce(fullRow);
+
+  // PostgREST 가 "Could not find the 'X' column" 으로 응답하면 X 만 빼고 재시도
+  if (error && /Could not find the '(\w+)' column/.test(error.message)) {
+    const missing = new Set<string>();
+    for (const m of error.message.matchAll(/Could not find the '(\w+)' column/g)) {
+      missing.add(m[1]);
     }
-  )
-    .insert(row)
-    .select("id")
-    .single();
+    // 문제의 컬럼 + 같은 마이그레이션의 형제 컬럼들도 함께 제거 (안전하게)
+    const stripped: Row = { ...fullRow };
+    for (const col of EXTRA_COLS) {
+      if (missing.has(col)) {
+        delete (stripped as Record<string, unknown>)[col];
+      }
+    }
+    // 재시도 시 검출된 missing 외에 EXTRA_COLS 도 모두 제거 (cascade)
+    for (const col of EXTRA_COLS) {
+      delete (stripped as Record<string, unknown>)[col];
+    }
+    console.warn(
+      "[trails/create] DB 마이그레이션 미적용 — extra 컬럼 제거 후 재시도:",
+      Array.from(missing).join(", ")
+    );
+    ({ data, error } = await insertOnce(stripped));
+  }
 
   if (error || !data) {
     console.error("[trails/create] error", error);
@@ -281,6 +318,62 @@ export async function updateTrailAction(id: string, formData: FormData) {
     .eq("id", id);
 
   if (error) throw new Error(`숲길 수정 실패: ${error.message}`);
+
+  // optional assignments (visibility=SELECTED 일 때만 의미 있음)
+  // hidden input "assigned_org_ids" (콤마 구분) 으로 전달
+  const assignedCsv = strOrNull(formData.get("assigned_org_ids"));
+  if (visibilityRaw === "SELECTED" && assignedCsv !== null) {
+    const orgIds = assignedCsv
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    // 기존 assignments 모두 삭제 후 재생성 (SELECTED 일 때만)
+    const { error: delErr } = await (
+      supabase.from("partner_trail_assignments" as never) as unknown as {
+        delete: () => {
+          eq: (k: string, v: string) => Promise<{
+            error: { message: string } | null;
+          }>;
+        };
+      }
+    )
+      .delete()
+      .eq("trail_id", id);
+    if (delErr) {
+      console.error("[trails/update] cleanup assignments error", delErr);
+    }
+
+    if (orgIds.length > 0) {
+      const rows = orgIds.map((oid) => ({ trail_id: id, org_id: oid }));
+      const { error: insErr } = await (
+        supabase.from("partner_trail_assignments" as never) as unknown as {
+          insert: (rows: Record<string, unknown>[]) => Promise<{
+            error: { message: string } | null;
+          }>;
+        }
+      ).insert(rows);
+      if (insErr) {
+        console.error("[trails/update] assignments insert error", insErr);
+      }
+    }
+  } else if (visibilityRaw && visibilityRaw !== "SELECTED") {
+    // SELECTED 가 아닌 visibility 로 변경된 경우 기존 assignments 정리
+    const { error: delErr } = await (
+      supabase.from("partner_trail_assignments" as never) as unknown as {
+        delete: () => {
+          eq: (k: string, v: string) => Promise<{
+            error: { message: string } | null;
+          }>;
+        };
+      }
+    )
+      .delete()
+      .eq("trail_id", id);
+    if (delErr) {
+      console.error("[trails/update] cleanup assignments error", delErr);
+    }
+  }
 
   revalidatePath("/partner/trails");
   revalidatePath(`/partner/trails/${id}`);

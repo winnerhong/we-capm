@@ -413,7 +413,8 @@ export async function moveMissionAction(
     throw new Error("스탬프북에 담긴 미션이 아니에요");
   }
 
-  // siblings sorted by display_order ASC
+  // siblings — display_order 가 모두 동일(legacy=0) 일 때도 안정적으로 정렬되도록
+  // 1차 키 display_order, 2차 키 created_at 사용
   const resp = (await (
     supabase.from("org_missions" as never) as unknown as {
       select: (c: string) => {
@@ -421,14 +422,20 @@ export async function moveMissionAction(
           order: (
             c: string,
             o: { ascending: boolean }
-          ) => Promise<{ data: OrgMissionRow[] | null }>;
+          ) => {
+            order: (
+              c: string,
+              o: { ascending: boolean }
+            ) => Promise<{ data: OrgMissionRow[] | null }>;
+          };
         };
       };
     }
   )
     .select("*")
     .eq("quest_pack_id", existing.quest_pack_id)
-    .order("display_order", { ascending: true })) as {
+    .order("display_order", { ascending: true })
+    .order("created_at", { ascending: true })) as {
     data: OrgMissionRow[] | null;
   };
 
@@ -439,45 +446,33 @@ export async function moveMissionAction(
   const neighborIdx = direction === "UP" ? idx - 1 : idx + 1;
   if (neighborIdx < 0 || neighborIdx >= list.length) return; // noop at edges
 
-  const me = list[idx];
-  const other = list[neighborIdx];
+  // 배열 자체에서 swap → 전체 재정렬 (legacy display_order=0 상황도 강건)
+  const reordered = [...list];
+  [reordered[idx], reordered[neighborIdx]] = [
+    reordered[neighborIdx],
+    reordered[idx],
+  ];
 
   const now = new Date().toISOString();
+  const api = supabase.from("org_missions" as never) as unknown as {
+    update: (r: Row) => {
+      eq: (
+        k: string,
+        v: string
+      ) => Promise<{ error: { message: string } | null }>;
+    };
+  };
 
-  // Swap display_order via two updates
-  const { error: e1 } = await (
-    supabase.from("org_missions" as never) as unknown as {
-      update: (r: Row) => {
-        eq: (
-          k: string,
-          v: string
-        ) => Promise<{ error: { message: string } | null }>;
-      };
-    }
-  )
-    .update({
-      display_order: other.display_order,
-      updated_at: now,
-    })
-    .eq("id", me.id);
-  if (e1) throw new Error(`순서 변경 실패: ${e1.message}`);
-
-  const { error: e2 } = await (
-    supabase.from("org_missions" as never) as unknown as {
-      update: (r: Row) => {
-        eq: (
-          k: string,
-          v: string
-        ) => Promise<{ error: { message: string } | null }>;
-      };
-    }
-  )
-    .update({
-      display_order: me.display_order,
-      updated_at: now,
-    })
-    .eq("id", other.id);
-  if (e2) throw new Error(`순서 변경 실패: ${e2.message}`);
+  // 모든 형제에게 0,1,2,... 새 display_order 일괄 부여.
+  // 같은 값이 한 row 라도 충돌 없음 (UNIQUE 제약 없음).
+  for (let i = 0; i < reordered.length; i++) {
+    const row = reordered[i];
+    if (row.display_order === i) continue; // skip noop
+    const { error } = await api
+      .update({ display_order: i, updated_at: now })
+      .eq("id", row.id);
+    if (error) throw new Error(`순서 변경 실패: ${error.message}`);
+  }
 
   revalidatePath(
     `/org/${session.orgId}/quest-packs/${existing.quest_pack_id}/edit`

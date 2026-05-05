@@ -48,6 +48,25 @@ export interface FaqItem {
   a: string;
 }
 
+/** 주차장 정보. parent program 의 parking_lots(JSONB 배열) 한 항목. */
+export interface ParkingLot {
+  name: string; // 1~50자 (예: "정문 주차장")
+  address: string; // 1~200자 (도로명 주소)
+  capacity?: number; // 정수 0~9999 (수용 대수)
+  fee?: string; // 1~50자 (예: "무료" / "1시간 무료" / "1,000원/시간")
+  note?: string; // 1~200자 (진입 안내, 주의사항)
+  image_url?: string; // 주차장 사진 (Supabase Storage public URL). 1~500자
+}
+
+/** 집결장소 단일. parent program 의 meeting_point(JSONB) 객체. */
+export interface MeetingPoint {
+  name: string; // 1~80자 (예: "센터 정문 광장")
+  address: string; // 1~200자
+  time?: string; // 1~50자 (예: "10:00 (시작 10분 전)")
+  note?: string; // 1~200자 (깃발 안내 등)
+  image_url?: string; // 집결장소 사진 (Supabase Storage public URL). 1~500자
+}
+
 export interface PartnerProgramRow {
   id: string;
   partner_id: string;
@@ -76,6 +95,10 @@ export interface PartnerProgramRow {
   rating_avg: number | null;
   rating_count: number;
   booking_count: number;
+  /** 주차장 배열. 비어있으면 [] (NULL 아님). 최대 10개 검증은 앱 레이어. */
+  parking_lots: ParkingLot[];
+  /** 집결장소 단일. 미설정이면 null. */
+  meeting_point: MeetingPoint | null;
   created_at: string;
 }
 
