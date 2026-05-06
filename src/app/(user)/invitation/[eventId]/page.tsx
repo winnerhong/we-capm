@@ -7,6 +7,7 @@ import { loadAppUserById, loadChildrenForUser } from "@/lib/app-user/queries";
 import { loadPartnerDisplayNameForOrg } from "@/lib/org-partner";
 import { loadTimelineSlots } from "@/lib/event-timeline/queries";
 import { SLOT_KIND_META } from "@/lib/event-timeline/types";
+import { createClient } from "@/lib/supabase/server";
 import { CopyButton } from "./copy-button";
 
 export const dynamic = "force-dynamic";
@@ -165,9 +166,26 @@ export default async function EventInvitationPage({
     () => null
   );
 
-  // 타임테이블 미리보기 (있으면 최대 6개 표시)
+  // 기관(어린이집/학교) 실제 이름 — partner_orgs.org_name. 푸터의 "이 초대합니다" 주체.
+  const supabase = await createClient();
+  const orgRowResp = (await (
+    supabase.from("partner_orgs" as never) as unknown as {
+      select: (c: string) => {
+        eq: (k: string, v: string) => {
+          maybeSingle: () => Promise<{
+            data: { org_name: string | null } | null;
+          }>;
+        };
+      };
+    }
+  )
+    .select("org_name")
+    .eq("id", event.org_id)
+    .maybeSingle()) as { data: { org_name: string | null } | null };
+  const inviterOrgName = orgRowResp.data?.org_name?.trim() || orgName || "";
+
+  // 타임테이블 — 행사 전체 흐름을 모두 노출 (참가자가 미리 보고 준비할 수 있도록)
   const slots = await loadTimelineSlots(eventId).catch(() => []);
-  const previewSlots = slots.slice(0, 6);
 
   // 자녀 이름 추출 (원생만)
   const enrolledNames = children
@@ -531,15 +549,15 @@ export default async function EventInvitationPage({
         </div>
       </section>
 
-      {/* ─── 타임테이블 미리보기 (있을 때만) ─── */}
-      {previewSlots.length > 0 && (
+      {/* ─── 타임테이블 — 전체 노출 ─── */}
+      {slots.length > 0 && (
         <section className="mx-auto max-w-md px-6 py-10">
           <h2 className="mb-4 flex items-center justify-center gap-2 text-base font-bold text-[#2D5A3D]">
             <span aria-hidden>🕐</span>
             <span>그날의 흐름</span>
           </h2>
           <ol className="relative space-y-3 border-l-2 border-emerald-200 pl-5">
-            {previewSlots.map((slot) => {
+            {slots.map((slot) => {
               const meta = SLOT_KIND_META[slot.slot_kind];
               const emoji = slot.icon_emoji || meta?.defaultEmoji || "🌲";
               return (
@@ -563,73 +581,77 @@ export default async function EventInvitationPage({
               );
             })}
           </ol>
-          {slots.length > previewSlots.length && (
-            <p className="mt-3 text-center text-[11px] text-[#8B7F75]">
-              외 {slots.length - previewSlots.length}개 더 있어요
-            </p>
-          )}
-          <div className="mt-4 text-center">
+        </section>
+      )}
+
+      {/* ─── CTA ─── */}
+      {/* 행사 LIVE 일 때만 "참여 확인 + 일정/미션/토리FM" 노출.
+          예정(DRAFT) 상태에서는 미션·FM 등 활성 기능은 아직 의미가 없어서 숨김. */}
+      {event.status === "LIVE" && (
+        <section className="mx-auto max-w-md px-6 py-8">
+          <Link
+            href="/home"
+            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#2D5A3D] to-[#3A7A52] px-6 py-4 text-base font-bold text-white shadow-lg transition hover:from-[#234a30] hover:to-[#2D5A3D]"
+          >
+            <span aria-hidden>🌲</span>
+            <span>참여 확인하기</span>
+            <span aria-hidden>→</span>
+          </Link>
+
+          <div className="mt-3 grid grid-cols-3 gap-2">
             <Link
               href="/schedule"
-              className="text-xs font-semibold text-[#2D5A3D] underline-offset-2 hover:underline"
+              className="flex flex-col items-center gap-0.5 rounded-xl border border-[#D4E4BC] bg-white px-2 py-3 text-[11px] font-semibold text-[#2D5A3D] transition hover:bg-[#F5F1E8]"
             >
-              📅 전체 일정 보기 →
+              <span className="text-base" aria-hidden>
+                📅
+              </span>
+              <span>일정</span>
+            </Link>
+            <Link
+              href="/stampbook"
+              className="flex flex-col items-center gap-0.5 rounded-xl border border-[#D4E4BC] bg-white px-2 py-3 text-[11px] font-semibold text-[#2D5A3D] transition hover:bg-[#F5F1E8]"
+            >
+              <span className="text-base" aria-hidden>
+                🎯
+              </span>
+              <span>미션</span>
+            </Link>
+            <Link
+              href="/tori-fm"
+              className="flex flex-col items-center gap-0.5 rounded-xl border border-[#D4E4BC] bg-white px-2 py-3 text-[11px] font-semibold text-[#2D5A3D] transition hover:bg-[#F5F1E8]"
+            >
+              <span className="text-base" aria-hidden>
+                📻
+              </span>
+              <span>토리FM</span>
             </Link>
           </div>
         </section>
       )}
 
-      {/* ─── CTA ─── */}
-      <section className="mx-auto max-w-md px-6 py-8">
-        <Link
-          href="/home"
-          className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#2D5A3D] to-[#3A7A52] px-6 py-4 text-base font-bold text-white shadow-lg transition hover:from-[#234a30] hover:to-[#2D5A3D]"
-        >
-          <span aria-hidden>🌲</span>
-          <span>참여 확인하기</span>
-          <span aria-hidden>→</span>
-        </Link>
-
-        <div className="mt-3 grid grid-cols-3 gap-2">
-          <Link
-            href="/schedule"
-            className="flex flex-col items-center gap-0.5 rounded-xl border border-[#D4E4BC] bg-white px-2 py-3 text-[11px] font-semibold text-[#2D5A3D] transition hover:bg-[#F5F1E8]"
-          >
-            <span className="text-base" aria-hidden>
-              📅
-            </span>
-            <span>일정</span>
-          </Link>
-          <Link
-            href="/missions"
-            className="flex flex-col items-center gap-0.5 rounded-xl border border-[#D4E4BC] bg-white px-2 py-3 text-[11px] font-semibold text-[#2D5A3D] transition hover:bg-[#F5F1E8]"
-          >
-            <span className="text-base" aria-hidden>
-              🎯
-            </span>
-            <span>미션</span>
-          </Link>
-          <Link
-            href="/tori-fm"
-            className="flex flex-col items-center gap-0.5 rounded-xl border border-[#D4E4BC] bg-white px-2 py-3 text-[11px] font-semibold text-[#2D5A3D] transition hover:bg-[#F5F1E8]"
-          >
-            <span className="text-base" aria-hidden>
-              📻
-            </span>
-            <span>토리FM</span>
-          </Link>
-        </div>
-
-      </section>
+      {/* DRAFT(예정) 행사 — 행사 시작 전 안내만 노출. 미션/FM 링크는 숨김. */}
+      {event.status === "DRAFT" && (
+        <section className="mx-auto max-w-md px-6 py-8">
+          <div className="rounded-2xl border border-amber-200 bg-amber-50/80 px-5 py-4 text-center">
+            <p className="text-sm font-bold text-amber-900">
+              🌱 행사 시작일에 다시 만나요
+            </p>
+            <p className="mt-1.5 text-[11px] text-amber-800/80">
+              행사가 시작되면 미션·라이브 방송이 활성화돼요.
+            </p>
+          </div>
+        </section>
+      )}
 
       {/* ─── 푸터 ─── */}
       <footer className="mx-auto max-w-md px-6 pb-12 pt-6 text-center text-[11px] text-[#8B7F75]">
-        {orgName && (
+        {inviterOrgName && (
           <p className="font-semibold text-[#2D5A3D]">
-            🌲 {orgName} 이(가) 초대합니다
+            🌲 {inviterOrgName} 이(가) 초대합니다
           </p>
         )}
-        <p className="mt-1">토리로 · 우리 아이 첫 캠프의 추억</p>
+        <p className="mt-1">토리로 · 우리 아이의 행복한 추억</p>
       </footer>
     </div>
   );

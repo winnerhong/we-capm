@@ -3,8 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "rimraf C:/Temp/we-camp-next && next dev -p 1000",
+    "dev": "rimraf .next C:/Temp/we-camp-next && next dev -p 1000",
     "dev:fast": "next dev -p 1000",
+    "clean": "rimraf .next C:/Temp/we-camp-next",
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",

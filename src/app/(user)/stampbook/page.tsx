@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireAppUser } from "@/lib/user-auth-guard";
+import { userHasAnyLiveEvent } from "@/lib/org-events/queries";
 import {
   loadOrgQuestPacks,
   loadOrgMissionsByQuestPack,
@@ -77,6 +78,8 @@ export default async function StampbookListPage({
   searchParams: Promise<{ filter?: string }>;
 }) {
   const user = await requireAppUser();
+  // 예정(DRAFT) 행사만 있는 참가자는 스탬프북 접근 차단 — 홈으로.
+  if (!(await userHasAnyLiveEvent(user.id))) redirect("/home");
   const { filter: rawFilter } = await searchParams;
   const filter: FilterKey =
     rawFilter === "done" ||

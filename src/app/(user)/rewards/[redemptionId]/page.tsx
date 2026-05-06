@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import QRCode from "qrcode";
 import { requireAppUser } from "@/lib/user-auth-guard";
+import { userHasAnyLiveEvent } from "@/lib/org-events/queries";
 import { createClient } from "@/lib/supabase/server";
 import type { MissionFinalRedemptionRow } from "@/lib/missions/types";
 import { AcornIcon } from "@/components/acorn-icon";
@@ -60,6 +61,8 @@ export default async function RewardRedemptionPage({
   params: Promise<{ redemptionId: string }>;
 }) {
   const user = await requireAppUser();
+  // 예정(DRAFT) 행사만 있는 참가자는 보상 티켓 차단.
+  if (!(await userHasAnyLiveEvent(user.id))) redirect("/home");
   const { redemptionId } = await params;
 
   const redemption = await loadRedemption(redemptionId);

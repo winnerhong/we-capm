@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { requireAppUser } from "@/lib/user-auth-guard";
+import { userHasAnyLiveEvent } from "@/lib/org-events/queries";
 import { loadChildrenForUser } from "@/lib/app-user/queries";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -62,6 +63,8 @@ export default async function MissionRunnerPage({
   params: Promise<{ orgMissionId: string }>;
 }) {
   const user = await requireAppUser();
+  // 예정(DRAFT) 행사만 있는 참가자는 미션 차단.
+  if (!(await userHasAnyLiveEvent(user.id))) redirect("/home");
   const { orgMissionId } = await params;
 
   const mission = await loadOrgMissionById(orgMissionId);

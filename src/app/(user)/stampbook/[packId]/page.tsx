@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { requireAppUser } from "@/lib/user-auth-guard";
+import { userHasAnyLiveEvent } from "@/lib/org-events/queries";
 import {
   loadOrgQuestPackById,
   loadOrgMissionsByQuestPack,
@@ -18,6 +19,8 @@ export default async function StampbookDetailPage({
   params: Promise<{ packId: string }>;
 }) {
   const user = await requireAppUser();
+  // 예정(DRAFT) 행사만 있는 참가자는 차단.
+  if (!(await userHasAnyLiveEvent(user.id))) redirect("/home");
   const { packId } = await params;
 
   const pack = await loadOrgQuestPackById(packId);

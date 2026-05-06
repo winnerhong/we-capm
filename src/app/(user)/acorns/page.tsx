@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
+import { redirect } from "next/navigation";
 import { requireAppUser } from "@/lib/user-auth-guard";
+import { userHasAnyLiveEvent } from "@/lib/org-events/queries";
 import {
   getAcornBalance,
   loadRecentAcornTransactions,
@@ -39,6 +41,8 @@ function formatWhen(iso: string): string {
 
 export default async function AcornsPage() {
   const user = await requireAppUser();
+  // 예정(DRAFT) 행사만 있는 참가자는 도토리 내역 차단.
+  if (!(await userHasAnyLiveEvent(user.id))) redirect("/home");
   const [balance, txs] = await Promise.all([
     getAcornBalance(user.id),
     loadRecentAcornTransactions(user.id, 20),

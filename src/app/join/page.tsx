@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { formatKorean } from "@/lib/phone";
@@ -46,14 +45,25 @@ export default function DirectJoinPage() {
           marketing: consent.marketing,
           thirdParty: consent.thirdParty,
           ageConfirm: consent.ageConfirm,
-        })) as { ok: boolean; message?: string; eventId?: string; name?: string };
+        })) as {
+          ok: boolean;
+          message?: string;
+          eventId?: string;
+          redirectTo?: string;
+          name?: string;
+        };
         if (!result.ok) {
           setError(result.message ?? "입장 실패");
           return;
         }
         setWelcomeName(result.name ?? "참가자");
+        const dest = result.redirectTo
+          ? result.redirectTo
+          : result.eventId
+            ? `/event/${result.eventId}`
+            : "/home";
         setTimeout(() => {
-          router.push(`/event/${result.eventId}`);
+          router.push(dest);
           router.refresh();
         }, 1000);
       } catch (err) {
@@ -108,15 +118,6 @@ export default function DirectJoinPage() {
         >
           {pending ? "확인 중..." : "입장하기"}
         </button>
-
-        <div className="flex justify-center gap-4 text-xs text-neutral-400">
-          <Link href="/manager" className="hover:text-violet-600">
-            행사 기관 →
-          </Link>
-          <Link href="/login" className="hover:text-violet-600">
-            관리자 →
-          </Link>
-        </div>
       </form>
     </main>
   );

@@ -187,9 +187,14 @@ function buildGroups(
           badge: reviewBadge,
         },
         {
-          label: "선물 수령",
-          href: `${base}/gifts/redeem`,
+          label: "선물함 모아보기",
+          href: `${base}/gifts`,
           icon: "🎁",
+        },
+        {
+          label: "선물 수령(매장)",
+          href: `${base}/gifts/redeem`,
+          icon: "🏪",
         },
       ],
     },

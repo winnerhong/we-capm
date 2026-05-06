@@ -117,45 +117,6 @@ function fmtClock(iso: string | null): string {
   return `${period} ${hh}:${pad2(m)}`;
 }
 
-function fmtDate(iso: string | null): string {
-  if (!iso) return "";
-  try {
-    return new Date(iso).toLocaleDateString("ko-KR", {
-      month: "2-digit",
-      day: "2-digit",
-    });
-  } catch {
-    return "";
-  }
-}
-
-type Tier = {
-  key: "sprout" | "bush" | "sapling" | "tree" | "forest";
-  name: string;
-  icon: string;
-  min: number;
-  max: number;
-};
-
-const TIERS: Tier[] = [
-  { key: "sprout", name: "새싹", icon: "🌱", min: 0, max: 9 },
-  { key: "bush", name: "덤불", icon: "🌿", min: 10, max: 49 },
-  { key: "sapling", name: "묘목", icon: "🪴", min: 50, max: 99 },
-  { key: "tree", name: "나무", icon: "🌳", min: 100, max: 499 },
-  { key: "forest", name: "숲", icon: "🌲", min: 500, max: Number.POSITIVE_INFINITY },
-];
-
-function currentTier(balance: number): Tier {
-  return (
-    TIERS.find((t) => balance >= t.min && balance <= t.max) ?? TIERS[0]
-  );
-}
-
-function nextTier(current: Tier): Tier | null {
-  const idx = TIERS.findIndex((t) => t.key === current.key);
-  return idx >= 0 && idx < TIERS.length - 1 ? TIERS[idx + 1] : null;
-}
-
 export default async function UserHomePage({
   searchParams,
 }: {
@@ -204,21 +165,6 @@ export default async function UserHomePage({
     enrolledChildren.length > 0
       ? `${enrolledChildren.map((c) => c.name).join("·")} 가족`
       : `${user.parentName || "보호자"}님`;
-
-  const tier = currentTier(acornBalance);
-  const next = nextTier(tier);
-  const nextLabel = next ? next.name : tier.name;
-  const nextIcon = next ? next.icon : tier.icon;
-  const remaining = next ? Math.max(0, next.min - acornBalance) : 0;
-  const progressPct = next
-    ? Math.min(
-        100,
-        Math.max(
-          0,
-          ((acornBalance - tier.min) / (next.min - tier.min)) * 100
-        )
-      )
-    : 100;
 
   // 선택된 행사가 DRAFT(예정) 상태면 — 참가자 포털은 초대장만 노출.
   // 스탬프북·미션·FM·온보딩 등은 행사가 LIVE 가 된 뒤에 활성화됨.
@@ -382,7 +328,7 @@ export default async function UserHomePage({
         </section>
       )}
 
-      {/* 행사 배너 / 선택기 */}
+      {/* 행사 배너 / 선택기 — 0개면 안내, 2개 이상이면 선택기. 1개면 숨김. */}
       {activeEvents.length === 0 ? (
         <section className="rounded-2xl border border-dashed border-[#D4E4BC] bg-white/70 p-4 text-center shadow-sm">
           <p className="text-sm font-bold text-[#2D5A3D]">
@@ -392,21 +338,7 @@ export default async function UserHomePage({
             담당자에게 문의해 주세요
           </p>
         </section>
-      ) : activeEvents.length === 1 && selectedEvent ? (
-        <section className="rounded-2xl border border-[#D4E4BC] bg-white/80 px-4 py-2.5 shadow-sm">
-          <p className="text-[11px] font-semibold text-[#6B6560]">
-            🎪 현재 행사
-          </p>
-          <p className="mt-0.5 text-sm font-bold text-[#2D5A3D]">
-            {selectedEvent.name}
-          </p>
-          {(selectedEvent.starts_at || selectedEvent.ends_at) && (
-            <p className="text-[11px] text-[#8B7F75]">
-              {fmtDate(selectedEvent.starts_at)} ~ {fmtDate(selectedEvent.ends_at)}
-            </p>
-          )}
-        </section>
-      ) : selectedEvent ? (
+      ) : activeEvents.length >= 2 && selectedEvent ? (
         <EventSelector events={activeEvents} selectedId={selectedEvent.id} />
       ) : null}
 
@@ -453,97 +385,6 @@ export default async function UserHomePage({
         </section>
       )}
 
-      {/* 오늘의 숲길 */}
-      <Link
-        href="/stamps"
-        className="block overflow-hidden rounded-3xl bg-gradient-to-br from-[#FAE7D0] to-[#C4956A] p-5 shadow-sm transition hover:shadow-md active:scale-[0.995]"
-      >
-        <p className="text-xs font-bold uppercase tracking-wide text-[#6B4423]/80">
-          오늘의 숲길
-        </p>
-        <h2 className="mt-1 text-lg font-bold text-[#6B4423]">
-          🌄 숲에서의 하루가 마무리됐어요
-        </h2>
-        <p className="mt-2 inline-flex items-center gap-1 text-sm font-bold text-[#6B4423]">
-          오늘의 걸음 돌아보기 <span aria-hidden>→</span>
-        </p>
-      </Link>
-
-      {/* 나의 나무 */}
-      <section className="space-y-3 rounded-3xl border border-[#D4E4BC] bg-[#E8F0E4] p-5 shadow-sm">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <p className="text-xs font-semibold text-[#6B6560]">나의 나무</p>
-            <p className="mt-1 flex items-center gap-1.5 text-xl font-bold text-[#2D5A3D]">
-              <span aria-hidden>{tier.icon}</span>
-              <span>{tier.name}</span>
-            </p>
-          </div>
-          <div className="text-right">
-            <p className="text-2xl font-bold tabular-nums text-[#2D5A3D]">
-              {acornBalance}{" "}
-              <AcornIcon size={20} />
-            </p>
-            <p className="text-[11px] text-[#6B6560]">도토리</p>
-          </div>
-        </div>
-
-        {/* Progress bar */}
-        <div
-          className="h-3 w-full overflow-hidden rounded-full bg-white/80"
-          role="progressbar"
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-valuenow={Math.round(progressPct)}
-          aria-label={`다음 단계 ${nextLabel}까지 진행도`}
-        >
-          <div
-            className="h-full rounded-full bg-gradient-to-r from-[#3A7A52] to-[#4A7C59] transition-all"
-            style={{ width: `${progressPct}%` }}
-          />
-        </div>
-        <p className="text-xs font-semibold text-[#2D5A3D]">
-          <span aria-hidden>{nextIcon}</span> {nextLabel}까지{" "}
-          <span className="tabular-nums">{remaining}</span>
-          <AcornIcon />
-        </p>
-
-        {/* Tier strip */}
-        <ul className="flex items-center justify-between pt-1">
-          {TIERS.map((t) => {
-            const active = t.key === tier.key;
-            return (
-              <li
-                key={t.key}
-                className={`flex flex-col items-center gap-1 rounded-2xl px-2 py-1.5 ${
-                  active
-                    ? "bg-white text-[#2D5A3D] shadow-sm ring-2 ring-[#3A7A52]/40"
-                    : "text-[#8B7F75]"
-                }`}
-                aria-current={active ? "step" : undefined}
-              >
-                <span className="text-xl" aria-hidden>
-                  {t.icon}
-                </span>
-                <span className="text-[10px] font-semibold">{t.name}</span>
-              </li>
-            );
-          })}
-        </ul>
-      </section>
-
-      {/* 진행 중 스탬프 placeholder */}
-      <section className="rounded-3xl border-2 border-dashed border-[#D4E4BC] bg-white/60 p-5 text-center">
-        <p className="text-sm font-bold text-[#2D5A3D]">
-          🤖 토리가 추천하는 숲길{" "}
-          <span className="inline-block rounded-md bg-[#FAE7D0] px-1.5 py-0.5 text-[10px] font-bold text-[#6B4423]">
-            준비 중
-          </span>
-        </p>
-        <p className="mt-1.5 text-xs text-[#6B6560]">
-          당신에게 딱 맞는 숲길을 찾는 중…
-        </p>
-      </section>
     </div>
   );
 }

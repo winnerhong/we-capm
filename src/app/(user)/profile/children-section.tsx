@@ -296,15 +296,9 @@ function ChildForm({
           성별
         </label>
         <div
-          className="grid grid-cols-3 gap-1 rounded-xl border border-[#D4E4BC] bg-white p-1"
+          className="grid grid-cols-2 gap-1 rounded-xl border border-[#D4E4BC] bg-white p-1"
           role="radiogroup"
         >
-          <ToggleButton
-            active={gender === ""}
-            onClick={() => setGender("")}
-            label="선택 안 함"
-            activeCls="bg-[#E8E0D0] text-[#6B6560]"
-          />
           <ToggleButton
             active={gender === "M"}
             onClick={() => setGender("M")}

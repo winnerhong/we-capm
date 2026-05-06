@@ -136,6 +136,9 @@ export async function POST(request: Request) {
   }
 
   // 1) app_users 조회 (연락처만으로)
+  const SELECT_COLS =
+    "id, phone, password_hash, parent_name, org_id, acorn_balance, status, notification_consent, first_login_at, last_login_at, created_at";
+
   const userResp = (await (
     supabase.from("app_users" as never) as unknown as {
       select: (c: string) => {
@@ -145,13 +148,56 @@ export async function POST(request: Request) {
       };
     }
   )
-    .select(
-      "id, phone, password_hash, parent_name, org_id, acorn_balance, status, notification_consent, first_login_at, last_login_at, created_at"
-    )
+    .select(SELECT_COLS)
     .eq("phone", phone)
     .maybeSingle()) as SbRespOne<AppUserRow>;
 
-  const user = userResp.data;
+  let user = userResp.data;
+
+  // 1-fallback) 레거시 데이터가 하이픈/공백 포함으로 저장된 경우 대비 — 변형 매칭.
+  // 예) "010-9299-9252", "010 9299 9252", " 01092999252 ".
+  if (!user && phone.length === 11 && phone.startsWith("010")) {
+    const a = phone.slice(0, 3);
+    const b = phone.slice(3, 7);
+    const c = phone.slice(7);
+    const variants = [
+      `${a}-${b}-${c}`,
+      `${a} ${b} ${c}`,
+      `${a}-${b}-${c} `,
+      ` ${a}-${b}-${c}`,
+      ` ${phone} `,
+    ];
+    const fbResp = (await (
+      supabase.from("app_users" as never) as unknown as {
+        select: (c: string) => {
+          in: (k: string, v: string[]) => {
+            limit: (n: number) => Promise<{ data: AppUserRow[] | null }>;
+          };
+        };
+      }
+    )
+      .select(SELECT_COLS)
+      .in("phone", variants)
+      .limit(1)) as { data: AppUserRow[] | null };
+
+    if (fbResp.data && fbResp.data.length > 0) {
+      user = fbResp.data[0];
+      // best-effort 정규화 — 다음부터는 exact 매칭이 즉시 성공
+      try {
+        await (
+          supabase.from("app_users" as never) as unknown as {
+            update: (p: unknown) => {
+              eq: (k: string, v: string) => Promise<{ error: unknown }>;
+            };
+          }
+        )
+          .update({ phone } as never)
+          .eq("id", user.id);
+      } catch {
+        /* ignore */
+      }
+    }
+  }
 
   if (!user) {
     // event_id 가 제공되면 self-register 흐름 시도.

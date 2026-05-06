@@ -2,7 +2,9 @@
 // Phase 2.E — Realtime 구독(LiveFmRefresher) 마운트로 LIVE 전환/곡 교체 즉시 반영.
 
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { requireAppUser } from "@/lib/user-auth-guard";
+import { userHasAnyLiveEvent } from "@/lib/org-events/queries";
 import { loadChildrenForUser } from "@/lib/app-user/queries";
 import {
   loadLiveFmSessionForOrg,
@@ -30,6 +32,8 @@ export const dynamic = "force-dynamic";
 
 export default async function ToriFmPage() {
   const user = await requireAppUser();
+  // 예정(DRAFT) 행사만 있는 참가자는 FM 차단.
+  if (!(await userHasAnyLiveEvent(user.id))) redirect("/home");
   const [liveSession, allSessions, radioMission, brandName, children] =
     await Promise.all([
       loadLiveFmSessionForOrg(user.orgId),

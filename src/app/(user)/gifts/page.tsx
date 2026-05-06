@@ -1,6 +1,8 @@
 // 참가자 선물함 — SSR. user_gifts 를 그대로 보여주고, QR 보기는 클라이언트 모달이 담당.
 
+import { redirect } from "next/navigation";
 import { requireAppUser } from "@/lib/user-auth-guard";
+import { userHasAnyLiveEvent } from "@/lib/org-events/queries";
 import { loadUserGifts } from "@/lib/gifts/queries";
 import {
   GIFT_SOURCE_LABELS,
@@ -45,6 +47,8 @@ function daysUntilExpire(iso: string | null, now: Date = new Date()): number | n
 
 export default async function UserGiftsPage() {
   const user = await requireAppUser();
+  // 예정(DRAFT) 행사만 있는 참가자는 선물함 차단.
+  if (!(await userHasAnyLiveEvent(user.id))) redirect("/home");
   const gifts = await loadUserGifts(user.id);
   const now = new Date();
 

@@ -1,7 +1,9 @@
 // 돌발 미션 인박스 — LIVE broadcasts for user's org.
 
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { requireAppUser } from "@/lib/user-auth-guard";
+import { userHasAnyLiveEvent } from "@/lib/org-events/queries";
 import {
   loadLiveBroadcastsForOrg,
   loadOrgMissionById,
@@ -15,6 +17,8 @@ export const dynamic = "force-dynamic";
 
 export default async function BroadcastsInboxPage() {
   const user = await requireAppUser();
+  // 예정(DRAFT) 행사만 있는 참가자는 돌발 미션 인박스 차단.
+  if (!(await userHasAnyLiveEvent(user.id))) redirect("/home");
   const live = await loadLiveBroadcastsForOrg(user.orgId);
 
   // 각 broadcast 의 org_mission 로드 (title 필요)

@@ -606,6 +606,17 @@ export async function loadActiveEventsForUser(
 }
 
 /**
+ * 참가자가 LIVE 행사를 1개라도 보유하는지 빠르게 체크.
+ * - true  → 스탬프북/미션/FM/방송 등 풀 기능 노출
+ * - false → 초대장(예정) 모드 — 보호 라우트는 /home 으로 리다이렉트
+ */
+export async function userHasAnyLiveEvent(userId: string): Promise<boolean> {
+  if (!userId) return false;
+  const events = await loadActiveEventsForUser(userId);
+  return events.length > 0;
+}
+
+/**
  * 참가자가 참여 중인 LIVE + DRAFT(예정) 행사 목록.
  * - DRAFT 행사는 참가자 포털에서 "초대장만" 노출하기 위해 필요.
  * - 참가자가 본인 등록을 확인하고 D-day 카운트다운을 볼 수 있게 함.

@@ -24,6 +24,7 @@ import {
 type Row = Record<string, unknown>;
 type SbErr = { message: string; code?: string } | null;
 type SbRespOne<T> = { data: T | null; error: SbErr };
+type SbResp<T> = { data: T[] | null; error: SbErr };
 
 const DEFAULT_EXPIRES_IN_DAYS = 30;
 const COUPON_RETRY_LIMIT = 10;
@@ -384,5 +385,216 @@ export async function cancelGiftAction(giftId: string): Promise<void> {
   revalidatePath("/gifts");
   revalidatePath(`/org/${org.orgId}/gifts`);
   revalidatePath(`/org/${org.orgId}/gifts/redeem`);
+}
+
+/* ========================================================================== */
+/* 4) extendGiftExpiryAction — STAFF                                          */
+/* ========================================================================== */
+
+/**
+ * 만료일 연장 — pending 건만 가능. 기준은 max(현재 expires_at, now()) + days.
+ *  - 이미 만료(expired) / 수령(redeemed) / 취소(cancelled) 면 거부.
+ *  - days 1~365 만 허용.
+ */
+export async function extendGiftExpiryAction(
+  giftId: string,
+  days: number
+): Promise<void> {
+  const org = await requireOrg();
+  const id = (giftId ?? "").trim();
+  if (!id) throw new Error("선물 정보가 없어요");
+  const d = Math.floor(Number(days));
+  if (!Number.isFinite(d) || d < 1 || d > 365) {
+    throw new Error("연장 일수는 1~365 사이로 입력해 주세요");
+  }
+
+  const supabase = await createClient();
+
+  const resp = (await (
+    supabase.from("user_gifts" as never) as unknown as {
+      select: (c: string) => {
+        eq: (k: string, v: string) => {
+          maybeSingle: () => Promise<SbRespOne<UserGiftRow>>;
+        };
+      };
+    }
+  )
+    .select("*")
+    .eq("id", id)
+    .maybeSingle()) as SbRespOne<UserGiftRow>;
+
+  const gift = resp.data;
+  if (!gift) throw new Error("선물을 찾을 수 없어요");
+  if (gift.org_id !== org.orgId) {
+    throw new Error("다른 기관의 선물은 변경할 수 없어요");
+  }
+  if (gift.status !== "pending") {
+    throw new Error("미수령(대기) 상태만 연장할 수 있어요");
+  }
+
+  const baseMs = Math.max(
+    Date.now(),
+    gift.expires_at ? new Date(gift.expires_at).getTime() : Date.now()
+  );
+  const newExpiresAt = new Date(baseMs + d * 24 * 60 * 60 * 1000).toISOString();
+
+  const updResp = (await (
+    supabase.from("user_gifts" as never) as unknown as {
+      update: (p: Row) => {
+        eq: (k: string, v: string) => {
+          eq: (k: string, v: string) => Promise<{ error: SbErr }>;
+        };
+      };
+    }
+  )
+    .update({ expires_at: newExpiresAt })
+    .eq("id", id)
+    .eq("status", "pending")) as { error: SbErr };
+
+  if (updResp.error) {
+    console.error("[gifts/extend] error", { code: updResp.error.code });
+    throw new Error("만료일 연장에 실패했어요");
+  }
+
+  revalidatePath(`/org/${org.orgId}/gifts`);
+}
+
+/* ========================================================================== */
+/* 5) expireOverdueGiftsAction — STAFF (기간 지난 pending 일괄 expired)        */
+/* ========================================================================== */
+
+/**
+ * 현재 org 의 expires_at < now AND status='pending' 건들을 expired 로 일괄 갱신.
+ * 결과는 갱신된 건수.
+ */
+export async function expireOverdueGiftsAction(): Promise<{ count: number }> {
+  const org = await requireOrg();
+  const supabase = await createClient();
+  const nowIso = new Date().toISOString();
+
+  const resp = (await (
+    supabase.from("user_gifts" as never) as unknown as {
+      update: (p: Row) => {
+        eq: (k: string, v: string) => {
+          eq: (k: string, v: string) => {
+            lt: (k: string, v: string) => {
+              select: (c: string) => Promise<SbResp<{ id: string }>>;
+            };
+          };
+        };
+      };
+    }
+  )
+    .update({ status: "expired" })
+    .eq("org_id", org.orgId)
+    .eq("status", "pending")
+    .lt("expires_at", nowIso)
+    .select("id")) as SbResp<{ id: string }>;
+
+  if (resp.error) {
+    console.error("[gifts/expireOverdue] error", { code: resp.error.code });
+    throw new Error("만료 정리에 실패했어요");
+  }
+
+  revalidatePath(`/org/${org.orgId}/gifts`);
+  return { count: resp.data?.length ?? 0 };
+}
+
+/* ========================================================================== */
+/* 6) bulkManualGrantAction — STAFF (참가자 다수에게 동일 선물 일괄 발급)      */
+/* ========================================================================== */
+
+/**
+ * 기관 staff 가 임의의 user 들에게 동일 선물을 일괄 발급.
+ *  - source_type 은 항상 'manual_grant'
+ *  - source_id 는 동일 발급 묶음(batch) 식별 위해 무작위 uuid 1개 공유 (멱등 가드 실효 — 명시적 중복 발급 허용)
+ *  - userIds 가 빈 배열이면 즉시 0건 반환.
+ *  - 각 userId 마다 grantGiftAction 호출 → 실패한 건은 errors[] 에 누적.
+ */
+export async function bulkManualGrantAction(input: {
+  userIds: string[];
+  giftLabel: string;
+  message?: string | null;
+  expiresInDays?: number;
+}): Promise<{
+  granted: number;
+  failed: Array<{ userId: string; reason: string }>;
+}> {
+  const org = await requireOrg();
+  const ids = Array.isArray(input.userIds)
+    ? input.userIds.map((s) => (s ?? "").trim()).filter(Boolean)
+    : [];
+  if (ids.length === 0) return { granted: 0, failed: [] };
+
+  const giftLabel = (input.giftLabel ?? "").trim();
+  if (!giftLabel) throw new Error("선물 이름을 입력해 주세요");
+
+  const message = (input.message ?? "").trim() || null;
+  const days =
+    typeof input.expiresInDays === "number"
+      ? Math.floor(input.expiresInDays)
+      : DEFAULT_EXPIRES_IN_DAYS;
+
+  const supabase = await createClient();
+
+  // 받는 사람 표시명 — app_users.parent_name 우선, 없으면 phone 뒷4자리.
+  type AppUserMin = {
+    id: string;
+    parent_name: string | null;
+    phone: string | null;
+    org_id: string;
+  };
+  const userResp = (await (
+    supabase.from("app_users" as never) as unknown as {
+      select: (c: string) => {
+        in: (k: string, v: string[]) => Promise<SbResp<AppUserMin>>;
+      };
+    }
+  )
+    .select("id, parent_name, phone, org_id")
+    .in("id", ids)) as SbResp<AppUserMin>;
+
+  const userMap = new Map<string, AppUserMin>();
+  for (const u of userResp.data ?? []) userMap.set(u.id, u);
+
+  const failed: Array<{ userId: string; reason: string }> = [];
+  let granted = 0;
+
+  for (const userId of ids) {
+    const u = userMap.get(userId);
+    if (!u) {
+      failed.push({ userId, reason: "사용자를 찾을 수 없음" });
+      continue;
+    }
+    if (u.org_id !== org.orgId) {
+      failed.push({ userId, reason: "다른 기관 사용자" });
+      continue;
+    }
+    const displayName =
+      (u.parent_name && u.parent_name.trim()) ||
+      (u.phone ? `010-${u.phone.slice(-4)}` : "참가자");
+
+    try {
+      await grantGiftAction({
+        userId,
+        orgId: org.orgId,
+        sourceType: "manual_grant",
+        sourceId: null,
+        displayName,
+        giftLabel,
+        message,
+        expiresInDays: days,
+      });
+      granted += 1;
+    } catch (err) {
+      failed.push({
+        userId,
+        reason: err instanceof Error ? err.message : "발급 실패",
+      });
+    }
+  }
+
+  revalidatePath(`/org/${org.orgId}/gifts`);
+  return { granted, failed };
 }
 
