@@ -8,34 +8,18 @@ import { loadPartnerDisplayNameForOrg } from "@/lib/org-partner";
 import { loadTimelineSlots } from "@/lib/event-timeline/queries";
 import { SLOT_KIND_META } from "@/lib/event-timeline/types";
 import { createClient } from "@/lib/supabase/server";
+// 시간 포맷은 KST 강제 (SSR/CSR 일치 보장).
+import {
+  fmtAmPmClockKst,
+  fmtClockKstAlways,
+  fmtKoreanLongDateKst,
+} from "@/lib/datetime/kst";
 import { CopyButton } from "./copy-button";
 
 export const dynamic = "force-dynamic";
 
-const WEEKDAY = ["일", "월", "화", "수", "목", "금", "토"];
-
-function pad2(n: number): string {
-  return n < 10 ? `0${n}` : `${n}`;
-}
-
-function fmtFullDate(iso: string | null): string {
-  if (!iso) return "-";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "-";
-  return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일 (${WEEKDAY[d.getDay()]})`;
-}
-
-function fmtClock(iso: string | null): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  const h = d.getHours();
-  const m = d.getMinutes();
-  if (h === 0 && m === 0) return "";
-  const period = h < 12 ? "오전" : "오후";
-  const hh = h === 0 ? 12 : h > 12 ? h - 12 : h;
-  return `${period} ${hh}:${pad2(m)}`;
-}
+const fmtFullDate = fmtKoreanLongDateKst;
+const fmtClock = fmtAmPmClockKst;
 
 function fmtDuration(startsAt: string | null, endsAt: string | null): string {
   if (!startsAt || !endsAt) return "";
@@ -54,9 +38,7 @@ function fmtDuration(startsAt: string | null, endsAt: string | null): string {
 }
 
 function fmtSlotTime(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "-";
-  return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+  return fmtClockKstAlways(iso);
 }
 
 /** 행사 시작까지 남은 일수. 오늘이면 0, 지났으면 음수. */

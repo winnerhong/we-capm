@@ -40,19 +40,20 @@ type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
 /* -------------------------------------------------------------------------- */
 
 /**
- * 6자 페어 코드 — 시각적 혼동 문자(I, O, 0, 1) 제거.
+ * 4자리 숫자 페어 코드 ("0000"~"9999").
+ *  - 모바일 numeric 키패드 친화, 종이 QR + 수기 입력에 간결.
+ *  - 알파벳 공간 10,000 — 만료/완료/취소 후 재사용 허용(부분 UNIQUE 인덱스).
+ *  - 충돌 시 호출부에서 재시도 (최대 RETRY 회).
  */
 function genPairCode(): string {
-  const chars = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
-  let code = "";
-  for (let i = 0; i < 6; i++) {
-    code += chars[Math.floor(Math.random() * chars.length)];
-  }
-  return code;
+  const n = Math.floor(Math.random() * 10000);
+  return n.toString().padStart(4, "0");
 }
 
+/** 숫자만 추출 + 4자리 보존. 사용자 입력(공백/하이픈) 정규화. */
 function normalizePairCode(raw: string): string {
-  return (raw ?? "").trim().toUpperCase();
+  const digits = (raw ?? "").replace(/\D/g, "");
+  return digits.slice(0, 4);
 }
 
 function activeStateOrThrow(state: CoopSessionState): void {
@@ -266,9 +267,10 @@ export async function createCoopSessionAction(
     Date.now() + matchWindowMin * 60 * 1000
   ).toISOString();
 
-  // pair_code 유니크 충돌 시 최대 5회 재시도
+  // pair_code 충돌 시 최대 10회 재시도 (4자리 숫자라 활성 세션 많으면 충돌 빈발).
+  // 부분 UNIQUE 인덱스 덕분에 만료/완료/취소된 코드는 다시 사용 가능.
   let lastErr: SbErr = null;
-  for (let attempt = 0; attempt < 5; attempt++) {
+  for (let attempt = 0; attempt < 10; attempt++) {
     const pairCode = genPairCode();
     const insertResp = (await (
       supabase.from("mission_coop_sessions" as never) as unknown as {
@@ -327,8 +329,8 @@ export async function joinCoopSessionAction(
   if (!orgMissionId) throw new Error("미션을 찾을 수 없어요");
 
   const code = normalizePairCode(pairCode);
-  if (!code || code.length < 4) {
-    throw new Error("페어 코드를 입력해 주세요");
+  if (!code || code.length !== 4) {
+    throw new Error("페어 코드 4자리 숫자를 입력해 주세요");
   }
 
   const session = await loadCoopSessionByPairCode(code);

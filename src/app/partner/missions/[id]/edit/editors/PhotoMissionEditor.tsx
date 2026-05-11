@@ -160,10 +160,11 @@ export function PhotoMissionEditor({ mission }: Props) {
         await updatePartnerMissionAction(mission.id, fd);
         if (publish) {
           await publishMissionAction(mission.id);
-          setMsg({ kind: "ok", text: "게시했어요! 기관에서 바로 볼 수 있어요." });
-        } else {
-          setMsg({ kind: "ok", text: "저장했어요." });
+          // 게시 후엔 같은 화면에 머무르지 않고 미션 목록으로 이동 — 상단 배너 표시.
+          router.push(`/partner/missions?published=1&id=${mission.id}`);
+          return;
         }
+        setMsg({ kind: "ok", text: "저장했어요." });
         setDirty(false);
         router.refresh();
       } catch (e) {
@@ -178,8 +179,8 @@ export function PhotoMissionEditor({ mission }: Props) {
     startTransition(async () => {
       try {
         await archiveMissionAction(mission.id);
-        setMsg({ kind: "ok", text: "보관했어요." });
-        router.refresh();
+        router.push(`/partner/missions?archived=1&id=${mission.id}`);
+        return;
       } catch (e) {
         setMsg({
           kind: "error",

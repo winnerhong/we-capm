@@ -242,10 +242,13 @@ export function EditEventForm({
     }
 
     const fd = new FormData();
+    // 사용자 입력은 KST 로 가정 — "+09:00" 명시해서 서버가 정확한 UTC instant 로 변환.
+    const toKstIso = (v: string) => (v ? `${v}:00+09:00` : "");
+
     fd.set("name", trimmed);
     fd.set("description", description.trim());
-    fd.set("starts_at", startsAt);
-    fd.set("ends_at", endsAt);
+    fd.set("starts_at", toKstIso(startsAt));
+    fd.set("ends_at", toKstIso(endsAt));
     fd.set("cover_image_url", coverUrl.trim());
     fd.set("status", status);
     // 체크박스 전용: backend 가 "on" / 미전송으로 true/false 판단하는 관례와 동일.

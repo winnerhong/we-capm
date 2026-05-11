@@ -5,6 +5,7 @@ import {
   type OrgEventStatus,
   type OrgEventSummaryRow,
 } from "@/lib/org-events/types";
+import { fmtClockKst, fmtFullDateKst } from "@/lib/datetime/kst";
 import { EventStatusToggle } from "./status-toggle";
 
 export const dynamic = "force-dynamic";
@@ -19,30 +20,14 @@ const STATUS_TABS: { key: StatusFilter; label: string }[] = [
   { key: "ARCHIVED", label: "보관" },
 ];
 
-const WEEKDAY = ["일", "월", "화", "수", "목", "금", "토"];
-
-function pad2(n: number): string {
-  return n < 10 ? `0${n}` : `${n}`;
-}
-
-/** "2026.05.16(토)" — 날짜 + 요일 한글 약어 */
-function fmtDateWeekday(iso: string | null): string {
+/** "2026.05.16(토)" — KST 강제 (SSR/CSR 일치). 공백 없는 라벨로. */
+const fmtDateWeekday = (iso: string | null): string => {
   if (!iso) return "-";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "-";
-  return `${d.getFullYear()}.${pad2(d.getMonth() + 1)}.${pad2(d.getDate())}(${WEEKDAY[d.getDay()]})`;
-}
+  return fmtFullDateKst(iso).replace(" (", "(");
+};
 
-/** "10:00" — 자정(0:00)은 시간 미지정으로 간주해 빈 문자열 */
-function fmtClock(iso: string | null): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  const h = d.getHours();
-  const m = d.getMinutes();
-  if (h === 0 && m === 0) return "";
-  return `${pad2(h)}:${pad2(m)}`;
-}
+/** "10:00" — 자정은 빈 문자열, KST 강제. */
+const fmtClock = (iso: string | null): string => fmtClockKst(iso);
 
 /** "3시간" / "1시간 30분" / "2일 3시간" 식 사람-친화 라벨 */
 function fmtDurationFromMs(ms: number): string {

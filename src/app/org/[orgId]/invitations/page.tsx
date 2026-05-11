@@ -1,22 +1,12 @@
 import Link from "next/link";
 import { requireOrg } from "@/lib/org-auth-guard";
 import { loadOrgEvents } from "@/lib/org-events/queries";
+import { fmtFullDateKst } from "@/lib/datetime/kst";
 import { InvitationCardShare } from "./invitation-card-share";
 
 export const dynamic = "force-dynamic";
 
-const WEEKDAY = ["일", "월", "화", "수", "목", "금", "토"];
-
-function pad2(n: number): string {
-  return n < 10 ? `0${n}` : `${n}`;
-}
-
-function fmtFullDate(iso: string | null): string {
-  if (!iso) return "-";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "-";
-  return `${d.getFullYear()}.${pad2(d.getMonth() + 1)}.${pad2(d.getDate())} (${WEEKDAY[d.getDay()]})`;
-}
+const fmtFullDate = fmtFullDateKst;
 
 const STATUS_META: Record<
   string,

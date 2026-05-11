@@ -81,7 +81,13 @@ function fmtDate(iso: string): string {
 export default async function PartnerMissionsListPage({
   searchParams,
 }: {
-  searchParams: Promise<{ kind?: string; status?: string }>;
+  searchParams: Promise<{
+    kind?: string;
+    status?: string;
+    published?: string;
+    archived?: string;
+    id?: string;
+  }>;
 }) {
   const partner = await requirePartner();
   const sp = await searchParams;
@@ -95,6 +101,9 @@ export default async function PartnerMissionsListPage({
     sp.status === "ARCHIVED"
       ? sp.status
       : "ALL";
+
+  const justPublishedId = sp.published === "1" ? sp.id ?? "" : "";
+  const justArchivedId = sp.archived === "1" ? sp.id ?? "" : "";
 
   const [all, pendingContributions] = await Promise.all([
     loadPartnerMissions(partner.id),
@@ -111,6 +120,13 @@ export default async function PartnerMissionsListPage({
   const published = all.filter((m) => m.status === "PUBLISHED").length;
   const draft = all.filter((m) => m.status === "DRAFT").length;
 
+  // 방금 게시/보관된 미션의 라벨 — 배너 메시지용
+  const flashMission = (() => {
+    const id = justPublishedId || justArchivedId;
+    if (!id) return null;
+    return all.find((m) => m.id === id) ?? null;
+  })();
+
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       {/* Breadcrumb */}
@@ -121,6 +137,54 @@ export default async function PartnerMissionsListPage({
         <span className="mx-2">/</span>
         <span className="font-semibold text-[#2D5A3D]">미션 라이브러리</span>
       </nav>
+
+      {/* 게시/보관 성공 배너 — searchParams 기반, 새로고침 시 사라짐. */}
+      {justPublishedId && (
+        <div
+          role="status"
+          className="flex items-start gap-3 rounded-2xl border-2 border-emerald-300 bg-gradient-to-br from-emerald-50 to-[#E8F0E4] p-4 shadow-sm"
+        >
+          <span className="text-2xl" aria-hidden>
+            🚀
+          </span>
+          <div className="flex-1">
+            <p className="text-sm font-bold text-emerald-900">
+              게시되었어요!
+            </p>
+            <p className="mt-0.5 text-xs text-emerald-800/90">
+              {flashMission
+                ? `"${flashMission.title}" 이(가) 이제 기관에서 사용할 수 있어요.`
+                : "이제 기관에서 이 미션을 사용할 수 있어요."}
+            </p>
+          </div>
+          {flashMission && (
+            <Link
+              href={`/partner/missions/${flashMission.id}/edit`}
+              className="shrink-0 rounded-xl border border-emerald-300 bg-white px-3 py-1.5 text-xs font-bold text-emerald-800 hover:bg-emerald-100"
+            >
+              계속 편집 →
+            </Link>
+          )}
+        </div>
+      )}
+      {justArchivedId && (
+        <div
+          role="status"
+          className="flex items-start gap-3 rounded-2xl border-2 border-amber-300 bg-amber-50 p-4 shadow-sm"
+        >
+          <span className="text-2xl" aria-hidden>
+            📦
+          </span>
+          <div className="flex-1">
+            <p className="text-sm font-bold text-amber-900">보관했어요</p>
+            <p className="mt-0.5 text-xs text-amber-800/90">
+              {flashMission
+                ? `"${flashMission.title}" 은(는) 더 이상 기관에 노출되지 않아요.`
+                : "이 미션은 더 이상 기관에 노출되지 않아요."}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Header card */}
       <section className="overflow-hidden rounded-2xl bg-gradient-to-br from-[#2D5A3D] via-[#4A7C59] to-[#2D5A3D] p-6 text-white shadow-sm md:p-8">

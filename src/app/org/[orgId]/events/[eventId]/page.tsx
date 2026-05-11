@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireOrg } from "@/lib/org-auth-guard";
 import { createClient } from "@/lib/supabase/server";
+import { fmtClockKst, fmtFullDateKst } from "@/lib/datetime/kst";
 import {
   loadOrgEventById,
   loadOrgEventSummaryById,
@@ -73,30 +74,15 @@ function parseTab(v: string | undefined): TabKey {
   return "overview";
 }
 
-const WEEKDAY = ["일", "월", "화", "수", "목", "금", "토"];
-
-function pad2(n: number): string {
-  return n < 10 ? `0${n}` : `${n}`;
-}
-
-/** "2026.05.16(토)" */
-function fmtDateWeekday(iso: string | null): string {
+// 시간 포맷은 KST 강제 — 서버/클라이언트 timezone 불일치 방지.
+//   fmtDateWeekday → "2026.05.16(토)"
+//   fmtClock       → "09:00" (자정은 빈 문자열)
+const fmtDateWeekday = (iso: string | null) => {
+  // fmtFullDateKst 는 "2026.05.16 (토)" 공백 포함 — 기존 라벨은 공백 없는 형태이므로 그대로 사용.
   if (!iso) return "-";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "-";
-  return `${d.getFullYear()}.${pad2(d.getMonth() + 1)}.${pad2(d.getDate())}(${WEEKDAY[d.getDay()]})`;
-}
-
-/** "10:00" — 자정은 빈 문자열 */
-function fmtClock(iso: string | null): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  const h = d.getHours();
-  const m = d.getMinutes();
-  if (h === 0 && m === 0) return "";
-  return `${pad2(h)}:${pad2(m)}`;
-}
+  return fmtFullDateKst(iso).replace(" (", "(");
+};
+const fmtClock = (iso: string | null) => fmtClockKst(iso);
 
 /** "3시간" / "1시간 30분" / "2일 3시간" */
 function fmtDurationFromMs(ms: number): string {

@@ -97,9 +97,10 @@ export function CoopRunner({
   };
 
   const handleJoin = () => {
-    const code = pairCodeInput.trim().toUpperCase();
-    if (code.length < 4) {
-      setErrorMsg("짝꿍 코드를 입력해 주세요");
+    // 4자리 숫자 페어 코드 — 입력은 숫자만 추출 후 길이 확인.
+    const code = pairCodeInput.replace(/\D/g, "").slice(0, 4);
+    if (code.length !== 4) {
+      setErrorMsg("짝꿍 코드 4자리 숫자를 입력해 주세요");
       return;
     }
     setErrorMsg(null);
@@ -280,18 +281,23 @@ export function CoopRunner({
               type="text"
               value={pairCodeInput}
               onChange={(e) =>
-                setPairCodeInput(e.target.value.toUpperCase().slice(0, 8))
+                // 숫자만 추출 + 4자리 보존 — 모바일 numeric 키패드와 호환
+                setPairCodeInput(e.target.value.replace(/\D/g, "").slice(0, 4))
               }
-              placeholder="예: ABC123"
-              inputMode="text"
-              autoCapitalize="characters"
-              autoComplete="off"
-              className="mt-2 min-h-[48px] w-full rounded-2xl border border-[#D4E4BC] bg-[#FFF8F0] px-4 py-3 text-center text-lg font-mono font-bold tracking-[0.3em] text-[#3D3A36] outline-none focus:border-[#2D5A3D] focus:ring-2 focus:ring-[#2D5A3D]/20"
+              placeholder="예: 1234"
+              inputMode="numeric"
+              pattern="[0-9]{4}"
+              maxLength={4}
+              autoComplete="one-time-code"
+              className="mt-2 min-h-[48px] w-full rounded-2xl border border-[#D4E4BC] bg-[#FFF8F0] px-4 py-3 text-center text-2xl font-mono font-bold tabular-nums tracking-[0.4em] text-[#3D3A36] outline-none focus:border-[#2D5A3D] focus:ring-2 focus:ring-[#2D5A3D]/20"
             />
             <button
               type="button"
               onClick={handleJoin}
-              disabled={isPending || pairCodeInput.trim().length < 4}
+              disabled={
+                isPending ||
+                pairCodeInput.replace(/\D/g, "").length !== 4
+              }
               className="mt-2 min-h-[48px] w-full rounded-2xl border-2 border-[#2D5A3D] bg-white px-4 py-3 text-sm font-bold text-[#2D5A3D] transition hover:bg-[#F5F1E8] disabled:cursor-not-allowed disabled:opacity-50"
             >
               {isPending ? "합류 중..." : "🌿 짝꿍에 합류하기"}

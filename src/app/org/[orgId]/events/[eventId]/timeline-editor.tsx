@@ -14,6 +14,7 @@ import {
   type SlotKind,
   type TimelineSlotRow,
 } from "@/lib/event-timeline/types";
+import { fmtClockKstFromMs } from "@/lib/datetime/kst";
 
 interface Props {
   orgId: string;
@@ -50,16 +51,8 @@ function fmtDuration(min: number): string {
   return `${h}시간 ${m}분`;
 }
 
-/** "HH:MM" 24시간 포맷. */
-function fmtClock(ms: number): string {
-  if (!Number.isFinite(ms)) return "--:--";
-  const d = new Date(ms);
-  return d.toLocaleTimeString("ko-KR", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  });
-}
+/** "HH:MM" 24시간 포맷 — Asia/Seoul 고정 (SSR/CSR 동일). */
+const fmtClock = fmtClockKstFromMs;
 
 /** ends_at - starts_at → 분. 5분 단위로 반올림. */
 function deriveDuration(row: TimelineSlotRow): number {
@@ -502,10 +495,21 @@ function SlotForm({
             min={5}
             max={600}
             step={5}
-            value={durationMin}
+            // 입력 중 leading zero ("060") 가 표시되지 않도록 값을 String 변환.
+            // React 가 controlled input 으로 재렌더 시 "060" → "60" 으로 강제 동기화.
+            value={String(durationMin)}
             onChange={(e) => {
               const n = Number(e.target.value);
               if (Number.isFinite(n)) setDurationMin(n);
+            }}
+            onBlur={(e) => {
+              // blur 시 명시적으로 정수 정규화. 빈값이면 5(MIN)로 fallback.
+              const n = Number(e.target.value);
+              if (!Number.isFinite(n) || n < 5) {
+                setDurationMin(5);
+              } else {
+                setDurationMin(Math.min(600, Math.round(n / 5) * 5));
+              }
             }}
             placeholder="직접 입력"
             className="w-20 rounded-full border border-amber-300 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-800 focus:border-amber-500 focus:outline-none"

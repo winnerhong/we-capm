@@ -217,10 +217,10 @@ export function FinalRewardMissionEditor({ mission }: Props) {
         await updatePartnerMissionAction(mission.id, fd);
         if (publish) {
           await publishMissionAction(mission.id);
-          setMsg({ kind: "ok", text: "게시했어요!" });
-        } else {
-          setMsg({ kind: "ok", text: "저장했어요." });
+          router.push(`/partner/missions?published=1&id=${mission.id}`);
+          return;
         }
+        setMsg({ kind: "ok", text: "저장했어요." });
         setDirty(false);
         router.refresh();
       } catch (e) {
@@ -237,8 +237,8 @@ export function FinalRewardMissionEditor({ mission }: Props) {
     startTransition(async () => {
       try {
         await archiveMissionAction(mission.id);
-        setMsg({ kind: "ok", text: "보관했어요." });
-        router.refresh();
+        router.push(`/partner/missions?archived=1&id=${mission.id}`);
+        return;
       } catch (e) {
         setMsg({
           kind: "error",

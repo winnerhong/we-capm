@@ -31,6 +31,7 @@ import { NextUpCard } from "./next-up-card";
 import { loadTimelineSlots } from "@/lib/event-timeline/queries";
 import { StampbookDetail } from "@/components/stampbook-detail";
 import { AcornIcon } from "@/components/acorn-icon";
+import { fmtAmPmClockKst, fmtFullDateKst } from "@/lib/datetime/kst";
 
 export const dynamic = "force-dynamic";
 
@@ -92,30 +93,9 @@ async function pickPrimaryLivePackForEvent(
   return incomplete ?? enriched[0] ?? null;
 }
 
-const WEEKDAY_KO = ["일", "월", "화", "수", "목", "금", "토"];
-
-function pad2(n: number): string {
-  return n < 10 ? `0${n}` : `${n}`;
-}
-
-function fmtFullDate(iso: string | null): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  return `${d.getFullYear()}.${pad2(d.getMonth() + 1)}.${pad2(d.getDate())} (${WEEKDAY_KO[d.getDay()]})`;
-}
-
-function fmtClock(iso: string | null): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  const h = d.getHours();
-  const m = d.getMinutes();
-  if (h === 0 && m === 0) return "";
-  const period = h < 12 ? "오전" : "오후";
-  const hh = h === 0 ? 12 : h > 12 ? h - 12 : h;
-  return `${period} ${hh}:${pad2(m)}`;
-}
+// KST 강제 포맷 사용 — SSR/CSR 일치.
+const fmtFullDate = (iso: string | null) => (iso ? fmtFullDateKst(iso) : "");
+const fmtClock = (iso: string | null) => fmtAmPmClockKst(iso);
 
 export default async function UserHomePage({
   searchParams,

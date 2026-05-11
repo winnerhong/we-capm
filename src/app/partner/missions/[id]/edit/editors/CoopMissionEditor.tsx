@@ -178,10 +178,10 @@ export function CoopMissionEditor({ mission }: Props) {
         await updatePartnerMissionAction(mission.id, fd);
         if (publish) {
           await publishMissionAction(mission.id);
-          setMsg({ kind: "ok", text: "게시했어요!" });
-        } else {
-          setMsg({ kind: "ok", text: "저장했어요." });
+          router.push(`/partner/missions?published=1&id=${mission.id}`);
+          return;
         }
+        setMsg({ kind: "ok", text: "저장했어요." });
         setDirty(false);
         router.refresh();
       } catch (e) {
@@ -198,8 +198,8 @@ export function CoopMissionEditor({ mission }: Props) {
     startTransition(async () => {
       try {
         await archiveMissionAction(mission.id);
-        setMsg({ kind: "ok", text: "보관했어요." });
-        router.refresh();
+        router.push(`/partner/missions?archived=1&id=${mission.id}`);
+        return;
       } catch (e) {
         setMsg({
           kind: "error",
@@ -381,8 +381,8 @@ export function CoopMissionEditor({ mission }: Props) {
                 className={inputCls}
               />
               <p className="mt-1 text-[11px] text-[#8B7F75]">
-                6자리 페어 코드가 유효한 시간이에요. 시간 내 짝꿍이 합류하지
-                않으면 세션이 만료돼요. 기본 30분.
+                4자리 숫자 페어 코드가 유효한 시간이에요. 시간 내 짝꿍이
+                합류하지 않으면 세션이 만료돼요. 기본 30분.
               </p>
             </Field>
 
@@ -448,8 +448,8 @@ export function CoopMissionEditor({ mission }: Props) {
                 <p className="text-[10px] font-semibold text-[#8B6F47]">
                   페어 코드
                 </p>
-                <p className="mt-0.5 font-mono text-lg tracking-widest text-[#2D5A3D]">
-                  ABC123
+                <p className="mt-0.5 font-mono text-2xl font-bold tabular-nums tracking-[0.3em] text-[#2D5A3D]">
+                  1234
                 </p>
                 <p className="mt-1 text-[10px] text-[#6B6560]">
                   유효 시간 {matchWindow || DEFAULT_WINDOW}분

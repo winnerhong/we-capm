@@ -107,11 +107,15 @@ export function NewEventForm({ orgId }: { orgId: string }) {
       return;
     }
 
+    // 사용자 입력은 KST 로 가정 — "+09:00" 명시해서 서버가 정확한 UTC instant 로 변환.
+    // (이전엔 naive 문자열을 서버(Vercel UTC)가 UTC 로 해석해서 9시간 어긋남.)
+    const toKstIso = (v: string) => (v ? `${v}:00+09:00` : "");
+
     const fd = new FormData();
     fd.set("name", trimmed);
     fd.set("description", description.trim());
-    fd.set("starts_at", startsAt);
-    fd.set("ends_at", endsAt);
+    fd.set("starts_at", toKstIso(startsAt));
+    fd.set("ends_at", toKstIso(endsAt));
     fd.set("cover_image_url", coverUrl.trim());
 
     startTransition(async () => {
