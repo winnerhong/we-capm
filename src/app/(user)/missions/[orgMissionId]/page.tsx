@@ -43,6 +43,22 @@ import { AcornIcon } from "@/components/acorn-icon";
 
 export const dynamic = "force-dynamic";
 
+// 서버 액션 후 자동 RSC refresh 시 throw 가 발생하면 클라이언트가
+// "An error occurred in the Server Components render" 만 보게 되므로,
+// 각 쿼리를 격리해 fallback 값으로 안전하게 처리.
+async function safeQuery<T>(
+  label: string,
+  fn: () => Promise<T>,
+  fallback: T
+): Promise<T> {
+  try {
+    return await fn();
+  } catch (e) {
+    console.error(`[MissionRunnerPage/${label}] threw`, e);
+    return fallback;
+  }
+}
+
 function formatDateTime(iso: string): string {
   try {
     return new Date(iso).toLocaleString("ko-KR", {
@@ -64,10 +80,16 @@ export default async function MissionRunnerPage({
 }) {
   const user = await requireAppUser();
   // 예정(DRAFT) 행사만 있는 참가자는 미션 차단.
-  if (!(await userHasAnyLiveEvent(user.id))) redirect("/home");
+  if (!(await safeQuery("userHasAnyLiveEvent", () => userHasAnyLiveEvent(user.id), true))) {
+    redirect("/home");
+  }
   const { orgMissionId } = await params;
 
-  const mission = await loadOrgMissionById(orgMissionId);
+  const mission = await safeQuery(
+    "loadOrgMissionById",
+    () => loadOrgMissionById(orgMissionId),
+    null
+  );
   if (!mission) notFound();
   if (mission.org_id !== user.orgId) redirect("/home");
 
@@ -76,7 +98,11 @@ export default async function MissionRunnerPage({
   const backHref = packId ? `/stampbook/${packId}` : "/stampbook";
 
   // 기존 제출 확인
-  const existing = await loadUserSubmissionForMission(user.id, mission.id);
+  const existing = await safeQuery(
+    "loadUserSubmissionForMission",
+    () => loadUserSubmissionForMission(user.id, mission.id),
+    null
+  );
   const hasActiveSubmission =
     existing &&
     (existing.status === "AUTO_APPROVED" ||
@@ -169,13 +195,23 @@ export default async function MissionRunnerPage({
   // Unlock check (FINAL_REWARD 외)
   if (mission.kind !== "FINAL_REWARD") {
     const allMissions = packId
-      ? await loadOrgMissionsByQuestPack(packId)
+      ? await safeQuery(
+          "loadOrgMissionsByQuestPack",
+          () => loadOrgMissionsByQuestPack(packId),
+          [mission]
+        )
       : [mission];
-    const userSubmissions = await loadUserSubmissions(user.id, {
-      packId: packId ?? undefined,
-    });
+    const userSubmissions = await safeQuery(
+      "loadUserSubmissions",
+      () => loadUserSubmissions(user.id, { packId: packId ?? undefined }),
+      []
+    );
     const acornsInPack = packId
-      ? await sumAcornsForPack(user.id, packId)
+      ? await safeQuery(
+          "sumAcornsForPack",
+          () => sumAcornsForPack(user.id, packId),
+          0
+        )
       : 0;
     const gate = isMissionUnlocked(
       mission,

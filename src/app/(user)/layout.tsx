@@ -10,6 +10,23 @@ import { PinnedNoticeBanner } from "./PinnedNoticeBanner";
 
 export const dynamic = "force-dynamic";
 
+// 안전 헬퍼 — 어떤 쿼리도 layout 전체를 죽이지 않도록 fallback.
+// 서버 액션 후 자동 RSC refresh 단계에서 throw 가 발생하면 클라이언트가
+// "An error occurred in the Server Components render" 만 보게 되므로,
+// 각 쿼리를 개별 try/catch 로 격리하고 실제 원인은 console.error 로 남긴다.
+async function safeQuery<T>(
+  label: string,
+  fn: () => Promise<T>,
+  fallback: T
+): Promise<T> {
+  try {
+    return await fn();
+  } catch (e) {
+    console.error(`[UserLayout/${label}] threw`, e);
+    return fallback;
+  }
+}
+
 export default async function UserLayout({
   children,
 }: {
@@ -17,10 +34,10 @@ export default async function UserLayout({
 }) {
   const user = await requireAppUser();
   const [acornBalance, hasLive, kids, toritalkOn] = await Promise.all([
-    getAcornBalance(user.id),
-    userHasAnyLiveEvent(user.id),
-    loadChildrenForUser(user.id),
-    isToritalkEnabled(user.orgId),
+    safeQuery("getAcornBalance", () => getAcornBalance(user.id), 0),
+    safeQuery("userHasAnyLiveEvent", () => userHasAnyLiveEvent(user.id), false),
+    safeQuery("loadChildrenForUser", () => loadChildrenForUser(user.id), []),
+    safeQuery("isToritalkEnabled", () => isToritalkEnabled(user.orgId), false),
   ]);
 
   // 아바타 글자 우선순위:
