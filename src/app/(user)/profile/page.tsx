@@ -5,6 +5,7 @@ import {
   loadAppUserById,
   loadChildrenForUser,
 } from "@/lib/app-user/queries";
+import { loadOrgNameById } from "@/lib/org-partner";
 import { AcornIcon } from "@/components/acorn-icon";
 import { ChildrenSection } from "./children-section";
 
@@ -24,10 +25,11 @@ function initialOf(name: string): string {
 
 export default async function UserProfilePage() {
   const session = await requireAppUser();
-  const [detail, children, acornBalance] = await Promise.all([
+  const [detail, children, acornBalance, freshOrgName] = await Promise.all([
     loadAppUserById(session.id),
     loadChildrenForUser(session.id),
     getAcornBalance(session.id),
+    loadOrgNameById(session.orgId, session.orgName || "소속 기관"),
   ]);
 
   const parentName = detail?.parent_name ?? session.parentName;
@@ -54,9 +56,7 @@ export default async function UserProfilePage() {
             {heroInitial}
           </div>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-xs text-[#D4E4BC]">
-              {session.orgName || "소속 기관"}
-            </p>
+            <p className="truncate text-xs text-[#D4E4BC]">{freshOrgName}</p>
             <p className="mt-0.5 truncate text-lg font-bold text-white">
               {heroTitle}
             </p>

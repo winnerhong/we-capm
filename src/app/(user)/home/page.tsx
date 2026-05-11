@@ -29,6 +29,7 @@ import { BroadcastCard } from "./broadcast-card";
 import { EventSelector } from "./event-selector";
 import { NextUpCard } from "./next-up-card";
 import { loadTimelineSlots } from "@/lib/event-timeline/queries";
+import { loadOrgNameById } from "@/lib/org-partner";
 import { StampbookDetail } from "@/components/stampbook-detail";
 import { AcornIcon } from "@/components/acorn-icon";
 import { fmtAmPmClockKst, fmtFullDateKst } from "@/lib/datetime/kst";
@@ -106,14 +107,14 @@ export default async function UserHomePage({
   const sp = await searchParams;
   const urlEventId = sp.event_id;
 
-  const [acornBalance, children, activeEvents, userDetail] = await Promise.all(
-    [
+  const [acornBalance, children, activeEvents, userDetail, freshOrgName] =
+    await Promise.all([
       getAcornBalance(user.id),
       loadChildrenForUser(user.id),
       loadActiveAndUpcomingEventsForUser(user.id),
       loadAppUserById(user.id),
-    ]
-  );
+      loadOrgNameById(user.orgId, user.orgName || "소속 기관"),
+    ]);
 
   // 선택 규칙:
   //   - URL ?event_id= 가 activeEvents 에 있으면 그걸 사용
@@ -170,7 +171,7 @@ export default async function UserHomePage({
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold text-[#D4E4BC]">
-                🌲 {user.orgName || "소속 기관"}
+                🌲 {freshOrgName}
               </p>
               <h1 className="mt-1 truncate text-xl font-bold text-white">
                 {familyLabel}
@@ -297,7 +298,7 @@ export default async function UserHomePage({
           userAcornsInPack={primaryPack.userAcornsInPack}
           progress={primaryPack.progress}
           familyHeader={{
-            orgName: user.orgName || "소속 기관",
+            orgName: freshOrgName,
             familyLabel,
             profileHref: "/profile",
             acornBalance,
@@ -310,7 +311,7 @@ export default async function UserHomePage({
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold text-[#D4E4BC]">
-                🌲 {user.orgName || "소속 기관"}
+                🌲 {freshOrgName}
               </p>
               <h1 className="mt-1 truncate text-xl font-bold text-white">
                 {familyLabel}
