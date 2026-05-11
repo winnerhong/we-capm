@@ -57,33 +57,46 @@ const ALLOWED_MIME = new Set([
  *
  * 경로: missions/{org_mission_id}/{user_id}/{ts}-{rand}.{ext}
  */
+/**
+ * 미션 사진 업로드 — throw 가 아니라 결과 객체로 반환.
+ *
+ * Next.js production 빌드는 server action 의 throw 메시지를 마스킹해서
+ * "An error occurred in the Server Components render." 만 노출한다.
+ * 사용자에게 진짜 원인을 보여주려면 throw 대신 ok/error 결과를 반환해야 한다.
+ */
+export type UploadMissionPhotoResult =
+  | { ok: true; url: string; path: string }
+  | { ok: false; error: string };
+
 export async function uploadMissionPhotoAction(
   orgMissionId: string,
   formData: FormData
-): Promise<{ url: string; path: string }> {
-  // 최상위 try/catch — 프로덕션에서 에러 메시지가 "Server Components render"
-  // 로 마스킹되는 것을 막고, 실제 원인을 콘솔(Vercel)에 남긴 뒤 클라이언트에는
-  // 의미 있는 한글 메시지를 던진다.
+): Promise<UploadMissionPhotoResult> {
+  const fail = (error: string, extra?: unknown): UploadMissionPhotoResult => {
+    console.error("[uploadMissionPhoto] fail", { error, extra });
+    return { ok: false, error };
+  };
+
   try {
     const user = await requireAppUser();
-    if (!orgMissionId) throw new Error("미션을 찾을 수 없어요");
+    if (!orgMissionId) return fail("미션을 찾을 수 없어요");
 
     const mission = await loadOrgMissionById(orgMissionId);
-    if (!mission) throw new Error("미션을 찾을 수 없어요");
+    if (!mission) return fail("미션을 찾을 수 없어요");
     if (mission.org_id !== user.orgId) {
-      throw new Error("다른 기관의 미션에는 업로드할 수 없어요");
+      return fail("다른 기관의 미션에는 업로드할 수 없어요");
     }
-    if (!mission.is_active) throw new Error("현재 진행할 수 없는 미션이에요");
+    if (!mission.is_active) return fail("현재 진행할 수 없는 미션이에요");
 
     const file = formData.get("file");
-    if (!(file instanceof File)) throw new Error("파일이 비어 있어요");
-    if (file.size === 0) throw new Error("빈 파일이에요");
+    if (!(file instanceof File)) return fail("파일이 비어 있어요");
+    if (file.size === 0) return fail("빈 파일이에요");
     if (file.size > MAX_UPLOAD_BYTES) {
-      throw new Error("사진은 5MB 이하만 업로드할 수 있어요");
+      return fail("사진은 5MB 이하만 업로드할 수 있어요");
     }
     const mime = file.type || "image/jpeg";
     if (!ALLOWED_MIME.has(mime)) {
-      throw new Error("이미지 형식만 업로드할 수 있어요 (jpg/png/webp/heic)");
+      return fail("이미지 형식만 업로드할 수 있어요 (jpg/png/webp/heic)");
     }
 
     const ext =
@@ -101,11 +114,12 @@ export async function uploadMissionPhotoAction(
     try {
       admin = createAdminClient();
     } catch (e) {
-      console.error("[uploadMissionPhoto] admin client init failed", e);
-      throw new Error("서버 설정 오류 — 관리자에게 문의해 주세요");
+      return fail(
+        `서버 설정 오류 (admin): ${e instanceof Error ? e.message : "unknown"}`,
+        e
+      );
     }
 
-    // upload() 가 reject 로 던지는 경우도 잡아낸다 (네트워크 오류 등).
     let upErr: { message: string } | null = null;
     try {
       const upResp = await admin.storage
@@ -116,51 +130,42 @@ export async function uploadMissionPhotoAction(
         });
       upErr = upResp.error;
     } catch (e) {
-      console.error("[uploadMissionPhoto] upload threw", { path, e });
-      throw new Error(
-        `업로드 실패: ${e instanceof Error ? e.message : "네트워크 오류"}`
+      return fail(
+        `업로드 네트워크 오류: ${e instanceof Error ? e.message : "unknown"}`,
+        { path, e }
       );
     }
     if (upErr) {
-      console.error("[uploadMissionPhoto] failed", { path, msg: upErr.message });
-      throw new Error(`업로드 실패: ${upErr.message}`);
+      return fail(`업로드 거부: ${upErr.message}`, { path });
     }
 
-    // 사설 버킷 — 서명 URL 발급 (24시간). 표시 측에서 만료 시 재요청 패턴.
-    let signed: { signedUrl: string } | null = null;
-    let signErr: { message: string } | null = null;
+    let signedUrl: string | null = null;
     try {
       const signResp = await admin.storage
         .from(SUBMISSION_BUCKET)
         .createSignedUrl(path, 60 * 60 * 24);
-      signed = signResp.data;
-      signErr = signResp.error;
+      if (signResp.error) {
+        return fail(`URL 발급 실패: ${signResp.error.message}`, { path });
+      }
+      signedUrl = signResp.data?.signedUrl ?? null;
     } catch (e) {
-      console.error("[uploadMissionPhoto] sign threw", { path, e });
-      throw new Error("업로드는 됐지만 URL 발급에 실패했어요");
+      return fail(
+        `URL 발급 예외: ${e instanceof Error ? e.message : "unknown"}`,
+        { path, e }
+      );
     }
-    if (signErr || !signed?.signedUrl) {
-      console.error("[uploadMissionPhoto] sign failed", {
-        path,
-        msg: signErr?.message,
-      });
-      throw new Error("업로드는 됐지만 URL 발급에 실패했어요");
+    if (!signedUrl) {
+      return fail("URL 발급은 됐지만 빈 응답이에요", { path });
     }
 
-    return { url: signed.signedUrl, path };
+    return { ok: true, url: signedUrl, path };
   } catch (e) {
-    // 이미 의도된 Error 면 그대로 재던짐 — 메시지가 한글로 클라이언트에 도달.
-    // 알 수 없는 throw(undefined / string / 객체) 은 메시지를 추출해 새 Error 로.
+    // 마지막 안전망 — 어떤 예상 못한 throw 도 결과 객체로 변환.
+    console.error("[uploadMissionPhoto] unexpected throw", e);
     if (e instanceof Error) {
-      // 디지스트 우회 — 새 Error 인스턴스로 다시 던지면 production 마스킹 회피.
-      console.error("[uploadMissionPhoto] top-level error", {
-        message: e.message,
-        stack: e.stack,
-      });
-      throw new Error(e.message);
+      return { ok: false, error: `예외: ${e.message}` };
     }
-    console.error("[uploadMissionPhoto] non-Error throw", e);
-    throw new Error("알 수 없는 오류로 업로드에 실패했어요");
+    return { ok: false, error: "알 수 없는 오류로 업로드 실패" };
   }
 }
 

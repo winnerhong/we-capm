@@ -60,11 +60,17 @@ export function PhotoRunner({ mission, config }: Props) {
           );
           const fd = new FormData();
           fd.append("file", compressed, compressed.name || "photo.jpg");
-          const { url } = await uploadMissionPhotoAction(mission.id, fd);
-          uploaded.push(url);
+          const result = await uploadMissionPhotoAction(mission.id, fd);
+          if (!result.ok) {
+            console.error("[PhotoRunner] upload result error", result.error);
+            setErrorMsg(`업로드 실패: ${result.error}`);
+          } else {
+            uploaded.push(result.url);
+          }
         } catch (e) {
+          // 결과 객체로 받기 때문에 여기 도달하면 진짜 transport / client 오류.
           const msg = e instanceof Error ? e.message : String(e);
-          console.error("[PhotoRunner] upload failed", msg);
+          console.error("[PhotoRunner] upload threw on client", msg);
           setErrorMsg(`업로드 실패: ${msg}`);
         }
         doneCount += 1;
