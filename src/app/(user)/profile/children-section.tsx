@@ -16,6 +16,7 @@ type ChildRow = {
   birth_date: string | null;
   gender: "M" | "F" | null;
   is_enrolled: boolean;
+  class_name: string | null;
 };
 
 type Props = { children: ChildRow[] };
@@ -71,6 +72,7 @@ export function ChildrenSection({ children }: Props) {
                     birthYYMMDD: formatBirthYYMMDD(c.birth_date),
                     gender: c.gender ?? "",
                     isEnrolled: c.is_enrolled,
+                    className: c.class_name ?? "",
                   }}
                   onDone={() => setEditingId(null)}
                 />
@@ -89,7 +91,13 @@ export function ChildrenSection({ children }: Props) {
         <div className="mt-3 rounded-2xl border border-dashed border-[#D4E4BC] bg-[#F5F1E8] p-4">
           <ChildForm
             mode="add"
-            initial={{ name: "", birthYYMMDD: "", gender: "", isEnrolled: true }}
+            initial={{
+              name: "",
+              birthYYMMDD: "",
+              gender: "",
+              isEnrolled: true,
+              className: "",
+            }}
             onDone={() => setShowAdd(false)}
           />
         </div>
@@ -142,6 +150,11 @@ function ChildRowView({
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-1.5">
+          {child.class_name && (
+            <span className="shrink-0 rounded-full border border-[#D4E4BC] bg-[#E8F0E4] px-1.5 py-0.5 text-[9px] font-bold text-[#2D5A3D]">
+              🐰 {child.class_name}
+            </span>
+          )}
           <p className="truncate text-sm font-bold text-[#2D5A3D]">
             {child.name}
           </p>
@@ -199,6 +212,7 @@ function ChildForm({
     birthYYMMDD: string;
     gender: Gender;
     isEnrolled: boolean;
+    className: string;
   };
   onDone: () => void;
 }) {
@@ -207,6 +221,7 @@ function ChildForm({
   const [birth, setBirth] = useState(initial.birthYYMMDD);
   const [gender, setGender] = useState<Gender>(initial.gender);
   const [isEnrolled, setIsEnrolled] = useState(initial.isEnrolled);
+  const [className, setClassName] = useState(initial.className);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
@@ -230,6 +245,7 @@ function ChildForm({
     fd.set("birth_date", digits);
     fd.set("gender", gender);
     fd.set("is_enrolled", isEnrolled ? "1" : "0");
+    fd.set("class_name", className.trim());
 
     start(async () => {
       try {
@@ -336,6 +352,25 @@ function ChildForm({
             activeCls="bg-amber-500 text-white"
           />
         </div>
+      </div>
+
+      {/* 반 (선택) — 토리톡 자동 가입 */}
+      <div>
+        <label className="mb-1 block text-xs font-semibold text-[#6B6560]">
+          반 (선택)
+        </label>
+        <input
+          type="text"
+          value={className}
+          onChange={(e) => setClassName(e.target.value)}
+          placeholder="예: 토끼반"
+          maxLength={40}
+          autoComplete="off"
+          className={INPUT_CLS}
+        />
+        <p className="mt-1 text-[10px] text-[#8B7F75]">
+          기관이 토리톡을 활성화한 경우 해당 반 채팅방에 자동으로 참여돼요.
+        </p>
       </div>
 
       <div className="flex gap-2">

@@ -28,6 +28,7 @@ type AppUserListRow = {
 type AppUserWithCount = AppUserListRow & {
   children_count: number;
   enrolled_names: string[];
+  class_names: string[];
 };
 
 const STATUS_META: Record<UserStatus, { label: string; chip: string }> = {
@@ -132,18 +133,25 @@ async function loadRecentParticipants(
             user_id: string;
             name: string;
             is_enrolled: boolean;
+            class_name: string | null;
           }> | null;
         }>;
       };
     }
   )
-    .select("user_id, name, is_enrolled")
+    .select("user_id, name, is_enrolled, class_name")
     .in("user_id", ids)) as {
-    data: Array<{ user_id: string; name: string; is_enrolled: boolean }> | null;
+    data: Array<{
+      user_id: string;
+      name: string;
+      is_enrolled: boolean;
+      class_name: string | null;
+    }> | null;
   };
 
   const countByUser = new Map<string, number>();
   const enrolledByUser = new Map<string, string[]>();
+  const classByUser = new Map<string, string[]>();
   for (const c of childResp.data ?? []) {
     countByUser.set(c.user_id, (countByUser.get(c.user_id) ?? 0) + 1);
     if (c.is_enrolled) {
@@ -151,12 +159,19 @@ async function loadRecentParticipants(
       list.push(c.name);
       enrolledByUser.set(c.user_id, list);
     }
+    const cn = (c.class_name ?? "").trim();
+    if (cn) {
+      const list = classByUser.get(c.user_id) ?? [];
+      if (!list.includes(cn)) list.push(cn);
+      classByUser.set(c.user_id, list);
+    }
   }
 
   const enriched = rows.map<AppUserWithCount>((r) => ({
     ...r,
     children_count: countByUser.get(r.id) ?? 0,
     enrolled_names: enrolledByUser.get(r.id) ?? [],
+    class_names: classByUser.get(r.id) ?? [],
   }));
 
   return { rows: enriched, total: countResp.count ?? enriched.length };
@@ -223,6 +238,9 @@ export async function DashboardParticipantsSection({
                     📋 출석
                   </th>
                   <th className="px-3 py-2.5 text-left text-[11px] font-bold">
+                    🐰 반
+                  </th>
+                  <th className="px-3 py-2.5 text-left text-[11px] font-bold">
                     🎒 원생명
                   </th>
                   <th className="px-3 py-2.5 text-left text-[11px] font-bold">
@@ -269,6 +287,22 @@ export async function DashboardParticipantsSection({
                           current={attendanceToday}
                           size="sm"
                         />
+                      </td>
+                      <td className="px-3 py-2.5">
+                        {r.class_names.length > 0 ? (
+                          <span className="inline-flex flex-wrap gap-1">
+                            {r.class_names.map((cn) => (
+                              <span
+                                key={cn}
+                                className="inline-flex items-center rounded-full bg-[#E8F0E4] px-2 py-0.5 text-[10px] font-bold text-[#2D5A3D]"
+                              >
+                                {cn}
+                              </span>
+                            ))}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-[#B0A89D]">—</span>
+                        )}
                       </td>
                       <td className="px-3 py-2.5">
                         <Link
@@ -350,6 +384,18 @@ export async function DashboardParticipantsSection({
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0 flex-1">
+                      {r.class_names.length > 0 && (
+                        <div className="mb-0.5 flex flex-wrap gap-1">
+                          {r.class_names.map((cn) => (
+                            <span
+                              key={cn}
+                              className="inline-flex items-center rounded-full bg-[#E8F0E4] px-1.5 py-0.5 text-[9px] font-bold text-[#2D5A3D]"
+                            >
+                              🐰 {cn}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                       <Link
                         href={`/org/${orgId}/users/${r.id}`}
                         className="truncate text-sm font-bold text-[#2D5A3D]"

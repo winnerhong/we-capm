@@ -164,6 +164,9 @@ export async function addChildAction(
   const birthRaw = String(formData.get("child_birth") ?? "").trim();
   const birth = /^\d{4}-\d{2}-\d{2}$/.test(birthRaw) ? birthRaw : null;
 
+  const classNameRaw = String(formData.get("child_class") ?? "").trim();
+  const class_name = classNameRaw.length > 0 ? classNameRaw : null;
+
   const supabase = await createClient();
 
   // 중복 이름 체크
@@ -195,14 +198,114 @@ export async function addChildAction(
     user_id: userId,
     name,
     birth_date: birth,
+    class_name,
   })) as { error: SbErr };
 
   if (ins.error) {
     throw new Error(`자녀 추가 실패: ${ins.error.message}`);
   }
 
+  // 토리톡 자동 가입
+  if (class_name) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sb = supabase as any;
+    try {
+      await sb.rpc("toritalk_ensure_room_membership", {
+        p_org_id: user.org_id,
+        p_class_name: class_name,
+        p_user_id: userId,
+      });
+    } catch {
+      /* swallow */
+    }
+  }
+
   revalidatePath(`/org/${user.org_id}/users/${userId}`);
   revalidatePath(`/org/${user.org_id}/users/${userId}/edit`);
+  revalidatePath(`/org/${user.org_id}/users`);
+}
+
+/** 자녀 반명(class_name) 수정 — 빈 문자열이면 null. 변경 시 토리톡 자동 가입. */
+export async function updateChildClassNameAction(
+  childId: string,
+  className: string | null
+): Promise<void> {
+  const session = await requireOrg();
+  if (!childId) throw new Error("자녀 ID가 없어요");
+
+  const cleaned = (className ?? "").trim();
+  const next = cleaned.length > 0 ? cleaned : null;
+
+  const supabase = await createClient();
+
+  // 소유 검증
+  const childResp = (await (
+    supabase.from("app_children" as never) as unknown as {
+      select: (c: string) => {
+        eq: (k: string, v: string) => {
+          maybeSingle: () => Promise<
+            SbOne<{ id: string; user_id: string }>
+          >;
+        };
+      };
+    }
+  )
+    .select("id, user_id")
+    .eq("id", childId)
+    .maybeSingle()) as SbOne<{ id: string; user_id: string }>;
+  const child = childResp.data;
+  if (!child) throw new Error("자녀를 찾을 수 없어요");
+
+  const userResp = (await (
+    supabase.from("app_users" as never) as unknown as {
+      select: (c: string) => {
+        eq: (k: string, v: string) => {
+          maybeSingle: () => Promise<SbOne<{ id: string; org_id: string }>>;
+        };
+      };
+    }
+  )
+    .select("id, org_id")
+    .eq("id", child.user_id)
+    .maybeSingle()) as SbOne<{ id: string; org_id: string }>;
+  const owner = userResp.data;
+  if (!owner) throw new Error("해당 참가자를 찾을 수 없어요");
+  if (owner.org_id !== session.orgId) {
+    throw new Error("이 자녀를 수정할 권한이 없어요");
+  }
+
+  const upd = (await (
+    supabase.from("app_children" as never) as unknown as {
+      update: (p: unknown) => {
+        eq: (k: string, v: string) => Promise<{ error: SbErr }>;
+      };
+    }
+  )
+    .update({ class_name: next })
+    .eq("id", childId)) as { error: SbErr };
+
+  if (upd.error) {
+    throw new Error(`반 수정 실패: ${upd.error.message}`);
+  }
+
+  // 토리톡 자동 가입 (옛 방은 보존)
+  if (next) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sb = supabase as any;
+    try {
+      await sb.rpc("toritalk_ensure_room_membership", {
+        p_org_id: owner.org_id,
+        p_class_name: next,
+        p_user_id: child.user_id,
+      });
+    } catch {
+      /* swallow */
+    }
+  }
+
+  revalidatePath(`/org/${owner.org_id}/users/${child.user_id}`);
+  revalidatePath(`/org/${owner.org_id}/users/${child.user_id}/edit`);
+  revalidatePath(`/org/${owner.org_id}/users`);
 }
 
 /** 자녀 삭제 */

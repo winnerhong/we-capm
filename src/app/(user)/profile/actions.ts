@@ -151,6 +151,7 @@ export async function addChildAction(formData: FormData): Promise<void> {
   const enrolledRaw = toStr(formData.get("is_enrolled"));
   const is_enrolled =
     enrolledRaw === "1" || enrolledRaw === "true" || enrolledRaw === "on";
+  const class_name = toNullStr(formData.get("class_name"));
 
   const supabase = await createClient();
   const { error } = (await (
@@ -164,12 +165,29 @@ export async function addChildAction(formData: FormData): Promise<void> {
     gender,
     notes,
     is_enrolled,
+    class_name,
   } as never)) as { error: { message: string } | null };
 
   if (error) throw new Error(error.message ?? "아이 추가에 실패했어요");
 
+  // 토리톡 자동 가입
+  if (class_name && class_name.trim().length > 0) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sb = supabase as any;
+    try {
+      await sb.rpc("toritalk_ensure_room_membership", {
+        p_org_id: user.orgId,
+        p_class_name: class_name,
+        p_user_id: user.id,
+      });
+    } catch {
+      /* swallow */
+    }
+  }
+
   revalidatePath("/profile");
   revalidatePath("/home");
+  revalidatePath("/tori-talk");
 }
 
 /**
@@ -190,6 +208,7 @@ export async function updateChildAction(
   const enrolledRaw = toStr(formData.get("is_enrolled"));
   const is_enrolled =
     enrolledRaw === "1" || enrolledRaw === "true" || enrolledRaw === "on";
+  const class_name = toNullStr(formData.get("class_name"));
 
   const supabase = await createClient();
   const { error } = (await (
@@ -204,14 +223,30 @@ export async function updateChildAction(
       };
     }
   )
-    .update({ name, birth_date, gender, is_enrolled } as never)
+    .update({ name, birth_date, gender, is_enrolled, class_name } as never)
     .eq("id", childId)
     .eq("user_id", user.id)) as { error: { message: string } | null };
 
   if (error) throw new Error(error.message ?? "수정에 실패했어요");
 
+  // 토리톡 자동 가입 — 새/변경된 반명 기준
+  if (class_name && class_name.trim().length > 0) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sb = supabase as any;
+    try {
+      await sb.rpc("toritalk_ensure_room_membership", {
+        p_org_id: user.orgId,
+        p_class_name: class_name,
+        p_user_id: user.id,
+      });
+    } catch {
+      /* swallow */
+    }
+  }
+
   revalidatePath("/profile");
   revalidatePath("/home");
+  revalidatePath("/tori-talk");
 }
 
 /**

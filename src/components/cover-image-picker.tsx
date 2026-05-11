@@ -221,17 +221,15 @@ export function CoverImagePicker({
           }}
           onDragLeave={() => setDragOver(false)}
           onDrop={onDrop}
-          onClick={() => fileInputRef.current?.click()}
-          className={`flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed text-center transition ${
+          className={`flex flex-col items-center justify-center rounded-2xl border-2 border-dashed text-center outline-none transition focus:ring-2 focus:ring-[#2D5A3D]/30 ${
             compact ? "max-w-sm p-4" : "p-6"
           } ${
             dragOver
               ? "border-[#2D5A3D] bg-[#E8F0E4]"
-              : "border-[#D4E4BC] bg-[#FFF8F0] hover:border-[#2D5A3D] hover:bg-[#F5F1E8]"
+              : "border-[#D4E4BC] bg-[#FFF8F0] hover:border-[#2D5A3D]"
           }`}
-          role="button"
           tabIndex={0}
-          aria-label="이미지 업로드"
+          aria-label="이미지 붙여넣기 영역 — 클릭하면 포커스, Ctrl+V 로 붙여넣기"
         >
           <span aria-hidden className={compact ? "text-3xl" : "text-4xl"}>
             📷
@@ -243,7 +241,7 @@ export function CoverImagePicker({
           >
             {uploading
               ? "업로드 중…"
-              : "클릭하거나 이미지를 드래그 · 붙여넣기 (Ctrl+V)"}
+              : "이미지를 드래그하거나 클릭 후 Ctrl+V 로 붙여넣기"}
           </p>
           <p className={`mt-1 text-[11px] text-[#8B7F75]`}>
             자동 리사이즈 · 최대 500KB · JPG/PNG/WebP

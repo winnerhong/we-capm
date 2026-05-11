@@ -30,6 +30,7 @@ type AppUserListRow = {
 type AppUserWithCount = AppUserListRow & {
   children_count: number;
   enrolled_names: string[];
+  class_names: string[];
 };
 
 const STATUS_META: Record<
@@ -172,16 +173,18 @@ async function loadUsers(orgId: string): Promise<AppUserWithCount[]> {
             user_id: string;
             name: string;
             is_enrolled: boolean;
+            class_name: string | null;
           }> | null;
         }>;
       };
     }
   )
-    .select("user_id, name, is_enrolled")
+    .select("user_id, name, is_enrolled, class_name")
     .in("user_id", ids);
 
   const countByUser = new Map<string, number>();
   const enrolledByUser = new Map<string, string[]>();
+  const classByUser = new Map<string, string[]>();
   for (const c of children ?? []) {
     countByUser.set(c.user_id, (countByUser.get(c.user_id) ?? 0) + 1);
     if (c.is_enrolled) {
@@ -189,13 +192,61 @@ async function loadUsers(orgId: string): Promise<AppUserWithCount[]> {
       list.push(c.name);
       enrolledByUser.set(c.user_id, list);
     }
+    const cn = (c.class_name ?? "").trim();
+    if (cn) {
+      const list = classByUser.get(c.user_id) ?? [];
+      if (!list.includes(cn)) list.push(cn);
+      classByUser.set(c.user_id, list);
+    }
   }
 
   return rows.map((r) => ({
     ...r,
     children_count: countByUser.get(r.id) ?? 0,
     enrolled_names: enrolledByUser.get(r.id) ?? [],
+    class_names: classByUser.get(r.id) ?? [],
   }));
+}
+
+/**
+ * 기관에서 사용 중인 모든 반명 (자동완성용).
+ */
+async function loadClassSuggestions(orgId: string): Promise<string[]> {
+  const supabase = await createClient();
+  type UserIdRow = { id: string };
+  const { data: users } = (await (
+    supabase.from("app_users" as never) as unknown as {
+      select: (c: string) => {
+        eq: (
+          k: string,
+          v: string
+        ) => Promise<{ data: UserIdRow[] | null }>;
+      };
+    }
+  )
+    .select("id")
+    .eq("org_id", orgId)) as { data: UserIdRow[] | null };
+
+  const userIds = (users ?? []).map((u) => u.id);
+  if (userIds.length === 0) return [];
+
+  type ClassRow = { class_name: string | null };
+  const { data: rows } = (await (
+    supabase.from("app_children" as never) as unknown as {
+      select: (c: string) => {
+        in: (k: string, v: string[]) => Promise<{ data: ClassRow[] | null }>;
+      };
+    }
+  )
+    .select("class_name")
+    .in("user_id", userIds)) as { data: ClassRow[] | null };
+
+  const set = new Set<string>();
+  for (const r of rows ?? []) {
+    const cn = (r.class_name ?? "").trim();
+    if (cn) set.add(cn);
+  }
+  return Array.from(set).sort((a, b) => a.localeCompare(b, "ko"));
 }
 
 export default async function OrgUsersPage({
@@ -209,10 +260,11 @@ export default async function OrgUsersPage({
   const sp = await searchParams;
   const org = await requireOrg();
 
-  // 1) 기관 전체 참가자 + 행사 목록 동시 로드
-  const [allUsers, events] = await Promise.all([
+  // 1) 기관 전체 참가자 + 행사 목록 + 반명 후보 동시 로드
+  const [allUsers, events, classSuggestions] = await Promise.all([
     loadUsers(orgId),
     loadOrgEventSummaries(orgId),
+    loadClassSuggestions(orgId),
   ]);
 
   // 2) 행사 필터 — ?event={id} 가 유효한 이 기관 행사인지 검증
@@ -231,12 +283,12 @@ export default async function OrgUsersPage({
     ? allUsers.filter((u) => eventUserIdSet.has(u.id))
     : allUsers;
 
-  // 4) 텍스트 검색
+  // 4) 텍스트 검색 — 원생명·반명·보호자명·전화번호
   const q = (sp.q ?? "").trim().toLowerCase();
   const filtered = q
     ? all.filter((r) => {
         const hay =
-          `${r.enrolled_names.join(" ")} ${r.parent_name} ${r.phone}`.toLowerCase();
+          `${r.enrolled_names.join(" ")} ${r.class_names.join(" ")} ${r.parent_name} ${r.phone}`.toLowerCase();
         return hay.includes(q);
       })
     : all;
@@ -523,6 +575,7 @@ export default async function OrgUsersPage({
           </p>
           <QuickAddUser
             orgId={orgId}
+            classSuggestions={classSuggestions}
             action={createSingleEventParticipantAction.bind(
               null,
               orgId,

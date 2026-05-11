@@ -24,6 +24,7 @@ type ChildRow = {
   id: string;
   name: string;
   birth_date: string | null;
+  class_name: string | null;
 };
 
 type SbErr = { message: string } | null;
@@ -122,7 +123,7 @@ async function loadUserAndChildren(userId: string): Promise<{
       };
     }
   )
-    .select("id, name, birth_date")
+    .select("id, name, birth_date, class_name")
     .eq("user_id", userId)
     .order("created_at", { ascending: true })) as SbMany<ChildRow>;
 
@@ -271,6 +272,11 @@ export default async function OrgUserDetailPage({
                 className="flex items-center justify-between rounded-xl border border-[#F0E8D8] bg-[#FFFDF8] px-4 py-3"
               >
                 <div className="flex items-center gap-2">
+                  {c.class_name && (
+                    <span className="rounded-full bg-[#E8F0E4] px-2 py-0.5 text-[10px] font-bold text-[#2D5A3D]">
+                      🐰 {c.class_name}
+                    </span>
+                  )}
                   <span className="text-lg" aria-hidden>
                     🧒
                   </span>

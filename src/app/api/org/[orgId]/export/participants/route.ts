@@ -93,11 +93,11 @@ export async function GET(
 
   const users = usersResp.data ?? [];
 
-  // 3) 자녀 정보 배치 로드 (app_children)
+  // 3) 자녀 정보 배치 로드 (app_children) — class_name 포함
   const userIds = users.map((u) => u.id);
   let childMap = new Map<
     string,
-    Array<{ name: string; birth_date: string | null }>
+    Array<{ name: string; birth_date: string | null; class_name: string | null }>
   >();
   if (userIds.length > 0) {
     const childResp = (await (
@@ -108,30 +108,40 @@ export async function GET(
               user_id: string;
               name: string;
               birth_date: string | null;
+              class_name: string | null;
             }> | null;
           }>;
         };
       }
     )
-      .select("user_id, name, birth_date")
+      .select("user_id, name, birth_date, class_name")
       .in("user_id", userIds)) as {
       data: Array<{
         user_id: string;
         name: string;
         birth_date: string | null;
+        class_name: string | null;
       }> | null;
     };
     childMap = (childResp.data ?? []).reduce((m, c) => {
       const arr = m.get(c.user_id) ?? [];
-      arr.push({ name: c.name, birth_date: c.birth_date });
+      arr.push({
+        name: c.name,
+        birth_date: c.birth_date,
+        class_name: c.class_name,
+      });
       m.set(c.user_id, arr);
       return m;
-    }, new Map<string, Array<{ name: string; birth_date: string | null }>>());
+    }, new Map<
+      string,
+      Array<{ name: string; birth_date: string | null; class_name: string | null }>
+    >());
   }
 
   type Row = {
     parent_name: string;
     phone: string;
+    class_names: string;
     children: string;
     child_count: string;
     acorn_balance: string;
@@ -143,9 +153,18 @@ export async function GET(
 
   const rows: Row[] = users.map((u) => {
     const children = childMap.get(u.id) ?? [];
+    // 반명 — 가족 단위로 unique 표시
+    const classNames = Array.from(
+      new Set(
+        children
+          .map((c) => (c.class_name ?? "").trim())
+          .filter((c) => c.length > 0)
+      )
+    ).join(" / ");
     return {
       parent_name: u.parent_name ?? "",
       phone: u.phone,
+      class_names: classNames,
       children: children.map((c) => c.name).join(" / "),
       child_count: String(children.length),
       acorn_balance: String(u.acorn_balance ?? 0),
@@ -157,9 +176,10 @@ export async function GET(
   });
 
   const csv = toCSV<Row>(rows, [
+    { key: "class_names", label: "반" },
+    { key: "children", label: "자녀" },
     { key: "parent_name", label: "보호자명" },
     { key: "phone", label: "연락처" },
-    { key: "children", label: "자녀" },
     { key: "child_count", label: "자녀 수" },
     { key: "acorn_balance", label: "도토리 잔액" },
     { key: "status", label: "상태" },

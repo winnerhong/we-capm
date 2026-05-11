@@ -9,6 +9,7 @@ import {
   toggleChildEnrolledAction,
   updateAppUserAction,
   updateChildBirthDateAction,
+  updateChildClassNameAction,
   type UserStatus,
 } from "../../actions";
 
@@ -17,6 +18,7 @@ type ChildRow = {
   name: string;
   birth_date: string | null;
   is_enrolled: boolean;
+  class_name: string | null;
 };
 
 const INPUT_CLS =
@@ -75,8 +77,13 @@ export function EditUserForm({
 
   const [newChildName, setNewChildName] = useState("");
   const [newChildBirth, setNewChildBirth] = useState("");
+  const [newChildClass, setNewChildClass] = useState("");
   const [childError, setChildError] = useState<string | null>(null);
   const [childPending, startChildTransition] = useTransition();
+
+  // 인라인 반명 편집
+  const [editingClassId, setEditingClassId] = useState<string | null>(null);
+  const [classDraft, setClassDraft] = useState("");
 
   const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -116,15 +123,31 @@ export function EditUserForm({
     const fd = new FormData();
     fd.set("child_name", trimmedName);
     fd.set("child_birth", newChildBirth);
+    fd.set("child_class", newChildClass.trim());
 
     startChildTransition(async () => {
       try {
         await addChildAction(userId, fd);
         setNewChildName("");
         setNewChildBirth("");
+        setNewChildClass("");
         router.refresh();
       } catch (e) {
         setChildError(e instanceof Error ? e.message : "자녀 추가 실패");
+      }
+    });
+  };
+
+  const onSaveClassName = (childId: string) => {
+    setChildError(null);
+    startChildTransition(async () => {
+      try {
+        await updateChildClassNameAction(childId, classDraft);
+        setEditingClassId(null);
+        setClassDraft("");
+        router.refresh();
+      } catch (e) {
+        setChildError(e instanceof Error ? e.message : "반 수정 실패");
       }
     });
   };
@@ -313,8 +336,59 @@ export function EditUserForm({
                       🧒
                     </span>
                     <div className="min-w-0">
-                      <div className="font-semibold text-[#2D5A3D]">
-                        {c.name}
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="font-semibold text-[#2D5A3D]">
+                          {c.name}
+                        </span>
+                        {editingClassId === c.id ? (
+                          <span className="inline-flex items-center gap-1">
+                            <input
+                              type="text"
+                              value={classDraft}
+                              onChange={(e) => setClassDraft(e.target.value)}
+                              placeholder="반 (예: 토끼반)"
+                              maxLength={40}
+                              autoFocus
+                              disabled={childPending}
+                              className="h-6 w-28 rounded-md border border-[#D4E4BC] bg-white px-2 text-[11px] focus:border-[#2D5A3D] focus:outline-none"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => onSaveClassName(c.id)}
+                              disabled={childPending}
+                              className="h-6 rounded-md bg-[#2D5A3D] px-2 text-[10px] font-bold text-white hover:bg-[#234a30] disabled:opacity-50"
+                            >
+                              저장
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingClassId(null);
+                                setClassDraft("");
+                              }}
+                              disabled={childPending}
+                              className="h-6 rounded-md border border-[#E5D3B8] bg-white px-2 text-[10px] font-semibold text-[#6B4423] hover:bg-[#FFF8F0] disabled:opacity-50"
+                            >
+                              취소
+                            </button>
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingClassId(c.id);
+                              setClassDraft(c.class_name ?? "");
+                            }}
+                            disabled={childPending}
+                            title="클릭해서 반 수정"
+                            className="inline-flex items-center gap-0.5 rounded-full bg-[#E8F0E4] px-2 py-0.5 text-[10px] font-bold text-[#2D5A3D] hover:bg-[#D4E4BC] disabled:opacity-50"
+                          >
+                            🐰 {c.class_name || "반 미지정"}
+                            <span aria-hidden className="ml-0.5 text-[9px]">
+                              ✏️
+                            </span>
+                          </button>
+                        )}
                       </div>
                       {isEditingBirth ? (
                         <div className="mt-1 flex items-center gap-1.5">
@@ -412,7 +486,25 @@ export function EditUserForm({
             <span aria-hidden>+</span>
             <span>자녀 추가</span>
           </h3>
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_1fr_auto]">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_1fr_1fr_auto]">
+            <div>
+              <label
+                htmlFor="new_child_class"
+                className="mb-1 block text-[11px] font-semibold text-[#2D5A3D]"
+              >
+                반 (선택)
+              </label>
+              <input
+                id="new_child_class"
+                type="text"
+                value={newChildClass}
+                onChange={(e) => setNewChildClass(e.target.value)}
+                placeholder="예) 토끼반"
+                autoComplete="off"
+                maxLength={40}
+                className={INPUT_CLS}
+              />
+            </div>
             <div>
               <label
                 htmlFor="new_child_name"

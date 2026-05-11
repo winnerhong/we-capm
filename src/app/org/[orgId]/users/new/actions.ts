@@ -17,6 +17,7 @@ type ParsedChild = {
   name: string;
   birth_date: string | null;
   is_enrolled: boolean;
+  class_name: string | null;
 };
 
 function parseChildren(formData: FormData): ParsedChild[] {
@@ -24,6 +25,9 @@ function parseChildren(formData: FormData): ParsedChild[] {
   const births = formData.getAll("child_birth").map((v) => String(v).trim());
   const enrolled = formData
     .getAll("child_enrolled")
+    .map((v) => String(v).trim());
+  const classes = formData
+    .getAll("child_class")
     .map((v) => String(v).trim());
   const out: ParsedChild[] = [];
   const seen = new Set<string>();
@@ -42,9 +46,49 @@ function parseChildren(formData: FormData): ParsedChild[] {
       enrolledRaw === undefined
         ? out.length === 0
         : enrolledRaw === "1" || enrolledRaw === "true";
-    out.push({ name, birth_date: birth, is_enrolled: isEnrolled });
+    const className = (classes[i] ?? "").trim() || null;
+    out.push({
+      name,
+      birth_date: birth,
+      is_enrolled: isEnrolled,
+      class_name: className,
+    });
   }
   return out;
+}
+
+/** 가입 후 토리톡 방 자동 매핑 — 자녀들의 unique class_name 마다 RPC 호출. */
+async function syncToritalkMembershipsFromChildren(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  orgId: string,
+  userId: string,
+  childrenClassNames: Array<string | null>
+): Promise<void> {
+  const uniqueClasses = Array.from(
+    new Set(
+      childrenClassNames
+        .map((c) => (c ?? "").trim())
+        .filter((c) => c.length > 0)
+    )
+  );
+  if (uniqueClasses.length === 0) return;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const sb = supabase as any;
+  // 병렬 호출 — RPC 들은 멱등하므로 실패해도 다른 반은 진행
+  await Promise.all(
+    uniqueClasses.map(async (cn) => {
+      try {
+        await sb.rpc("toritalk_ensure_room_membership", {
+          p_org_id: orgId,
+          p_class_name: cn,
+          p_user_id: userId,
+        });
+      } catch {
+        /* swallow — 토리톡 미세팅이어도 핵심 가입은 성공 */
+      }
+    })
+  );
 }
 
 /**
@@ -149,21 +193,37 @@ export async function createSingleAppUserAction(
     userId = insResp.data.id;
   }
 
-  // 3) 자녀 추가 (기존 이름과 dedup)
+  // 3) 자녀 추가 (기존 이름과 dedup) — class_name 도 함께 저장
+  //    기존 자녀 이름이 다시 들어오고 class_name 이 다르면 UPDATE 로 반영.
   const existingChildrenResp = (await (
     supabase.from("app_children" as never) as unknown as {
       select: (c: string) => {
-        eq: (k: string, v: string) => Promise<SbMany<{ name: string }>>;
+        eq: (
+          k: string,
+          v: string
+        ) => Promise<SbMany<{ id: string; name: string; class_name: string | null }>>;
       };
     }
   )
-    .select("name")
-    .eq("user_id", userId)) as SbMany<{ name: string }>;
+    .select("id, name, class_name")
+    .eq("user_id", userId)) as SbMany<{
+    id: string;
+    name: string;
+    class_name: string | null;
+  }>;
 
-  const existingNames = new Set(
-    (existingChildrenResp.data ?? []).map((r) => r.name)
+  const existingByName = new Map(
+    (existingChildrenResp.data ?? []).map((r) => [r.name, r])
   );
-  const toInsert = children.filter((c) => !existingNames.has(c.name));
+  const toInsert = children.filter((c) => !existingByName.has(c.name));
+  const toUpdate = children.filter((c) => {
+    const ex = existingByName.get(c.name);
+    if (!ex) return false;
+    // class_name 만 바뀌었으면 update 대상
+    const before = (ex.class_name ?? "").trim();
+    const after = (c.class_name ?? "").trim();
+    return after.length > 0 && after !== before;
+  });
 
   if (toInsert.length > 0) {
     const childResp = (await (
@@ -176,6 +236,7 @@ export async function createSingleAppUserAction(
         name: c.name,
         birth_date: c.birth_date,
         is_enrolled: c.is_enrolled,
+        class_name: c.class_name,
       }))
     )) as { error: SbErr };
 
@@ -183,6 +244,31 @@ export async function createSingleAppUserAction(
       throw new Error(`자녀 등록 실패: ${childResp.error.message}`);
     }
   }
+
+  // 같은 자녀의 반만 바뀐 경우 UPDATE
+  for (const c of toUpdate) {
+    const ex = existingByName.get(c.name);
+    if (!ex) continue;
+    await (
+      supabase.from("app_children" as never) as unknown as {
+        update: (p: unknown) => {
+          eq: (k: string, v: string) => Promise<{ error: SbErr }>;
+        };
+      }
+    )
+      .update({ class_name: c.class_name })
+      .eq("id", ex.id);
+  }
+
+  // 4) 토리톡 자동 가입 — 모든 자녀의 class_name 기반
+  //    insert/update 후 최신 자녀 데이터로 동기화
+  const allClasses = [
+    ...children.map((c) => c.class_name),
+    ...Array.from(existingByName.values())
+      .filter((ex) => !children.some((c) => c.name === ex.name)) // 이번 폼 외 기존
+      .map((ex) => ex.class_name),
+  ];
+  await syncToritalkMembershipsFromChildren(supabase, orgId, userId, allClasses);
 
   revalidatePath(`/org/${orgId}/users`);
   redirect(

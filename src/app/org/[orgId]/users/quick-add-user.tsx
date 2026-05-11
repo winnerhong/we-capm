@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { createSingleAppUserAction } from "./new/actions";
 
-type Sibling = { id: string; name: string };
+type Sibling = { id: string; name: string; className: string };
 
 function newSiblingId(): string {
   return Math.random().toString(36).slice(2, 8);
@@ -25,14 +25,18 @@ export function QuickAddUser({
   orgId,
   action,
   successHint,
+  classSuggestions = [],
 }: {
   orgId: string;
   action?: (formData: FormData) => Promise<void>;
   successHint?: string;
+  /** 자동완성 후보 — 이미 사용된 반명 목록 */
+  classSuggestions?: string[];
 }) {
   const router = useRouter();
   const [enrolledName, setEnrolledName] = useState("");
   const [phone, setPhone] = useState("");
+  const [className, setClassName] = useState("");
   const [siblings, setSiblings] = useState<Sibling[]>([]);
   const [msg, setMsg] = useState<{ kind: "ok" | "error"; text: string } | null>(
     null
@@ -42,20 +46,30 @@ export function QuickAddUser({
   function reset() {
     setEnrolledName("");
     setPhone("");
+    setClassName("");
     setSiblings([]);
   }
 
   function addSibling() {
     if (siblings.length >= 9) return;
-    setSiblings([...siblings, { id: newSiblingId(), name: "" }]);
+    setSiblings([
+      ...siblings,
+      { id: newSiblingId(), name: "", className: "" },
+    ]);
   }
 
   function removeSibling(id: string) {
     setSiblings(siblings.filter((s) => s.id !== id));
   }
 
-  function updateSibling(id: string, name: string) {
-    setSiblings(siblings.map((s) => (s.id === id ? { ...s, name } : s)));
+  function updateSibling(
+    id: string,
+    field: "name" | "className",
+    value: string
+  ) {
+    setSiblings(
+      siblings.map((s) => (s.id === id ? { ...s, [field]: value } : s))
+    );
   }
 
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -86,12 +100,14 @@ export function QuickAddUser({
     fd.append("child_name", trimmed);
     fd.append("child_birth", "");
     fd.append("child_enrolled", "1");
+    fd.append("child_class", className.trim());
 
     // 형제/자매
     for (const s of validSiblings) {
       fd.append("child_name", s.name.trim());
       fd.append("child_birth", "");
       fd.append("child_enrolled", "0");
+      fd.append("child_class", s.className.trim());
     }
 
     startTransition(async () => {
@@ -150,7 +166,31 @@ export function QuickAddUser({
       )}
 
       <form onSubmit={onSubmit} className="space-y-2">
-        <div className="grid grid-cols-1 gap-2 md:grid-cols-[1fr_1fr_auto]">
+        <div className="grid grid-cols-1 gap-2 md:grid-cols-[1fr_1.2fr_1.2fr_auto]">
+          <div>
+            <label htmlFor="qa-class" className="sr-only">
+              반명
+            </label>
+            <input
+              id="qa-class"
+              type="text"
+              value={className}
+              onChange={(e) => setClassName(e.target.value)}
+              placeholder="🐰 반 (예: 토끼반)"
+              autoComplete="off"
+              disabled={isPending}
+              list="qa-class-suggestions"
+              maxLength={40}
+              className={INPUT_CLS}
+            />
+            {classSuggestions.length > 0 && (
+              <datalist id="qa-class-suggestions">
+                {classSuggestions.map((c) => (
+                  <option key={c} value={c} />
+                ))}
+              </datalist>
+            )}
+          </div>
           <div>
             <label htmlFor="qa-name" className="sr-only">
               원생명
@@ -193,18 +233,36 @@ export function QuickAddUser({
           </button>
         </div>
 
-        {/* 형제/자매 입력 영역 */}
+        {/* 형제/자매 입력 영역 — 반명도 자녀별 입력 */}
         {siblings.length > 0 && (
           <ul className="space-y-1.5 rounded-xl border border-[#F0E8D8] bg-[#FFFDF8] p-2">
             {siblings.map((s, idx) => (
-              <li key={s.id} className="flex items-center gap-1.5">
+              <li
+                key={s.id}
+                className="flex items-center gap-1.5"
+              >
                 <span className="inline-flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-[#FAE7D0] text-[10px] font-bold text-[#6B4423]">
                   👫 {idx + 1}
                 </span>
                 <input
                   type="text"
+                  value={s.className}
+                  onChange={(e) =>
+                    updateSibling(s.id, "className", e.target.value)
+                  }
+                  placeholder="반 (선택)"
+                  autoComplete="off"
+                  list="qa-class-suggestions"
+                  maxLength={40}
+                  disabled={isPending}
+                  className={`${INPUT_CLS} max-w-[8rem]`}
+                />
+                <input
+                  type="text"
                   value={s.name}
-                  onChange={(e) => updateSibling(s.id, e.target.value)}
+                  onChange={(e) =>
+                    updateSibling(s.id, "name", e.target.value)
+                  }
                   placeholder={`형제/자매 ${idx + 1} 이름`}
                   autoComplete="off"
                   disabled={isPending}
@@ -239,7 +297,10 @@ export function QuickAddUser({
 
       <p className="mt-2 text-[10px] leading-relaxed text-[#8B7F75]">
         🔑 로그인 아이디 = 부모님 연락처. 비밀번호는 없어요. 생년월일·성별은
-        부모님이 앱에서 직접 입력해요.
+        부모님이 앱에서 직접 입력해요.{" "}
+        <span className="text-[#6B4423]">
+          반명 입력 시 토리톡 활성화된 기관은 자동으로 반 채팅방에 참여돼요.
+        </span>
       </p>
     </section>
   );

@@ -27,6 +27,7 @@ export interface AppChildRow {
   gender: "M" | "F" | null;
   notes: string | null;
   is_enrolled: boolean;
+  class_name: string | null;
   created_at: string;
 }
 

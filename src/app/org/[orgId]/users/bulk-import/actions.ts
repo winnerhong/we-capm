@@ -53,6 +53,10 @@ const HEADER_KEYWORDS = [
   "핸드폰",
   "전화번호",
   "전화",
+  "반",
+  "반명",
+  "학급",
+  "학반",
 ];
 
 /** 첫 줄이 진짜 헤더인지 판별 — 2칸 이상 + 헤더 키워드 포함 */
@@ -78,12 +82,18 @@ function normalizeSeparator(text: string): string {
     return line.trim().split(/\s+/).join(",");
   });
 
-  // 2) 첫 줄이 헤더 키워드를 포함한 "진짜 헤더"가 아니면 기본 헤더 prepend
+  // 2) 첫 줄이 헤더 키워드를 포함한 "진짜 헤더"가 아니면 기본 헤더 prepend.
+  //    canonical 순서: 반 → 원생명 → 학부모연락처. 3컬럼이면 새 순서 가정,
+  //    2컬럼이면 legacy(원생명,학부모연락처) 형식으로 처리.
   const nonEmpty = commaLines.findIndex((l) => l.trim().length > 0);
   if (nonEmpty >= 0) {
     const firstCols = commaLines[nonEmpty].split(",");
     if (!isHeaderRow(firstCols)) {
-      commaLines.splice(nonEmpty, 0, "원생명,학부모연락처");
+      const defaultHeader =
+        firstCols.length >= 3
+          ? "반,원생명,학부모연락처"
+          : "원생명,학부모연락처";
+      commaLines.splice(nonEmpty, 0, defaultHeader);
     }
   }
 
@@ -124,6 +134,7 @@ type GroupedRow = {
   children: Array<{
     name: string;
     birth_date: string | null;
+    class_name: string | null;
     rowNum: number;
   }>;
 };
@@ -199,6 +210,7 @@ export async function bulkImportAppUsersAction(
       "자녀이름"
     ).trim();
     const birthRaw = headerOf(row, "생년월일", "생일").trim();
+    const classNameRaw = headerOf(row, "반", "반명", "학급", "학반").trim();
 
     if (!phoneRaw) {
       rowErrors.push({
@@ -252,7 +264,12 @@ export async function bulkImportAppUsersAction(
     }
     // Dedup children by name within the same uploaded group
     if (!g.children.some((c) => c.name === childName)) {
-      g.children.push({ name: childName, birth_date: birth, rowNum });
+      g.children.push({
+        name: childName,
+        birth_date: birth,
+        class_name: classNameRaw || null,
+        rowNum,
+      });
     }
   }
 
@@ -347,6 +364,13 @@ async function processGroup(
     if (existing) {
       // Merge children only — dedup by existing child names
       const added = await mergeChildren(supabase, existing.id, g.children);
+      // 토리톡 자동 가입 — 이번에 추가한 자녀들의 unique 반명 기반
+      await ensureToritalkRooms(
+        supabase,
+        orgId,
+        existing.id,
+        g.children.map((c) => c.class_name)
+      );
       return {
         row: g.firstRowNum,
         phone: g.phoneDisplay,
@@ -401,6 +425,7 @@ async function processGroup(
         user_id: newUserId,
         name: c.name,
         birth_date: c.birth_date,
+        class_name: c.class_name,
       }));
       const childInsert = (await (
         supabase.from("app_children" as never) as unknown as {
@@ -420,6 +445,14 @@ async function processGroup(
         };
       }
     }
+
+    // 토리톡 자동 가입 — 자녀들의 unique 반명 기반
+    await ensureToritalkRooms(
+      supabase,
+      orgId,
+      newUserId,
+      g.children.map((c) => c.class_name)
+    );
 
     return {
       row: g.firstRowNum,
@@ -443,7 +476,7 @@ async function processGroup(
 async function mergeChildren(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
-  children: Array<{ name: string; birth_date: string | null }>
+  children: Array<{ name: string; birth_date: string | null; class_name: string | null }>
 ): Promise<number> {
   if (children.length === 0) return 0;
 
@@ -470,6 +503,7 @@ async function mergeChildren(
     user_id: userId,
     name: c.name,
     birth_date: c.birth_date,
+    class_name: c.class_name,
   }));
 
   const resp = (await (
@@ -483,4 +517,40 @@ async function mergeChildren(
     return 0;
   }
   return toInsert.length;
+}
+
+/**
+ * 자녀들의 unique class_name 들에 대해 토리톡 RPC 호출.
+ * 토리톡 비활성/정원초과/빈반명은 silent skip.
+ */
+async function ensureToritalkRooms(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  orgId: string,
+  userId: string,
+  classNames: Array<string | null | undefined>
+): Promise<void> {
+  const unique = Array.from(
+    new Set(
+      classNames
+        .map((c) => (c ?? "").trim())
+        .filter((c) => c.length > 0)
+    )
+  );
+  if (unique.length === 0) return;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const sb = supabase as any;
+  await Promise.all(
+    unique.map(async (cn) => {
+      try {
+        await sb.rpc("toritalk_ensure_room_membership", {
+          p_org_id: orgId,
+          p_class_name: cn,
+          p_user_id: userId,
+        });
+      } catch {
+        /* swallow */
+      }
+    })
+  );
 }

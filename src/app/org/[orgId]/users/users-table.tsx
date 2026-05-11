@@ -44,6 +44,7 @@ type AppUserListRow = {
 type AppUserWithCount = AppUserListRow & {
   children_count: number;
   enrolled_names: string[];
+  class_names: string[];
 };
 
 type EventLite = {
@@ -369,6 +370,9 @@ export function UsersTable({ orgId, rows, todayIso, events }: Props) {
                   📋 출석
                 </th>
                 <th className="px-2 py-2 text-left text-[10px] font-bold">
+                  🐰 반
+                </th>
+                <th className="px-2 py-2 text-left text-[10px] font-bold">
                   🎒 원생명
                 </th>
                 <th className="px-2 py-2 text-left text-[10px] font-bold">
@@ -426,6 +430,22 @@ export function UsersTable({ orgId, rows, todayIso, events }: Props) {
                         current={attendanceToday}
                         size="sm"
                       />
+                    </td>
+                    <td className="px-2 py-2">
+                      {r.class_names.length > 0 ? (
+                        <span className="inline-flex flex-wrap gap-1">
+                          {r.class_names.map((cn) => (
+                            <span
+                              key={cn}
+                              className="inline-flex items-center rounded-full bg-[#E8F0E4] px-2 py-0.5 text-[10px] font-bold text-[#2D5A3D]"
+                            >
+                              {cn}
+                            </span>
+                          ))}
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-[#B0A89D]">—</span>
+                      )}
                     </td>
                     <td className="px-2 py-2">
                       <Link
@@ -534,6 +554,18 @@ export function UsersTable({ orgId, rows, todayIso, events }: Props) {
               </div>
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0 flex-1">
+                  {r.class_names.length > 0 && (
+                    <div className="mb-1 flex flex-wrap gap-1">
+                      {r.class_names.map((cn) => (
+                        <span
+                          key={cn}
+                          className="inline-flex items-center rounded-full bg-[#E8F0E4] px-2 py-0.5 text-[10px] font-bold text-[#2D5A3D]"
+                        >
+                          🐰 {cn}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                   <Link
                     href={`/org/${orgId}/users/${r.id}`}
                     className="block text-base font-bold text-[#2D5A3D] hover:underline"
@@ -542,7 +574,7 @@ export function UsersTable({ orgId, rows, todayIso, events }: Props) {
                   </Link>
                   <a
                     href={`tel:${phoneDigits}`}
-                    className="mt-0.5 inline-flex items-center gap-1 font-mono text-xs text-[#2D5A3D] underline-offset-2 hover:underline"
+                    className="mt-1 inline-flex items-center gap-1 font-mono text-xs text-[#2D5A3D] underline-offset-2 hover:underline"
                   >
                     📞 {formatPhone(r.phone)}
                   </a>

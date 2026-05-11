@@ -161,6 +161,7 @@ function buildGroups(
         `${base}/missions/review`,
         `${base}/missions/radio`,
         `${base}/gifts`,
+        `${base}/toritalk`,
       ],
       badge: fmBadge ?? reviewBadge,
       items: [
@@ -169,6 +170,11 @@ function buildGroups(
           href: `${base}/tori-fm`,
           icon: "🎙",
           badge: fmBadge,
+        },
+        {
+          label: "토리톡 관리",
+          href: `${base}/toritalk`,
+          icon: "💬",
         },
         {
           label: "돌발 미션 방송",

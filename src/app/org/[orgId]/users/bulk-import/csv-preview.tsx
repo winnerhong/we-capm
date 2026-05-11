@@ -8,14 +8,15 @@ import {
   type ClipboardEvent,
 } from "react";
 
-const EXAMPLE_ROWS: Array<[string, string]> = [
-  ["홍길동", "01012341234"],
-  ["홍길순", "01012344567"],
+// 튜플 순서: [반, 원생명, 학부모연락처] — 전체 UI/CSV 정렬 통일.
+const EXAMPLE_ROWS: Array<[string, string, string]> = [
+  ["토끼반", "홍길동", "01012341234"],
+  ["곰반", "홍길순", "01012344567"],
 ];
 
 const INITIAL_ROW_COUNT = 5;
 
-type GridRow = { id: string; name: string; phone: string };
+type GridRow = { id: string; name: string; phone: string; className: string };
 
 function newRowId(): string {
   return Math.random().toString(36).slice(2, 8);
@@ -26,6 +27,7 @@ function makeEmptyRows(n: number): GridRow[] {
     id: newRowId(),
     name: "",
     phone: "",
+    className: "",
   }));
 }
 
@@ -36,15 +38,29 @@ function splitLineCells(line: string): string[] {
   return line.trim().split(/\s+/);
 }
 
-/** 그리드 rows → 서버가 받는 CSV 문자열 (헤더 포함) */
+/** CSV 셀 이스케이프 — 콤마/따옴표/줄바꿈이 있으면 따옴표로 감싸기 */
+function csvCell(v: string): string {
+  if (v.includes(",") || v.includes('"') || v.includes("\n")) {
+    return `"${v.replace(/"/g, '""')}"`;
+  }
+  return v;
+}
+
+/** 그리드 rows → 서버가 받는 CSV 문자열 (헤더 포함, 반→원생명→연락처 순) */
 function rowsToCsv(rows: GridRow[]): string {
   const valid = rows.filter(
     (r) => r.name.trim().length > 0 && r.phone.replace(/\D/g, "").length > 0
   );
   if (valid.length === 0) return "";
-  const lines = ["원생명,학부모연락처"];
+  const lines = ["반,원생명,학부모연락처"];
   for (const r of valid) {
-    lines.push(`${r.name.trim()},${r.phone.trim()}`);
+    lines.push(
+      [
+        csvCell(r.className.trim()),
+        csvCell(r.name.trim()),
+        csvCell(r.phone.trim()),
+      ].join(",")
+    );
   }
   return lines.join("\n");
 }
@@ -65,7 +81,21 @@ const HEADER_KEYWORDS = [
   "핸드폰",
   "전화번호",
   "전화",
+  "반",
+  "반명",
+  "학급",
+  "학반",
 ];
+
+const CLASS_KEYWORDS = ["반", "반명", "학급", "학반"];
+
+function detectClassColumnIdx(headerCols: string[]): number {
+  for (let i = 0; i < headerCols.length; i++) {
+    const c = headerCols[i].trim();
+    if (CLASS_KEYWORDS.some((k) => c === k || c.includes(k))) return i;
+  }
+  return -1;
+}
 
 /** 첫 줄이 헤더처럼 보이는지 — 2칸 이상 + 헤더 키워드 포함 시만 true */
 function isHeaderRow(cols: string[]): boolean {
@@ -75,21 +105,89 @@ function isHeaderRow(cols: string[]): boolean {
   );
 }
 
-/** 파일/복붙 텍스트 → 그리드 rows */
+/** 헤더 컬럼에서 "이름/원생명" 또는 "연락처" 위치 찾기 */
+function detectNameColumnIdx(headerCols: string[]): number {
+  const kw = [
+    "원생명",
+    "원생이름",
+    "학생이름",
+    "아동이름",
+    "아이이름",
+    "자녀이름",
+    "이름",
+  ];
+  for (let i = 0; i < headerCols.length; i++) {
+    const c = headerCols[i].trim();
+    if (kw.some((k) => c === k || c.includes(k))) return i;
+  }
+  return -1;
+}
+
+function detectPhoneColumnIdx(headerCols: string[]): number {
+  const kw = [
+    "학부모연락처",
+    "학부모전화",
+    "부모연락처",
+    "부모전화",
+    "연락처",
+    "핸드폰",
+    "전화번호",
+    "전화",
+  ];
+  for (let i = 0; i < headerCols.length; i++) {
+    const c = headerCols[i].trim();
+    if (kw.some((k) => c === k || c.includes(k))) return i;
+  }
+  return -1;
+}
+
+/**
+ * 파일/복붙 텍스트 → 그리드 rows.
+ * 헤더가 있으면 컬럼명으로 매핑 (구버전 "원생명,학부모연락처,반" 데이터도 정상 import).
+ * 헤더가 없으면 canonical 순서(반→원생명→연락처) 가정. 단, 3열이 아닐 때는
+ * 첫 셀의 패턴으로 추정 — 숫자 위주면 phone 로 본다 (legacy "원생명,학부모연락처").
+ */
 function textToRows(text: string): GridRow[] {
   const cleaned = text.replace(/^﻿/, "");
   const lines = cleaned.split(/\r?\n/).filter((l) => l.trim());
   if (lines.length === 0) return [];
 
   const firstCols = splitLineCells(lines[0]);
-  const dataLines = isHeaderRow(firstCols) ? lines.slice(1) : lines;
+  const hasHeader = isHeaderRow(firstCols);
+  const dataLines = hasHeader ? lines.slice(1) : lines;
+
+  let classIdx: number;
+  let nameIdx: number;
+  let phoneIdx: number;
+
+  if (hasHeader) {
+    classIdx = detectClassColumnIdx(firstCols);
+    nameIdx = detectNameColumnIdx(firstCols);
+    phoneIdx = detectPhoneColumnIdx(firstCols);
+    // 폴백 — 헤더에 있지만 키워드 안 잡힐 경우
+    if (nameIdx < 0) nameIdx = classIdx >= 0 && classIdx === 0 ? 1 : 0;
+    if (phoneIdx < 0) phoneIdx = nameIdx + 1;
+  } else {
+    // 헤더 없음 — canonical 순서 (반, 원생명, 연락처) 가정
+    // 단 2열이면 legacy 형식 (원생명, 연락처) 으로 처리
+    if (firstCols.length >= 3) {
+      classIdx = 0;
+      nameIdx = 1;
+      phoneIdx = 2;
+    } else {
+      classIdx = -1;
+      nameIdx = 0;
+      phoneIdx = 1;
+    }
+  }
 
   return dataLines.map((l) => {
     const cols = splitLineCells(l);
     return {
       id: newRowId(),
-      name: cols[0] ?? "",
-      phone: cols[1] ?? "",
+      name: cols[nameIdx] ?? "",
+      phone: cols[phoneIdx] ?? "",
+      className: classIdx >= 0 ? (cols[classIdx] ?? "") : "",
     };
   });
 }
@@ -128,7 +226,7 @@ export function BulkImportForm({
   }, [rows]);
 
   const updateCell = useCallback(
-    (id: string, key: "name" | "phone", value: string) => {
+    (id: string, key: "name" | "phone" | "className", value: string) => {
       setRows((prev) =>
         prev.map((r) => (r.id === id ? { ...r, [key]: value } : r))
       );
@@ -137,7 +235,10 @@ export function BulkImportForm({
   );
 
   const addRow = useCallback(() => {
-    setRows((prev) => [...prev, { id: newRowId(), name: "", phone: "" }]);
+    setRows((prev) => [
+      ...prev,
+      { id: newRowId(), name: "", phone: "", className: "" },
+    ]);
   }, []);
 
   const addRows = useCallback((n: number) => {
@@ -160,7 +261,7 @@ export function BulkImportForm({
     (
       e: ClipboardEvent<HTMLInputElement>,
       rowIdx: number,
-      col: "name" | "phone"
+      col: "name" | "phone" | "className"
     ) => {
       const clip = e.clipboardData.getData("text/plain") ?? "";
       // 단일 셀 복붙이면 기본 동작 허용
@@ -172,8 +273,10 @@ export function BulkImportForm({
       const parsed = textToRows(clip);
       if (parsed.length === 0) return;
 
-      // 붙여넣은 데이터가 1칸짜리(= 모든 행의 phone 이 비어있음)인지 감지
-      const isSingleColumnPaste = parsed.every((r) => !r.phone);
+      // 붙여넣은 데이터가 1칸짜리(= phone/className 둘 다 비어있음)인지 감지
+      const isSingleColumnPaste = parsed.every(
+        (r) => !r.phone && !r.className
+      );
 
       setRows((prev) => {
         const next = [...prev];
@@ -181,28 +284,27 @@ export function BulkImportForm({
           const targetIdx = rowIdx + i;
           // 필요하면 빈 행 추가
           while (next.length <= targetIdx) {
-            next.push({ id: newRowId(), name: "", phone: "" });
+            next.push({
+              id: newRowId(),
+              name: "",
+              phone: "",
+              className: "",
+            });
           }
 
           if (isSingleColumnPaste) {
-            // 단일 컬럼 복붙 — 시작 셀의 열에만 값을 채우고 반대 열은 보존
-            if (col === "name") {
-              next[targetIdx] = {
-                ...next[targetIdx],
-                name: parsed[i].name,
-              };
-            } else {
-              next[targetIdx] = {
-                ...next[targetIdx],
-                phone: parsed[i].name,
-              };
-            }
+            // 단일 컬럼 복붙 — 시작 셀의 열에만 값을 채우고 다른 열은 보존
+            next[targetIdx] = {
+              ...next[targetIdx],
+              [col]: parsed[i].name,
+            };
           } else {
-            // 2칸 이상 복붙 — name+phone 모두 교체
+            // 2칸 이상 복붙 — name+phone+className 모두 교체
             next[targetIdx] = {
               ...next[targetIdx],
               name: parsed[i].name,
               phone: parsed[i].phone,
+              className: parsed[i].className,
             };
           }
         }
@@ -213,9 +315,9 @@ export function BulkImportForm({
   );
 
   const downloadExample = useCallback(() => {
-    const rows = ["원생명,학부모연락처"];
-    for (const [n, p] of EXAMPLE_ROWS) {
-      rows.push(`${n},${p}`);
+    const rows = ["반,원생명,학부모연락처"];
+    for (const [c, n, p] of EXAMPLE_ROWS) {
+      rows.push(`${c},${n},${p}`);
     }
     const csv = rows.join("\n") + "\n";
     // UTF-8 BOM 포함 (Excel 한글 호환)
@@ -258,7 +360,9 @@ export function BulkImportForm({
   }, []);
 
   const copyExample = useCallback(async () => {
-    const example = EXAMPLE_ROWS.map(([n, p]) => `${n}\t${p}`).join("\n");
+    const example = EXAMPLE_ROWS.map(([c, n, p]) => `${c}\t${n}\t${p}`).join(
+      "\n"
+    );
     try {
       await navigator.clipboard.writeText(example);
       setCopied(true);
@@ -329,16 +433,20 @@ export function BulkImportForm({
           </div>
 
           <p className="mb-2 text-[11px] text-[#6B6560]">
-            💡 엑셀에서 2열(이름·번호)을 복사해 첫 번째 칸에 붙여넣으면 자동으로
-            퍼져요. 또는 아래 표에 직접 입력하세요.
+            💡 엑셀에서 3열(반·원생명·연락처)을 복사해 첫 번째 칸에 붙여넣으면
+            자동으로 퍼져요. <b>반</b>은 선택입력이며 토리톡 활성화 기관은 반
+            채팅방에 자동 참여돼요.
           </p>
 
-          {/* Excel-like grid */}
+          {/* Excel-like grid — 반 / 원생명 / 학부모연락처 순 */}
           <div className="overflow-hidden rounded-xl border border-[#D4E4BC] bg-[#F4EFE8]">
             {/* 헤더 */}
-            <div className="grid grid-cols-[36px_1fr_1fr_36px] border-b-2 border-[#D4E4BC] bg-[#E8F0E4] text-[11px] font-bold text-[#2D5A3D]">
+            <div className="grid grid-cols-[36px_0.8fr_1fr_1fr_36px] border-b-2 border-[#D4E4BC] bg-[#E8F0E4] text-[11px] font-bold text-[#2D5A3D]">
               <div className="border-r border-[#D4E4BC] px-2 py-2 text-center">
                 #
+              </div>
+              <div className="border-r border-[#D4E4BC] px-2 py-2">
+                🐰 반 (선택)
               </div>
               <div className="border-r border-[#D4E4BC] px-2 py-2">
                 🎒 원생명
@@ -355,11 +463,23 @@ export function BulkImportForm({
             {rows.map((r, idx) => (
               <div
                 key={r.id}
-                className="grid grid-cols-[36px_1fr_1fr_36px] border-b border-[#E8E0D0] bg-white"
+                className="grid grid-cols-[36px_0.8fr_1fr_1fr_36px] border-b border-[#E8E0D0] bg-white"
               >
                 <div className="flex items-center justify-center border-r border-[#E8E0D0] bg-[#FFFDF8] px-2 text-[11px] font-mono text-[#8B7F75]">
                   {idx + 1}
                 </div>
+                <input
+                  type="text"
+                  value={r.className}
+                  onChange={(e) =>
+                    updateCell(r.id, "className", e.target.value)
+                  }
+                  onPaste={(e) => handlePaste(e, idx, "className")}
+                  placeholder="토끼반"
+                  autoComplete="off"
+                  maxLength={40}
+                  className={`${cellBase} border-r border-[#E8E0D0]`}
+                />
                 <input
                   type="text"
                   value={r.name}

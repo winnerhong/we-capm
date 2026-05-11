@@ -21,6 +21,7 @@ type ChildRow = {
   name: string;
   birth_date: string | null;
   is_enrolled: boolean;
+  class_name: string | null;
 };
 
 type SbErr = { message: string } | null;
@@ -60,7 +61,7 @@ async function loadUser(userId: string): Promise<{
       };
     }
   )
-    .select("id, name, birth_date, is_enrolled")
+    .select("id, name, birth_date, is_enrolled, class_name")
     .eq("user_id", userId)
     .order("created_at", { ascending: true })) as SbMany<ChildRow>;
 

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireAppUser } from "@/lib/user-auth-guard";
 import { getAcornBalance, loadChildrenForUser } from "@/lib/app-user/queries";
 import { userHasAnyLiveEvent } from "@/lib/org-events/queries";
+import { isToritalkEnabled } from "@/lib/toritalk/queries";
 import { AcornIcon } from "@/components/acorn-icon";
 import { WinnerTalkIcon } from "@/components/winner-talk-icon";
 import { OrgPresenceTracker } from "@/components/presence/org-presence-tracker";
@@ -15,10 +16,11 @@ export default async function UserLayout({
   children: React.ReactNode;
 }) {
   const user = await requireAppUser();
-  const [acornBalance, hasLive, kids] = await Promise.all([
+  const [acornBalance, hasLive, kids, toritalkOn] = await Promise.all([
     getAcornBalance(user.id),
     userHasAnyLiveEvent(user.id),
     loadChildrenForUser(user.id),
+    isToritalkEnabled(user.orgId),
   ]);
 
   // 아바타 글자 우선순위:
@@ -96,26 +98,26 @@ export default async function UserLayout({
         className="fixed inset-x-0 bottom-0 z-40 border-t border-[#D4E4BC]/60 bg-white/95 backdrop-blur-md"
         aria-label="주요 메뉴"
       >
-        {/* LIVE 행사가 없으면(예정만 있는 참가자) 활성 기능(스탬프/토리톡/선물)
-            탭은 숨김 — 행사 시작 후 활성화. 홈·일정·내 정보만 노출. */}
+        {/* LIVE 행사가 없으면 스탬프/선물 탭은 숨김 — 행사 시작 후 활성화.
+            토리톡은 기관이 활성화했을 때만 노출 (LIVE 와 무관). */}
         <ul className="mx-auto flex max-w-md items-stretch">
           <TabItem href="/home" label="홈" icon="🏠" />
           <TabItem href="/schedule" label="일정" icon="📅" />
           {hasLive && (
-            <>
-              <TabItem
-                href="/stamps"
-                label="스탬프"
-                icon={<AcornIcon size={20} />}
-              />
-              <TabItem
-                href="/tori-talk"
-                label="토리톡"
-                icon={<WinnerTalkIcon size={22} />}
-              />
-              <TabItem href="/gifts" label="선물함" icon="🎁" />
-            </>
+            <TabItem
+              href="/stamps"
+              label="스탬프"
+              icon={<AcornIcon size={20} />}
+            />
           )}
+          {toritalkOn && (
+            <TabItem
+              href="/tori-talk"
+              label="토리톡"
+              icon={<WinnerTalkIcon size={22} />}
+            />
+          )}
+          {hasLive && <TabItem href="/gifts" label="선물함" icon="🎁" />}
           <TabItem href="/profile" label="내 정보" icon="👤" />
         </ul>
       </nav>

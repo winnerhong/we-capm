@@ -101,6 +101,7 @@ export async function GET(
   type Row = {
     parent_name: string;
     phone: string;
+    class_names: string;
     children: string;
     joined_at: string;
     approved_count: string;
@@ -109,9 +110,10 @@ export async function GET(
 
   if (userIds.length === 0) {
     const csv = toCSV<Row>([], [
+      { key: "class_names", label: "반" },
+      { key: "children", label: "자녀" },
       { key: "parent_name", label: "보호자명" },
       { key: "phone", label: "연락처" },
-      { key: "children", label: "자녀" },
       { key: "joined_at", label: "참가일시" },
       { key: "approved_count", label: "승인 제출 수" },
       { key: "acorn_balance", label: "도토리 잔액(전체)" },
@@ -158,25 +160,40 @@ export async function GET(
     });
   }
 
-  // 4) 자녀 정보
+  // 4) 자녀 정보 — 이름 + 반명
   const childMap = new Map<string, string[]>();
+  const classMap = new Map<string, string[]>();
   const cResp = (await (
     supabase.from("app_children" as never) as unknown as {
       select: (c: string) => {
         in: (k: string, v: string[]) => Promise<{
-          data: Array<{ user_id: string; name: string }> | null;
+          data: Array<{
+            user_id: string;
+            name: string;
+            class_name: string | null;
+          }> | null;
         }>;
       };
     }
   )
-    .select("user_id, name")
+    .select("user_id, name, class_name")
     .in("user_id", userIds)) as {
-    data: Array<{ user_id: string; name: string }> | null;
+    data: Array<{
+      user_id: string;
+      name: string;
+      class_name: string | null;
+    }> | null;
   };
   for (const c of cResp.data ?? []) {
     const arr = childMap.get(c.user_id) ?? [];
     arr.push(c.name);
     childMap.set(c.user_id, arr);
+    const cn = (c.class_name ?? "").trim();
+    if (cn) {
+      const cls = classMap.get(c.user_id) ?? [];
+      if (!cls.includes(cn)) cls.push(cn);
+      classMap.set(c.user_id, cls);
+    }
   }
 
   // 5) 이 기관의 미션 ids (제출 카운트 스코프 제한용)
@@ -231,9 +248,11 @@ export async function GET(
   const rows: Row[] = participants.map((p) => {
     const u = userMap.get(p.user_id);
     const children = childMap.get(p.user_id) ?? [];
+    const classes = classMap.get(p.user_id) ?? [];
     return {
       parent_name: u?.parent_name ?? "",
       phone: u?.phone ?? "",
+      class_names: classes.join(" / "),
       children: children.join(" / "),
       joined_at: formatDateKR(p.joined_at),
       approved_count: String(approvedCountByUser.get(p.user_id) ?? 0),
@@ -244,6 +263,7 @@ export async function GET(
   const csv = toCSV<Row>(rows, [
     { key: "parent_name", label: "보호자명" },
     { key: "phone", label: "연락처" },
+    { key: "class_names", label: "반" },
     { key: "children", label: "자녀" },
     { key: "joined_at", label: "참가일시" },
     { key: "approved_count", label: "승인 제출 수" },

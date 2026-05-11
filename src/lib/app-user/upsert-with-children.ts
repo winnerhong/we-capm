@@ -27,6 +27,7 @@ export type UpsertChild = {
   name: string;
   birth_date: string | null;
   is_enrolled: boolean;
+  class_name: string | null;
 };
 
 export function parseChildrenFromFormData(formData: FormData): UpsertChild[] {
@@ -34,6 +35,9 @@ export function parseChildrenFromFormData(formData: FormData): UpsertChild[] {
   const births = formData.getAll("child_birth").map((v) => String(v).trim());
   const enrolled = formData
     .getAll("child_enrolled")
+    .map((v) => String(v).trim());
+  const classes = formData
+    .getAll("child_class")
     .map((v) => String(v).trim());
   const out: UpsertChild[] = [];
   const seen = new Set<string>();
@@ -49,7 +53,13 @@ export function parseChildrenFromFormData(formData: FormData): UpsertChild[] {
       enrolledRaw === undefined
         ? out.length === 0
         : enrolledRaw === "1" || enrolledRaw === "true";
-    out.push({ name, birth_date: birth, is_enrolled: isEnrolled });
+    const className = (classes[i] ?? "").trim() || null;
+    out.push({
+      name,
+      birth_date: birth,
+      is_enrolled: isEnrolled,
+      class_name: className,
+    });
   }
   return out;
 }
@@ -147,21 +157,38 @@ export async function upsertParticipantWithChildren(
     userId = insResp.data.id;
   }
 
-  // 2) 자녀 dedup 후 추가
+  // 2) 자녀 dedup 후 추가 — class_name 도 함께 저장.
+  //    이미 있는 자녀 이름이 다시 들어오고 class_name 이 다르면 UPDATE.
   const existingChildrenResp = (await (
     supabase.from("app_children" as never) as unknown as {
       select: (c: string) => {
-        eq: (k: string, v: string) => Promise<SbMany<{ name: string }>>;
+        eq: (
+          k: string,
+          v: string
+        ) => Promise<
+          SbMany<{ id: string; name: string; class_name: string | null }>
+        >;
       };
     }
   )
-    .select("name")
-    .eq("user_id", userId)) as SbMany<{ name: string }>;
+    .select("id, name, class_name")
+    .eq("user_id", userId)) as SbMany<{
+    id: string;
+    name: string;
+    class_name: string | null;
+  }>;
 
-  const existingNames = new Set(
-    (existingChildrenResp.data ?? []).map((r) => r.name)
+  const existingByName = new Map(
+    (existingChildrenResp.data ?? []).map((r) => [r.name, r])
   );
-  const toInsert = children.filter((c) => !existingNames.has(c.name));
+  const toInsert = children.filter((c) => !existingByName.has(c.name));
+  const toUpdate = children.filter((c) => {
+    const ex = existingByName.get(c.name);
+    if (!ex) return false;
+    const before = (ex.class_name ?? "").trim();
+    const after = (c.class_name ?? "").trim();
+    return after.length > 0 && after !== before;
+  });
 
   if (toInsert.length > 0) {
     const childResp = (await (
@@ -174,12 +201,59 @@ export async function upsertParticipantWithChildren(
         name: c.name,
         birth_date: c.birth_date,
         is_enrolled: c.is_enrolled,
+        class_name: c.class_name,
       }))
     )) as { error: SbErr };
 
     if (childResp.error) {
       throw new Error(`자녀 등록 실패: ${childResp.error.message}`);
     }
+  }
+
+  for (const c of toUpdate) {
+    const ex = existingByName.get(c.name);
+    if (!ex) continue;
+    await (
+      supabase.from("app_children" as never) as unknown as {
+        update: (p: unknown) => {
+          eq: (k: string, v: string) => Promise<{ error: SbErr }>;
+        };
+      }
+    )
+      .update({ class_name: c.class_name })
+      .eq("id", ex.id);
+  }
+
+  // 3) 토리톡 자동 가입 — 이번 폼 자녀 + 기존 자녀 모두의 unique class_name
+  const allClasses = [
+    ...children.map((c) => c.class_name),
+    ...Array.from(existingByName.values())
+      .filter((ex) => !children.some((c) => c.name === ex.name))
+      .map((ex) => ex.class_name),
+  ];
+  const uniqueClasses = Array.from(
+    new Set(
+      allClasses
+        .map((c) => (c ?? "").trim())
+        .filter((c) => c.length > 0)
+    )
+  );
+  if (uniqueClasses.length > 0) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sb = supabase as any;
+    await Promise.all(
+      uniqueClasses.map(async (cn) => {
+        try {
+          await sb.rpc("toritalk_ensure_room_membership", {
+            p_org_id: orgId,
+            p_class_name: cn,
+            p_user_id: userId,
+          });
+        } catch {
+          /* swallow */
+        }
+      })
+    );
   }
 
   return { userId, merged };

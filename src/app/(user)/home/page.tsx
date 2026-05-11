@@ -151,6 +151,20 @@ export default async function UserHomePage({
   if (selectedEvent && selectedEvent.status === "DRAFT") {
     return (
       <div className="space-y-4">
+        {/* 온보딩 위저드 — 최상단 노출(미완 시 배너). 행사 시작 전에도 프로필을 미리 채울 수 있도록. */}
+        <OnboardingWizard
+          userId={user.id}
+          initialParentName={userDetail?.parent_name ?? user.parentName}
+          initialChildren={children.map((c) => ({
+            id: c.id,
+            name: c.name,
+            birth_date: c.birth_date,
+            gender: c.gender,
+          }))}
+          initialRewarded={userDetail?.onboarding_rewarded ?? false}
+          initialBonusCount={userDetail?.onboarding_bonus_count ?? 0}
+        />
+
         {/* 가족 헤더 */}
         <section className="overflow-hidden rounded-3xl bg-gradient-to-br from-[#2D5A3D] via-[#3A7A52] to-[#4A7C59] p-5 shadow-lg">
           <div className="flex items-start justify-between gap-3">
@@ -260,6 +274,20 @@ export default async function UserHomePage({
 
   return (
     <div className="space-y-4">
+      {/* 온보딩 위저드 — 최상단 노출(미완 시 배너). 첫 입장 시 자동 오픈, 미완 시 상단 배너 유지. */}
+      <OnboardingWizard
+        userId={user.id}
+        initialParentName={userDetail?.parent_name ?? user.parentName}
+        initialChildren={children.map((c) => ({
+          id: c.id,
+          name: c.name,
+          birth_date: c.birth_date,
+          gender: c.gender,
+        }))}
+        initialRewarded={userDetail?.onboarding_rewarded ?? false}
+        initialBonusCount={userDetail?.onboarding_bonus_count ?? 0}
+      />
+
       {primaryPack ? (
         /* Hero + 진행 중 스탬프북 — 한 카드로 통합 */
         <StampbookDetail
@@ -326,20 +354,6 @@ export default async function UserHomePage({
       {selectedEvent && timelineSlots.length > 0 && (
         <NextUpCard eventName={selectedEvent.name} slots={timelineSlots} />
       )}
-
-      {/* 온보딩 위저드 — 첫 입장 시 자동 오픈, 미완 시 상단 배너 유지 */}
-      <OnboardingWizard
-        userId={user.id}
-        initialParentName={userDetail?.parent_name ?? user.parentName}
-        initialChildren={children.map((c) => ({
-          id: c.id,
-          name: c.name,
-          birth_date: c.birth_date,
-          gender: c.gender,
-        }))}
-        initialRewarded={userDetail?.onboarding_rewarded ?? false}
-        initialBonusCount={userDetail?.onboarding_bonus_count ?? 0}
-      />
 
       {/* 돌발 미션 — 시간 임계이므로 FM 보다 위 */}
       <BroadcastCard orgId={user.orgId} />
