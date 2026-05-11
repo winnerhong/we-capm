@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireAppUser } from "@/lib/user-auth-guard";
-import { getAcornBalance } from "@/lib/app-user/queries";
+import { getAcornBalance, loadChildrenForUser } from "@/lib/app-user/queries";
 import { userHasAnyLiveEvent } from "@/lib/org-events/queries";
 import { AcornIcon } from "@/components/acorn-icon";
 import { WinnerTalkIcon } from "@/components/winner-talk-icon";
@@ -15,13 +15,22 @@ export default async function UserLayout({
   children: React.ReactNode;
 }) {
   const user = await requireAppUser();
-  const [acornBalance, hasLive] = await Promise.all([
+  const [acornBalance, hasLive, kids] = await Promise.all([
     getAcornBalance(user.id),
     userHasAnyLiveEvent(user.id),
+    loadChildrenForUser(user.id),
   ]);
 
-  const firstLetter =
-    (user.parentName ?? "").trim().charAt(0) || "🌱";
+  // 아바타 글자 우선순위:
+  //   1) 원생(is_enrolled=true) 자녀의 첫 글자 — "홍유빈" → "홍"
+  //   2) 보호자 이름 첫 글자 — fallback
+  //   3) 🌱 — 그것도 없을 때
+  const firstLetter = (() => {
+    const enrolled = kids.find((c) => c.is_enrolled && c.name?.trim());
+    if (enrolled) return enrolled.name.trim().charAt(0);
+    const parentFirst = (user.parentName ?? "").trim().charAt(0);
+    return parentFirst || "🌱";
+  })();
 
   return (
     <div className="min-h-dvh bg-gradient-to-b from-[#FFF8F0] via-[#F5F1E8] to-[#E8F0E4]">

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import type { MissionType } from "@/lib/trails/types";
+import { ImageUploader } from "@/components/image-uploader";
 import { submitStopMissionAction } from "./actions";
 
 type Props = {
@@ -149,27 +150,12 @@ export function MissionForm({
       )}
 
       {missionType === "PHOTO" && (
-        <div>
-          <label
-            htmlFor="photo_url"
-            className="block text-sm font-bold text-[#2D5A3D] mb-1"
-          >
-            📷 사진 URL
-          </label>
-          <p className="text-xs text-zinc-500 mb-2">
-            (Phase 2에서 업로드 가능 — 지금은 URL을 붙여넣어 주세요)
-          </p>
-          <input
-            id="photo_url"
-            name="photo_url"
-            type="url"
-            required
-            inputMode="url"
-            autoComplete="off"
-            className="w-full rounded-xl border-2 border-[#D4E4BC] focus:border-[#2D5A3D] focus:ring-2 focus:ring-[#2D5A3D]/20 bg-white px-3 py-2 text-sm outline-none"
-            placeholder="https://..."
-          />
-        </div>
+        <ImageUploader
+          name="photo_url"
+          label="📷 미션 사진"
+          folder="trails/submissions"
+          hint="클릭·드래그·붙여넣기 모두 가능"
+        />
       )}
 
       {missionType === "LOCATION" && (

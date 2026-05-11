@@ -480,6 +480,76 @@ export async function moveMissionAction(
 }
 
 /* -------------------------------------------------------------------------- */
+/* Reorder missions in pack (drag & drop)                                     */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * 클라이언트가 드래그 앤 드롭으로 결정한 새 순서를 일괄 반영.
+ *  - orderedIds 가 같은 pack 의 모든 미션을 포함하지 않거나 외부 id 가 섞이면
+ *    부분 업데이트로 진행 (소유권/같은 pack 검증된 id 만 0..N-1 로 갱신).
+ *  - 동일 display_order 인 row 는 skip.
+ *  - 호출자: <DraggableMissionList /> onDrop 핸들러.
+ */
+export async function reorderMissionsInPackAction(
+  packId: string,
+  orderedIds: string[]
+): Promise<void> {
+  const session = await requireOrg();
+  if (!packId) throw new Error("스탬프북 정보가 없어요");
+  if (!Array.isArray(orderedIds) || orderedIds.length === 0) return;
+
+  const supabase = await createClient();
+
+  // 해당 pack 의 미션 전체 fetch (소유권 검증용)
+  const resp = (await (
+    supabase.from("org_missions" as never) as unknown as {
+      select: (c: string) => {
+        eq: (k: string, v: string) => {
+          eq: (k: string, v: string) => Promise<{ data: OrgMissionRow[] | null }>;
+        };
+      };
+    }
+  )
+    .select("id, display_order, quest_pack_id, org_id")
+    .eq("quest_pack_id", packId)
+    .eq("org_id", session.orgId)) as { data: OrgMissionRow[] | null };
+
+  const dbList = resp.data ?? [];
+  if (dbList.length === 0) return;
+  const ownedIds = new Set(dbList.map((r) => r.id));
+  const orderMap = new Map(dbList.map((r) => [r.id, r.display_order]));
+
+  // 외부 id 는 무시. 누락된 db row 는 뒤에 붙임 (기존 상대 순서 보존).
+  const validOrdered = orderedIds.filter((id) => ownedIds.has(id));
+  const missing = dbList
+    .filter((r) => !validOrdered.includes(r.id))
+    .sort((a, b) => a.display_order - b.display_order)
+    .map((r) => r.id);
+  const finalOrder = [...validOrdered, ...missing];
+
+  const now = new Date().toISOString();
+  const api = supabase.from("org_missions" as never) as unknown as {
+    update: (r: Row) => {
+      eq: (
+        k: string,
+        v: string
+      ) => Promise<{ error: { message: string } | null }>;
+    };
+  };
+
+  for (let i = 0; i < finalOrder.length; i++) {
+    const id = finalOrder[i];
+    if (orderMap.get(id) === i) continue; // noop
+    const { error } = await api
+      .update({ display_order: i, updated_at: now })
+      .eq("id", id);
+    if (error) throw new Error(`순서 변경 실패: ${error.message}`);
+  }
+
+  revalidatePath(`/org/${session.orgId}/quest-packs/${packId}/edit`);
+}
+
+/* -------------------------------------------------------------------------- */
 /* Remove mission (hard delete for org-owned)                                 */
 /* -------------------------------------------------------------------------- */
 

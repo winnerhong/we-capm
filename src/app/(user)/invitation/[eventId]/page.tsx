@@ -41,6 +41,36 @@ function fmtSlotTime(iso: string): string {
   return fmtClockKstAlways(iso);
 }
 
+/**
+ * 슬롯 시작 시각을 행사 시작 시각 + 누적 길이로 재계산.
+ *  - DB 의 slot.starts_at 는 행사 시각이 바뀐 후 timeline 재저장이 안 됐으면
+ *    구 값일 수 있어, 항상 event.starts_at 기준 누적으로 표시하는 게 안전.
+ *  - duration = ends_at - starts_at (둘 다 있을 때) / 없으면 0 분.
+ */
+function computeSlotDisplayTimes(
+  eventStartsAt: string | null,
+  slots: Array<{ starts_at: string; ends_at: string | null }>
+): string[] {
+  if (!eventStartsAt || slots.length === 0) {
+    return slots.map((s) => fmtSlotTime(s.starts_at));
+  }
+  const startMs = new Date(eventStartsAt).getTime();
+  if (!Number.isFinite(startMs)) {
+    return slots.map((s) => fmtSlotTime(s.starts_at));
+  }
+  let cursor = startMs;
+  const out: string[] = [];
+  for (const s of slots) {
+    out.push(fmtSlotTime(new Date(cursor).toISOString()));
+    const sMs = new Date(s.starts_at).getTime();
+    const eMs = s.ends_at ? new Date(s.ends_at).getTime() : NaN;
+    const dur =
+      Number.isFinite(sMs) && Number.isFinite(eMs) && eMs > sMs ? eMs - sMs : 0;
+    cursor += dur;
+  }
+  return out;
+}
+
 /** 행사 시작까지 남은 일수. 오늘이면 0, 지났으면 음수. */
 function calcDDay(startsAt: string | null): number | null {
   if (!startsAt) return null;
@@ -531,40 +561,43 @@ export default async function EventInvitationPage({
         </div>
       </section>
 
-      {/* ─── 타임테이블 — 전체 노출 ─── */}
-      {slots.length > 0 && (
-        <section className="mx-auto max-w-md px-6 py-10">
-          <h2 className="mb-4 flex items-center justify-center gap-2 text-base font-bold text-[#2D5A3D]">
-            <span aria-hidden>🕐</span>
-            <span>그날의 흐름</span>
-          </h2>
-          <ol className="relative space-y-3 border-l-2 border-emerald-200 pl-5">
-            {slots.map((slot) => {
-              const meta = SLOT_KIND_META[slot.slot_kind];
-              const emoji = slot.icon_emoji || meta?.defaultEmoji || "🌲";
-              return (
-                <li
-                  key={slot.id}
-                  className="relative rounded-xl border border-[#D4E4BC] bg-white p-3 shadow-sm"
-                >
-                  <span
-                    aria-hidden
-                    className="absolute -left-[27px] top-3 inline-flex h-4 w-4 items-center justify-center rounded-full border-2 border-emerald-400 bg-white"
+      {/* ─── 타임테이블 — 전체 노출. 시간은 event.starts_at + 누적 길이로 재계산. ─── */}
+      {slots.length > 0 && (() => {
+        const slotTimes = computeSlotDisplayTimes(event.starts_at, slots);
+        return (
+          <section className="mx-auto max-w-md px-6 py-10">
+            <h2 className="mb-4 flex items-center justify-center gap-2 text-base font-bold text-[#2D5A3D]">
+              <span aria-hidden>🕐</span>
+              <span>그날의 흐름</span>
+            </h2>
+            <ol className="relative space-y-3 border-l-2 border-emerald-200 pl-5">
+              {slots.map((slot, idx) => {
+                const meta = SLOT_KIND_META[slot.slot_kind];
+                const emoji = slot.icon_emoji || meta?.defaultEmoji || "🌲";
+                return (
+                  <li
+                    key={slot.id}
+                    className="relative rounded-xl border border-[#D4E4BC] bg-white p-3 shadow-sm"
                   >
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                  </span>
-                  <p className="text-xs font-semibold text-[#6B6560]">
-                    {fmtSlotTime(slot.starts_at)}
-                  </p>
-                  <p className="mt-0.5 text-sm font-bold text-[#2D5A3D]">
-                    {emoji} {slot.title || meta?.label || "활동"}
-                  </p>
-                </li>
-              );
-            })}
-          </ol>
-        </section>
-      )}
+                    <span
+                      aria-hidden
+                      className="absolute -left-[27px] top-3 inline-flex h-4 w-4 items-center justify-center rounded-full border-2 border-emerald-400 bg-white"
+                    >
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                    </span>
+                    <p className="text-xs font-semibold text-[#6B6560]">
+                      {slotTimes[idx]}
+                    </p>
+                    <p className="mt-0.5 text-sm font-bold text-[#2D5A3D]">
+                      {emoji} {slot.title || meta?.label || "활동"}
+                    </p>
+                  </li>
+                );
+              })}
+            </ol>
+          </section>
+        );
+      })()}
 
       {/* ─── CTA ─── */}
       {/* 행사 LIVE 일 때만 "참여 확인 + 일정/미션/토리FM" 노출.

@@ -212,7 +212,8 @@ export function CoverImagePicker({
           </div>
         </div>
       ) : (
-        // ─── 빈 상태: 드롭존 + 붙여넣기 안내 ──────────────────────
+        // ─── 빈 상태: 카메라 + "클릭하거나 드래그·붙여넣기" + 파일 선택 버튼 ──
+        // (디자인은 ImageUploader 와 통일 — 사용자 친화적인 단일 스타일)
         <div
           onDragOver={(e) => {
             e.preventDefault();
@@ -221,30 +222,46 @@ export function CoverImagePicker({
           onDragLeave={() => setDragOver(false)}
           onDrop={onDrop}
           onClick={() => fileInputRef.current?.click()}
-          className={`flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed bg-[#FFF8F0] text-center transition ${
+          className={`flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed text-center transition ${
             compact ? "max-w-sm p-4" : "p-6"
           } ${
             dragOver
               ? "border-[#2D5A3D] bg-[#E8F0E4]"
-              : "border-[#D4E4BC] hover:border-[#2D5A3D] hover:bg-[#F5F1E8]"
+              : "border-[#D4E4BC] bg-[#FFF8F0] hover:border-[#2D5A3D] hover:bg-[#F5F1E8]"
           }`}
           role="button"
           tabIndex={0}
-          aria-label="커버 이미지 업로드"
+          aria-label="이미지 업로드"
         >
-          <span aria-hidden className={compact ? "text-2xl" : "text-3xl"}>
-            🖼
+          <span aria-hidden className={compact ? "text-3xl" : "text-4xl"}>
+            📷
           </span>
-          <span
-            className={`mt-1 font-bold text-[#2D5A3D] ${
-              compact ? "text-xs" : "mt-2 text-sm"
+          <p
+            className={`mt-2 font-bold text-[#2D5A3D] ${
+              compact ? "text-xs" : "text-sm"
             }`}
           >
             {uploading
               ? "업로드 중…"
-              : "클릭 / 드래그 / Ctrl+V 로 이미지 추가"}
-          </span>
-          <span className="mt-1 text-[11px] text-[#6B6560]">{hint}</span>
+              : "클릭하거나 이미지를 드래그 · 붙여넣기 (Ctrl+V)"}
+          </p>
+          <p className={`mt-1 text-[11px] text-[#8B7F75]`}>
+            자동 리사이즈 · 최대 500KB · JPG/PNG/WebP
+            {hint && hint !== "PNG / JPG / WEBP · 500KB 이하 자동 압축"
+              ? ` · ${hint}`
+              : ""}
+          </p>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              fileInputRef.current?.click();
+            }}
+            disabled={uploading}
+            className="mt-3 rounded-xl bg-[#2D5A3D] px-4 py-2 text-xs font-semibold text-white hover:bg-[#3A7A52] disabled:opacity-50"
+          >
+            파일 선택
+          </button>
         </div>
       )}
 

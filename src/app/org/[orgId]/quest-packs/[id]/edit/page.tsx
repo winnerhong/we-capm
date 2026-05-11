@@ -14,7 +14,7 @@ import {
   type UnlockRule,
 } from "@/lib/missions/types";
 import { PackInfoEditor } from "./pack-info-editor";
-import { MissionRowActions } from "./mission-row-actions";
+import { DraggableMissionList } from "./draggable-mission-list";
 import { loadPartnerDisplayNameForOrg } from "@/lib/org-partner";
 
 export const dynamic = "force-dynamic";
@@ -145,18 +145,18 @@ export default async function EditOrgQuestPackPage({
                 </Link>
               </div>
             ) : (
-              <ul className="space-y-2">
-                {missions.map((m, idx) => (
-                  <MissionRow
-                    key={m.id}
-                    mission={m}
-                    index={idx}
-                    orgId={orgId}
-                    canMoveUp={idx > 0}
-                    canMoveDown={idx < missions.length - 1}
-                  />
-                ))}
-              </ul>
+              <>
+                <p className="mb-2 text-[11px] text-[#8B7F75]">
+                  💡 미션 행을 드래그해서 순서를 바꿀 수 있어요.
+                </p>
+                <DraggableMissionList
+                  packId={id}
+                  orgId={orgId}
+                  missions={missions}
+                  unlockMetaMap={UNLOCK_META}
+                  approvalMetaMap={APPROVAL_META}
+                />
+              </>
             )}
           </section>
         </div>
@@ -232,85 +232,3 @@ function StampBookPreview({ missions }: { missions: OrgMissionRow[] }) {
   );
 }
 
-function MissionRow({
-  mission,
-  index,
-  orgId,
-  canMoveUp,
-  canMoveDown,
-}: {
-  mission: OrgMissionRow;
-  index: number;
-  orgId: string;
-  canMoveUp: boolean;
-  canMoveDown: boolean;
-}) {
-  const kindMeta = MISSION_KIND_META[mission.kind];
-  const unlockMeta = UNLOCK_META[mission.unlock_rule];
-  const approvalMeta = APPROVAL_META[mission.approval_mode];
-  return (
-    <li className="flex flex-col gap-2 rounded-xl border border-[#D4E4BC] bg-[#FFF8F0] p-3 md:flex-row md:items-center md:justify-between">
-      <div className="flex min-w-0 items-start gap-3">
-        <span
-          className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-white text-lg font-bold text-[#2D5A3D]"
-          aria-hidden
-        >
-          {index + 1}
-        </span>
-        <span
-          className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-[#E8F0E4] text-xl"
-          aria-hidden
-        >
-          {mission.icon || kindMeta.icon}
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-bold text-[#2C2C2C]">
-            {mission.title || "(제목 없음)"}
-          </p>
-          <div className="mt-1 flex flex-wrap items-center gap-1">
-            <span className="inline-flex items-center gap-1 rounded-full border border-[#D4E4BC] bg-white px-1.5 py-0.5 text-[10px] font-semibold text-[#2D5A3D]">
-              <span aria-hidden>{kindMeta.icon}</span>
-              <span>{kindMeta.label}</span>
-            </span>
-            <span className="inline-flex items-center gap-0.5 rounded-full border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800">
-              <AcornIcon size={12} />
-              <span>+{mission.acorns}</span>
-            </span>
-            <span
-              className={`inline-flex items-center gap-0.5 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold ${unlockMeta.color}`}
-            >
-              <span aria-hidden>{unlockMeta.icon}</span>
-              <span>{unlockMeta.label}</span>
-            </span>
-            <span
-              className={`inline-flex items-center gap-0.5 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold ${approvalMeta.color}`}
-            >
-              <span aria-hidden>{approvalMeta.icon}</span>
-              <span>{approvalMeta.label}</span>
-            </span>
-            {!mission.is_active && (
-              <span className="inline-flex items-center gap-0.5 rounded-full border border-zinc-200 bg-zinc-50 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-600">
-                비활성
-              </span>
-            )}
-          </div>
-        </div>
-      </div>
-
-      <div className="flex flex-shrink-0 items-center gap-2">
-        <Link
-          href={`/org/${orgId}/missions/${mission.id}/edit`}
-          className="inline-flex items-center gap-1 rounded-lg border border-[#D4E4BC] bg-white px-2.5 py-1.5 text-xs font-bold text-[#2D5A3D] transition hover:bg-[#F5F1E8]"
-        >
-          <span aria-hidden>✏️</span>
-          <span>편집</span>
-        </Link>
-        <MissionRowActions
-          missionId={mission.id}
-          canMoveUp={canMoveUp}
-          canMoveDown={canMoveDown}
-        />
-      </div>
-    </li>
-  );
-}
