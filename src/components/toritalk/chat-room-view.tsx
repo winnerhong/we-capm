@@ -449,9 +449,91 @@ function MessageBubble({
   const [draft, setDraft] = useState(message.content);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const isDeleted = Boolean(message.deleted_at);
   const isEdited = Boolean(message.edited_at);
+
+  // 꾹 누르기(long-press) 감지용 ref
+  const containerRef = useRef<HTMLDivElement>(null);
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pressStart = useRef<{ x: number; y: number } | null>(null);
+
+  const cancelLongPress = () => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+    pressStart.current = null;
+  };
+
+  const startLongPress = (x: number, y: number) => {
+    if (!canMutate || editing || isDeleted) return;
+    cancelLongPress();
+    pressStart.current = { x, y };
+    longPressTimer.current = setTimeout(() => {
+      setMenuOpen(true);
+      try {
+        if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+          (navigator as Navigator & { vibrate?: (p: number) => boolean }).vibrate?.(15);
+        }
+      } catch {
+        /* ignore */
+      }
+    }, 500);
+  };
+
+  // 메뉴 열린 상태에서 바깥 탭 → 닫기
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onDocDown = (e: PointerEvent) => {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(e.target as Node)
+      ) {
+        setMenuOpen(false);
+      }
+    };
+    // 메뉴를 연 그 pointerdown 이 즉시 닫지 않도록 한 틱 미룸
+    const tid = setTimeout(() => {
+      document.addEventListener("pointerdown", onDocDown);
+    }, 0);
+    return () => {
+      clearTimeout(tid);
+      document.removeEventListener("pointerdown", onDocDown);
+    };
+  }, [menuOpen]);
+
+  const longPressHandlers =
+    canMutate && !editing && !isDeleted
+      ? {
+          onPointerDown: (e: React.PointerEvent) =>
+            startLongPress(e.clientX, e.clientY),
+          onPointerMove: (e: React.PointerEvent) => {
+            if (!pressStart.current) return;
+            const dx = Math.abs(e.clientX - pressStart.current.x);
+            const dy = Math.abs(e.clientY - pressStart.current.y);
+            if (dx > 8 || dy > 8) cancelLongPress();
+          },
+          onPointerUp: cancelLongPress,
+          onPointerLeave: cancelLongPress,
+          onPointerCancel: cancelLongPress,
+          onContextMenu: (e: React.MouseEvent) => {
+            // 모바일 길게 눌렀을 때 OS 컨텍스트 메뉴/선택 콜아웃 차단
+            e.preventDefault();
+          },
+        }
+      : {};
+
+  const longPressStyle: React.CSSProperties =
+    canMutate && !editing && !isDeleted
+      ? {
+          WebkitUserSelect: "none",
+          userSelect: "none",
+          WebkitTouchCallout: "none",
+          touchAction: "manipulation",
+        }
+      : {};
 
   const onSaveEdit = () => {
     const text = draft.trim();
@@ -465,6 +547,7 @@ function MessageBubble({
           await editMessageAction(message.id, text);
         }
         setEditing(false);
+        setMenuOpen(false);
       } catch (err) {
         setError(err instanceof Error ? err.message : "수정 실패");
       }
@@ -481,6 +564,7 @@ function MessageBubble({
         } else {
           await deleteMessageAction(message.id);
         }
+        setMenuOpen(false);
       } catch (err) {
         setError(err instanceof Error ? err.message : "삭제 실패");
       }
@@ -491,7 +575,10 @@ function MessageBubble({
   if (message.sender_org_id) {
     return (
       <div className="flex justify-center">
-        <div className="max-w-[85%] rounded-2xl border border-[#D6CDE9] bg-[#F7F3FB] px-4 py-2.5 shadow-sm">
+        <div
+          ref={containerRef}
+          className="max-w-[85%] rounded-2xl border border-[#D6CDE9] bg-[#F7F3FB] px-4 py-2.5 shadow-sm"
+        >
           <p className="mb-1 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-[#6B4FB2]">
             <span aria-hidden>📢</span>
             <span>{message.sender_org_name ?? "기관"} 공지</span>
@@ -524,29 +611,36 @@ function MessageBubble({
             />
           ) : (
             <>
-              <p className="whitespace-pre-wrap break-words text-sm text-[#2C2444]">
+              <p
+                className={`whitespace-pre-wrap break-words text-sm text-[#2C2444] transition ${
+                  menuOpen ? "ring-2 ring-[#6B4FB2]/40 rounded-md" : ""
+                }`}
+                style={longPressStyle}
+                {...longPressHandlers}
+              >
                 {message.content}
               </p>
-              {canMutate && (
+              {canMutate && menuOpen && (
                 <div className="mt-1 flex justify-end gap-2 text-[10px] font-semibold">
                   <button
                     type="button"
                     onClick={() => {
                       setDraft(message.content);
                       setEditing(true);
+                      setMenuOpen(false);
                     }}
                     disabled={pending}
-                    className="text-[#6B4FB2] hover:underline disabled:opacity-50"
+                    className="rounded-md bg-white px-2 py-1 text-[#6B4FB2] shadow-sm hover:bg-[#F7F3FB] disabled:opacity-50"
                   >
-                    수정
+                    ✏️ 수정
                   </button>
                   <button
                     type="button"
                     onClick={onDelete}
                     disabled={pending}
-                    className="text-rose-700 hover:underline disabled:opacity-50"
+                    className="rounded-md bg-white px-2 py-1 text-rose-700 shadow-sm hover:bg-rose-50 disabled:opacity-50"
                   >
-                    삭제
+                    🗑 삭제
                   </button>
                 </div>
               )}
@@ -571,6 +665,7 @@ function MessageBubble({
         photoUrl={message.sender_photo_url}
       />
       <div
+        ref={containerRef}
         className={`flex max-w-[75%] flex-col ${
           isMe ? "items-end" : "items-start"
         }`}
@@ -611,17 +706,19 @@ function MessageBubble({
             <div className="flex items-end gap-1.5">
               {isMe && <Time iso={message.created_at} />}
               <p
-                className={`whitespace-pre-wrap break-words rounded-2xl px-3 py-2 text-sm shadow-sm ${
+                className={`whitespace-pre-wrap break-words rounded-2xl px-3 py-2 text-sm shadow-sm transition ${
                   isMe
                     ? "bg-[#2D5A3D] text-white"
                     : "bg-white text-[#2C2C2C] border border-[#D4E4BC]"
-                }`}
+                } ${menuOpen ? "ring-2 ring-offset-1 ring-[#2D5A3D]/50" : ""}`}
+                style={longPressStyle}
+                {...longPressHandlers}
               >
                 {message.content}
               </p>
               {!isMe && <Time iso={message.created_at} />}
             </div>
-            {(isEdited || canMutate || error) && (
+            {(isEdited || (canMutate && menuOpen) || error) && (
               <div
                 className={`mt-0.5 flex items-center gap-2 text-[10px] ${
                   isMe ? "justify-end" : "justify-start"
@@ -630,7 +727,7 @@ function MessageBubble({
                 {isEdited && (
                   <span className="text-[#8B7F75]">(수정됨)</span>
                 )}
-                {canMutate && (
+                {canMutate && menuOpen && (
                   <>
                     <button
                       type="button"
@@ -638,19 +735,20 @@ function MessageBubble({
                         setDraft(message.content);
                         setEditing(true);
                         setError(null);
+                        setMenuOpen(false);
                       }}
                       disabled={pending}
-                      className="font-semibold text-[#2D5A3D] hover:underline disabled:opacity-50"
+                      className="rounded-md bg-white px-2 py-1 font-semibold text-[#2D5A3D] shadow-sm hover:bg-[#F5F9EE] disabled:opacity-50"
                     >
-                      수정
+                      ✏️ 수정
                     </button>
                     <button
                       type="button"
                       onClick={onDelete}
                       disabled={pending}
-                      className="font-semibold text-rose-700 hover:underline disabled:opacity-50"
+                      className="rounded-md bg-white px-2 py-1 font-semibold text-rose-700 shadow-sm hover:bg-rose-50 disabled:opacity-50"
                     >
-                      삭제
+                      🗑 삭제
                     </button>
                   </>
                 )}
