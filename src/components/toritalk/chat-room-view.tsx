@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import {
+  adminClearRoomMessagesAction,
+  adminDeleteAnyMessageAction,
   deleteMessageAction,
   deleteOrgMessageAction,
   editMessageAction,
@@ -318,9 +320,29 @@ export function ChatRoomView({
         </Link>
         <h1 className="text-base font-bold text-[#2D5A3D]">💬 {roomName}</h1>
         {isAdmin && (
-          <span className="ml-auto rounded-full bg-[#6B4FB2] px-2 py-0.5 text-[10px] font-bold text-white">
-            📢 관제실 · 공지 모드
-          </span>
+          <div className="ml-auto flex items-center gap-2">
+            <AdminClearButton
+              roomId={roomId}
+              onCleared={(deletedCount) => {
+                // 로컬 메시지 즉시 반영 — realtime 도 곧 도착하지만 UX 를 위해 선반영
+                setMessages((prev) =>
+                  prev.map((m) =>
+                    m.deleted_at
+                      ? m
+                      : {
+                          ...m,
+                          content: "",
+                          deleted_at: new Date().toISOString(),
+                        }
+                  )
+                );
+                console.log(`[admin clear] ${deletedCount}개 정리됨`);
+              }}
+            />
+            <span className="rounded-full bg-[#6B4FB2] px-2 py-0.5 text-[10px] font-bold text-white">
+              📢 관제실 · 공지 모드
+            </span>
+          </div>
         )}
       </header>
 
@@ -348,14 +370,21 @@ export function ChatRoomView({
               {g.messages.map((m) => {
                 // admin 모드에서는 자기 메시지도 시스템처럼 가운데 (isMe=false)
                 const isMe = !isAdmin && m.sender_user_id === meUserId;
-                // 수정·삭제 권한 판정
-                const canMutate =
-                  !m.deleted_at &&
+                const notDeleted = !m.deleted_at;
+                // 수정 권한: 자기 메시지만 (user) / 우리 기관 공지만 (admin)
+                const canEdit =
+                  notDeleted &&
                   (isAdmin
-                    ? // admin: 우리 기관 공지(sender_org_id===orgId)
-                      Boolean(m.sender_org_id && m.sender_org_id === orgId)
-                    : // user: 본인 메시지(sender_user_id===meUserId)
-                      Boolean(
+                    ? Boolean(m.sender_org_id && m.sender_org_id === orgId)
+                    : Boolean(
+                        m.sender_user_id && m.sender_user_id === meUserId
+                      ));
+                // 삭제 권한: 자기 메시지 (user) / 모든 메시지 (admin — 운영 권한)
+                const canDelete =
+                  notDeleted &&
+                  (isAdmin
+                    ? true
+                    : Boolean(
                         m.sender_user_id && m.sender_user_id === meUserId
                       ));
                 return (
@@ -363,8 +392,10 @@ export function ChatRoomView({
                     key={m.id}
                     message={m}
                     isMe={isMe}
-                    canMutate={canMutate}
+                    canEdit={canEdit}
+                    canDelete={canDelete}
                     mode={mode}
+                    orgId={orgId}
                   />
                 );
               })}
@@ -437,13 +468,17 @@ export function ChatRoomView({
 function MessageBubble({
   message,
   isMe,
-  canMutate,
+  canEdit,
+  canDelete,
   mode,
+  orgId,
 }: {
   message: ToritalkMessageWithSender;
   isMe: boolean;
-  canMutate: boolean;
+  canEdit: boolean;
+  canDelete: boolean;
   mode: Mode;
+  orgId?: string;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(message.content);
@@ -453,6 +488,16 @@ function MessageBubble({
 
   const isDeleted = Boolean(message.deleted_at);
   const isEdited = Boolean(message.edited_at);
+  // 어떤 동작 하나라도 가능하면 long-press 메뉴를 띄움
+  const canMutate = canEdit || canDelete;
+  // admin 이 다른 사람 글을 지우는 경우 — 표시·동작 분기용
+  const isAdminDeletingOther =
+    mode === "admin" &&
+    canDelete &&
+    !canEdit &&
+    !!message.sender_user_id &&
+    message.sender_user_id !== null &&
+    message.sender_org_id !== orgId;
 
   // 꾹 누르기(long-press) 감지용 ref
   const containerRef = useRef<HTMLDivElement>(null);
@@ -555,12 +600,21 @@ function MessageBubble({
   };
 
   const onDelete = () => {
-    if (!confirm("이 메시지를 삭제할까요?")) return;
+    const confirmMsg = isAdminDeletingOther
+      ? "이 보호자 메시지를 관리자 권한으로 삭제할까요?"
+      : "이 메시지를 삭제할까요?";
+    if (!confirm(confirmMsg)) return;
     setError(null);
     startTransition(async () => {
       try {
         if (mode === "admin") {
-          await deleteOrgMessageAction(message.id);
+          if (isAdminDeletingOther) {
+            // admin 이 보호자/타기관 메시지 정리
+            await adminDeleteAnyMessageAction(message.id);
+          } else {
+            // admin 자기 기관 공지 삭제
+            await deleteOrgMessageAction(message.id);
+          }
         } else {
           await deleteMessageAction(message.id);
         }
@@ -622,26 +676,30 @@ function MessageBubble({
               </p>
               {canMutate && menuOpen && (
                 <div className="mt-1 flex justify-end gap-2 text-[10px] font-semibold">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setDraft(message.content);
-                      setEditing(true);
-                      setMenuOpen(false);
-                    }}
-                    disabled={pending}
-                    className="rounded-md bg-white px-2 py-1 text-[#6B4FB2] shadow-sm hover:bg-[#F7F3FB] disabled:opacity-50"
-                  >
-                    ✏️ 수정
-                  </button>
-                  <button
-                    type="button"
-                    onClick={onDelete}
-                    disabled={pending}
-                    className="rounded-md bg-white px-2 py-1 text-rose-700 shadow-sm hover:bg-rose-50 disabled:opacity-50"
-                  >
-                    🗑 삭제
-                  </button>
+                  {canEdit && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDraft(message.content);
+                        setEditing(true);
+                        setMenuOpen(false);
+                      }}
+                      disabled={pending}
+                      className="rounded-md bg-white px-2 py-1 text-[#6B4FB2] shadow-sm hover:bg-[#F7F3FB] disabled:opacity-50"
+                    >
+                      ✏️ 수정
+                    </button>
+                  )}
+                  {canDelete && (
+                    <button
+                      type="button"
+                      onClick={onDelete}
+                      disabled={pending}
+                      className="rounded-md bg-white px-2 py-1 text-rose-700 shadow-sm hover:bg-rose-50 disabled:opacity-50"
+                    >
+                      🗑 삭제
+                    </button>
+                  )}
                 </div>
               )}
             </>
@@ -729,27 +787,35 @@ function MessageBubble({
                 )}
                 {canMutate && menuOpen && (
                   <>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setDraft(message.content);
-                        setEditing(true);
-                        setError(null);
-                        setMenuOpen(false);
-                      }}
-                      disabled={pending}
-                      className="rounded-md bg-white px-2 py-1 font-semibold text-[#2D5A3D] shadow-sm hover:bg-[#F5F9EE] disabled:opacity-50"
-                    >
-                      ✏️ 수정
-                    </button>
-                    <button
-                      type="button"
-                      onClick={onDelete}
-                      disabled={pending}
-                      className="rounded-md bg-white px-2 py-1 font-semibold text-rose-700 shadow-sm hover:bg-rose-50 disabled:opacity-50"
-                    >
-                      🗑 삭제
-                    </button>
+                    {canEdit && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDraft(message.content);
+                          setEditing(true);
+                          setError(null);
+                          setMenuOpen(false);
+                        }}
+                        disabled={pending}
+                        className="rounded-md bg-white px-2 py-1 font-semibold text-[#2D5A3D] shadow-sm hover:bg-[#F5F9EE] disabled:opacity-50"
+                      >
+                        ✏️ 수정
+                      </button>
+                    )}
+                    {canDelete && (
+                      <button
+                        type="button"
+                        onClick={onDelete}
+                        disabled={pending}
+                        className={`rounded-md px-2 py-1 font-semibold shadow-sm disabled:opacity-50 ${
+                          isAdminDeletingOther
+                            ? "bg-rose-600 text-white hover:bg-rose-700"
+                            : "bg-white text-rose-700 hover:bg-rose-50"
+                        }`}
+                      >
+                        {isAdminDeletingOther ? "🛡 관리자 삭제" : "🗑 삭제"}
+                      </button>
+                    )}
                   </>
                 )}
                 {error && (
@@ -856,6 +922,52 @@ function InlineEdit({
         </button>
       </div>
     </div>
+  );
+}
+
+/**
+ * 관리자 전용 — 방의 모든 메시지를 일괄 삭제.
+ * 새 차수 시작 전이나 도배 정리할 때 사용.
+ */
+function AdminClearButton({
+  roomId,
+  onCleared,
+}: {
+  roomId: string;
+  onCleared: (deletedCount: number) => void;
+}) {
+  const [pending, startTransition] = useTransition();
+
+  const handleClick = () => {
+    if (
+      !confirm(
+        "이 방의 모든 메시지를 정리할까요?\n\n· 메시지는 '삭제됨' 상태로 표시되고 복구할 수 없어요\n· 멤버십과 방 자체는 그대로 유지됩니다"
+      )
+    ) {
+      return;
+    }
+    startTransition(async () => {
+      try {
+        const r = await adminClearRoomMessagesAction(roomId);
+        onCleared(r.deletedCount);
+      } catch (err) {
+        alert(
+          err instanceof Error ? `⚠ ${err.message}` : "⚠ 일괄 삭제에 실패했어요"
+        );
+      }
+    });
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      disabled={pending}
+      className="rounded-full border border-rose-300 bg-white px-2.5 py-1 text-[10px] font-bold text-rose-700 transition hover:bg-rose-50 disabled:opacity-50"
+      title="이 방의 모든 메시지를 일괄 삭제합니다"
+    >
+      {pending ? "정리 중..." : "🧹 전체 삭제"}
+    </button>
   );
 }
 

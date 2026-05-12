@@ -508,6 +508,88 @@ export async function editOrgMessageAction(
 }
 
 /**
+ * 기관 admin 권한 — 같은 기관 방에서 발생한 메시지면 (누가 보냈든) 소프트 삭제.
+ * 부적절한 글·도배 등을 운영 차원에서 정리할 때 사용.
+ */
+export async function adminDeleteAnyMessageAction(
+  messageId: string
+): Promise<void> {
+  const org = await requireOrg();
+  const sb = await tx();
+
+  const { data: msg } = await sb
+    .from("toritalk_messages")
+    .select("id,room_id,deleted_at")
+    .eq("id", messageId)
+    .maybeSingle();
+  const m = msg as
+    | { id: string; room_id: string; deleted_at: string | null }
+    | null;
+  if (!m) throw new Error("메시지를 찾을 수 없어요");
+  if (m.deleted_at) return;
+
+  // 메시지가 우리 기관 방에 속하는지 확인
+  const { data: room } = await sb
+    .from("toritalk_rooms")
+    .select("id,org_id")
+    .eq("id", m.room_id)
+    .maybeSingle();
+  const r = room as { id: string; org_id: string } | null;
+  if (!r || r.org_id !== org.orgId) {
+    throw new Error("우리 기관 방의 메시지만 삭제할 수 있어요");
+  }
+
+  const { error } = await sb
+    .from("toritalk_messages")
+    .update({
+      content: "",
+      deleted_at: new Date().toISOString(),
+    } as Row)
+    .eq("id", messageId);
+  if (error) throw new Error(error.message);
+}
+
+/**
+ * 기관 admin 권한 — 방의 모든 메시지를 일괄 소프트 삭제.
+ * 새 행사 시작 전·이전 차수 정리할 때 사용. 멤버십·방 자체는 유지.
+ */
+export async function adminClearRoomMessagesAction(
+  roomId: string
+): Promise<{ deletedCount: number }> {
+  const org = await requireOrg();
+  const sb = await tx();
+
+  const { data: room } = await sb
+    .from("toritalk_rooms")
+    .select("id,org_id")
+    .eq("id", roomId)
+    .maybeSingle();
+  const r = room as { id: string; org_id: string } | null;
+  if (!r || r.org_id !== org.orgId) {
+    throw new Error("우리 기관 방만 정리할 수 있어요");
+  }
+
+  // 삭제 대상 카운트 (미삭제 메시지만)
+  const { count } = await sb
+    .from("toritalk_messages")
+    .select("id", { count: "exact", head: true })
+    .eq("room_id", roomId)
+    .is("deleted_at", null);
+
+  const { error } = await sb
+    .from("toritalk_messages")
+    .update({
+      content: "",
+      deleted_at: new Date().toISOString(),
+    } as Row)
+    .eq("room_id", roomId)
+    .is("deleted_at", null);
+  if (error) throw new Error(error.message);
+
+  return { deletedCount: Number(count ?? 0) };
+}
+
+/**
  * 기관 admin 공지 메시지 소프트 삭제.
  */
 export async function deleteOrgMessageAction(
