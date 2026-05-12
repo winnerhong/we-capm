@@ -225,6 +225,24 @@ export function BulkImportForm({
     return s.size;
   }, [rows]);
 
+  // 중복 전화번호 식별 — 2번째 이상 등장한 행 id 집합.
+  // 사용자가 "왜 99명만?" 헷갈리지 않도록 회색 배경으로 표시.
+  const duplicateRowIds = useMemo(() => {
+    const seen = new Map<string, string>(); // phone → 첫 등장 row.id
+    const dup = new Set<string>();
+    for (const r of rows) {
+      const digits = r.phone.replace(/\D/g, "");
+      if (!digits || !r.name.trim()) continue;
+      if (seen.has(digits)) {
+        dup.add(r.id);
+      } else {
+        seen.set(digits, r.id);
+      }
+    }
+    return dup;
+  }, [rows]);
+  const duplicateCount = duplicateRowIds.size;
+
   const updateCell = useCallback(
     (id: string, key: "name" | "phone" | "className", value: string) => {
       setRows((prev) =>
@@ -372,8 +390,9 @@ export function BulkImportForm({
     }
   }, []);
 
+  // 행 배경(중복 행은 amber 톤)을 가리지 않도록 cell 자체는 transparent.
   const cellBase =
-    "block w-full border-0 bg-white px-2 py-2 text-xs text-[#2C2C2C] outline-none focus:bg-[#FFFBF0] focus:ring-2 focus:ring-inset focus:ring-[#3A7A52]/30";
+    "block w-full border-0 bg-transparent px-2 py-2 text-xs text-[#2C2C2C] outline-none focus:bg-[#FFFBF0] focus:ring-2 focus:ring-inset focus:ring-[#3A7A52]/30";
 
   return (
     <div className="space-y-5">
@@ -460,10 +479,17 @@ export function BulkImportForm({
             </div>
 
             {/* 데이터 행 */}
-            {rows.map((r, idx) => (
+            {rows.map((r, idx) => {
+              const isDup = duplicateRowIds.has(r.id);
+              return (
               <div
                 key={r.id}
-                className="grid grid-cols-[36px_0.8fr_1fr_1fr_36px] border-b border-[#E8E0D0] bg-white"
+                className={`grid grid-cols-[36px_0.8fr_1fr_1fr_36px] border-b border-[#E8E0D0] ${
+                  isDup
+                    ? "bg-amber-50/70"
+                    : "bg-white"
+                }`}
+                title={isDup ? "중복된 전화번호 — 첫 행만 등록되고 이 행은 자동 합쳐집니다" : undefined}
               >
                 <div className="flex items-center justify-center border-r border-[#E8E0D0] bg-[#FFFDF8] px-2 text-[11px] font-mono text-[#8B7F75]">
                   {idx + 1}
@@ -503,12 +529,15 @@ export function BulkImportForm({
                   type="button"
                   onClick={() => removeRow(r.id)}
                   aria-label={`${idx + 1}번 행 삭제`}
-                  className="flex items-center justify-center bg-white text-sm text-rose-400 transition hover:bg-rose-50 hover:text-rose-700"
+                  className={`flex items-center justify-center text-sm text-rose-400 transition hover:bg-rose-50 hover:text-rose-700 ${
+                    isDup ? "bg-amber-50/70" : "bg-white"
+                  }`}
                 >
                   ×
                 </button>
               </div>
-            ))}
+              );
+            })}
 
             {/* 추가 버튼 */}
             <div className="flex flex-wrap gap-2 bg-white p-2">
@@ -535,12 +564,25 @@ export function BulkImportForm({
 
         {/* 액션 바 */}
         <div className="flex flex-col gap-2 border-t border-[#D4E4BC] pt-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="text-[11px] text-[#8B7F75]">
-            {validCount > 0
-              ? `등록 대상: 고유 번호 ${uniquePhones.toLocaleString(
-                  "ko-KR"
-                )}명 · 행 ${validCount.toLocaleString("ko-KR")}건`
-              : "입력된 데이터가 없어요"}
+          <div className="space-y-1 text-[11px] text-[#8B7F75]">
+            {validCount > 0 ? (
+              <>
+                <p>
+                  📋 입력 {validCount.toLocaleString("ko-KR")}행 ·{" "}
+                  <b className="text-[#2D5A3D]">
+                    {uniquePhones.toLocaleString("ko-KR")}명 등록 예정
+                  </b>
+                </p>
+                {duplicateCount > 0 && (
+                  <p className="text-amber-700">
+                    ⚠ 같은 전화번호 {duplicateCount}건은 첫 행으로 자동 합쳐져요
+                    (노란 배경 표시).
+                  </p>
+                )}
+              </>
+            ) : (
+              "입력된 데이터가 없어요"
+            )}
           </div>
           <div className="flex gap-2 sm:ml-auto">
             <button
