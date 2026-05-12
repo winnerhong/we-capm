@@ -35,16 +35,14 @@ export default async function OrgToritalkAdminChatPage({
   ]);
 
   return (
-    <div className="-mx-4 -my-4">
-      <ChatRoomView
-        roomId={roomId}
-        roomName={room.name}
-        mode="admin"
-        orgId={orgId}
-        orgName={orgName}
-        backHref={`/org/${orgId}/toritalk/${roomId}`}
-        initialMessages={initialMessages}
-      />
-    </div>
+    <ChatRoomView
+      roomId={roomId}
+      roomName={room.name}
+      mode="admin"
+      orgId={orgId}
+      orgName={orgName}
+      backHref={`/org/${orgId}/toritalk/${roomId}`}
+      initialMessages={initialMessages}
+    />
   );
 }

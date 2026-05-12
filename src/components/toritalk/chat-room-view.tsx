@@ -305,7 +305,7 @@ export function ChatRoomView({
     >
       {/* 헤더 */}
       <header
-        className={`sticky top-0 z-10 flex items-center gap-2 border-b px-4 py-3 backdrop-blur ${
+        className={`sticky top-0 z-10 flex items-center gap-2 border-b px-4 pt-5 pb-3 backdrop-blur ${
           isAdmin
             ? "border-[#D6CDE9] bg-[#F7F3FB]/95"
             : "border-[#D4E4BC] bg-white/95"
