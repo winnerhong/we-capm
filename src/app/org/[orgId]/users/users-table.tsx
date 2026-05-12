@@ -101,6 +101,102 @@ function formatDateTime(iso: string | null): string {
 
 const PAGE_SIZE = 20;
 
+// 정렬 가능한 컬럼 키 (체크박스/작업은 제외).
+type SortKey =
+  | "attendance"
+  | "class"
+  | "name"
+  | "phone"
+  | "children"
+  | "acorns"
+  | "recent"
+  | "status";
+type SortDir = "asc" | "desc";
+type SortState = { key: SortKey; dir: SortDir } | null;
+
+// 동일 키 클릭 시 asc → desc → 해제 사이클.
+function cycleSort(prev: SortState, key: SortKey): SortState {
+  if (!prev || prev.key !== key) return { key, dir: "asc" };
+  if (prev.dir === "asc") return { key, dir: "desc" };
+  return null;
+}
+
+function getSortValue(
+  r: AppUserWithCount,
+  key: SortKey,
+  todayIso: string
+): string | number | null {
+  switch (key) {
+    case "attendance": {
+      const a = r.attendance_date === todayIso ? r.attendance_status : null;
+      if (a === "PRESENT") return 0;
+      if (a === "LATE") return 1;
+      if (a === "ABSENT") return 2;
+      return null;
+    }
+    case "class":
+      return r.class_names[0]?.toLowerCase() ?? null;
+    case "name": {
+      const name = r.enrolled_names[0] || r.parent_name || "";
+      return name.toLocaleLowerCase("ko");
+    }
+    case "phone":
+      return (r.phone ?? "").replace(/\D/g, "");
+    case "children":
+      return r.children_count;
+    case "acorns":
+      return r.acorn_balance;
+    case "recent":
+      return r.last_login_at ?? null;
+    case "status": {
+      if (r.status === "ACTIVE") return 0;
+      if (r.status === "SUSPENDED") return 1;
+      return 2; // CLOSED
+    }
+  }
+}
+
+function compareForSort(
+  a: AppUserWithCount,
+  b: AppUserWithCount,
+  sort: NonNullable<SortState>,
+  todayIso: string
+): number {
+  const va = getSortValue(a, sort.key, todayIso);
+  const vb = getSortValue(b, sort.key, todayIso);
+  // null 은 항상 뒤로 (정렬 방향과 무관).
+  if (va == null && vb == null) return 0;
+  if (va == null) return 1;
+  if (vb == null) return -1;
+  const mul = sort.dir === "asc" ? 1 : -1;
+  if (typeof va === "number" && typeof vb === "number") {
+    return (va - vb) * mul;
+  }
+  // 문자열 비교 — ko locale.
+  return String(va).localeCompare(String(vb), "ko") * mul;
+}
+
+function SortIndicator({
+  active,
+  dir,
+}: {
+  active: boolean;
+  dir: SortDir;
+}) {
+  if (!active) {
+    return (
+      <span aria-hidden className="text-[9px] text-[#B0A89D]">
+        ⇅
+      </span>
+    );
+  }
+  return (
+    <span aria-hidden className="text-[10px] text-[#2D5A3D]">
+      {dir === "asc" ? "▲" : "▼"}
+    </span>
+  );
+}
+
 export function UsersTable({ orgId, rows, todayIso, events }: Props) {
   const router = useRouter();
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -111,14 +207,28 @@ export function UsersTable({ orgId, rows, todayIso, events }: Props) {
   // "행사에 추가" 드롭다운
   const [pickerEventId, setPickerEventId] = useState("");
 
+  // 컬럼 정렬 상태 — null 이면 서버에서 받은 원래 순서 유지.
+  const [sort, setSort] = useState<SortState>(null);
+
+  // 정렬된 전체 rows.
+  const sortedRows = useMemo(() => {
+    if (!sort) return rows;
+    const copy = rows.slice();
+    copy.sort((a, b) => compareForSort(a, b, sort, todayIso));
+    return copy;
+  }, [rows, sort, todayIso]);
+
   // 페이지네이션 — 기본 20개, "더 보기" 누를수록 PAGE_SIZE 만큼 추가, "전체 보기"는 즉시 모두 노출.
   const [visibleCount, setVisibleCount] = useState<number>(PAGE_SIZE);
   const visibleRows = useMemo(
-    () => rows.slice(0, visibleCount),
-    [rows, visibleCount]
+    () => sortedRows.slice(0, visibleCount),
+    [sortedRows, visibleCount]
   );
-  const hasMore = visibleCount < rows.length;
-  const expanded = visibleCount >= rows.length && rows.length > PAGE_SIZE;
+  const hasMore = visibleCount < sortedRows.length;
+  const expanded =
+    visibleCount >= sortedRows.length && sortedRows.length > PAGE_SIZE;
+
+  const onSort = (key: SortKey) => setSort((prev) => cycleSort(prev, key));
 
   const allSelected = useMemo(
     () =>
@@ -367,28 +477,81 @@ export function UsersTable({ orgId, rows, todayIso, events }: Props) {
                   />
                 </th>
                 <th className="px-2 py-2 text-center text-[10px] font-bold">
-                  📋 출석
+                  <SortableHeader
+                    onClick={() => onSort("attendance")}
+                    active={sort?.key === "attendance"}
+                    dir={sort?.dir ?? "asc"}
+                    align="center"
+                  >
+                    📋 출석
+                  </SortableHeader>
                 </th>
                 <th className="px-2 py-2 text-left text-[10px] font-bold">
-                  🐰 반
+                  <SortableHeader
+                    onClick={() => onSort("class")}
+                    active={sort?.key === "class"}
+                    dir={sort?.dir ?? "asc"}
+                  >
+                    🐰 반
+                  </SortableHeader>
                 </th>
                 <th className="px-2 py-2 text-left text-[10px] font-bold">
-                  🎒 원생명
+                  <SortableHeader
+                    onClick={() => onSort("name")}
+                    active={sort?.key === "name"}
+                    dir={sort?.dir ?? "asc"}
+                  >
+                    🎒 원생명
+                  </SortableHeader>
                 </th>
                 <th className="px-2 py-2 text-left text-[10px] font-bold">
-                  📞 학부모연락처
+                  <SortableHeader
+                    onClick={() => onSort("phone")}
+                    active={sort?.key === "phone"}
+                    dir={sort?.dir ?? "asc"}
+                  >
+                    📞 학부모연락처
+                  </SortableHeader>
                 </th>
                 <th className="px-2 py-2 text-center text-[10px] font-bold">
-                  👫 자녀
+                  <SortableHeader
+                    onClick={() => onSort("children")}
+                    active={sort?.key === "children"}
+                    dir={sort?.dir ?? "asc"}
+                    align="center"
+                  >
+                    👫 자녀
+                  </SortableHeader>
                 </th>
                 <th className="px-2 py-2 text-center text-[10px] font-bold">
-                  <AcornIcon /> 도토리
+                  <SortableHeader
+                    onClick={() => onSort("acorns")}
+                    active={sort?.key === "acorns"}
+                    dir={sort?.dir ?? "asc"}
+                    align="center"
+                  >
+                    <AcornIcon /> 도토리
+                  </SortableHeader>
                 </th>
                 <th className="px-2 py-2 text-right text-[10px] font-bold">
-                  📅 최근
+                  <SortableHeader
+                    onClick={() => onSort("recent")}
+                    active={sort?.key === "recent"}
+                    dir={sort?.dir ?? "asc"}
+                    align="right"
+                  >
+                    📅 최근
+                  </SortableHeader>
                 </th>
                 <th className="px-2 py-2 text-center text-[10px] font-bold">
-                  상태
+                  <SortableHeader
+                    onClick={() => onSort("status")}
+                    active={sort?.key === "status"}
+                    dir={sort?.dir ?? "asc"}
+                    align="center"
+                  >
+                    상태
+                  </SortableHeader>
                 </th>
                 <th className="px-2 py-2 text-center text-[10px] font-bold">
                   작업
@@ -507,6 +670,31 @@ export function UsersTable({ orgId, rows, todayIso, events }: Props) {
             </tbody>
           </table>
         </div>
+      </div>
+
+      {/* ─── 모바일 정렬 셀렉터 — 헤더 클릭 대안 ─── */}
+      <div className="md:hidden flex items-center gap-2 rounded-xl border border-[#D4E4BC] bg-white px-3 py-2 text-[11px] shadow-sm">
+        <span className="font-semibold text-[#6B6560]">정렬</span>
+        <select
+          value={sort ? `${sort.key}:${sort.dir}` : ""}
+          onChange={(e) => {
+            const v = e.target.value;
+            if (!v) return setSort(null);
+            const [k, d] = v.split(":") as [SortKey, SortDir];
+            setSort({ key: k, dir: d });
+          }}
+          className="flex-1 rounded-md border border-[#D4E4BC] bg-white px-2 py-1 text-xs"
+        >
+          <option value="">기본 (등록 순)</option>
+          <option value="attendance:asc">📋 출석 (출석→결석)</option>
+          <option value="class:asc">🐰 반 (가나다)</option>
+          <option value="name:asc">🎒 원생명 (가나다)</option>
+          <option value="acorns:desc">🌰 도토리 많은순</option>
+          <option value="acorns:asc">🌰 도토리 적은순</option>
+          <option value="recent:desc">📅 최근 접속 (최신순)</option>
+          <option value="recent:asc">📅 최근 접속 (오래된순)</option>
+          <option value="status:asc">상태 (활성→비활성)</option>
+        </select>
       </div>
 
       {/* ─── 모바일 카드 ─── */}
@@ -664,5 +852,49 @@ export function UsersTable({ orgId, rows, todayIso, events }: Props) {
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * 정렬 가능한 컬럼 헤더 — 클릭으로 asc → desc → 해제 사이클.
+ * align 으로 좌/중/우 정렬, 현재 활성이면 ▲▼ 아니면 ⇅.
+ */
+function SortableHeader({
+  children,
+  onClick,
+  active,
+  dir,
+  align = "left",
+}: {
+  children: React.ReactNode;
+  onClick: () => void;
+  active: boolean;
+  dir: SortDir;
+  align?: "left" | "center" | "right";
+}) {
+  const alignClass =
+    align === "center"
+      ? "justify-center"
+      : align === "right"
+        ? "justify-end"
+        : "justify-start";
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex w-full items-center gap-1 ${alignClass} text-[10px] font-bold transition hover:text-[#2D5A3D] ${
+        active ? "text-[#2D5A3D]" : "text-[#6B4423]"
+      }`}
+      title={
+        active
+          ? dir === "asc"
+            ? "오름차순 — 한 번 더 누르면 내림차순"
+            : "내림차순 — 한 번 더 누르면 해제"
+          : "정렬"
+      }
+    >
+      <span>{children}</span>
+      <SortIndicator active={active} dir={dir} />
+    </button>
   );
 }
