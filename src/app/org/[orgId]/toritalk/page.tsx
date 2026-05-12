@@ -72,42 +72,80 @@ export default async function OrgToritalkPage({
               </div>
             ) : (
               <ul className="grid gap-3 md:grid-cols-2">
-                {active.map((r) => (
-                  <li key={r.id}>
-                    <Link
-                      href={`/org/${orgId}/toritalk/${r.id}`}
-                      className="block rounded-2xl border border-[#D4E4BC] bg-white p-4 shadow-sm transition hover:border-[#2D5A3D] hover:shadow-md"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-base font-bold text-[#2D5A3D]">
-                            {r.name}
-                          </p>
-                          {r.description && (
-                            <p className="mt-0.5 truncate text-xs text-[#6B6560]">
-                              {r.description}
+                {active.map((r) => {
+                  // 기본값 보강: 정책 필드가 NULL/undefined 면 마이그레이션 직후 default 와 동일하게 처리.
+                  const allowSelfJoin = r.allow_self_join ?? false;
+                  const isListed = r.is_listed ?? true;
+                  return (
+                    <li key={r.id}>
+                      <Link
+                        href={`/org/${orgId}/toritalk/${r.id}`}
+                        className="block rounded-2xl border border-[#D4E4BC] bg-white p-4 shadow-sm transition hover:border-[#2D5A3D] hover:shadow-md"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-base font-bold text-[#2D5A3D]">
+                              {r.name}
                             </p>
+                            {r.description && (
+                              <p className="mt-0.5 truncate text-xs text-[#6B6560]">
+                                {r.description}
+                              </p>
+                            )}
+                          </div>
+                          <span className="shrink-0 rounded-full bg-[#E8F0E4] px-2 py-0.5 text-[10px] font-bold text-[#2D5A3D]">
+                            {r.member_count}/{r.max_members}명
+                          </span>
+                        </div>
+
+                        {/* 공개 정책 chip — 누가 들어올 수 있는지·둘러보기 노출 여부 */}
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          <span
+                            className={`inline-flex items-center gap-0.5 rounded-full border px-2 py-0.5 text-[10px] font-bold ${
+                              allowSelfJoin
+                                ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                                : "border-amber-200 bg-amber-50 text-amber-700"
+                            }`}
+                            title={
+                              allowSelfJoin
+                                ? "다른 반 보호자도 셀프 입장 가능"
+                                : "관리자 초대만 — 같은 반은 자동 가입"
+                            }
+                          >
+                            {allowSelfJoin ? "🌐 누구나 입장" : "✋ 같은 반만"}
+                          </span>
+                          <span
+                            className={`inline-flex items-center gap-0.5 rounded-full border px-2 py-0.5 text-[10px] font-bold ${
+                              isListed
+                                ? "border-sky-200 bg-sky-50 text-sky-700"
+                                : "border-zinc-200 bg-zinc-100 text-zinc-600"
+                            }`}
+                            title={
+                              isListed
+                                ? "참가자 '다른 방 둘러보기' 에 노출"
+                                : "목록에서 숨김 — 멤버만 보임"
+                            }
+                          >
+                            {isListed ? "👁️ 목록 노출" : "🙈 비공개"}
+                          </span>
+                        </div>
+
+                        <div className="mt-3 rounded-xl bg-[#FFF8F0] px-3 py-2 text-[11px] text-[#6B6560]">
+                          {r.last_message_preview ? (
+                            <span className="line-clamp-1">
+                              💬 {r.last_message_preview}
+                            </span>
+                          ) : (
+                            <span>아직 대화가 없어요</span>
                           )}
                         </div>
-                        <span className="shrink-0 rounded-full bg-[#E8F0E4] px-2 py-0.5 text-[10px] font-bold text-[#2D5A3D]">
-                          {r.member_count}/{r.max_members}명
-                        </span>
-                      </div>
-                      <div className="mt-3 rounded-xl bg-[#FFF8F0] px-3 py-2 text-[11px] text-[#6B6560]">
-                        {r.last_message_preview ? (
-                          <span className="line-clamp-1">
-                            💬 {r.last_message_preview}
-                          </span>
-                        ) : (
-                          <span>아직 대화가 없어요</span>
-                        )}
-                      </div>
-                      <p className="mt-2 text-[10px] text-[#8B7F75]">
-                        생성: {fmtFullDateKst(r.created_at)}
-                      </p>
-                    </Link>
-                  </li>
-                ))}
+                        <p className="mt-2 text-[10px] text-[#8B7F75]">
+                          생성: {fmtFullDateKst(r.created_at)}
+                        </p>
+                      </Link>
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </section>
