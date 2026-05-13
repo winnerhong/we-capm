@@ -1,8 +1,11 @@
 "use client";
 
 // 홈 화면 "오늘의 일정" 카드 — 진행 중 + 다음 슬롯 압축 미리보기.
-//   1초 clock 으로 진행 상태 자동 갱신 (별도 fetch 없이 props 만으로 계산).
+//   30초 clock 으로 진행 상태 자동 갱신 (별도 fetch 없이 props 만으로 계산).
 //   "전체 보기" 클릭 → /schedule 풀페이지.
+//
+// 시간 처리: schedule-timeline / 초대장과 동일하게 event.starts_at + duration
+// 누적으로 재계산. admin 이 행사 시각 바꾸고 슬롯 재저장 안 했어도 따라옴.
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -10,23 +13,16 @@ import {
   SLOT_KIND_META,
   type TimelineSlotRow,
 } from "@/lib/event-timeline/types";
+import { fmtClockKstAlways } from "@/lib/datetime/kst";
 
 interface Props {
   eventName: string;
+  /** 행사 시작 시각 — 슬롯 시각 누적 기준점. */
+  eventStartsAt: string | null;
   slots: TimelineSlotRow[];
 }
 
-function fmtClock(iso: string): string {
-  try {
-    return new Date(iso).toLocaleTimeString("ko-KR", {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    });
-  } catch {
-    return "";
-  }
-}
+const fmtClock = (iso: string): string => fmtClockKstAlways(iso);
 
 function fmtCountdown(minutes: number): string {
   if (minutes <= 0) return "곧";
@@ -37,7 +33,61 @@ function fmtCountdown(minutes: number): string {
   return `${h}시간 ${m}분 후`;
 }
 
-export function NextUpCard({ eventName, slots }: Props) {
+interface SlotWithComputed extends TimelineSlotRow {
+  computedStartMs: number;
+  computedEndMs: number;
+}
+
+/** event.starts_at + 누적 duration 으로 각 슬롯 시각 재계산. */
+function computeSlots(
+  rawSlots: TimelineSlotRow[],
+  eventStartsAt: string | null
+): SlotWithComputed[] {
+  const sorted = rawSlots.slice().sort((a, b) => {
+    if (a.display_order !== b.display_order) {
+      return a.display_order - b.display_order;
+    }
+    return a.starts_at.localeCompare(b.starts_at);
+  });
+
+  const evMs = eventStartsAt ? new Date(eventStartsAt).getTime() : NaN;
+  const useAccum = Number.isFinite(evMs);
+  let cursor = useAccum ? evMs : NaN;
+
+  return sorted.map((s, idx) => {
+    const rawStart = new Date(s.starts_at).getTime();
+    const rawEnd = s.ends_at ? new Date(s.ends_at).getTime() : NaN;
+    const dur =
+      Number.isFinite(rawStart) && Number.isFinite(rawEnd) && rawEnd > rawStart
+        ? rawEnd - rawStart
+        : 30 * 60 * 1000;
+
+    let startMs: number;
+    let endMs: number;
+    if (useAccum) {
+      startMs = cursor;
+      endMs = startMs + dur;
+      cursor = endMs;
+    } else {
+      startMs = rawStart;
+      endMs = Number.isFinite(rawEnd)
+        ? rawEnd
+        : idx < sorted.length - 1
+          ? new Date(sorted[idx + 1].starts_at).getTime()
+          : startMs + dur;
+    }
+    return {
+      ...s,
+      // 표시용으로 starts_at/ends_at 도 덮어씀
+      starts_at: new Date(startMs).toISOString(),
+      ends_at: new Date(endMs).toISOString(),
+      computedStartMs: startMs,
+      computedEndMs: endMs,
+    };
+  });
+}
+
+export function NextUpCard({ eventName, eventStartsAt, slots }: Props) {
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
@@ -46,32 +96,21 @@ export function NextUpCard({ eventName, slots }: Props) {
   }, []);
 
   const { current, next } = useMemo(() => {
-    const sorted = slots
-      .slice()
-      .sort((a, b) => a.starts_at.localeCompare(b.starts_at));
+    const computed = computeSlots(slots, eventStartsAt);
 
-    let current: TimelineSlotRow | null = null;
-    let next: TimelineSlotRow | null = null;
+    let current: SlotWithComputed | null = null;
+    let next: SlotWithComputed | null = null;
 
-    for (let i = 0; i < sorted.length; i += 1) {
-      const s = sorted[i];
-      const startMs = new Date(s.starts_at).getTime();
-      const explicitEnd = s.ends_at ? new Date(s.ends_at).getTime() : null;
-      const fallbackEnd =
-        i < sorted.length - 1
-          ? new Date(sorted[i + 1].starts_at).getTime()
-          : startMs + 30 * 60 * 1000;
-      const endMs = explicitEnd ?? fallbackEnd;
-
-      if (now >= startMs && now < endMs) {
+    for (const s of computed) {
+      if (now >= s.computedStartMs && now < s.computedEndMs) {
         current = s;
-      } else if (now < startMs && !next) {
+      } else if (now < s.computedStartMs && !next) {
         next = s;
       }
     }
 
     return { current, next };
-  }, [slots, now]);
+  }, [slots, eventStartsAt, now]);
 
   if (!current && !next) return null;
 

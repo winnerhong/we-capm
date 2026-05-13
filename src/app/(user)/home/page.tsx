@@ -353,7 +353,11 @@ export default async function UserHomePage({
 
       {/* 오늘의 일정 — 진행 중 + 다음 슬롯 압축 미리보기 */}
       {selectedEvent && timelineSlots.length > 0 && (
-        <NextUpCard eventName={selectedEvent.name} slots={timelineSlots} />
+        <NextUpCard
+          eventName={selectedEvent.name}
+          eventStartsAt={selectedEvent.starts_at}
+          slots={timelineSlots}
+        />
       )}
 
       {/* 돌발 미션 — 시간 임계이므로 FM 보다 위 */}

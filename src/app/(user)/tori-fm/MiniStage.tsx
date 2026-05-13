@@ -123,11 +123,14 @@ function fmtRelative(iso: string): string {
 
 function fmtTimeRange(start: string, end: string): string {
   try {
+    // KST 강제 — 브라우저 timezone 무관
     const fmt = (iso: string) =>
-      new Date(iso).toLocaleTimeString("ko-KR", {
+      new Intl.DateTimeFormat("ko-KR", {
+        timeZone: "Asia/Seoul",
         hour: "2-digit",
         minute: "2-digit",
-      });
+        hour12: false,
+      }).format(new Date(iso));
     return `${fmt(start)} ~ ${fmt(end)}`;
   } catch {
     return "";
