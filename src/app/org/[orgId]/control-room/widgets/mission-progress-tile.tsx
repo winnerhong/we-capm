@@ -31,10 +31,10 @@ export function MissionProgressTile({ items, isTvMode }: Props) {
         <span className="text-base" aria-hidden>
           🎯
         </span>
-        <h2 className="text-xs font-semibold tracking-[0.15em] text-[#7FA892]">
+        <h2 className="text-xs font-semibold tracking-[0.15em] text-[#a8b8d0]">
           미션별 진행률
         </h2>
-        <span className="ml-auto font-mono text-xs text-[#7FA892]">
+        <span className="ml-auto font-mono text-xs text-[#a8b8d0]">
           {items.length}
         </span>
       </div>
@@ -44,7 +44,7 @@ export function MissionProgressTile({ items, isTvMode }: Props) {
           <div className="text-5xl" aria-hidden>
             🌱
           </div>
-          <div className="text-sm text-[#7FA892]">
+          <div className="text-sm text-[#a8b8d0]">
             활성 미션이 없어요
           </div>
         </div>
@@ -59,16 +59,16 @@ export function MissionProgressTile({ items, isTvMode }: Props) {
             return (
               <li
                 key={m.missionId}
-                className="rounded-lg border border-[#1f2a24] bg-[#0e1513] p-3"
+                className="rounded-lg border border-[#1a2a52] bg-[#0a1839] p-3"
               >
                 <div className="flex items-center gap-1.5">
                   <span className="text-base" aria-hidden>
                     {m.icon ?? "🌱"}
                   </span>
-                  <span className="min-w-0 flex-1 truncate text-sm font-semibold text-[#e8f0e4]">
+                  <span className="min-w-0 flex-1 truncate text-sm font-semibold text-[#f4ecd8]">
                     {m.title}
                   </span>
-                  <span className="shrink-0 rounded-full bg-[#1a2320] px-1.5 py-0.5 text-[9px] font-bold text-[#7FA892]">
+                  <span className="shrink-0 rounded-full bg-[#16234a] px-1.5 py-0.5 text-[9px] font-bold text-[#a8b8d0]">
                     {kindLabel}
                   </span>
                   <span
@@ -103,7 +103,7 @@ export function MissionProgressTile({ items, isTvMode }: Props) {
                       ✕ 반려 {m.rejectedCount}
                     </span>
                   )}
-                  <span className="text-[#5e7a6c]">
+                  <span className="text-[#7a8aa8]">
                     · 미시작 {notStarted}
                   </span>
                 </div>

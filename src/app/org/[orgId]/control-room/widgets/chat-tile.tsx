@@ -49,16 +49,16 @@ export function ChatTile({ snapshot, isTvMode }: Props) {
         <span className="text-base" aria-hidden>
           💬
         </span>
-        <h2 className="text-xs font-semibold tracking-[0.15em] text-[#7FA892]">
+        <h2 className="text-xs font-semibold tracking-[0.15em] text-[#a8b8d0]">
           토리톡
         </h2>
-        <span className="ml-auto font-mono text-xs text-[#7FA892]">
+        <span className="ml-auto font-mono text-xs text-[#a8b8d0]">
           {snapshot.chat.length}
         </span>
       </div>
 
       {messages.length === 0 ? (
-        <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed border-[#1f2a24] py-8 text-sm text-[#7FA892]">
+        <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed border-[#1a2a52] py-8 text-sm text-[#a8b8d0]">
           🌱 아직 이야기가 없어요
         </div>
       ) : (
@@ -66,17 +66,17 @@ export function ChatTile({ snapshot, isTvMode }: Props) {
           {messages.map((m) => (
             <li
               key={m.id}
-              className="rounded-lg border border-[#1f2a24] bg-[#0e1513] px-3 py-2"
+              className="rounded-lg border border-[#1a2a52] bg-[#0a1839] px-3 py-2"
             >
               <div className="mb-0.5 flex items-center justify-between gap-2 text-[10px]">
                 <span className={`${styles.neonCyan} font-semibold`}>
                   {isTvMode ? maskName(m.senderName) : m.senderName}
                 </span>
-                <span className="truncate text-[#7FA892]">
+                <span className="truncate text-[#a8b8d0]">
                   {m.roomName} · {timeAgo(m.createdAt, now)}
                 </span>
               </div>
-              <div className="line-clamp-2 text-sm text-[#e8f0e4]">
+              <div className="line-clamp-2 text-sm text-[#f4ecd8]">
                 {m.content}
               </div>
             </li>

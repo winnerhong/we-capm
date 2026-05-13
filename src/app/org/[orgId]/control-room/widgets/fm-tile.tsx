@@ -25,7 +25,7 @@ export function FmTile({ snapshot }: Props) {
           <span className="text-base" aria-hidden>
             📻
           </span>
-          <h2 className="text-xs font-semibold tracking-[0.15em] text-[#7FA892]">
+          <h2 className="text-xs font-semibold tracking-[0.15em] text-[#a8b8d0]">
             토리FM
           </h2>
         </div>
@@ -47,19 +47,19 @@ export function FmTile({ snapshot }: Props) {
 
       {session ? (
         <div className="mb-3">
-          <div className="truncate text-sm font-bold text-[#e8f0e4]">
+          <div className="truncate text-sm font-bold text-[#f4ecd8]">
             {session.name}
           </div>
-          <div className="font-mono text-xs text-[#7FA892]">
+          <div className="font-mono text-xs text-[#a8b8d0]">
             {formatRange(session.scheduledStart, session.scheduledEnd)}
           </div>
         </div>
       ) : (
-        <div className="mb-3 text-xs text-[#7FA892]">세션 없음</div>
+        <div className="mb-3 text-xs text-[#a8b8d0]">세션 없음</div>
       )}
 
       <div className="mb-3">
-        <div className="text-[10px] text-[#7FA892]">오늘 하트</div>
+        <div className="text-[10px] text-[#a8b8d0]">오늘 하트</div>
         <div
           className={`${styles.neonPink} font-mono text-3xl font-extrabold leading-none md:text-4xl`}
         >
@@ -68,9 +68,9 @@ export function FmTile({ snapshot }: Props) {
       </div>
 
       <div className="mt-auto">
-        <div className="mb-1 text-[10px] text-[#7FA892]">신청곡</div>
+        <div className="mb-1 text-[10px] text-[#a8b8d0]">신청곡</div>
         {requests.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-[#1f2a24] px-3 py-2 text-xs text-[#7FA892]">
+          <div className="rounded-lg border border-dashed border-[#1a2a52] px-3 py-2 text-xs text-[#a8b8d0]">
             🌲 아직 신청곡이 없어요
           </div>
         ) : (
@@ -80,12 +80,12 @@ export function FmTile({ snapshot }: Props) {
               {[...requests, ...requests].map((r, i) => (
                 <span
                   key={`${r.id}-${i}`}
-                  className="inline-flex items-center gap-2 text-xs text-[#e8f0e4]"
+                  className="inline-flex items-center gap-2 text-xs text-[#f4ecd8]"
                 >
                   <span className={styles.neonPink}>♥{r.heartCount}</span>
                   <span className="font-semibold">{r.songTitle}</span>
                   {r.artist && (
-                    <span className="text-[#7FA892]">— {r.artist}</span>
+                    <span className="text-[#a8b8d0]">— {r.artist}</span>
                   )}
                 </span>
               ))}

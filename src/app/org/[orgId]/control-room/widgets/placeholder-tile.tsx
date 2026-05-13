@@ -14,7 +14,7 @@ export function PlaceholderTile({ icon, label, hint }: Props) {
       <div className="text-3xl opacity-60" aria-hidden>
         {icon}
       </div>
-      <div className="text-xs font-semibold tracking-[0.25em] text-[#7FA892]">
+      <div className="text-xs font-semibold tracking-[0.25em] text-[#a8b8d0]">
         {label}
       </div>
       <div className="text-[10px] text-[#4e6659]">

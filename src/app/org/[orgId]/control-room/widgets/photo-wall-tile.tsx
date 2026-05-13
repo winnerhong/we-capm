@@ -39,10 +39,10 @@ export function PhotoWallTile({ items, isTvMode }: Props) {
         <span className="text-base" aria-hidden>
           📸
         </span>
-        <h2 className="text-xs font-semibold tracking-[0.15em] text-[#7FA892]">
+        <h2 className="text-xs font-semibold tracking-[0.15em] text-[#a8b8d0]">
           사진 월
         </h2>
-        <span className="ml-auto font-mono text-xs text-[#7FA892]">
+        <span className="ml-auto font-mono text-xs text-[#a8b8d0]">
           {items.length}
         </span>
       </div>
@@ -52,7 +52,7 @@ export function PhotoWallTile({ items, isTvMode }: Props) {
           <div className="text-5xl" aria-hidden>
             🌲
           </div>
-          <div className="text-sm text-[#7FA892]">
+          <div className="text-sm text-[#a8b8d0]">
             아직 올라온 사진이 없어요
           </div>
         </div>
@@ -65,7 +65,7 @@ export function PhotoWallTile({ items, isTvMode }: Props) {
           {list.map((p, i) => (
             <li
               key={p.submissionId}
-              className="group relative aspect-square overflow-hidden rounded-md border border-[#1f2a24] bg-[#0e1513]"
+              className="group relative aspect-square overflow-hidden rounded-md border border-[#1a2a52] bg-[#0a1839]"
               title={`${p.userDisplayName} · ${p.missionTitle} · ${fmtClockKstAlways(p.submittedAt)}`}
             >
               <button
@@ -84,13 +84,13 @@ export function PhotoWallTile({ items, isTvMode }: Props) {
               </button>
               {/* hover/tap overlay */}
               <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent p-1.5 opacity-0 transition-opacity group-hover:opacity-100">
-                <div className="truncate text-[10px] font-bold text-[#e8f0e4]">
+                <div className="truncate text-[10px] font-bold text-[#f4ecd8]">
                   {p.missionIcon ?? "📷"} {p.missionTitle}
                 </div>
-                <div className="truncate text-[9px] text-[#a8c3b3]">
+                <div className="truncate text-[9px] text-[#cad3e0]">
                   {p.userDisplayName}
                 </div>
-                <div className="font-mono text-[9px] text-[#7FA892]">
+                <div className="font-mono text-[9px] text-[#a8b8d0]">
                   {fmtClockKstAlways(p.submittedAt)}
                 </div>
               </div>

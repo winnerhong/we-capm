@@ -57,7 +57,7 @@ export function LeaderboardTile({ items, isTvMode }: Props) {
         <span className="text-base" aria-hidden>
           🏆
         </span>
-        <h2 className="text-xs font-semibold tracking-[0.15em] text-[#7FA892]">
+        <h2 className="text-xs font-semibold tracking-[0.15em] text-[#a8b8d0]">
           순위 · TOP 10
         </h2>
       </div>
@@ -67,7 +67,7 @@ export function LeaderboardTile({ items, isTvMode }: Props) {
           <div className="text-5xl" aria-hidden>
             🌱
           </div>
-          <div className="text-sm text-[#7FA892]">
+          <div className="text-sm text-[#a8b8d0]">
             아직 집계된 도토리가 없어요
           </div>
         </div>
@@ -85,11 +85,11 @@ export function LeaderboardTile({ items, isTvMode }: Props) {
             return (
               <li
                 key={it.userId}
-                className="flex items-center gap-3 rounded-lg border border-[#1f2a24] bg-[#0e1513] px-3 py-2"
+                className="flex items-center gap-3 rounded-lg border border-[#1a2a52] bg-[#0a1839] px-3 py-2"
               >
                 <span
                   className={`w-10 shrink-0 font-mono text-[11px] font-bold tabular-nums ${
-                    isTop3 ? styles.neonGreen : "text-[#7FA892]"
+                    isTop3 ? styles.neonGreen : "text-[#a8b8d0]"
                   }`}
                 >
                   {rankLabel(it.rank)}
@@ -106,7 +106,7 @@ export function LeaderboardTile({ items, isTvMode }: Props) {
                       className={`truncate text-sm font-semibold ${
                         isTop3
                           ? `${styles.neonGreen} ${styles.top3Glow}`
-                          : "text-[#e8f0e4]"
+                          : "text-[#f4ecd8]"
                       }`}
                     >
                       {name}
@@ -124,7 +124,7 @@ export function LeaderboardTile({ items, isTvMode }: Props) {
                       />
                     </div>
                     {it.childrenLabel && (
-                      <span className="shrink-0 truncate text-[10px] text-[#5e7a6c]">
+                      <span className="shrink-0 truncate text-[10px] text-[#7a8aa8]">
                         └{" "}
                         {isTvMode
                           ? maskChildrenLabel(it.childrenLabel)

@@ -21,13 +21,13 @@ export function StampsTile({ stamps }: Props) {
         <span className="text-base" aria-hidden>
           🌱
         </span>
-        <h2 className="text-xs font-semibold tracking-[0.15em] text-[#7FA892]">
+        <h2 className="text-xs font-semibold tracking-[0.15em] text-[#a8b8d0]">
           오늘의 스탬프
         </h2>
       </div>
 
       <div>
-        <div className="text-[10px] text-[#7FA892]">오늘 제출</div>
+        <div className="text-[10px] text-[#a8b8d0]">오늘 제출</div>
         <div
           className={`${styles.neonGreen} font-mono text-5xl font-extrabold leading-none tabular-nums md:text-6xl`}
         >
@@ -80,7 +80,7 @@ export function StampsTile({ stamps }: Props) {
         </svg>
       </div>
 
-      <div className="mt-auto pt-2 text-[11px] text-[#7FA892]">
+      <div className="mt-auto pt-2 text-[11px] text-[#a8b8d0]">
         {isEmpty
           ? "오늘은 아직 조용해요 🌱"
           : `${stamps.participantsSubmittedToday.toLocaleString("ko-KR")}명 참여`}

@@ -16,7 +16,7 @@ export function ParticipantsTile({ snapshot, orgId }: Props) {
         <span className="text-base" aria-hidden>
           🧑‍🤝‍🧑
         </span>
-        <h2 className="text-xs font-semibold tracking-[0.15em] text-[#7FA892]">
+        <h2 className="text-xs font-semibold tracking-[0.15em] text-[#a8b8d0]">
           참가자
         </h2>
       </div>
@@ -27,7 +27,7 @@ export function ParticipantsTile({ snapshot, orgId }: Props) {
           initialFallback={snapshot.todayActiveParticipants}
           render={(liveCount, isLive) => (
             <div>
-              <div className="flex items-center gap-1.5 text-[10px] text-[#7FA892]">
+              <div className="flex items-center gap-1.5 text-[10px] text-[#a8b8d0]">
                 {isLive ? (
                   <>
                     <span
@@ -48,7 +48,7 @@ export function ParticipantsTile({ snapshot, orgId }: Props) {
                 {liveCount.toLocaleString("ko-KR")}
               </div>
               {isLive && (
-                <div className="mt-1 text-[10px] text-[#7FA892]">
+                <div className="mt-1 text-[10px] text-[#a8b8d0]">
                   오늘 활동 {snapshot.todayActiveParticipants.toLocaleString("ko-KR")}
                 </div>
               )}
@@ -57,8 +57,8 @@ export function ParticipantsTile({ snapshot, orgId }: Props) {
         />
         <div className={styles.divider} />
         <div>
-          <div className="text-[10px] text-[#7FA892]">전체 참가자</div>
-          <div className="font-mono text-3xl font-bold text-[#e8f0e4]">
+          <div className="text-[10px] text-[#a8b8d0]">전체 참가자</div>
+          <div className="font-mono text-3xl font-bold text-[#f4ecd8]">
             {snapshot.totalParticipants.toLocaleString("ko-KR")}
           </div>
         </div>

@@ -1,43 +1,49 @@
-/* 관제실(Control Room) 다크테마 전용 토큰.
+/* 관제실(Control Room) 다크테마 — 토리FM 라이브 스튜디오와 통일.
    - 이 모듈은 control-room 라우트 하위에서만 import.
-   - 글로벌 CSS는 절대 건드리지 않는다. */
+   - 글로벌 CSS는 절대 건드리지 않는다.
+   - 팔레트: 네이비(#070C1F → #0F1F4A) + 앰버 액센트(#FFC83D). */
 
 .bg {
-  background: #0a0f0d;
-  color: #e8f0e4;
+  background: linear-gradient(180deg, #070C1F 0%, #0B1538 45%, #0F1F4A 100%);
+  color: #f4ecd8;
   min-height: 100dvh;
 }
 
 .surface {
-  background: #121916;
-  border: 1px solid #1f2a24;
+  background: rgba(11, 21, 56, 0.7);
+  border: 1px solid rgba(251, 191, 36, 0.15);
   border-radius: 1rem;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset,
+    0 0 0 1px rgba(15, 31, 74, 0.5);
 }
 
 .surfaceMuted {
-  background: #0e1513;
-  border: 1px dashed #223029;
+  background: rgba(7, 12, 31, 0.6);
+  border: 1px dashed rgba(251, 191, 36, 0.18);
   border-radius: 1rem;
 }
 
 .neonGreen {
-  color: #39ff88;
-  filter: drop-shadow(0 0 8px rgba(57, 255, 136, 0.4));
+  /* 완료/성공 (FM 스튜디오와 동일 emerald 톤) */
+  color: #6ee7b7;
+  filter: drop-shadow(0 0 8px rgba(110, 231, 183, 0.45));
 }
 
 .neonAmber {
   color: #ffc83d;
-  filter: drop-shadow(0 0 8px rgba(255, 200, 61, 0.4));
+  filter: drop-shadow(0 0 8px rgba(255, 200, 61, 0.5));
 }
 
 .neonPink {
   color: #ff4d8a;
-  filter: drop-shadow(0 0 8px rgba(255, 77, 138, 0.4));
+  filter: drop-shadow(0 0 8px rgba(255, 77, 138, 0.45));
 }
 
 .neonCyan {
-  color: #5ee9f0;
-  filter: drop-shadow(0 0 8px rgba(94, 233, 240, 0.4));
+  color: #7dd3fc;
+  filter: drop-shadow(0 0 8px rgba(125, 211, 252, 0.45));
 }
 
 .neonRed {
@@ -212,7 +218,7 @@
 }
 
 .divider {
-  border-top: 1px solid #1f2a24;
+  border-top: 1px solid rgba(251, 191, 36, 0.15);
 }
 
 /* reduced motion — TV 모드는 예외 처리 위해 .tvScale 안에서는 복원 */
@@ -249,7 +255,7 @@
   background: linear-gradient(
     90deg,
     transparent,
-    rgba(57, 255, 136, 0.2),
+    rgba(255, 200, 61, 0.22),
     transparent
   );
   animation: scanSweep 400ms ease-out;
@@ -289,11 +295,11 @@
 
 /* Phase 2: Stamps 원형 게이지 */
 .gaugeTrack {
-  stroke: #1f2a24;
+  stroke: rgba(251, 191, 36, 0.15);
 }
 .gaugeFill {
-  stroke: #39ff88;
-  filter: drop-shadow(0 0 6px rgba(57, 255, 136, 0.55));
+  stroke: #ffc83d;
+  filter: drop-shadow(0 0 6px rgba(255, 200, 61, 0.6));
   transition: stroke-dashoffset 600ms ease-out;
 }
 
@@ -314,16 +320,16 @@
   }
 }
 
-/* Phase 2: Leaderboard 막대 */
+/* Phase 2: Leaderboard 막대 — 앰버 그라데이션 (FM 스튜디오 NOW PLAYING 와 동일 톤) */
 .rankBar {
   height: 100%;
-  background: linear-gradient(90deg, #1f5a3d, #39ff88);
-  box-shadow: 0 0 6px rgba(57, 255, 136, 0.5);
+  background: linear-gradient(90deg, #8a5a00, #ffc83d);
+  box-shadow: 0 0 6px rgba(255, 200, 61, 0.55);
   border-radius: 9999px;
   transition: width 400ms ease-out;
 }
 .top3Glow {
-  filter: drop-shadow(0 0 10px rgba(57, 255, 136, 0.7));
+  filter: drop-shadow(0 0 10px rgba(255, 200, 61, 0.75));
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -368,6 +374,6 @@
   z-index: 1;
 }
 .heatmapPeak {
-  border: 1px solid #39ff88;
-  filter: drop-shadow(0 0 8px rgba(57, 255, 136, 0.6));
+  border: 1px solid #ffc83d;
+  filter: drop-shadow(0 0 8px rgba(255, 200, 61, 0.7));
 }

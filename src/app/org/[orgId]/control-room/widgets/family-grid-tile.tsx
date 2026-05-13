@@ -119,10 +119,10 @@ export function FamilyGridTile({ grid, photos, isTvMode }: Props) {
         <span className="text-base" aria-hidden>
           👥
         </span>
-        <h2 className="text-xs font-semibold tracking-[0.15em] text-[#7FA892]">
+        <h2 className="text-xs font-semibold tracking-[0.15em] text-[#a8b8d0]">
           가족별 진행
         </h2>
-        <span className="ml-auto font-mono text-xs text-[#7FA892]">
+        <span className="ml-auto font-mono text-xs text-[#a8b8d0]">
           {classFilter
             ? `${rowsToShow.length}/${grid.rows.length}`
             : grid.rows.length}
@@ -169,7 +169,7 @@ export function FamilyGridTile({ grid, photos, isTvMode }: Props) {
           <div className="text-5xl" aria-hidden>
             🌱
           </div>
-          <div className="text-sm text-[#7FA892]">
+          <div className="text-sm text-[#a8b8d0]">
             {grid.missions.length === 0
               ? "활성 미션이 없어요"
               : "참가자가 없어요"}
@@ -179,27 +179,27 @@ export function FamilyGridTile({ grid, photos, isTvMode }: Props) {
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start">
           {/* 좌측: 그리드 — 가족 많아도 모두 노출. 일정 높이 넘으면 내부 스크롤. */}
           <div
-            className="min-w-0 flex-1 overflow-auto rounded-lg border border-[#1a2320]"
+            className="min-w-0 flex-1 overflow-auto rounded-lg border border-[#16234a]"
             style={{ maxHeight: isTvMode ? 720 : 520 }}
           >
             <table className="w-full border-collapse text-[11px]">
-              <thead className="sticky top-0 z-20 bg-[#0e1513]">
+              <thead className="sticky top-0 z-20 bg-[#0a1839]">
                 <tr>
-                  <th className="sticky left-0 z-30 bg-[#0e1513] px-2 py-1.5 text-left font-semibold text-[#7FA892]">
+                  <th className="sticky left-0 z-30 bg-[#0a1839] px-2 py-1.5 text-left font-semibold text-[#a8b8d0]">
                     가족
                   </th>
                   {grid.missions.map((m) => (
                     <th
                       key={m.id}
                       title={m.title}
-                      className="bg-[#0e1513] px-1 py-1.5 text-center font-semibold text-[#7FA892]"
+                      className="bg-[#0a1839] px-1 py-1.5 text-center font-semibold text-[#a8b8d0]"
                     >
                       <span className="text-base" aria-hidden>
                         {m.icon ?? "🌱"}
                       </span>
                     </th>
                   ))}
-                  <th className="bg-[#0e1513] px-2 py-1.5 text-right font-semibold text-[#7FA892]">
+                  <th className="bg-[#0a1839] px-2 py-1.5 text-right font-semibold text-[#a8b8d0]">
                     🌰
                   </th>
                 </tr>
@@ -221,19 +221,19 @@ export function FamilyGridTile({ grid, photos, isTvMode }: Props) {
                           prev === r.userId ? null : prev
                         )
                       }
-                      className={`cursor-pointer border-t border-[#1a2320] transition hover:bg-[#0e1513] ${
+                      className={`cursor-pointer border-t border-[#16234a] transition hover:bg-[#0a1839] ${
                         isSelected
-                          ? "bg-[#11251c]"
+                          ? "bg-[#1e2b56]"
                           : isHovered
-                            ? "bg-[#0e1513]"
+                            ? "bg-[#0a1839]"
                             : ""
                       }`}
                     >
-                      <td className="sticky left-0 bg-inherit px-2 py-1.5 font-semibold text-[#e8f0e4]">
+                      <td className="sticky left-0 bg-inherit px-2 py-1.5 font-semibold text-[#f4ecd8]">
                         <span className="block max-w-[110px] truncate">
                           {r.displayName}
                         </span>
-                        <span className="text-[9px] font-normal text-[#7FA892]">
+                        <span className="text-[9px] font-normal text-[#a8b8d0]">
                           ✓ {r.doneCount}/{grid.missions.length}
                         </span>
                       </td>
@@ -243,7 +243,7 @@ export function FamilyGridTile({ grid, photos, isTvMode }: Props) {
                           return (
                             <td
                               key={m.id}
-                              className="px-1 py-1 text-center text-[#3a4a44]"
+                              className="px-1 py-1 text-center text-[#3a4868]"
                             >
                               ·
                             </td>
@@ -277,10 +277,10 @@ export function FamilyGridTile({ grid, photos, isTvMode }: Props) {
               테이블이 길어 스크롤해도 따라온다. */}
           {previewRow ? (
             <aside
-              className={`w-full shrink-0 rounded-lg border bg-[#0e1513] p-3 lg:sticky lg:top-2 lg:w-[260px] ${
+              className={`w-full shrink-0 rounded-lg border bg-[#0a1839] p-3 lg:sticky lg:top-2 lg:w-[260px] ${
                 isPinned
                   ? "border-emerald-500/40 ring-1 ring-emerald-500/20"
-                  : "border-[#1f2a24] opacity-95"
+                  : "border-[#1a2a52] opacity-95"
               }`}
               onMouseEnter={() => {
                 // 패널 위에 마우스 올린 동안엔 hover 유지 (행을 떠도 사라지지 않게).
@@ -292,12 +292,12 @@ export function FamilyGridTile({ grid, photos, isTvMode }: Props) {
             >
               <div className="mb-2 flex items-center justify-between gap-2">
                 <div className="min-w-0">
-                  <h3 className="truncate text-sm font-bold text-[#e8f0e4]">
+                  <h3 className="truncate text-sm font-bold text-[#f4ecd8]">
                     {previewRow.displayName}
                   </h3>
                   <span
                     className={`text-[9px] font-semibold ${
-                      isPinned ? "text-emerald-300" : "text-[#7FA892]"
+                      isPinned ? "text-emerald-300" : "text-[#a8b8d0]"
                     }`}
                   >
                     {isPinned ? "📌 고정됨" : "👁 미리보기 (클릭 = 고정)"}
@@ -307,14 +307,14 @@ export function FamilyGridTile({ grid, photos, isTvMode }: Props) {
                   <button
                     type="button"
                     onClick={() => setSelectedUserId(null)}
-                    className="rounded-full px-1.5 text-[10px] text-[#7FA892] hover:bg-[#1a2320]"
+                    className="rounded-full px-1.5 text-[10px] text-[#a8b8d0] hover:bg-[#16234a]"
                     aria-label="고정 해제"
                   >
                     ✕
                   </button>
                 )}
               </div>
-              <p className="text-[10px] text-[#7FA892]">
+              <p className="text-[10px] text-[#a8b8d0]">
                 ✓ {previewRow.doneCount}/{grid.missions.length} 미션 완료 ·{" "}
                 <span className={styles.neonAmber}>
                   🌰 {previewRow.totalAcorns}
@@ -340,7 +340,7 @@ export function FamilyGridTile({ grid, photos, isTvMode }: Props) {
                   return (
                     <li
                       key={m.id}
-                      className="flex items-center justify-between gap-2 rounded px-1 py-0.5 text-[10px] text-[#a8c3b3]"
+                      className="flex items-center justify-between gap-2 rounded px-1 py-0.5 text-[10px] text-[#cad3e0]"
                     >
                       <span className="min-w-0 flex-1 truncate">
                         {m.icon ?? "🌱"} {m.title}
@@ -352,7 +352,7 @@ export function FamilyGridTile({ grid, photos, isTvMode }: Props) {
                           {STATE_META[state].emoji} {STATE_META[state].label}
                         </span>
                       ) : (
-                        <span className="shrink-0 text-[9px] text-[#3a4a44]">
+                        <span className="shrink-0 text-[9px] text-[#3a4868]">
                           미시작
                         </span>
                       )}
@@ -364,9 +364,9 @@ export function FamilyGridTile({ grid, photos, isTvMode }: Props) {
               {/* 이 가족의 사진 — 클릭 시 확대 모달 */}
               {previewPhotos.length > 0 && (
                 <>
-                  <div className="mt-3 text-[10px] font-semibold text-[#7FA892]">
+                  <div className="mt-3 text-[10px] font-semibold text-[#a8b8d0]">
                     📸 올린 사진 ({previewPhotos.length})
-                    <span className="ml-1 font-normal text-[#5e7a6c]">
+                    <span className="ml-1 font-normal text-[#7a8aa8]">
                       · 클릭하면 확대
                     </span>
                   </div>
@@ -374,7 +374,7 @@ export function FamilyGridTile({ grid, photos, isTvMode }: Props) {
                     {previewPhotos.slice(0, 6).map((p, i) => (
                       <li
                         key={p.submissionId}
-                        className="aspect-square overflow-hidden rounded border border-[#1a2320]"
+                        className="aspect-square overflow-hidden rounded border border-[#16234a]"
                         title={`${p.missionTitle} · ${fmtClockKstAlways(p.submittedAt)}`}
                       >
                         <button
@@ -399,13 +399,13 @@ export function FamilyGridTile({ grid, photos, isTvMode }: Props) {
             </aside>
           ) : (
             // 아무 행도 hover/click 안 됐을 때 자리 차지용 안내 카드 (lg+ 만).
-            <aside className="hidden w-full shrink-0 rounded-lg border border-dashed border-[#1f2a24] bg-[#0e1513]/60 p-3 lg:sticky lg:top-2 lg:block lg:w-[260px]">
-              <p className="text-center text-[10px] text-[#5e7a6c]">
+            <aside className="hidden w-full shrink-0 rounded-lg border border-dashed border-[#1a2a52] bg-[#0a1839]/60 p-3 lg:sticky lg:top-2 lg:block lg:w-[260px]">
+              <p className="text-center text-[10px] text-[#7a8aa8]">
                 👈 왼쪽 가족 이름 위에 마우스를 올리면
                 <br />
                 미리보기가 표시됩니다.
                 <br />
-                <span className="text-[#7FA892]">클릭하면 고정됩니다.</span>
+                <span className="text-[#a8b8d0]">클릭하면 고정됩니다.</span>
               </p>
             </aside>
           )}
@@ -434,7 +434,7 @@ function ClassChip({
       className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-semibold transition ${
         active
           ? "border-emerald-400 bg-emerald-500/20 text-emerald-200"
-          : "border-[#1f2a24] bg-[#0e1513] text-[#7FA892] hover:border-[#2d4439] hover:text-[#a8c3b3]"
+          : "border-[#1a2a52] bg-[#0a1839] text-[#a8b8d0] hover:border-[#2d4439] hover:text-[#cad3e0]"
       }`}
     >
       <span>{label}</span>

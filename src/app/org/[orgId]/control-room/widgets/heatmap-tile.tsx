@@ -29,23 +29,23 @@ export function HeatmapTile({ heatmap, isTvMode }: Props) {
         <span className="text-base" aria-hidden>
           🗓
         </span>
-        <h2 className="text-xs font-semibold tracking-[0.15em] text-[#7FA892]">
+        <h2 className="text-xs font-semibold tracking-[0.15em] text-[#a8b8d0]">
           24시간 활동 히트맵
         </h2>
       </div>
 
       {/* 부제 */}
-      <div className="mb-3 flex items-center justify-between text-[11px] text-[#7FA892]">
+      <div className="mb-3 flex items-center justify-between text-[11px] text-[#a8b8d0]">
         <span>
           총{" "}
-          <span className="font-mono font-semibold text-[#e8f0e4]">
+          <span className="font-mono font-semibold text-[#f4ecd8]">
             {totalLast24h.toLocaleString("ko-KR")}
           </span>
           건
         </span>
         <span>
           피크:{" "}
-          <span className="font-mono font-semibold text-[#e8f0e4]">
+          <span className="font-mono font-semibold text-[#f4ecd8]">
             {peakHour ?? "—"}
           </span>
         </span>
@@ -56,7 +56,7 @@ export function HeatmapTile({ heatmap, isTvMode }: Props) {
           <div className="text-5xl" aria-hidden>
             🌱
           </div>
-          <div className="text-sm text-[#7FA892]">
+          <div className="text-sm text-[#a8b8d0]">
             아직 조용한 24시간이에요
           </div>
         </div>

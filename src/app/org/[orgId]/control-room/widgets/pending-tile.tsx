@@ -13,7 +13,7 @@ function elapsedLabel(iso: string, nowMs: number): string {
 }
 
 function oldestColor(min: number | null): string {
-  if (min === null) return "#7FA892";
+  if (min === null) return "#a8b8d0";
   if (min >= 30) return "#FF4D8A";
   if (min >= 10) return "#FFC83D";
   return "#39FF88";
@@ -31,7 +31,7 @@ export function PendingTile({ snapshot }: Props) {
         <span className="text-base" aria-hidden>
           ⏳
         </span>
-        <h2 className="text-xs font-semibold tracking-[0.15em] text-[#7FA892]">
+        <h2 className="text-xs font-semibold tracking-[0.15em] text-[#a8b8d0]">
           검토 대기
         </h2>
       </div>
@@ -49,7 +49,7 @@ export function PendingTile({ snapshot }: Props) {
         <>
           <div className="mb-3 flex items-end gap-6">
             <div>
-              <div className="text-[10px] text-[#7FA892]">대기 건수</div>
+              <div className="text-[10px] text-[#a8b8d0]">대기 건수</div>
               <div
                 className={`${styles.neonAmber} font-mono text-5xl font-extrabold leading-none md:text-6xl`}
               >
@@ -58,7 +58,7 @@ export function PendingTile({ snapshot }: Props) {
             </div>
             {oldestWaitingMinutes !== null && (
               <div>
-                <div className="text-[10px] text-[#7FA892]">최장 대기</div>
+                <div className="text-[10px] text-[#a8b8d0]">최장 대기</div>
                 <div
                   className="font-mono text-2xl font-bold leading-none"
                   style={{
@@ -76,13 +76,13 @@ export function PendingTile({ snapshot }: Props) {
             {list.map((it) => (
               <li
                 key={it.id}
-                className="flex items-start justify-between gap-3 rounded-lg border border-[#1f2a24] bg-[#0e1513] px-3 py-2"
+                className="flex items-start justify-between gap-3 rounded-lg border border-[#1a2a52] bg-[#0a1839] px-3 py-2"
               >
                 <div className="min-w-0">
-                  <div className="truncate text-sm font-semibold text-[#e8f0e4]">
+                  <div className="truncate text-sm font-semibold text-[#f4ecd8]">
                     {it.missionTitle}
                   </div>
-                  <div className="truncate text-[11px] text-[#7FA892]">
+                  <div className="truncate text-[11px] text-[#a8b8d0]">
                     {it.submitterName}
                     {it.packName ? ` · ${it.packName}` : ""}
                   </div>

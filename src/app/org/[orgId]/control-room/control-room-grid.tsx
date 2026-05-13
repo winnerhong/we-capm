@@ -2,8 +2,8 @@ import type { ControlRoomSnapshot } from "@/lib/control-room/types";
 import styles from "./control-room.module.css";
 import { HeaderBar } from "./widgets/header-bar";
 import { ParticipantsTile } from "./widgets/participants-tile";
-import { FmTile } from "./widgets/fm-tile";
-import { ChatTile } from "./widgets/chat-tile";
+// FmTile · ChatTile 제거됨 — 토리FM 라이브 스튜디오가 페이지 하단에
+// 풀콘솔로 임베드되어 FM 세션·신청곡·채팅 모두 거기서 보임.
 import { PendingTile } from "./widgets/pending-tile";
 import { StampsTile } from "./widgets/stamps-tile";
 import { AcornsTile } from "./widgets/acorns-tile";
@@ -38,16 +38,15 @@ export function ControlRoomGrid({ snapshot, orgId, isTvMode }: Props) {
         {/* row 1: Header */}
         <HeaderBar snapshot={snapshot} orgId={orgId} isTvMode={isTvMode} />
 
-        {/* row 2: 4 tiles — 모바일 1열, md 2열, xl 4열 */}
+        {/* row 2: 3 stats tiles — 모바일 1열, md 이상 3열 */}
         <div
-          className={`grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 ${
+          className={`grid grid-cols-1 md:grid-cols-3 ${
             isTvMode ? "gap-[1.25em]" : "gap-4"
           }`}
         >
           <ParticipantsTile snapshot={snapshot} orgId={orgId} />
           <StampsTile stamps={snapshot.stamps} isTvMode={isTvMode} />
           <AcornsTile acorns={snapshot.acorns} isTvMode={isTvMode} />
-          <FmTile snapshot={snapshot} />
         </div>
 
         {/* row 2.3: Phase 2 — 🔴 라이브 수행 (정체 가족 강조) */}
@@ -93,13 +92,8 @@ export function ControlRoomGrid({ snapshot, orgId, isTvMode }: Props) {
           />
         </div>
 
-        {/* row 4: Chat + Pending — 모바일 1열, md 이상 2열 */}
-        <div
-          className={`grid grid-cols-1 md:grid-cols-2 ${
-            isTvMode ? "gap-[1.25em]" : "gap-4"
-          }`}
-        >
-          <ChatTile snapshot={snapshot} isTvMode={isTvMode} />
+        {/* row 4: Pending — 채팅은 FM 임베드와 중복이라 제거. Pending 만 풀폭. */}
+        <div className="grid grid-cols-1">
           <PendingTile snapshot={snapshot} />
         </div>
 

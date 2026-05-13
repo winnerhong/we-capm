@@ -30,7 +30,7 @@ export function BroadcastTile({ broadcast, orgId }: Props) {
         <span className="text-base" aria-hidden>
           📣
         </span>
-        <h2 className="text-xs font-semibold tracking-[0.15em] text-[#7FA892]">
+        <h2 className="text-xs font-semibold tracking-[0.15em] text-[#a8b8d0]">
           돌발 미션
         </h2>
       </div>
@@ -40,10 +40,10 @@ export function BroadcastTile({ broadcast, orgId }: Props) {
           <div className="text-5xl" aria-hidden>
             📣
           </div>
-          <div className="text-lg font-bold text-[#e8f0e4]">
+          <div className="text-lg font-bold text-[#f4ecd8]">
             아직 발송 기록 없음
           </div>
-          <div className="text-xs text-[#7FA892]">
+          <div className="text-xs text-[#a8b8d0]">
             지금 바로 첫 돌발 미션을 보내보세요
           </div>
           <Link
@@ -59,35 +59,35 @@ export function BroadcastTile({ broadcast, orgId }: Props) {
           <div className="grid flex-1 grid-cols-1 items-center gap-6 py-2 md:grid-cols-[1.2fr_1fr]">
             {/* 좌측: 24h 발송 수 큰 숫자 */}
             <div>
-              <div className="text-[10px] text-[#7FA892]">지난 24시간 발송</div>
+              <div className="text-[10px] text-[#a8b8d0]">지난 24시간 발송</div>
               <div
                 className={`${styles.neonPink} flex items-end gap-2 font-mono text-5xl font-extrabold leading-none tabular-nums md:text-6xl`}
               >
                 <span>{data.sentLast24h.toLocaleString("ko-KR")}</span>
-                <span className="text-2xl text-[#7FA892] md:text-3xl">건</span>
+                <span className="text-2xl text-[#a8b8d0] md:text-3xl">건</span>
               </div>
             </div>
 
             {/* 우측: 통계 2개 세로 */}
             <div className="flex flex-col gap-3">
               <div>
-                <div className="text-[10px] text-[#7FA892]">평균 응답률</div>
+                <div className="text-[10px] text-[#a8b8d0]">평균 응답률</div>
                 <div
                   className={`${styles.neonGreen} font-mono text-2xl font-bold leading-none tabular-nums md:text-3xl`}
                 >
                   {data.avgResponseRatePct.toLocaleString("ko-KR")}
-                  <span className="ml-1 text-sm text-[#7FA892]">%</span>
+                  <span className="ml-1 text-sm text-[#a8b8d0]">%</span>
                 </div>
               </div>
               <div>
-                <div className="text-[10px] text-[#7FA892]">평균 응답시간</div>
-                <div className="font-mono text-2xl font-bold leading-none tabular-nums text-[#e8f0e4] md:text-3xl">
+                <div className="text-[10px] text-[#a8b8d0]">평균 응답시간</div>
+                <div className="font-mono text-2xl font-bold leading-none tabular-nums text-[#f4ecd8] md:text-3xl">
                   {data.avgResponseTimeMinutes === null ? (
-                    <span className="text-[#7FA892]">—</span>
+                    <span className="text-[#a8b8d0]">—</span>
                   ) : (
                     <>
                       {data.avgResponseTimeMinutes.toLocaleString("ko-KR")}
-                      <span className="ml-1 text-sm text-[#7FA892]">분</span>
+                      <span className="ml-1 text-sm text-[#a8b8d0]">분</span>
                     </>
                   )}
                 </div>
@@ -99,7 +99,7 @@ export function BroadcastTile({ broadcast, orgId }: Props) {
           {data.lastSentAt && (
             <>
               <div className={styles.divider} />
-              <div className="pt-2 text-[11px] text-[#7FA892]">
+              <div className="pt-2 text-[11px] text-[#a8b8d0]">
                 마지막:{" "}
                 <span className="font-semibold text-[#c9c9c9]">
                   {data.lastSentTitle

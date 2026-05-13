@@ -29,10 +29,10 @@ export function LiveAttemptsTile({ live, isTvMode }: Props) {
         <span className="text-base" aria-hidden>
           🔴
         </span>
-        <h2 className="text-xs font-semibold tracking-[0.15em] text-[#7FA892]">
+        <h2 className="text-xs font-semibold tracking-[0.15em] text-[#a8b8d0]">
           라이브 수행
         </h2>
-        <span className="ml-2 font-mono text-xs text-[#7FA892]">
+        <span className="ml-2 font-mono text-xs text-[#a8b8d0]">
           {activeFamilies}가족
         </span>
         {stuckCount > 0 && (
@@ -47,10 +47,10 @@ export function LiveAttemptsTile({ live, isTvMode }: Props) {
           <div className="text-5xl" aria-hidden>
             🌿
           </div>
-          <div className="text-sm text-[#7FA892]">
+          <div className="text-sm text-[#a8b8d0]">
             지금 수행 중인 미션이 없어요
           </div>
-          <div className="text-[10px] text-[#5e7a6c]">
+          <div className="text-[10px] text-[#7a8aa8]">
             (참가자가 미션 페이지를 열면 3분 이내 표시)
           </div>
         </div>
@@ -62,23 +62,23 @@ export function LiveAttemptsTile({ live, isTvMode }: Props) {
               className={`flex items-center gap-2 rounded-lg border px-3 py-2 ${
                 a.stuck
                   ? "border-rose-500/40 bg-rose-500/10"
-                  : "border-[#1f2a24] bg-[#0e1513]"
+                  : "border-[#1a2a52] bg-[#0a1839]"
               }`}
             >
               <span className="shrink-0 text-lg" aria-hidden>
                 {a.missionIcon ?? "🌱"}
               </span>
               <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-semibold text-[#e8f0e4]">
+                <div className="truncate text-sm font-semibold text-[#f4ecd8]">
                   {a.userDisplayName}
                 </div>
-                <div className="truncate text-[11px] text-[#a8c3b3]">
+                <div className="truncate text-[11px] text-[#cad3e0]">
                   {a.missionTitle}
                 </div>
               </div>
               <span
                 className={`shrink-0 font-mono text-xs tabular-nums ${
-                  a.stuck ? "text-rose-300" : "text-[#7FA892]"
+                  a.stuck ? "text-rose-300" : "text-[#a8b8d0]"
                 }`}
                 title={`opened: ${a.openedAt}`}
               >

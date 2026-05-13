@@ -25,7 +25,7 @@ export function ServerClock({ serverNowIso }: { serverNowIso: string }) {
 
   return (
     <div className="flex flex-col items-end leading-none">
-      <span className="text-[10px] tracking-[0.15em] text-[#7FA892]">
+      <span className="text-[10px] tracking-[0.15em] text-[#a8b8d0]">
         서버 시각
       </span>
       <span

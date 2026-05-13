@@ -25,10 +25,10 @@ export function ActivityFeedTile({ items, isTvMode }: Props) {
         <span className="text-base" aria-hidden>
           🌱
         </span>
-        <h2 className="text-xs font-semibold tracking-[0.15em] text-[#7FA892]">
+        <h2 className="text-xs font-semibold tracking-[0.15em] text-[#a8b8d0]">
           실시간 피드
         </h2>
-        <span className="ml-auto font-mono text-xs text-[#7FA892]">
+        <span className="ml-auto font-mono text-xs text-[#a8b8d0]">
           {items.length}
         </span>
       </div>
@@ -38,7 +38,7 @@ export function ActivityFeedTile({ items, isTvMode }: Props) {
           <div className="text-5xl" aria-hidden>
             🌲
           </div>
-          <div className="text-sm text-[#7FA892]">
+          <div className="text-sm text-[#a8b8d0]">
             오늘 아직 스탬프가 찍히지 않았어요
           </div>
         </div>
@@ -48,13 +48,13 @@ export function ActivityFeedTile({ items, isTvMode }: Props) {
             {list.map((it) => (
               <li
                 key={it.id}
-                className={`${styles.scanLine} flex h-[44px] items-center gap-2 border-b border-[#1a2320] px-1 font-mono text-xs md:text-sm`}
+                className={`${styles.scanLine} flex h-[44px] items-center gap-2 border-b border-[#16234a] px-1 font-mono text-xs md:text-sm`}
               >
                 <span className="shrink-0 text-lg" aria-hidden>
                   {it.missionIcon ?? "🌱"}
                 </span>
                 <span className="min-w-0 flex-1 truncate">
-                  <span className="font-semibold text-[#e8f0e4]">
+                  <span className="font-semibold text-[#f4ecd8]">
                     {it.userDisplayName}
                   </span>
                   <span className="mx-1 text-[#4e6659]">·</span>
@@ -65,7 +65,7 @@ export function ActivityFeedTile({ items, isTvMode }: Props) {
                 >
                   +{it.acornsAwarded.toLocaleString("ko-KR")}🌰
                 </span>
-                <span className="shrink-0 tabular-nums text-[#7FA892]">
+                <span className="shrink-0 tabular-nums text-[#a8b8d0]">
                   {formatTime(it.submittedAt)}
                 </span>
               </li>

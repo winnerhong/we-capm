@@ -23,7 +23,7 @@ export function HeaderBar({ snapshot, orgId, isTvMode }: Props) {
           🎛️
         </span>
         <div className="min-w-0">
-          <div className="text-xs tracking-[0.15em] text-[#7FA892]">
+          <div className="text-xs tracking-[0.15em] text-[#a8b8d0]">
             🎛️ 관제실
           </div>
           <h1 className="truncate text-xl font-extrabold md:text-2xl">
@@ -51,7 +51,7 @@ export function HeaderBar({ snapshot, orgId, isTvMode }: Props) {
             </span>
           </div>
         ) : (
-          <div className="rounded-full border border-[#1f2a24] bg-[#0e1513] px-3 py-1.5 text-xs text-[#7FA892]">
+          <div className="rounded-full border border-[#1a2a52] bg-[#0a1839] px-3 py-1.5 text-xs text-[#a8b8d0]">
             진행 중 행사 없음
           </div>
         )}
@@ -61,7 +61,7 @@ export function HeaderBar({ snapshot, orgId, isTvMode }: Props) {
         {!isTvMode && (
           <Link
             href={`/org/${orgId}/control-room/tv`}
-            className={`rounded-xl border border-[#1f3a3d] bg-[#0e1d1f] px-3 py-2 text-xs font-semibold ${styles.neonCyan} hover:bg-[#12292c]`}
+            className={`rounded-xl border border-[#1a2a52] bg-[#0a1839] px-3 py-2 text-xs font-semibold ${styles.neonCyan} hover:bg-[#12244a]`}
           >
             📺 TV 모드
           </Link>
@@ -69,7 +69,7 @@ export function HeaderBar({ snapshot, orgId, isTvMode }: Props) {
         {isTvMode && (
           <Link
             href={`/org/${orgId}/control-room`}
-            className="rounded-xl border border-[#1f2a24] bg-[#0e1513] px-3 py-2 text-xs font-semibold text-[#7FA892] hover:bg-[#12201c]"
+            className="rounded-xl border border-[#1a2a52] bg-[#0a1839] px-3 py-2 text-xs font-semibold text-[#a8b8d0] hover:bg-[#12201c]"
           >
             ← 관리자 뷰
           </Link>
