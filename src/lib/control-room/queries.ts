@@ -5,6 +5,7 @@
 // 어느 하나가 실패해도 나머지 필드는 정상값을 유지한다. 에러는 console.error 로만.
 
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { startOfTodayKstIso } from "@/lib/time/kst";
 import type {
   ControlRoomAcorns,
@@ -2145,6 +2146,51 @@ async function loadPhotoWall(
       });
       if (out.length >= 30) break;
     }
+
+    // 5) 사설 버킷 signed URL 은 24시간 후 만료 → admin client 로 재서명.
+    // payload_json 에 박힌 URL 에서 storage path 를 추출, batch sign 으로 갱신.
+    try {
+      const SUBMISSION_BUCKET = "submission-photos";
+      const marker = `/storage/v1/object/sign/${SUBMISSION_BUCKET}/`;
+      type Plan = { idx: number; path: string };
+      const plans: Plan[] = [];
+      for (let i = 0; i < out.length; i++) {
+        const u = out[i].url;
+        try {
+          const parsed = new URL(u);
+          const at = parsed.pathname.indexOf(marker);
+          if (at < 0) continue; // 비 Supabase URL — 원본 유지
+          const path = decodeURIComponent(
+            parsed.pathname.slice(at + marker.length)
+          );
+          if (path) plans.push({ idx: i, path });
+        } catch {
+          /* invalid URL — skip */
+        }
+      }
+      if (plans.length > 0) {
+        const admin = createAdminClient();
+        const { data: signed } = await admin.storage
+          .from(SUBMISSION_BUCKET)
+          .createSignedUrls(
+            plans.map((p) => p.path),
+            60 * 60 * 6 // 6시간 — 관제 한 세션 충분
+          );
+        const signedArr = (signed ?? []) as Array<{
+          path?: string;
+          signedUrl?: string;
+          error?: string | null;
+        }>;
+        for (let i = 0; i < plans.length; i++) {
+          const fresh = signedArr[i]?.signedUrl;
+          if (fresh) out[plans[i].idx].url = fresh;
+        }
+      }
+    } catch (e) {
+      console.error("[control-room/loadPhotoWall] resign err", e);
+      // 재서명 실패해도 원본 URL 그대로 — 만료된 경우 broken image 로 표시.
+    }
+
     return out;
   } catch (e) {
     console.error("[control-room/loadPhotoWall] throw", e);
