@@ -5,8 +5,11 @@ import {
   loadOrgAppUsers,
   loadRoom,
   loadRoomMembersWithProfile,
+  loadRoomMessages,
 } from "@/lib/toritalk/queries";
+import { loadOrgNameById } from "@/lib/org-partner";
 import { fmtFullDateKst } from "@/lib/datetime/kst";
+import { ChatRoomView } from "@/components/toritalk/chat-room-view";
 import { RoomEditForm } from "./room-edit-form";
 import { RoomMembersPanel } from "./room-members-panel";
 
@@ -24,9 +27,11 @@ export default async function OrgToritalkRoomDetailPage({
   const room = await loadRoom(roomId);
   if (!room || room.org_id !== orgId) notFound();
 
-  const [members, allOrgUsers] = await Promise.all([
+  const [members, allOrgUsers, initialMessages, orgName] = await Promise.all([
     loadRoomMembersWithProfile(roomId),
     loadOrgAppUsers(orgId),
+    loadRoomMessages(roomId, 200),
+    loadOrgNameById(orgId, "기관"),
   ]);
 
   const memberIdSet = new Set(members.map((m) => m.user_id));
@@ -80,10 +85,11 @@ export default async function OrgToritalkRoomDetailPage({
           {!room.archived && (
             <Link
               href={`/org/${orgId}/toritalk/${room.id}/chat`}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-[#6B4FB2] to-[#8B6FCE] px-4 py-2 text-sm font-bold text-white shadow-md transition hover:from-[#5a3fa1] hover:to-[#7a5fbe]"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-[#6B4FB2] bg-white px-3 py-2 text-xs font-bold text-[#6B4FB2] shadow-sm transition hover:bg-[#F7F3FB]"
+              title="채팅창만 풀스크린으로 보기"
             >
-              <span aria-hidden>💬</span>
-              <span>채팅 보기·공지 보내기</span>
+              <span aria-hidden>↗</span>
+              <span>풀스크린</span>
             </Link>
           )}
         </div>
@@ -109,6 +115,29 @@ export default async function OrgToritalkRoomDetailPage({
         members={members}
         candidates={candidates}
       />
+
+      {/* 채팅창 — 페이지 하단에 임베드 (별도 클릭 없이 바로 보임) */}
+      {!room.archived && (
+        <section className="space-y-2">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-bold text-[#6B4FB2]">
+              📢 채팅·공지 보내기
+            </h2>
+            <span className="text-[10px] text-[#8B7F75]">
+              메시지는 모든 멤버에게 실시간 전달돼요
+            </span>
+          </div>
+          <ChatRoomView
+            roomId={room.id}
+            roomName={room.name}
+            mode="admin"
+            orgId={orgId}
+            orgName={orgName}
+            initialMessages={initialMessages}
+            embedded
+          />
+        </section>
+      )}
     </div>
   );
 }

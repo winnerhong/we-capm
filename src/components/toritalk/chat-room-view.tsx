@@ -32,9 +32,14 @@ interface Props {
   /** mode=admin 일 때 기관 정보 */
   orgId?: string;
   orgName?: string;
-  /** 뒤로가기 링크 — 모드별로 다름 */
+  /** 뒤로가기 링크 — 모드별로 다름. embedded 모드에서는 무시. */
   backHref?: string;
   initialMessages: ToritalkMessageWithSender[];
+  /**
+   * embedded=true 면 풀스크린이 아니라 부모 컨테이너 안에 고정 높이로 렌더.
+   * 방 상세 페이지 하단처럼 다른 컨텐츠와 같이 보여줄 때 사용.
+   */
+  embedded?: boolean;
 }
 
 export function ChatRoomView({
@@ -48,6 +53,7 @@ export function ChatRoomView({
   orgName,
   backHref,
   initialMessages,
+  embedded = false,
 }: Props) {
   const isAdmin = mode === "admin";
   const [messages, setMessages] = useState<ToritalkMessageWithSender[]>(
@@ -295,29 +301,42 @@ export function ChatRoomView({
 
   const grouped = useMemo(() => groupByDay(messages), [messages]);
 
+  // embedded 모드: 부모 컨테이너 안의 고정 높이, 풀스크린 X
+  // user 모드: 100dvh - 120 (상단 헤더 + 하단 탭바)
+  // admin 모드: 탭바 없음 — 더 크게 (100dvh - 60)
+  const heightClass = embedded
+    ? "h-[560px]"
+    : isAdmin
+      ? "h-[calc(100dvh-60px)]"
+      : "h-[calc(100dvh-120px)]";
+
+  // embedded 일 때 sticky 헤더/푸터는 부모 페이지 스크롤과 충돌하므로 제거.
+  const headerStickyCls = embedded ? "" : "sticky top-0 z-10";
+  const footerStickyCls = embedded ? "" : "sticky bottom-0 z-10";
+
   return (
-    // user 모드: 100dvh - 120 (상단 헤더 + 하단 탭바)
-    // admin 모드: 탭바 없음 — 더 크게 (100dvh - 60)
     <div
-      className={`flex flex-col bg-[#FFF8F0] ${
-        isAdmin ? "h-[calc(100dvh-60px)]" : "h-[calc(100dvh-120px)]"
+      className={`flex flex-col bg-[#FFF8F0] ${heightClass} ${
+        embedded ? "overflow-hidden rounded-2xl border border-[#D6CDE9] shadow-sm" : ""
       }`}
     >
       {/* 헤더 */}
       <header
-        className={`sticky top-0 z-10 flex items-center gap-2 border-b px-4 pt-5 pb-3 backdrop-blur ${
+        className={`flex items-center gap-2 border-b px-4 pt-5 pb-3 backdrop-blur ${headerStickyCls} ${
           isAdmin
             ? "border-[#D6CDE9] bg-[#F7F3FB]/95"
             : "border-[#D4E4BC] bg-white/95"
         }`}
       >
-        <Link
-          href={backHref ?? "/tori-talk"}
-          aria-label="뒤로"
-          className="rounded-full px-2 py-1 text-[#2D5A3D] hover:bg-[#F5F1E8]"
-        >
-          ←
-        </Link>
+        {!embedded && (
+          <Link
+            href={backHref ?? "/tori-talk"}
+            aria-label="뒤로"
+            className="rounded-full px-2 py-1 text-[#2D5A3D] hover:bg-[#F5F1E8]"
+          >
+            ←
+          </Link>
+        )}
         <h1 className="text-base font-bold text-[#2D5A3D]">💬 {roomName}</h1>
         {isAdmin && (
           <div className="ml-auto flex items-center gap-2">
@@ -408,7 +427,7 @@ export function ChatRoomView({
       {/* 입력창 */}
       <form
         onSubmit={send}
-        className={`sticky bottom-0 z-10 border-t px-3 py-2 backdrop-blur ${
+        className={`border-t px-3 py-2 backdrop-blur ${footerStickyCls} ${
           isAdmin
             ? "border-[#D6CDE9] bg-[#F7F3FB]/95"
             : "border-[#D4E4BC] bg-white/95"
