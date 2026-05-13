@@ -138,8 +138,32 @@ type AcornTxRow = {
 type AppChildLiteRow = {
   user_id: string;
   name: string;
+  is_enrolled: boolean | null;
   created_at: string;
 };
+
+/**
+ * 가족 표시 이름 — 원생 자녀가 있으면 "{원생이름·원생이름2} 학부모",
+ * 없으면 fallback 으로 "{parent_name} 가족".
+ * 자동 생성 이름("학부모_9252") 가 보이지 않도록 원생 이름 우선.
+ */
+function formatFamilyDisplayName(
+  parentName: string,
+  enrolledChildNames: string[],
+  allChildNames: string[]
+): string {
+  // 원생(is_enrolled=true) 자녀 이름 우선
+  const enrolled = enrolledChildNames.filter((n) => n && n.trim().length > 0);
+  if (enrolled.length > 0) {
+    return `${enrolled.join("·")} 학부모`;
+  }
+  // 등록 안 된 자녀가 있어도 마찬가지로 자녀 이름 우선 (보호자 자동명 회피)
+  const any = allChildNames.filter((n) => n && n.trim().length > 0);
+  if (any.length > 0 && /^학부모_\d+$/.test(parentName ?? "")) {
+    return `${any.join("·")} 학부모`;
+  }
+  return `${parentName || "보호자"} 가족`;
+}
 
 type MissionBroadcastLiteRow = {
   id: string;
@@ -1217,36 +1241,90 @@ async function loadActivityFeed(
     const subs = subResp.data ?? [];
     if (subs.length === 0) return [];
 
-    // 3) 제출 유저 parent_name 맵
+    // 3) 제출 유저 parent_name + 자녀(원생) 이름 맵
     const userIds = Array.from(new Set(subs.map((s) => s.user_id)));
     const nameMap = new Map<string, string>();
-    if (userIds.length > 0) {
-      try {
-        const usersResp = (await (
-          supabase.from("app_users" as never) as unknown as {
-            select: (c: string) => {
-              in: (
-                k: string,
-                v: string[]
-              ) => Promise<SbResp<AppUserLiteRow>>;
-            };
-          }
-        )
-          .select("id, parent_name")
-          .in("id", userIds)) as SbResp<AppUserLiteRow>;
+    const enrolledMap = new Map<string, string[]>();
+    const allChildrenMap = new Map<string, string[]>();
 
-        if (usersResp.error) {
-          console.error(
-            "[control-room/loadActivityFeed] users error",
-            usersResp.error
-          );
-        } else {
-          for (const u of usersResp.data ?? [])
-            nameMap.set(u.id, u.parent_name);
-        }
-      } catch (e) {
-        console.error("[control-room/loadActivityFeed] users throw", e);
-      }
+    if (userIds.length > 0) {
+      await Promise.all([
+        (async () => {
+          try {
+            const usersResp = (await (
+              supabase.from("app_users" as never) as unknown as {
+                select: (c: string) => {
+                  in: (
+                    k: string,
+                    v: string[]
+                  ) => Promise<SbResp<AppUserLiteRow>>;
+                };
+              }
+            )
+              .select("id, parent_name")
+              .in("id", userIds)) as SbResp<AppUserLiteRow>;
+
+            if (usersResp.error) {
+              console.error(
+                "[control-room/loadActivityFeed] users error",
+                usersResp.error
+              );
+            } else {
+              for (const u of usersResp.data ?? [])
+                nameMap.set(u.id, u.parent_name);
+            }
+          } catch (e) {
+            console.error("[control-room/loadActivityFeed] users throw", e);
+          }
+        })(),
+        (async () => {
+          try {
+            const resp = (await (
+              supabase.from("app_children" as never) as unknown as {
+                select: (c: string) => {
+                  in: (
+                    k: string,
+                    v: string[]
+                  ) => {
+                    order: (
+                      c: string,
+                      o: { ascending: boolean }
+                    ) => Promise<SbResp<AppChildLiteRow>>;
+                  };
+                };
+              }
+            )
+              .select("user_id, name, is_enrolled, created_at")
+              .in("user_id", userIds)
+              .order("created_at", {
+                ascending: true,
+              })) as SbResp<AppChildLiteRow>;
+
+            if (resp.error) {
+              console.error(
+                "[control-room/loadActivityFeed] children error",
+                resp.error
+              );
+              return;
+            }
+            for (const c of resp.data ?? []) {
+              const all = allChildrenMap.get(c.user_id) ?? [];
+              all.push(c.name);
+              allChildrenMap.set(c.user_id, all);
+              if (c.is_enrolled) {
+                const en = enrolledMap.get(c.user_id) ?? [];
+                en.push(c.name);
+                enrolledMap.set(c.user_id, en);
+              }
+            }
+          } catch (e) {
+            console.error(
+              "[control-room/loadActivityFeed] children throw",
+              e
+            );
+          }
+        })(),
+      ]);
     }
 
     return subs.map((s) => {
@@ -1256,7 +1334,11 @@ async function loadActivityFeed(
         id: s.id,
         missionTitle: mission?.title ?? "(삭제된 미션)",
         missionIcon: mission?.icon ?? null,
-        userDisplayName: `${parentName} 가족`,
+        userDisplayName: formatFamilyDisplayName(
+          parentName,
+          enrolledMap.get(s.user_id) ?? [],
+          allChildrenMap.get(s.user_id) ?? []
+        ),
         acornsAwarded: s.awarded_acorns ?? 0,
         submittedAt: s.submitted_at,
       };
@@ -1327,7 +1409,8 @@ async function loadLeaderboard(
 
     // 2) parent_name + children 일괄 조회
     const nameMap = new Map<string, string>();
-    const childrenMap = new Map<string, string[]>();
+    const enrolledMap = new Map<string, string[]>();
+    const allChildrenMap = new Map<string, string[]>();
 
     await Promise.all([
       (async () => {
@@ -1374,7 +1457,7 @@ async function loadLeaderboard(
               };
             }
           )
-            .select("user_id, name, created_at")
+            .select("user_id, name, is_enrolled, created_at")
             .in("user_id", topUserIds)
             .order("created_at", {
               ascending: true,
@@ -1388,9 +1471,14 @@ async function loadLeaderboard(
             return;
           }
           for (const c of resp.data ?? []) {
-            const list = childrenMap.get(c.user_id) ?? [];
-            list.push(c.name);
-            childrenMap.set(c.user_id, list);
+            const all = allChildrenMap.get(c.user_id) ?? [];
+            all.push(c.name);
+            allChildrenMap.set(c.user_id, all);
+            if (c.is_enrolled) {
+              const en = enrolledMap.get(c.user_id) ?? [];
+              en.push(c.name);
+              enrolledMap.set(c.user_id, en);
+            }
           }
         } catch (e) {
           console.error("[control-room/loadLeaderboard] children throw", e);
@@ -1400,11 +1488,22 @@ async function loadLeaderboard(
 
     return sorted.map(([uid, total], idx) => {
       const parentName = nameMap.get(uid) || "보호자";
-      const kids = childrenMap.get(uid) ?? [];
+      const enrolled = enrolledMap.get(uid) ?? [];
+      const all = allChildrenMap.get(uid) ?? [];
+      const displayName = formatFamilyDisplayName(parentName, enrolled, all);
+      // 표시 이름에 이미 자녀 이름이 들어가 있으면 childrenLabel 중복이라 숨김.
+      const isUsingChildren = enrolled.length > 0 || (all.length > 0 &&
+        /^학부모_\d+$/.test(parentName ?? ""));
       return {
         userId: uid,
-        displayName: `${parentName} 가족`,
-        childrenLabel: kids.length > 0 ? kids.join(" · ") : null,
+        displayName,
+        childrenLabel: isUsingChildren
+          ? null
+          : enrolled.length > 0
+            ? enrolled.join(" · ")
+            : all.length > 0
+              ? all.join(" · ")
+              : null,
         totalAcorns: total,
         rank: idx + 1,
       };
