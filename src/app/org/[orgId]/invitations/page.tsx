@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { requireOrg } from "@/lib/org-auth-guard";
 import { loadOrgEvents } from "@/lib/org-events/queries";
+import { loadOrgHomepageBanner } from "@/lib/org-banner/queries";
 import { fmtFullDateKst } from "@/lib/datetime/kst";
 import { InvitationCardShare } from "./invitation-card-share";
+import { HomepageBannerEditor } from "./homepage-banner-editor";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +27,10 @@ export default async function OrgInvitationsPage({
 }) {
   const { orgId } = await params;
   await requireOrg();
-  const events = await loadOrgEvents(orgId);
+  const [events, banner] = await Promise.all([
+    loadOrgEvents(orgId),
+    loadOrgHomepageBanner(orgId),
+  ]);
   const visible = events.filter((e) => e.status !== "ARCHIVED");
 
   return (
@@ -72,7 +77,18 @@ export default async function OrgInvitationsPage({
           </Link>
         </section>
       ) : (
-        <div className="space-y-4">
+        <>
+          {/* 하단 홈페이지 배너 편집 — 외부 홈페이지 링크 */}
+          <HomepageBannerEditor
+            orgId={orgId}
+            initial={{
+              text: banner?.text ?? "",
+              url: banner?.url ?? "",
+              imageUrl: banner?.imageUrl ?? "",
+            }}
+          />
+
+          <div className="space-y-4">
           {visible.map((e) => {
             const sm = STATUS_META[e.status] ?? STATUS_META.DRAFT;
             return (
@@ -113,7 +129,8 @@ export default async function OrgInvitationsPage({
               </section>
             );
           })}
-        </div>
+          </div>
+        </>
       )}
     </div>
   );

@@ -3,8 +3,10 @@ import { requireAppUser } from "@/lib/user-auth-guard";
 import { getAcornBalance, loadChildrenForUser } from "@/lib/app-user/queries";
 import { userHasAnyLiveEvent } from "@/lib/org-events/queries";
 import { isToritalkEnabled } from "@/lib/toritalk/queries";
+import { loadOrgHomepageBanner } from "@/lib/org-banner/queries";
 import { AcornIcon } from "@/components/acorn-icon";
 import { WinnerTalkIcon } from "@/components/winner-talk-icon";
+import { HomepageBannerDisplay } from "@/components/homepage-banner-display";
 import { OrgPresenceTracker } from "@/components/presence/org-presence-tracker";
 import { PinnedNoticeBanner } from "./PinnedNoticeBanner";
 
@@ -33,12 +35,18 @@ export default async function UserLayout({
   children: React.ReactNode;
 }) {
   const user = await requireAppUser();
-  const [acornBalance, hasLive, kids, toritalkOn] = await Promise.all([
-    safeQuery("getAcornBalance", () => getAcornBalance(user.id), 0),
-    safeQuery("userHasAnyLiveEvent", () => userHasAnyLiveEvent(user.id), false),
-    safeQuery("loadChildrenForUser", () => loadChildrenForUser(user.id), []),
-    safeQuery("isToritalkEnabled", () => isToritalkEnabled(user.orgId), false),
-  ]);
+  const [acornBalance, hasLive, kids, toritalkOn, homepageBanner] =
+    await Promise.all([
+      safeQuery("getAcornBalance", () => getAcornBalance(user.id), 0),
+      safeQuery("userHasAnyLiveEvent", () => userHasAnyLiveEvent(user.id), false),
+      safeQuery("loadChildrenForUser", () => loadChildrenForUser(user.id), []),
+      safeQuery("isToritalkEnabled", () => isToritalkEnabled(user.orgId), false),
+      safeQuery(
+        "loadOrgHomepageBanner",
+        () => loadOrgHomepageBanner(user.orgId),
+        null
+      ),
+    ]);
 
   // 아바타 글자 우선순위:
   //   1) 원생(is_enrolled=true) 자녀의 첫 글자 — "홍유빈" → "홍"
@@ -101,7 +109,16 @@ export default async function UserLayout({
         </div>
       </header>
 
-      <main className="mx-auto max-w-md px-4 py-4 pb-24">{children}</main>
+      <main className="mx-auto max-w-md px-4 py-4 pb-24">
+        {children}
+        {/* 하단 홈페이지 배너 — 기관 admin 이 설정했을 때만 노출. 탭바와 겹치지
+            않도록 main 안쪽 (pb-24 영역 내부 상단) 마지막에 배치. */}
+        {homepageBanner && (
+          <div className="mt-6">
+            <HomepageBannerDisplay banner={homepageBanner} />
+          </div>
+        )}
+      </main>
 
       {/* Supabase Presence: 이 참가자의 접속 상태를 org 채널에 track — 관제실이 구독 */}
       <OrgPresenceTracker

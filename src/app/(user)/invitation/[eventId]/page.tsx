@@ -4,6 +4,8 @@ import type { Metadata } from "next";
 import { getAppUser } from "@/lib/user-auth-guard";
 import { loadOrgEventById } from "@/lib/org-events/queries";
 import { loadAppUserById, loadChildrenForUser } from "@/lib/app-user/queries";
+import { loadOrgHomepageBanner } from "@/lib/org-banner/queries";
+import { HomepageBannerDisplay } from "@/components/homepage-banner-display";
 import { loadPartnerDisplayNameForOrg } from "@/lib/org-partner";
 import { loadTimelineSlots } from "@/lib/event-timeline/queries";
 import { SLOT_KIND_META } from "@/lib/event-timeline/types";
@@ -163,6 +165,9 @@ export default async function EventInvitationPage({
   ]);
 
   if (!event) notFound();
+
+  // 하단 홈페이지 배너 — 기관 설정값 (모든 필드 빈 값이면 자동 비노출)
+  const homepageBanner = await loadOrgHomepageBanner(event.org_id);
 
   // 행사 미발행 — 초안 안내
   if (!event.invitation_published_at) {
@@ -661,6 +666,13 @@ export default async function EventInvitationPage({
               행사가 시작되면 미션·라이브 방송이 활성화돼요.
             </p>
           </div>
+        </section>
+      )}
+
+      {/* ─── 하단 홈페이지 배너 (기관 admin 이 설정했을 때만) ─── */}
+      {homepageBanner && (
+        <section className="mx-auto max-w-md px-6 pt-4">
+          <HomepageBannerDisplay banner={homepageBanner} />
         </section>
       )}
 
