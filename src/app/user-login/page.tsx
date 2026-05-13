@@ -23,15 +23,29 @@ function formatEventWindow(
   };
 }
 
+function safeReturnPath(raw: unknown): string | null {
+  if (typeof raw !== "string" || !raw) return null;
+  if (!raw.startsWith("/")) return null;
+  if (raw.startsWith("//") || raw.startsWith("/\\")) return null;
+  if (raw.length > 500) return null;
+  return raw;
+}
+
 export default async function UserLoginPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ error?: string }>;
+  searchParams?: Promise<{ error?: string; return?: string }>;
 }) {
-  const existing = await getAppUser();
-  if (existing) redirect("/home");
-
   const sp = (await searchParams) ?? {};
+  // 초대장 등에서 ?return= 으로 보내준 경로가 있으면 우선 처리.
+  const returnTo = safeReturnPath(sp.return);
+
+  const existing = await getAppUser();
+  if (existing) {
+    // 이미 로그인 → 초대장 같은 원래 가려던 곳이 있으면 거기로, 아니면 home
+    redirect(returnTo ?? "/home");
+  }
+
   const initialError =
     typeof sp.error === "string" && sp.error.trim() ? sp.error : null;
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 function formatPhone(raw: string): string {
   const digits = raw.replace(/\D/g, "").slice(0, 11);
@@ -10,8 +10,20 @@ function formatPhone(raw: string): string {
   return `${digits.slice(0, 3)} - ${digits.slice(3, 7)} - ${digits.slice(7)}`;
 }
 
+// 로그인 후 돌아갈 URL 안전 검증 — open redirect 방지.
+function safeReturnPath(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  if (!raw.startsWith("/")) return null;
+  if (raw.startsWith("//") || raw.startsWith("/\\")) return null;
+  if (raw.length > 500) return null;
+  return raw;
+}
+
 export function LoginForm({ initialError }: { initialError?: string | null }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  // 초대장 등에서 ?return=/invitation/xxx 로 넘어온 경우 그쪽으로 복귀.
+  const returnTo = safeReturnPath(searchParams.get("return"));
   const [phone, setPhone] = useState("");
   const [error, setError] = useState<string | null>(initialError ?? null);
   const [pending, startTransition] = useTransition();
@@ -39,7 +51,9 @@ export function LoginForm({ initialError }: { initialError?: string | null }) {
             ok?: boolean;
             redirectTo?: string;
           } | null;
-          const dest = data?.redirectTo ?? "/home";
+          // 우선순위: URL ?return= > API redirectTo > /home
+          // (초대장 링크 → 로그인 → 다시 초대장 으로 자연스럽게 돌아오기)
+          const dest = returnTo ?? data?.redirectTo ?? "/home";
           router.push(dest);
           router.refresh();
           return;
