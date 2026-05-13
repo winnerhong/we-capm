@@ -15,6 +15,7 @@ import {
 } from "../../../actions";
 import { DeployFields, Field, inputCls, toLocalInput } from "./common-fields";
 import { AcornIcon } from "@/components/acorn-icon";
+import { QrTokenPreview } from "./qr-token-preview";
 
 type Props = {
   mission: OrgMissionRow;
@@ -346,6 +347,10 @@ export function QrQuizOrgMissionEditor({ mission, siblings }: Props) {
                 🎲 토큰 생성
               </button>
             </div>
+
+            {/* QR 미리보기 + 다운로드 (SVG / PNG 2048px) */}
+            <QrTokenPreview token={qrToken} filenameBase={title || "QR"} />
+
             <label className="inline-flex items-center gap-2 text-sm text-[#2C2C2C]">
               <input
                 type="checkbox"

@@ -16,6 +16,7 @@ import {
 } from "../../../actions";
 import { DeployFields, Field, inputCls, toLocalInput } from "./common-fields";
 import { AcornIcon } from "@/components/acorn-icon";
+import { QrTokenPreview } from "./qr-token-preview";
 
 type Props = {
   mission: OrgMissionRow;
@@ -549,6 +550,14 @@ export function TreasureOrgMissionEditor({ mission, siblings }: Props) {
           <p className="mt-2 text-[11px] text-[#8B7F75]">
             보물 장소에 부착할 QR 코드에 들어갈 토큰이에요. (ts_/tr_ 접두사)
           </p>
+
+          {/* QR 미리보기 + SVG/PNG 다운로드 */}
+          <div className="mt-3">
+            <QrTokenPreview
+              token={finalQrToken}
+              filenameBase={`${title || "보물"}_최종`}
+            />
+          </div>
         </section>
 
         <DeployFields

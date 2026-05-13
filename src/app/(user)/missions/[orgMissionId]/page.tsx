@@ -143,28 +143,6 @@ export default async function MissionRunnerPage({
               <AcornIcon className="text-[#6B4423]" /> +{mission.acorns}
             </p>
           )}
-          {(mission.invitation_host || mission.invitation_organizer) && (
-            <div className="mt-2 space-y-0.5 rounded-xl bg-gradient-to-br from-[#2D5A3D]/95 to-[#3A7A52]/95 px-3 py-2 text-[11px] text-white shadow-sm">
-              {mission.invitation_host && (
-                <p className="flex items-start gap-1.5">
-                  <span aria-hidden>🏫</span>
-                  <span>
-                    <span className="font-semibold text-white/75">주최:</span>{" "}
-                    <b>{mission.invitation_host}</b>
-                  </span>
-                </p>
-              )}
-              {mission.invitation_organizer && (
-                <p className="flex items-start gap-1.5">
-                  <span aria-hidden>🎯</span>
-                  <span>
-                    <span className="font-semibold text-white/75">주관:</span>{" "}
-                    {mission.invitation_organizer}
-                  </span>
-                </p>
-              )}
-            </div>
-          )}
         </div>
       </div>
     </div>
