@@ -11,14 +11,19 @@ import type {
   ControlRoomActivityItem,
   ControlRoomBroadcastStat,
   ControlRoomChatMessage,
+  ControlRoomFamilyGrid,
+  ControlRoomFamilyRow,
   ControlRoomFmRequest,
   ControlRoomFmSessionSummary,
   ControlRoomHeatmap,
   ControlRoomHeatmapHour,
   ControlRoomLeaderItem,
+  ControlRoomMissionProgressRow,
   ControlRoomPendingItem,
+  ControlRoomPhotoItem,
   ControlRoomSnapshot,
   ControlRoomStamps,
+  FamilyMissionCellState,
 } from "./types";
 
 type SbResp<T> = { data: T[] | null; error: unknown };
@@ -225,6 +230,12 @@ const EMPTY_SNAPSHOT_BASE = {
     lastSentAt: null,
     lastSentTitle: null,
   } as ControlRoomBroadcastStat,
+  photoWall: [] as import("./types").ControlRoomPhotoItem[],
+  missionProgress: [] as import("./types").ControlRoomMissionProgressRow[],
+  familyGrid: {
+    missions: [],
+    rows: [],
+  } as import("./types").ControlRoomFamilyGrid,
   // heatmap 은 호출 시점 기준 24칸을 만들어야 하므로 이 상수엔 포함하지 않는다.
   // 사용부에서 `emptyHeatmap()` 을 호출해 덮어씌운다.
 };
@@ -269,7 +280,7 @@ export async function loadControlRoomSnapshot(
   // (stamps 의 avgPackCompletePct 계산 시 분모로도 재사용.)
   const participantUserIds = await loadParticipantUserIds(supabase, orgId);
 
-  // 11개 서브쿼리 병렬 실행 — 각각 내부에서 try/catch 로 실패 격리.
+  // 14개 서브쿼리 병렬 실행 — 각각 내부에서 try/catch 로 실패 격리.
   const [
     liveEvents,
     participants,
@@ -282,6 +293,9 @@ export async function loadControlRoomSnapshot(
     leaderboard,
     broadcastStats,
     heatmap,
+    photoWall,
+    missionProgress,
+    familyGrid,
   ] = await Promise.all([
     loadLiveEvents(supabase, orgId),
     loadParticipants(supabase, orgId, todayIso),
@@ -294,6 +308,9 @@ export async function loadControlRoomSnapshot(
     loadLeaderboard(supabase, participantUserIds, last30dIso),
     loadBroadcastStats(supabase, orgId, todayIso, participantUserIds.length),
     loadHeatmap(supabase, orgId, last24hIso),
+    loadPhotoWall(supabase, orgId),
+    loadMissionProgress(supabase, orgId, participantUserIds.length),
+    loadFamilyGrid(supabase, orgId, participantUserIds),
   ]);
 
   return {
@@ -312,6 +329,9 @@ export async function loadControlRoomSnapshot(
     leaderboard,
     broadcast: broadcastStats,
     heatmap,
+    photoWall,
+    missionProgress,
+    familyGrid,
   };
 }
 
@@ -1934,5 +1954,521 @@ async function loadHeatmap(
   } catch (e) {
     console.error("[control-room/loadHeatmap] throw", e);
     return emptyHeatmap();
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/* 12) Phase 1 — 사진 월 (Photo Wall)                                          */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * 최근 PHOTO/PHOTO_APPROVAL 미션 제출의 사진 URL 모음.
+ * - status 가 REJECTED 인 것도 표시 (운영진은 검수에 도움됨)
+ * - 한 제출에 여러 사진이면 첫 사진만 사용
+ * - 최대 30장
+ */
+async function loadPhotoWall(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  orgId: string
+): Promise<ControlRoomPhotoItem[]> {
+  try {
+    // 1) org 의 PHOTO/PHOTO_APPROVAL 미션 id + meta
+    const missionResp = (await (
+      supabase.from("org_missions" as never) as unknown as {
+        select: (c: string) => {
+          eq: (k: string, v: string) => {
+            in: (
+              k: string,
+              v: string[]
+            ) => Promise<
+              SbResp<{
+                id: string;
+                title: string;
+                icon: string | null;
+                kind: string;
+              }>
+            >;
+          };
+        };
+      }
+    )
+      .select("id, title, icon, kind")
+      .eq("org_id", orgId)
+      .in("kind", ["PHOTO", "PHOTO_APPROVAL"])) as SbResp<{
+      id: string;
+      title: string;
+      icon: string | null;
+      kind: string;
+    }>;
+
+    if (missionResp.error) {
+      console.error("[control-room/loadPhotoWall] mission err", missionResp.error);
+      return [];
+    }
+    const missions = missionResp.data ?? [];
+    if (missions.length === 0) return [];
+
+    const missionMap = new Map(missions.map((m) => [m.id, m]));
+    const missionIds = missions.map((m) => m.id);
+
+    // 2) submissions — payload_json 포함
+    type SubRow = {
+      id: string;
+      org_mission_id: string;
+      user_id: string;
+      status: string;
+      submitted_at: string;
+      payload_json: { photo_urls?: string[] } | null;
+    };
+    const subResp = (await (
+      supabase.from("mission_submissions" as never) as unknown as {
+        select: (c: string) => {
+          in: (k: string, v: string[]) => {
+            order: (
+              c: string,
+              o: { ascending: boolean }
+            ) => {
+              limit: (n: number) => Promise<SbResp<SubRow>>;
+            };
+          };
+        };
+      }
+    )
+      .select("id, org_mission_id, user_id, status, submitted_at, payload_json")
+      .in("org_mission_id", missionIds)
+      .order("submitted_at", { ascending: false })
+      .limit(60)) as SbResp<SubRow>;
+
+    if (subResp.error) {
+      console.error("[control-room/loadPhotoWall] sub err", subResp.error);
+      return [];
+    }
+    const subs = subResp.data ?? [];
+    if (subs.length === 0) return [];
+
+    // 3) 사용자 이름 + 자녀 이름 (formatFamilyDisplayName 사용)
+    const userIds = Array.from(new Set(subs.map((s) => s.user_id)));
+    const nameMap = new Map<string, string>();
+    const enrolledMap = new Map<string, string[]>();
+    const allChildrenMap = new Map<string, string[]>();
+
+    if (userIds.length > 0) {
+      await Promise.all([
+        (async () => {
+          try {
+            const r = (await (
+              supabase.from("app_users" as never) as unknown as {
+                select: (c: string) => {
+                  in: (
+                    k: string,
+                    v: string[]
+                  ) => Promise<SbResp<AppUserLiteRow>>;
+                };
+              }
+            )
+              .select("id, parent_name")
+              .in("id", userIds)) as SbResp<AppUserLiteRow>;
+            for (const u of r.data ?? []) nameMap.set(u.id, u.parent_name);
+          } catch (e) {
+            console.error("[control-room/loadPhotoWall] users", e);
+          }
+        })(),
+        (async () => {
+          try {
+            const r = (await (
+              supabase.from("app_children" as never) as unknown as {
+                select: (c: string) => {
+                  in: (
+                    k: string,
+                    v: string[]
+                  ) => {
+                    order: (
+                      c: string,
+                      o: { ascending: boolean }
+                    ) => Promise<SbResp<AppChildLiteRow>>;
+                  };
+                };
+              }
+            )
+              .select("user_id, name, is_enrolled, created_at")
+              .in("user_id", userIds)
+              .order("created_at", {
+                ascending: true,
+              })) as SbResp<AppChildLiteRow>;
+            for (const c of r.data ?? []) {
+              const all = allChildrenMap.get(c.user_id) ?? [];
+              all.push(c.name);
+              allChildrenMap.set(c.user_id, all);
+              if (c.is_enrolled) {
+                const en = enrolledMap.get(c.user_id) ?? [];
+                en.push(c.name);
+                enrolledMap.set(c.user_id, en);
+              }
+            }
+          } catch (e) {
+            console.error("[control-room/loadPhotoWall] children", e);
+          }
+        })(),
+      ]);
+    }
+
+    // 4) 사진 URL 추출 + 30장 cap
+    const out: ControlRoomPhotoItem[] = [];
+    for (const s of subs) {
+      const urls = s.payload_json?.photo_urls ?? [];
+      const firstUrl = urls.find((u) => typeof u === "string" && u.length > 0);
+      if (!firstUrl) continue;
+      const mission = missionMap.get(s.org_mission_id);
+      const parentName = nameMap.get(s.user_id) || "보호자";
+      out.push({
+        submissionId: s.id,
+        url: firstUrl,
+        missionTitle: mission?.title ?? "(미션)",
+        missionIcon: mission?.icon ?? null,
+        userDisplayName: formatFamilyDisplayName(
+          parentName,
+          enrolledMap.get(s.user_id) ?? [],
+          allChildrenMap.get(s.user_id) ?? []
+        ),
+        submittedAt: s.submitted_at,
+        status: s.status,
+      });
+      if (out.length >= 30) break;
+    }
+    return out;
+  } catch (e) {
+    console.error("[control-room/loadPhotoWall] throw", e);
+    return [];
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/* 13) Phase 1 — 미션별 진행률                                                 */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * org 활성 미션마다 완료/대기/거부 카운트 + 미시작 추정.
+ * 미시작 = totalParticipants - distinct user_id (any submission status).
+ */
+async function loadMissionProgress(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  orgId: string,
+  totalParticipants: number
+): Promise<ControlRoomMissionProgressRow[]> {
+  try {
+    type MissionRow = {
+      id: string;
+      title: string;
+      icon: string | null;
+      kind: string;
+      is_active: boolean;
+      created_at: string;
+    };
+    const mResp = (await (
+      supabase.from("org_missions" as never) as unknown as {
+        select: (c: string) => {
+          eq: (k: string, v: string) => {
+            eq: (k: string, v: boolean) => {
+              order: (
+                c: string,
+                o: { ascending: boolean }
+              ) => Promise<SbResp<MissionRow>>;
+            };
+          };
+        };
+      }
+    )
+      .select("id, title, icon, kind, is_active, created_at")
+      .eq("org_id", orgId)
+      .eq("is_active", true)
+      .order("created_at", { ascending: true })) as SbResp<MissionRow>;
+
+    if (mResp.error) {
+      console.error("[control-room/loadMissionProgress] mission err", mResp.error);
+      return [];
+    }
+    const missions = mResp.data ?? [];
+    if (missions.length === 0) return [];
+
+    const missionIds = missions.map((m) => m.id);
+
+    // 모든 제출 조회 — 미션별 distinct user 카운트
+    type Row = {
+      org_mission_id: string;
+      user_id: string;
+      status: string;
+    };
+    const sResp = (await (
+      supabase.from("mission_submissions" as never) as unknown as {
+        select: (c: string) => {
+          in: (k: string, v: string[]) => Promise<SbResp<Row>>;
+        };
+      }
+    )
+      .select("org_mission_id, user_id, status")
+      .in("org_mission_id", missionIds)) as SbResp<Row>;
+
+    if (sResp.error) {
+      console.error("[control-room/loadMissionProgress] sub err", sResp.error);
+    }
+    const subs = sResp.data ?? [];
+
+    // 미션별 user 집계
+    type Agg = {
+      done: Set<string>;
+      pending: Set<string>;
+      rejected: Set<string>;
+    };
+    const aggMap = new Map<string, Agg>();
+    for (const m of missions) {
+      aggMap.set(m.id, {
+        done: new Set(),
+        pending: new Set(),
+        rejected: new Set(),
+      });
+    }
+    for (const s of subs) {
+      const a = aggMap.get(s.org_mission_id);
+      if (!a) continue;
+      if (s.status === "AUTO_APPROVED" || s.status === "APPROVED") {
+        a.done.add(s.user_id);
+      } else if (s.status === "SUBMITTED" || s.status === "PENDING_REVIEW") {
+        a.pending.add(s.user_id);
+      } else if (s.status === "REJECTED") {
+        a.rejected.add(s.user_id);
+      }
+    }
+
+    return missions.map((m) => {
+      const a = aggMap.get(m.id) ?? {
+        done: new Set<string>(),
+        pending: new Set<string>(),
+        rejected: new Set<string>(),
+      };
+      const completedCount = a.done.size;
+      const pendingCount = a.pending.size;
+      const rejectedCount = a.rejected.size;
+      const completionPct =
+        totalParticipants > 0
+          ? Math.round((completedCount / totalParticipants) * 100)
+          : 0;
+      return {
+        missionId: m.id,
+        title: m.title,
+        icon: m.icon,
+        kind: m.kind,
+        completedCount,
+        pendingCount,
+        rejectedCount,
+        totalParticipants,
+        completionPct,
+      };
+    });
+  } catch (e) {
+    console.error("[control-room/loadMissionProgress] throw", e);
+    return [];
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/* 14) Phase 1 — 가족 × 미션 매트릭스                                          */
+/* -------------------------------------------------------------------------- */
+
+async function loadFamilyGrid(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  orgId: string,
+  participantUserIds: string[]
+): Promise<ControlRoomFamilyGrid> {
+  try {
+    if (participantUserIds.length === 0) {
+      return { missions: [], rows: [] };
+    }
+
+    // 1) org active missions (컬럼)
+    type MissionRow = {
+      id: string;
+      title: string;
+      icon: string | null;
+      created_at: string;
+    };
+    const mResp = (await (
+      supabase.from("org_missions" as never) as unknown as {
+        select: (c: string) => {
+          eq: (k: string, v: string) => {
+            eq: (k: string, v: boolean) => {
+              order: (
+                c: string,
+                o: { ascending: boolean }
+              ) => Promise<SbResp<MissionRow>>;
+            };
+          };
+        };
+      }
+    )
+      .select("id, title, icon, created_at")
+      .eq("org_id", orgId)
+      .eq("is_active", true)
+      .order("created_at", { ascending: true })) as SbResp<MissionRow>;
+
+    if (mResp.error || !mResp.data) {
+      return { missions: [], rows: [] };
+    }
+    const missions = mResp.data.map((m) => ({
+      id: m.id,
+      title: m.title,
+      icon: m.icon,
+    }));
+    if (missions.length === 0) {
+      return { missions: [], rows: [] };
+    }
+    const missionIds = missions.map((m) => m.id);
+
+    // 2) 모든 제출 조회 (org × active missions × all participants)
+    type SubRow = {
+      org_mission_id: string;
+      user_id: string;
+      status: string;
+      awarded_acorns: number | null;
+    };
+    const sResp = (await (
+      supabase.from("mission_submissions" as never) as unknown as {
+        select: (c: string) => {
+          in: (k: string, v: string[]) => {
+            in: (
+              k: string,
+              v: string[]
+            ) => Promise<SbResp<SubRow>>;
+          };
+        };
+      }
+    )
+      .select("org_mission_id, user_id, status, awarded_acorns")
+      .in("org_mission_id", missionIds)
+      .in("user_id", participantUserIds)) as SbResp<SubRow>;
+
+    if (sResp.error) {
+      console.error("[control-room/loadFamilyGrid] sub err", sResp.error);
+    }
+    const subs = sResp.data ?? [];
+
+    // 3) (userId, missionId) → 셀 상태 (우선순위: DONE > REJECTED > WAITING)
+    const stateMap = new Map<string, FamilyMissionCellState>();
+    const acornsMap = new Map<string, number>();
+    const key = (uid: string, mid: string) => `${uid}::${mid}`;
+    const priority = (s: FamilyMissionCellState): number => {
+      if (s === "DONE") return 3;
+      if (s === "WAITING") return 2;
+      if (s === "REJECTED") return 1;
+      return 0;
+    };
+    for (const s of subs) {
+      let next: FamilyMissionCellState = null;
+      if (s.status === "AUTO_APPROVED" || s.status === "APPROVED") next = "DONE";
+      else if (s.status === "SUBMITTED" || s.status === "PENDING_REVIEW") next = "WAITING";
+      else if (s.status === "REJECTED") next = "REJECTED";
+      if (!next) continue;
+      const k = key(s.user_id, s.org_mission_id);
+      const prev = stateMap.get(k) ?? null;
+      if (priority(next) > priority(prev)) stateMap.set(k, next);
+      if (next === "DONE" && (s.awarded_acorns ?? 0) > 0) {
+        acornsMap.set(s.user_id, (acornsMap.get(s.user_id) ?? 0) + s.awarded_acorns!);
+      }
+    }
+
+    // 4) 사용자 정보 (parent_name + children) — 표시명·정렬용
+    const nameMap = new Map<string, string>();
+    const enrolledMap = new Map<string, string[]>();
+    const allChildrenMap = new Map<string, string[]>();
+    await Promise.all([
+      (async () => {
+        try {
+          const r = (await (
+            supabase.from("app_users" as never) as unknown as {
+              select: (c: string) => {
+                in: (
+                  k: string,
+                  v: string[]
+                ) => Promise<SbResp<AppUserLiteRow>>;
+              };
+            }
+          )
+            .select("id, parent_name")
+            .in("id", participantUserIds)) as SbResp<AppUserLiteRow>;
+          for (const u of r.data ?? []) nameMap.set(u.id, u.parent_name);
+        } catch (e) {
+          console.error("[control-room/loadFamilyGrid] users", e);
+        }
+      })(),
+      (async () => {
+        try {
+          const r = (await (
+            supabase.from("app_children" as never) as unknown as {
+              select: (c: string) => {
+                in: (
+                  k: string,
+                  v: string[]
+                ) => {
+                  order: (
+                    c: string,
+                    o: { ascending: boolean }
+                  ) => Promise<SbResp<AppChildLiteRow>>;
+                };
+              };
+            }
+          )
+            .select("user_id, name, is_enrolled, created_at")
+            .in("user_id", participantUserIds)
+            .order("created_at", {
+              ascending: true,
+            })) as SbResp<AppChildLiteRow>;
+          for (const c of r.data ?? []) {
+            const all = allChildrenMap.get(c.user_id) ?? [];
+            all.push(c.name);
+            allChildrenMap.set(c.user_id, all);
+            if (c.is_enrolled) {
+              const en = enrolledMap.get(c.user_id) ?? [];
+              en.push(c.name);
+              enrolledMap.set(c.user_id, en);
+            }
+          }
+        } catch (e) {
+          console.error("[control-room/loadFamilyGrid] children", e);
+        }
+      })(),
+    ]);
+
+    // 5) 행 구성. 완료 수 많은 순 → 도토리 많은 순으로 정렬.
+    const rows: ControlRoomFamilyRow[] = participantUserIds.map((uid) => {
+      const perMission: Record<string, FamilyMissionCellState> = {};
+      let doneCount = 0;
+      for (const m of missions) {
+        const state = stateMap.get(key(uid, m.id)) ?? null;
+        perMission[m.id] = state;
+        if (state === "DONE") doneCount += 1;
+      }
+      const parentName = nameMap.get(uid) || "보호자";
+      return {
+        userId: uid,
+        displayName: formatFamilyDisplayName(
+          parentName,
+          enrolledMap.get(uid) ?? [],
+          allChildrenMap.get(uid) ?? []
+        ),
+        totalAcorns: acornsMap.get(uid) ?? 0,
+        doneCount,
+        perMission,
+      };
+    });
+
+    rows.sort((a, b) => {
+      if (a.doneCount !== b.doneCount) return b.doneCount - a.doneCount;
+      if (a.totalAcorns !== b.totalAcorns) return b.totalAcorns - a.totalAcorns;
+      return a.displayName.localeCompare(b.displayName, "ko");
+    });
+
+    return { missions, rows };
+  } catch (e) {
+    console.error("[control-room/loadFamilyGrid] throw", e);
+    return { missions: [], rows: [] };
   }
 }

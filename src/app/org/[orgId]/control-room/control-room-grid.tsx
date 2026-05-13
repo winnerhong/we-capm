@@ -11,6 +11,9 @@ import { ActivityFeedTile } from "./widgets/activity-feed-tile";
 import { LeaderboardTile } from "./widgets/leaderboard-tile";
 import { BroadcastTile } from "./widgets/broadcast-tile";
 import { HeatmapTile } from "./widgets/heatmap-tile";
+import { PhotoWallTile } from "./widgets/photo-wall-tile";
+import { MissionProgressTile } from "./widgets/mission-progress-tile";
+import { FamilyGridTile } from "./widgets/family-grid-tile";
 
 type Props = {
   snapshot: ControlRoomSnapshot;
@@ -44,6 +47,28 @@ export function ControlRoomGrid({ snapshot, orgId, isTvMode }: Props) {
           <StampsTile stamps={snapshot.stamps} isTvMode={isTvMode} />
           <AcornsTile acorns={snapshot.acorns} isTvMode={isTvMode} />
           <FmTile snapshot={snapshot} />
+        </div>
+
+        {/* row 2.5: Phase 1 관제 — 📸 사진 월 + 🎯 미션별 진행률 */}
+        <div
+          className={`grid grid-cols-1 md:grid-cols-2 ${
+            isTvMode ? "gap-[1.25em]" : "gap-4"
+          }`}
+        >
+          <PhotoWallTile items={snapshot.photoWall} isTvMode={isTvMode} />
+          <MissionProgressTile
+            items={snapshot.missionProgress}
+            isTvMode={isTvMode}
+          />
+        </div>
+
+        {/* row 2.7: Phase 1 관제 — 👥 가족 × 미션 매트릭스 (가로 풀폭) */}
+        <div className="grid grid-cols-1">
+          <FamilyGridTile
+            grid={snapshot.familyGrid}
+            photos={snapshot.photoWall}
+            isTvMode={isTvMode}
+          />
         </div>
 
         {/* row 3: Activity Feed + Leaderboard — 모바일 1열, md 이상 2열 */}

@@ -85,6 +85,61 @@ export interface ControlRoomHeatmap {
   totalLast24h: number;
 }
 
+/**
+ * Phase 1 관제 — 실시간 사진 월.
+ * 최근 제출된 사진 미션 결과를 갤러리로 모아 본다.
+ */
+export interface ControlRoomPhotoItem {
+  submissionId: string;
+  url: string;
+  missionTitle: string;
+  missionIcon: string | null;
+  userDisplayName: string;
+  submittedAt: string;
+  status: string; // SUBMITTED | AUTO_APPROVED | APPROVED | PENDING_REVIEW
+}
+
+/**
+ * Phase 1 관제 — 미션별 진행 현황.
+ * 미션마다 "몇 명 완료했는지 / 검수 대기 / 미시작" 한눈에.
+ */
+export interface ControlRoomMissionProgressRow {
+  missionId: string;
+  title: string;
+  icon: string | null;
+  kind: string; // PHOTO | QR_QUIZ | TREASURE | ...
+  completedCount: number; // AUTO_APPROVED + APPROVED
+  pendingCount: number; // SUBMITTED + PENDING_REVIEW
+  rejectedCount: number;
+  totalParticipants: number; // org 활성 참가자 수 (분모)
+  completionPct: number; // completed / total * 100 (정수)
+}
+
+/**
+ * Phase 1 관제 — 가족 × 미션 진행 매트릭스.
+ * perMission 의 각 셀: "DONE" | "WAITING" | "REJECTED" | null(미시작).
+ */
+export type FamilyMissionCellState =
+  | "DONE"
+  | "WAITING"
+  | "REJECTED"
+  | null;
+
+export interface ControlRoomFamilyRow {
+  userId: string;
+  displayName: string;
+  totalAcorns: number;
+  doneCount: number;
+  /** missionId → 셀 상태. 미션 목록은 missionsForGrid 와 동일 순서. */
+  perMission: Record<string, FamilyMissionCellState>;
+}
+
+export interface ControlRoomFamilyGrid {
+  /** 그리드 컬럼 — org 의 active missions, 표시 순서 보장. */
+  missions: Array<{ id: string; title: string; icon: string | null }>;
+  rows: ControlRoomFamilyRow[];
+}
+
 export interface ControlRoomSnapshot {
   orgName: string;
   serverNowIso: string;
@@ -112,4 +167,8 @@ export interface ControlRoomSnapshot {
   // Phase 3 widgets
   broadcast: ControlRoomBroadcastStat;
   heatmap: ControlRoomHeatmap; // K) 지난 24시간 시간대별 활동량
+  // Phase 4 widgets — 실시간 관제 (사진 월, 미션별 진행, 가족 매트릭스)
+  photoWall: ControlRoomPhotoItem[]; // 최근 30장
+  missionProgress: ControlRoomMissionProgressRow[]; // 활성 미션 전부
+  familyGrid: ControlRoomFamilyGrid;
 }
