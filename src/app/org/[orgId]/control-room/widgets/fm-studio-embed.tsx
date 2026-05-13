@@ -27,7 +27,7 @@ export async function FmStudioEmbed({ orgId }: { orgId: string }) {
     return (
       <section
         aria-label="토리FM"
-        className="rounded-3xl border border-amber-500/20 bg-gradient-to-b from-[#0a1228] via-[#0d1838] to-[#101e44] p-6 text-center text-white shadow-xl"
+        className="rounded-2xl border border-amber-500/15 bg-[rgba(11,21,56,0.5)] p-6 text-center text-amber-50/95"
       >
         <p className="text-3xl" aria-hidden>
           📻
@@ -35,8 +35,8 @@ export async function FmStudioEmbed({ orgId }: { orgId: string }) {
         <p className="mt-2 text-sm font-bold text-amber-100">
           진행 중인 토리FM 방송이 없어요
         </p>
-        <p className="mt-1 text-[11px] text-white/60">
-          /tori-fm 에서 방송을 시작하면 여기에 라이브 스튜디오가 노출됩니다.
+        <p className="mt-1 text-[11px] text-amber-50/60">
+          /tori-fm 에서 방송을 시작하면 여기에 라이브 스튜디오가 이어집니다.
         </p>
         <Link
           href={`/org/${orgId}/tori-fm`}
@@ -110,30 +110,7 @@ export async function FmStudioEmbed({ orgId }: { orgId: string }) {
   }));
 
   return (
-    <section
-      aria-label="토리FM 라이브 스튜디오 (관제실 임베드)"
-      className="space-y-2"
-    >
-      <div className="flex items-center justify-between px-1">
-        <h2 className="flex items-center gap-2 text-sm font-bold text-amber-200">
-          🎙 토리FM 라이브 스튜디오
-          <span className="inline-flex items-center gap-1 rounded-full bg-rose-500/95 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-widest text-white shadow-md">
-            <span className="relative inline-flex h-1.5 w-1.5">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white opacity-75" />
-              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-white" />
-            </span>
-            ON AIR
-          </span>
-        </h2>
-        <Link
-          href={`/org/${orgId}/tori-fm${
-            liveSession.event_id ? `?event=${liveSession.event_id}` : ""
-          }`}
-          className="rounded-lg bg-amber-400/90 px-2.5 py-1 text-[10px] font-bold text-[#1B2B3A] shadow hover:bg-amber-300"
-        >
-          ↗ 풀스크린
-        </Link>
-      </div>
+    <section aria-label="토리FM 라이브 스튜디오" className="contents">
       <LiveStudioConsole
         orgId={orgId}
         sessionId={liveSession.id}
@@ -165,6 +142,7 @@ export async function FmStudioEmbed({ orgId }: { orgId: string }) {
         initialStoryRequests={initialStoryRequests}
         eventId={liveSession.event_id ?? null}
         initialRpsRoom={initialRpsRoom}
+        embedded
       />
     </section>
   );

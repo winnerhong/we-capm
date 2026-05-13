@@ -15,6 +15,7 @@ import { PhotoWallTile } from "./widgets/photo-wall-tile";
 import { MissionProgressTile } from "./widgets/mission-progress-tile";
 import { FamilyGridTile } from "./widgets/family-grid-tile";
 import { LiveAttemptsTile } from "./widgets/live-attempts-tile";
+import { FmStudioEmbed } from "./widgets/fm-studio-embed";
 
 type Props = {
   snapshot: ControlRoomSnapshot;
@@ -22,7 +23,9 @@ type Props = {
   isTvMode: boolean;
 };
 
-export function ControlRoomGrid({ snapshot, orgId, isTvMode }: Props) {
+// ControlRoomGrid 는 async — FmStudioEmbed (server component) 가 LIVE 세션
+// 데이터를 직접 로드한다.
+export async function ControlRoomGrid({ snapshot, orgId, isTvMode }: Props) {
   return (
     <div
       className={`${styles.bg} ${isTvMode ? styles.tvScale : ""}`}
@@ -110,6 +113,10 @@ export function ControlRoomGrid({ snapshot, orgId, isTvMode }: Props) {
         <div className="grid grid-cols-1">
           <HeatmapTile heatmap={snapshot.heatmap} isTvMode={isTvMode} />
         </div>
+
+        {/* row 7: 토리FM 라이브 스튜디오 — 관제실과 같은 네이비 바탕 위에
+            바로 이어지도록 페이지 안으로 통합. 별도 헤더/풀스크린 버튼 없음. */}
+        <FmStudioEmbed orgId={orgId} />
       </div>
     </div>
   );

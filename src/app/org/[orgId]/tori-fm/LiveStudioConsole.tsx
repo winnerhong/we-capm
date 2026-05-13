@@ -70,6 +70,9 @@ interface Props {
   // RPS 통합 (옵셔널)
   eventId?: string | null;
   initialRpsRoom?: RpsRoomRow | null;
+  /** 관제실 안에 임베드될 때 — 바깥 rounded·border·bg 그라데이션 제거하여
+   *  부모 네이비 배경에 자연스럽게 흐르게. */
+  embedded?: boolean;
 }
 
 export function LiveStudioConsole({
@@ -96,6 +99,7 @@ export function LiveStudioConsole({
   initialStoryRequests,
   eventId = null,
   initialRpsRoom = null,
+  embedded = false,
 }: Props) {
   // 모달 상태 — mode 가 변할 때마다 key 를 증가시켜 HostRpsModal 을 강제 재마운트
   const [rpsState, setRpsState] = useState<{
@@ -131,8 +135,13 @@ export function LiveStudioConsole({
   return (
     // 콘솔 전체를 다크 네이비 wrapper 로 감싸 메인 스테이지 + 보조 카드들이
     // 같은 군청 배경 위에 떠있도록. 사연 모드는 미세하게 violet 으로 변화.
+    // embedded=true 면 부모(관제실) 가 이미 같은 네이비 바탕이라 wrapper 제거.
     <section
-      className={`rounded-3xl border border-white/10 ${consoleBg} p-3 shadow-2xl transition-colors duration-700 md:p-5`}
+      className={
+        embedded
+          ? "transition-colors duration-700"
+          : `rounded-3xl border border-white/10 ${consoleBg} p-3 shadow-2xl transition-colors duration-700 md:p-5`
+      }
     >
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
         {/* Zone A: 메인 스테이지 Hero — 좌측 9/12 (압도적 비중)
