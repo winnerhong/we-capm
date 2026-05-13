@@ -5,6 +5,7 @@ import {
   loadDiscoverableRoomsForUser,
   loadRoomsForUser,
 } from "@/lib/toritalk/queries";
+import { userHasAnyLiveEvent } from "@/lib/org-events/queries";
 import { fmtFullDateKst } from "@/lib/datetime/kst";
 import { JoinRoomButton } from "./join-room-button";
 
@@ -12,6 +13,38 @@ export const dynamic = "force-dynamic";
 
 export default async function ToriTalkHubPage() {
   const user = await requireAppUser();
+
+  // 행사가 DRAFT(예정) 단계면 토리톡 잠금 — LIVE 행사가 1개라도 있어야 입장 가능.
+  const hasLive = await userHasAnyLiveEvent(user.id).catch(() => false);
+  if (!hasLive) {
+    return (
+      <div className="space-y-4">
+        <Header />
+        <section className="rounded-3xl border-2 border-dashed border-amber-200 bg-amber-50/80 p-8 text-center shadow-sm">
+          <p className="text-4xl" aria-hidden>
+            🌱
+          </p>
+          <p className="mt-3 text-base font-bold text-amber-900">
+            행사 시작일에 다시 만나요
+          </p>
+          <p className="mt-2 text-xs leading-relaxed text-amber-800">
+            아직 행사가 시작되지 않았어요. 행사가 시작되면 토리톡으로 친구들과
+            이야기 나눌 수 있어요.
+          </p>
+          <div className="mt-5">
+            <Link
+              href="/home"
+              className="inline-flex items-center gap-1.5 rounded-xl bg-[#2D5A3D] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#234a30]"
+            >
+              <span aria-hidden>🏠</span>
+              <span>홈으로</span>
+            </Link>
+          </div>
+        </section>
+      </div>
+    );
+  }
+
   const enabled = await isToritalkEnabled(user.orgId);
 
   if (!enabled) {

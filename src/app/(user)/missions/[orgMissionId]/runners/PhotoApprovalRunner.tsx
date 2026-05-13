@@ -128,18 +128,17 @@ export function PhotoApprovalRunner({ mission, config, existing }: Props) {
     }
     setErrorMsg(null);
     startTransition(async () => {
-      try {
-        const result = await submitMissionAction(mission.id, {
-          photo_urls: photos,
-          caption: caption.trim() || undefined,
-        });
+      const result = await submitMissionAction(mission.id, {
+        photo_urls: photos,
+        caption: caption.trim() || undefined,
+      });
+      if (result.ok) {
         if (result.redirectTo) {
           router.push(result.redirectTo);
           router.refresh();
         }
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        setErrorMsg(msg);
+      } else {
+        setErrorMsg(result.error);
       }
     });
   };
@@ -299,7 +298,7 @@ export function PhotoApprovalRunner({ mission, config, existing }: Props) {
                     {uploadStatus ?? "업로드 중..."}
                   </span>
                 ) : (
-                  <>📷 카메라로 찍기 / 사진 선택</>
+                  <>📷 카메라로 찍기</>
                 )}
               </button>
             )}

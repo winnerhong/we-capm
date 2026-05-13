@@ -111,28 +111,27 @@ export function TreasureRunner({ mission, config, initialProgress }: Props) {
       return;
     }
     submitTransition(async () => {
-      try {
-        const steps_cleared = [...unlockedOrders]
-          .sort((a, b) => a - b)
-          .map((step_order) => {
-            const found = progress.find((p) => p.step_order === step_order);
-            return {
-              step_order,
-              method: (found?.unlock_method ?? "AUTO") as TreasureUnlockMethod,
-              at: found?.unlocked_at ?? new Date().toISOString(),
-            };
-          });
-        const result = await submitMissionAction(mission.id, {
-          steps_cleared,
-          final_qr_token_scanned: scanned,
+      const steps_cleared = [...unlockedOrders]
+        .sort((a, b) => a - b)
+        .map((step_order) => {
+          const found = progress.find((p) => p.step_order === step_order);
+          return {
+            step_order,
+            method: (found?.unlock_method ?? "AUTO") as TreasureUnlockMethod,
+            at: found?.unlocked_at ?? new Date().toISOString(),
+          };
         });
+      const result = await submitMissionAction(mission.id, {
+        steps_cleared,
+        final_qr_token_scanned: scanned,
+      });
+      if (result.ok) {
         if (result.redirectTo) {
           router.push(result.redirectTo);
           router.refresh();
         }
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        setErrorMsg(msg);
+      } else {
+        setErrorMsg(result.error);
       }
     });
   };

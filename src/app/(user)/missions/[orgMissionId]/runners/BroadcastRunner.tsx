@@ -109,22 +109,22 @@ export function BroadcastRunner({
 
     setErrorMsg(null);
     startTransition(async () => {
-      try {
-        const content =
-          submissionKind === "PHOTO" ? (photoUrl ?? "") : text.trim();
-        const result = await submitMissionAction(mission.id, {
-          broadcast_id: broadcast.id,
-          content_type: submissionKind,
-          content,
-        });
+      const content =
+        submissionKind === "PHOTO" ? (photoUrl ?? "") : text.trim();
+      const result = await submitMissionAction(mission.id, {
+        broadcast_id: broadcast.id,
+        content_type: submissionKind,
+        content,
+      });
+      if (result.ok) {
         if (result.redirectTo) {
           router.push(result.redirectTo);
           router.refresh();
         } else {
           router.refresh();
         }
-      } catch (e) {
-        setErrorMsg(e instanceof Error ? e.message : String(e));
+      } else {
+        setErrorMsg(result.error);
       }
     });
   };
@@ -258,7 +258,7 @@ export function BroadcastRunner({
                   {uploadStatus ?? "업로드 중..."}
                 </span>
               ) : (
-                <>📷 카메라로 찍기 / 사진 선택</>
+                <>📷 카메라로 찍기</>
               )}
             </button>
           )}

@@ -7,6 +7,7 @@ import {
   loadRoom,
   loadRoomMessages,
 } from "@/lib/toritalk/queries";
+import { userHasAnyLiveEvent } from "@/lib/org-events/queries";
 import { loadChildrenForUser } from "@/lib/app-user/queries";
 import { ChatRoomView } from "@/components/toritalk/chat-room-view";
 
@@ -19,6 +20,10 @@ export default async function ToriTalkRoomPage({
 }) {
   const { roomId } = await params;
   const user = await requireAppUser();
+
+  // 행사가 DRAFT(예정) 단계면 채팅방 입장 불가 — 토리톡 hub 로 리다이렉트.
+  const hasLive = await userHasAnyLiveEvent(user.id).catch(() => false);
+  if (!hasLive) redirect("/tori-talk");
 
   const enabled = await isToritalkEnabled(user.orgId);
   if (!enabled) redirect("/tori-talk");

@@ -138,8 +138,8 @@ export function PhotoUploadModal({ eventId, slotId, slotName, slotEmoji }: Props
                 className="mb-3 flex aspect-square w-full flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-[#D4E4BC] bg-[#E8F0E4]/40 text-[#4A7C59] hover:bg-[#E8F0E4] transition-colors"
               >
                 <span className="text-5xl" aria-hidden="true">📷</span>
-                <span className="text-sm font-semibold">사진 찍기 / 고르기</span>
-                <span className="text-[11px] text-[#6B6560]">카메라 또는 갤러리</span>
+                <span className="text-sm font-semibold">사진 찍기</span>
+                <span className="text-[11px] text-[#6B6560]">카메라로 촬영</span>
               </button>
             )}
 

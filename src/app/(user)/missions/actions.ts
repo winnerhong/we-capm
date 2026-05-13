@@ -174,29 +174,75 @@ export async function uploadMissionPhotoAction(
 /* submitMissionAction                                                        */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * 미션 제출 결과 — throw 대신 결과 객체로 반환.
+ *
+ * Next.js production 빌드는 server action 의 throw 메시지를 마스킹해서
+ * "An error occurred in the Server Components render." 로 노출한다. 사용자에게
+ * 실제 사유(예: "QR 코드가 일치하지 않아요")를 보여주려면 throw 대신 ok/error
+ * 결과를 반환해야 한다.
+ *
+ * `code` 는 클라이언트가 케이스별로 UX 를 분기할 수 있게 한 식별자.
+ *  - 'qr_mismatch' : 다른 미션의 QR / 행사와 무관한 QR
+ *  - 'wrong_answer': 퀴즈 정답 오답
+ *  - 'duplicate'   : 이미 제출함
+ *  - 'validation'  : 그 외 입력 검증 실패
+ *  - 'unknown'     : 그 외
+ */
+export type SubmitMissionResult =
+  | { ok: true; redirectTo?: string }
+  | { ok: false; error: string; code: SubmitErrorCode };
+
+export type SubmitErrorCode =
+  | "qr_mismatch"
+  | "wrong_answer"
+  | "duplicate"
+  | "validation"
+  | "unknown";
+
+class SubmitError extends Error {
+  constructor(
+    message: string,
+    public code: SubmitErrorCode = "validation"
+  ) {
+    super(message);
+  }
+}
+
 export async function submitMissionAction(
   orgMissionId: string,
   payload: unknown
-): Promise<{ redirectTo?: string }> {
+): Promise<SubmitMissionResult> {
   try {
     return await submitMissionActionInner(orgMissionId, payload);
   } catch (e) {
+    if (e instanceof SubmitError) {
+      console.error("[submitMissionAction] validation", {
+        code: e.code,
+        message: e.message,
+      });
+      return { ok: false, error: e.message, code: e.code };
+    }
     if (e instanceof Error) {
       console.error("[submitMissionAction] error", {
         message: e.message,
         stack: e.stack,
       });
-      throw new Error(e.message);
+      return { ok: false, error: e.message, code: "unknown" };
     }
     console.error("[submitMissionAction] non-Error throw", e);
-    throw new Error("알 수 없는 오류로 제출에 실패했어요");
+    return {
+      ok: false,
+      error: "알 수 없는 오류로 제출에 실패했어요",
+      code: "unknown",
+    };
   }
 }
 
 async function submitMissionActionInner(
   orgMissionId: string,
   payload: unknown
-): Promise<{ redirectTo?: string }> {
+): Promise<SubmitMissionResult> {
   const user = await requireAppUser();
   if (!orgMissionId) throw new Error("미션을 찾을 수 없어요");
 
@@ -218,7 +264,7 @@ async function submitMissionActionInner(
       existing.status === "SUBMITTED" ||
       existing.status === "PENDING_REVIEW")
   ) {
-    throw new Error("이미 제출된 미션이에요");
+    throw new SubmitError("이미 제출된 미션이에요", "duplicate");
   }
 
   // Validate payload per kind + build idempotency key + per-kind payload_json
@@ -256,19 +302,27 @@ async function submitMissionActionInner(
       quiz_answer?: unknown;
     };
     const token = asStr(p.qr_scanned_token);
-    if (!token) throw new Error("QR 코드를 입력해 주세요");
+    if (!token) throw new SubmitError("QR 코드를 입력해 주세요");
     const qrCfg = config as Partial<QrQuizMissionConfig>;
     const correctToken = asStr(qrCfg.qr_token);
     if (!correctToken || token !== correctToken) {
-      throw new Error("QR 코드가 일치하지 않아요");
+      throw new SubmitError(
+        "이 미션의 QR 이 아니에요. 미션 안내에 표시된 올바른 QR을 다시 한 번 스캔해 주세요.",
+        "qr_mismatch"
+      );
     }
     const answer = asStr(p.quiz_answer);
     if (qrCfg.quiz_type && qrCfg.quiz_type !== "NONE") {
-      if (!answer) throw new Error("퀴즈 정답을 입력해 주세요");
+      if (!answer)
+        throw new SubmitError("퀴즈 정답을 입력해 주세요", "validation");
       const correctAnswer = asStr(qrCfg.quiz_answer);
-      if (!correctAnswer) throw new Error("이 퀴즈는 정답이 설정되지 않았어요");
+      if (!correctAnswer)
+        throw new SubmitError("이 퀴즈는 정답이 설정되지 않았어요", "validation");
       if (answer.toLowerCase() !== correctAnswer.toLowerCase()) {
-        throw new Error("정답이 아니에요. 다시 시도해 주세요");
+        throw new SubmitError(
+          "정답이 아니에요. 다시 시도해 주세요",
+          "wrong_answer"
+        );
       }
     }
     idempotencyKey = `${user.id}|${mission.id}|${token}`;
@@ -307,7 +361,10 @@ async function submitMissionActionInner(
     const expectedToken = asStr(treasureCfg.final_qr_token);
     const scanned = asStr(p.final_qr_token_scanned);
     if (!expectedToken || scanned !== expectedToken) {
-      throw new Error("최종 QR 코드가 일치하지 않아요");
+      throw new SubmitError(
+        "이 보물찾기 미션의 최종 QR 이 아니에요. 마지막 보물 장소에 부착된 QR을 다시 한 번 확인해 주세요.",
+        "qr_mismatch"
+      );
     }
     const totalSteps = Array.isArray(treasureCfg.steps)
       ? treasureCfg.steps.length
@@ -624,7 +681,7 @@ async function submitMissionActionInner(
   if (packId) revalidatePath(`/stampbook/${packId}`);
   revalidatePath(`/missions/${mission.id}`);
 
-  return { redirectTo };
+  return { ok: true, redirectTo };
 }
 
 /* -------------------------------------------------------------------------- */

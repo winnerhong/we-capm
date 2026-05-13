@@ -151,8 +151,8 @@ export default async function UserLayout({
         className="fixed inset-x-0 bottom-0 z-40 border-t border-[#D4E4BC]/60 bg-white/95 backdrop-blur-md"
         aria-label="주요 메뉴"
       >
-        {/* LIVE 행사가 없으면 스탬프/선물 탭은 숨김 — 행사 시작 후 활성화.
-            토리톡은 기관이 활성화했을 때만 노출 (LIVE 와 무관). */}
+        {/* LIVE 행사가 없으면 스탬프/선물/토리톡 탭 모두 숨김 — 행사 시작 후 활성화.
+            토리톡은 LIVE 행사 + 기관 활성화 둘 다 필요. */}
         <ul className="mx-auto flex max-w-md items-stretch">
           <TabItem href="/home" label="홈" icon="🏠" />
           <TabItem href="/schedule" label="일정" icon="📅" />
@@ -163,7 +163,7 @@ export default async function UserLayout({
               icon={<AcornIcon size={20} />}
             />
           )}
-          {toritalkOn && (
+          {hasLive && toritalkOn && (
             <TabItem
               href="/tori-talk"
               label="토리톡"

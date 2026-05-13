@@ -84,7 +84,7 @@ export function PhotoForm({ eventId, missionId, participantId, config }: Props) 
     <form onSubmit={handleSubmit} className="space-y-4 rounded-lg border bg-white p-6">
       <div>
         <label htmlFor="photos" className="mb-1 block text-sm font-medium">
-          사진 선택 ({minPhotos}~{maxPhotos}장)
+          📷 카메라로 찍기 ({minPhotos}~{maxPhotos}장)
         </label>
         <input id="photos" type="file" accept="image/*" multiple capture="environment"
           onChange={(e) => handleFiles(e.target.files)}
