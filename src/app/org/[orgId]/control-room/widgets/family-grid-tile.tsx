@@ -97,32 +97,35 @@ export function FamilyGridTile({ grid, photos, isTvMode }: Props) {
         </div>
       ) : (
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start">
-          {/* 좌측: 그리드 */}
-          <div className="min-w-0 flex-1 overflow-x-auto">
+          {/* 좌측: 그리드 — 가족 많아도 모두 노출. 일정 높이 넘으면 내부 스크롤. */}
+          <div
+            className="min-w-0 flex-1 overflow-auto rounded-lg border border-[#1a2320]"
+            style={{ maxHeight: isTvMode ? 720 : 520 }}
+          >
             <table className="w-full border-collapse text-[11px]">
-              <thead>
+              <thead className="sticky top-0 z-20 bg-[#0e1513]">
                 <tr>
-                  <th className="sticky left-0 z-10 bg-[#0e1513] px-2 py-1.5 text-left font-semibold text-[#7FA892]">
+                  <th className="sticky left-0 z-30 bg-[#0e1513] px-2 py-1.5 text-left font-semibold text-[#7FA892]">
                     가족
                   </th>
                   {grid.missions.map((m) => (
                     <th
                       key={m.id}
                       title={m.title}
-                      className="px-1 py-1.5 text-center font-semibold text-[#7FA892]"
+                      className="bg-[#0e1513] px-1 py-1.5 text-center font-semibold text-[#7FA892]"
                     >
                       <span className="text-base" aria-hidden>
                         {m.icon ?? "🌱"}
                       </span>
                     </th>
                   ))}
-                  <th className="px-2 py-1.5 text-right font-semibold text-[#7FA892]">
+                  <th className="bg-[#0e1513] px-2 py-1.5 text-right font-semibold text-[#7FA892]">
                     🌰
                   </th>
                 </tr>
               </thead>
               <tbody>
-                {rowsToShow.slice(0, isTvMode ? 20 : 14).map((r) => {
+                {rowsToShow.map((r) => {
                   const isSelected = r.userId === selectedUserId;
                   const isHovered =
                     !selectedUserId && r.userId === hoveredUserId;
@@ -190,10 +193,11 @@ export function FamilyGridTile({ grid, photos, isTvMode }: Props) {
             </table>
           </div>
 
-          {/* 우측: 드릴다운 — hover 미리보기 + click 고정 */}
+          {/* 우측: 드릴다운 — hover 미리보기 + click 고정. lg+ 에서 sticky 로
+              테이블이 길어 스크롤해도 따라온다. */}
           {previewRow ? (
             <aside
-              className={`w-full shrink-0 rounded-lg border bg-[#0e1513] p-3 lg:w-[260px] ${
+              className={`w-full shrink-0 rounded-lg border bg-[#0e1513] p-3 lg:sticky lg:top-2 lg:w-[260px] ${
                 isPinned
                   ? "border-emerald-500/40 ring-1 ring-emerald-500/20"
                   : "border-[#1f2a24] opacity-95"
@@ -293,7 +297,7 @@ export function FamilyGridTile({ grid, photos, isTvMode }: Props) {
             </aside>
           ) : (
             // 아무 행도 hover/click 안 됐을 때 자리 차지용 안내 카드 (lg+ 만).
-            <aside className="hidden w-full shrink-0 rounded-lg border border-dashed border-[#1f2a24] bg-[#0e1513]/60 p-3 lg:block lg:w-[260px]">
+            <aside className="hidden w-full shrink-0 rounded-lg border border-dashed border-[#1f2a24] bg-[#0e1513]/60 p-3 lg:sticky lg:top-2 lg:block lg:w-[260px]">
               <p className="text-center text-[10px] text-[#5e7a6c]">
                 👈 왼쪽 가족 이름 위에 마우스를 올리면
                 <br />
