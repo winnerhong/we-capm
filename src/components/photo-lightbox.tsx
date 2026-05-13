@@ -96,16 +96,14 @@ export function PhotoLightbox({ items, startIndex, onClose }: Props) {
         </div>
       </div>
 
-      {/* 이미지 */}
-      <div
-        className="flex max-h-[85vh] max-w-[95vw] items-center justify-center"
-        onClick={(e) => e.stopPropagation()}
-      >
+      {/* 이미지 — 클릭 시 모달 닫기 (외부 onClick 그대로 버블링) */}
+      <div className="flex max-h-[85vh] max-w-[95vw] items-center justify-center">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={current.url}
           alt={current.caption ?? "사진"}
-          className="max-h-[85vh] max-w-[95vw] rounded-lg object-contain shadow-2xl"
+          onClick={onClose}
+          className="max-h-[85vh] max-w-[95vw] cursor-zoom-out rounded-lg object-contain shadow-2xl"
         />
       </div>
 
@@ -139,7 +137,7 @@ export function PhotoLightbox({ items, startIndex, onClose }: Props) {
 
       {/* 힌트 */}
       <p className="absolute bottom-3 left-1/2 -translate-x-1/2 text-[10px] text-white/50">
-        ESC · 바깥 클릭 = 닫기{total > 1 ? " · ← → 키 = 이전/다음" : ""}
+        사진/바깥 클릭 · ESC = 닫기{total > 1 ? " · ← → 키 = 이전/다음" : ""}
       </p>
     </div>
   );
