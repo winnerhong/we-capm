@@ -232,6 +232,94 @@ export async function loadOrgEventForJoin(eventId: string): Promise<{
 }
 
 /**
+ * 모든 기관에서 현재 LIVE 상태인 행사 목록 — user-login 랜딩에서
+ * "오늘 진행 중인 행사" 카드로 표시.
+ * - 인증 불필요 (공개 정보)
+ * - cover_image_url, starts_at, ends_at, org_name 함께 join
+ * - starts_at ASC (먼저 시작한 행사가 위)
+ * - 실패 시 빈 배열 (silent fail)
+ */
+export async function loadAllLiveEvents(): Promise<
+  Array<{
+    id: string;
+    name: string;
+    org_id: string;
+    org_name: string;
+    starts_at: string | null;
+    ends_at: string | null;
+    cover_image_url: string | null;
+  }>
+> {
+  try {
+    const supabase = await createClient();
+
+    type EvtRow = {
+      id: string;
+      name: string;
+      org_id: string;
+      starts_at: string | null;
+      ends_at: string | null;
+      cover_image_url: string | null;
+    };
+
+    const evtResp = (await (
+      supabase.from("org_events" as never) as unknown as {
+        select: (c: string) => {
+          eq: (k: string, v: string) => {
+            order: (
+              c: string,
+              o: { ascending: boolean }
+            ) => Promise<SbResp<EvtRow>>;
+          };
+        };
+      }
+    )
+      .select("id, name, org_id, starts_at, ends_at, cover_image_url")
+      .eq("status", "LIVE")
+      .order("starts_at", { ascending: true })) as SbResp<EvtRow>;
+
+    if (evtResp.error || !evtResp.data) {
+      console.error("[org-events/loadAllLiveEvents] err", evtResp.error);
+      return [];
+    }
+    const events = evtResp.data;
+    if (events.length === 0) return [];
+
+    const orgIds = Array.from(new Set(events.map((e) => e.org_id)));
+    const orgResp = (await (
+      supabase.from("partner_orgs" as never) as unknown as {
+        select: (c: string) => {
+          in: (
+            k: string,
+            v: string[]
+          ) => Promise<SbResp<{ id: string; org_name: string | null }>>;
+        };
+      }
+    )
+      .select("id, org_name")
+      .in("id", orgIds)) as SbResp<{ id: string; org_name: string | null }>;
+
+    const orgMap = new Map<string, string>();
+    for (const o of orgResp.data ?? []) {
+      orgMap.set(o.id, o.org_name ?? "");
+    }
+
+    return events.map((e) => ({
+      id: e.id,
+      name: e.name,
+      org_id: e.org_id,
+      org_name: orgMap.get(e.org_id) ?? "",
+      starts_at: e.starts_at,
+      ends_at: e.ends_at,
+      cover_image_url: e.cover_image_url,
+    }));
+  } catch (e) {
+    console.error("[org-events/loadAllLiveEvents] throw", e);
+    return [];
+  }
+}
+
+/**
  * 단건 조회.
  */
 export async function loadOrgEventById(

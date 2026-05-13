@@ -2,10 +2,26 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { getAppUser } from "@/lib/user-auth-guard";
+import { loadAllLiveEvents } from "@/lib/org-events/queries";
+import { fmtFullDateKst, fmtAmPmClockKst } from "@/lib/datetime/kst";
 import { LoginForm } from "./login-form";
 import { AcornIcon } from "@/components/acorn-icon";
 
 export const dynamic = "force-dynamic";
+
+function formatEventWindow(
+  startsAt: string | null,
+  endsAt: string | null
+): { dateLabel: string; timeLabel: string } {
+  if (!startsAt) return { dateLabel: "", timeLabel: "" };
+  const dateLabel = fmtFullDateKst(startsAt);
+  const startLabel = fmtAmPmClockKst(startsAt);
+  const endLabel = endsAt ? fmtAmPmClockKst(endsAt) : "";
+  return {
+    dateLabel,
+    timeLabel: endLabel ? `${startLabel} ~ ${endLabel}` : startLabel,
+  };
+}
 
 export default async function UserLoginPage({
   searchParams,
@@ -18,6 +34,8 @@ export default async function UserLoginPage({
   const sp = (await searchParams) ?? {};
   const initialError =
     typeof sp.error === "string" && sp.error.trim() ? sp.error : null;
+
+  const liveEvents = await loadAllLiveEvents();
 
   return (
     <main className="flex min-h-dvh items-center justify-center bg-gradient-to-b from-[#FFF8F0] via-[#F5F1E8] to-[#E8F0E4] px-4 py-10">
@@ -36,6 +54,68 @@ export default async function UserLoginPage({
             학부모 연락처만 입력하면 바로 입장돼요
           </p>
         </div>
+
+        {/* 진행 중인 행사 — 있을 때만 노출 */}
+        {liveEvents.length > 0 && (
+          <section className="space-y-2">
+            <div className="flex items-center gap-2 px-1">
+              <span className="inline-flex h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
+              <h2 className="text-xs font-bold uppercase tracking-wide text-emerald-700">
+                지금 진행 중 ({liveEvents.length})
+              </h2>
+            </div>
+            <ul className="space-y-2">
+              {liveEvents.map((e) => {
+                const { dateLabel, timeLabel } = formatEventWindow(
+                  e.starts_at,
+                  e.ends_at
+                );
+                return (
+                  <li key={e.id}>
+                    <article className="overflow-hidden rounded-3xl border border-[#D4E4BC] bg-white shadow-sm">
+                      {e.cover_image_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={e.cover_image_url}
+                          alt={e.name}
+                          className="aspect-[16/9] w-full object-cover"
+                        />
+                      ) : (
+                        <div className="aspect-[16/9] w-full bg-gradient-to-br from-[#D4E4BC] via-[#E8F0E4] to-[#FAE7D0]" />
+                      )}
+                      <div className="space-y-1 p-4">
+                        <div className="flex items-center gap-2">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 ring-1 ring-emerald-200">
+                            <span className="inline-flex h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
+                            진행중
+                          </span>
+                          {e.org_name && (
+                            <span className="truncate text-[11px] font-semibold text-[#6B6560]">
+                              🌲 {e.org_name}
+                            </span>
+                          )}
+                        </div>
+                        <h3 className="truncate text-base font-bold text-[#2D5A3D]">
+                          {e.name || "(이름 없음)"}
+                        </h3>
+                        {dateLabel && (
+                          <p className="text-xs text-[#6B6560]">
+                            📅 {dateLabel}
+                            {timeLabel && (
+                              <span className="ml-1.5 font-mono text-[#8B7F75]">
+                                {timeLabel}
+                              </span>
+                            )}
+                          </p>
+                        )}
+                      </div>
+                    </article>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        )}
 
         {/* Card */}
         <section className="rounded-3xl border border-[#D4E4BC] bg-white/80 p-6 shadow-sm backdrop-blur-sm">
