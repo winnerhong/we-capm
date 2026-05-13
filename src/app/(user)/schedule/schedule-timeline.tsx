@@ -65,27 +65,61 @@ function fmtCountdown(minutes: number): string {
   return `${h}시간 ${m}분 후 시작`;
 }
 
+/**
+ * 슬롯의 실제 표시 시각을 행사 시작 시각 + 누적 길이로 재계산.
+ *
+ * 이유: admin 이 행사 시각을 바꾸고 timeline 재저장을 안 했을 때
+ * DB 의 slot.starts_at 은 옛 값 그대로 남아있어 일정 페이지가 잘못된
+ * 시각을 보여줌. 초대장(computeSlotDisplayTimes) 과 동일한 누적 방식.
+ *
+ * 슬롯 자체의 duration = ends_at - starts_at (둘 다 있을 때) 으로 계산.
+ * duration 만 보존되면 어느 시점의 starts_at 이든 노이즈 무시 가능.
+ */
 function deriveStatuses(
   rawSlots: TimelineSlotRow[],
-  nowMs: number
+  nowMs: number,
+  eventStartsAt: string | null
 ): SlotWithStatus[] {
-  // 시작 시각 + display_order 정렬
+  // display_order → starts_at 순서. event 시각으로 누적 계산할 거라
+  // display_order 가 더 신뢰할 수 있는 정렬 키.
   const sorted = rawSlots.slice().sort((a, b) => {
-    const t = a.starts_at.localeCompare(b.starts_at);
-    return t !== 0 ? t : a.display_order - b.display_order;
+    if (a.display_order !== b.display_order) {
+      return a.display_order - b.display_order;
+    }
+    return a.starts_at.localeCompare(b.starts_at);
   });
 
+  // 행사 시작 시각 기준 cursor 로 슬롯 시각 누적. eventStartsAt 가 없거나
+  // 잘못된 경우엔 fallback 으로 슬롯의 starts_at 직접 사용.
+  const evStartMs = eventStartsAt
+    ? new Date(eventStartsAt).getTime()
+    : NaN;
+  const useAccum = Number.isFinite(evStartMs);
+  let cursorMs = useAccum ? evStartMs : NaN;
+
   return sorted.map((s, idx) => {
-    const startMs = new Date(s.starts_at).getTime();
-    const explicitEnd = s.ends_at ? new Date(s.ends_at).getTime() : null;
-    // 종료 시각 추정: 명시 ends_at > 다음 슬롯 시작 > 시작+30분
+    const slotRawStart = new Date(s.starts_at).getTime();
+    const slotRawEnd = s.ends_at ? new Date(s.ends_at).getTime() : NaN;
+    const durMs =
+      Number.isFinite(slotRawStart) &&
+      Number.isFinite(slotRawEnd) &&
+      slotRawEnd > slotRawStart
+        ? slotRawEnd - slotRawStart
+        : 30 * 60 * 1000; // 기본 30분
+
+    let startMs: number;
     let endMs: number;
-    if (explicitEnd && Number.isFinite(explicitEnd)) {
-      endMs = explicitEnd;
-    } else if (idx < sorted.length - 1) {
-      endMs = new Date(sorted[idx + 1].starts_at).getTime();
+    if (useAccum) {
+      startMs = cursorMs;
+      endMs = startMs + durMs;
+      cursorMs = endMs;
     } else {
-      endMs = startMs + 30 * 60 * 1000;
+      startMs = slotRawStart;
+      endMs = Number.isFinite(slotRawEnd)
+        ? slotRawEnd
+        : idx < sorted.length - 1
+          ? new Date(sorted[idx + 1].starts_at).getTime()
+          : startMs + durMs;
     }
 
     let status: SlotStatus;
@@ -97,6 +131,9 @@ function deriveStatuses(
 
     return {
       ...s,
+      // 재계산된 시각을 starts_at 으로 덮어써 표시·status·countdown 일관.
+      starts_at: new Date(startMs).toISOString(),
+      ends_at: new Date(endMs).toISOString(),
       status,
       effectiveEndsAt: new Date(endMs).toISOString(),
       startsInMinutes,
@@ -170,8 +207,8 @@ export function ScheduleTimeline({
   }, [eventId, router]);
 
   const enrichedSlots = useMemo(
-    () => deriveStatuses(slots, now),
-    [slots, now]
+    () => deriveStatuses(slots, now, eventStartsAt),
+    [slots, now, eventStartsAt]
   );
 
   const currentSlot = enrichedSlots.find((s) => s.status === "CURRENT") ?? null;
