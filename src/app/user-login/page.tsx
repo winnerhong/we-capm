@@ -114,6 +114,15 @@ export default async function UserLoginPage({
                 );
               })}
             </ul>
+            {/* 행사 카드 바로 아래 안내 — 행사장 위치·식순은 로그인 후 노출됨 */}
+            <div className="rounded-2xl border-2 border-amber-300 bg-amber-50 px-4 py-3 text-center shadow-sm">
+              <p className="text-sm font-bold text-amber-900">
+                📍 행사 장소와 식순을 보시려면
+              </p>
+              <p className="mt-1 text-xs text-amber-800">
+                아래에 <b>등록된 학부모 연락처</b>를 입력해 주세요!
+              </p>
+            </div>
           </section>
         )}
 
