@@ -6,6 +6,7 @@ import {
   type RadioModerationStatus,
 } from "@/lib/missions/types";
 import { RadioQueueActions } from "./RadioQueueActions";
+import { fmtShortDateKst } from "@/lib/datetime/kst";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +25,7 @@ function formatRelative(iso: string): string {
   if (min < 60) return `${min}분 전`;
   const hr = Math.floor(min / 60);
   if (hr < 24) return `${hr}시간 전`;
-  return d.toLocaleDateString("ko-KR");
+  return fmtShortDateKst(iso);
 }
 
 export default async function OrgRadioModerationPage({

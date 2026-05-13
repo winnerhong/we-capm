@@ -13,6 +13,7 @@ import {
 } from "@/lib/org-documents/types";
 import { signedDocUrl } from "@/lib/documents/signed-url";
 import { deleteOrgDocumentAction } from "../actions";
+import { fmtDateTimeKst } from "@/lib/datetime/kst";
 
 export const dynamic = "force-dynamic";
 
@@ -23,13 +24,7 @@ type PageProps = {
 function fmtDateTime(iso: string | null | undefined) {
   if (!iso) return "-";
   try {
-    return new Date(iso).toLocaleString("ko-KR", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    return fmtDateTimeKst(iso);
   } catch {
     return iso;
   }

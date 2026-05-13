@@ -8,6 +8,7 @@ import { AttendanceToggle } from "./users/attendance-toggle";
 import { AcornAdjuster } from "./users/acorn-adjuster";
 import { UserRowActions } from "./users/user-row-actions";
 import { AcornIcon } from "@/components/acorn-icon";
+import { fmtFullDateKst } from "@/lib/datetime/kst";
 
 type UserStatus = "ACTIVE" | "SUSPENDED" | "CLOSED";
 type AttendanceStatus = "PRESENT" | "LATE" | "ABSENT";
@@ -60,11 +61,7 @@ function formatPhone(raw: string): string {
 function formatDateTime(iso: string | null): string {
   if (!iso) return "-";
   try {
-    return new Date(iso).toLocaleDateString("ko-KR", {
-      year: "2-digit",
-      month: "2-digit",
-      day: "2-digit",
-    });
+    return fmtFullDateKst(iso);
   } catch {
     return "-";
   }

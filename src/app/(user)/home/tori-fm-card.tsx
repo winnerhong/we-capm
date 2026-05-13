@@ -20,6 +20,7 @@ import type {
   RadioSubmissionPayload,
   ToriFmSessionRow,
 } from "@/lib/missions/types";
+import { fmtDateTimeKst } from "@/lib/datetime/kst";
 
 interface Props {
   orgId: string;
@@ -33,13 +34,7 @@ interface Props {
 function fmtSchedule(iso: string | null): string {
   if (!iso) return "";
   try {
-    return new Date(iso).toLocaleString("ko-KR", {
-      month: "2-digit",
-      day: "2-digit",
-      weekday: "short",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    return fmtDateTimeKst(iso);
   } catch {
     return "";
   }

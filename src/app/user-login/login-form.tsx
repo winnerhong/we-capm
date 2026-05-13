@@ -19,7 +19,15 @@ function safeReturnPath(raw: string | null | undefined): string | null {
   return raw;
 }
 
-export function LoginForm({ initialError }: { initialError?: string | null }) {
+export function LoginForm({
+  initialError,
+  liveEventId,
+}: {
+  initialError?: string | null;
+  // 라이브 이벤트가 정확히 1개일 때 그 행사 ID. 로그인 후 초대장으로 자연스럽게
+  // 안내하기 위한 기본 목적지.
+  liveEventId?: string | null;
+}) {
   const router = useRouter();
   const searchParams = useSearchParams();
   // 초대장 등에서 ?return=/invitation/xxx 로 넘어온 경우 그쪽으로 복귀.
@@ -51,9 +59,16 @@ export function LoginForm({ initialError }: { initialError?: string | null }) {
             ok?: boolean;
             redirectTo?: string;
           } | null;
-          // 우선순위: URL ?return= > API redirectTo > /home
-          // (초대장 링크 → 로그인 → 다시 초대장 으로 자연스럽게 돌아오기)
-          const dest = returnTo ?? data?.redirectTo ?? "/home";
+          // 우선순위:
+          //  1) URL ?return= — 초대장 링크에서 직접 진입 (가장 명시적)
+          //  2) liveEventId — 라이브 이벤트가 1개면 그 행사 초대장 보여주고 입장
+          //  3) API redirectTo
+          //  4) /home
+          const dest =
+            returnTo ??
+            (liveEventId ? `/invitation/${liveEventId}` : null) ??
+            data?.redirectTo ??
+            "/home";
           router.push(dest);
           router.refresh();
           return;

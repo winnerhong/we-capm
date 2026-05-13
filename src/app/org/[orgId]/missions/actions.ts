@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireOrg } from "@/lib/org-auth-guard";
-import { toIsoKstFromLocalInput } from "@/lib/datetime/kst";
+import { toIsoKstFromLocalInput, fmtFullDateKst } from "@/lib/datetime/kst";
 import { loadAvailableMissionsForOrg } from "@/lib/missions/queries";
 import type {
   ApprovalMode,
@@ -399,6 +399,47 @@ export async function updateOrgMissionAction(
       `/org/${session.orgId}/quest-packs/${existing.quest_pack_id}/edit`
     );
   }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Update mission host/organizer (초대장 주최·주관)                            */
+/* -------------------------------------------------------------------------- */
+
+export async function updateMissionHostOrganizerAction(
+  id: string,
+  formData: FormData
+): Promise<void> {
+  const session = await requireOrg();
+  const supabase = await createClient();
+
+  const existing = await loadOrgMissionOwned(supabase, id, session.orgId);
+  if (!existing) throw new Error("미션을 찾을 수 없어요");
+
+  const invitation_host = strOrNull(formData.get("invitation_host"));
+  const invitation_organizer = strOrNull(formData.get("invitation_organizer"));
+
+  const patch: Row = {
+    invitation_host,
+    invitation_organizer,
+    updated_at: new Date().toISOString(),
+  };
+
+  const { error } = await (
+    supabase.from("org_missions" as never) as unknown as {
+      update: (r: Row) => {
+        eq: (
+          k: string,
+          v: string
+        ) => Promise<{ error: { message: string } | null }>;
+      };
+    }
+  )
+    .update(patch)
+    .eq("id", id);
+
+  if (error) throw new Error(`주최·주관 저장 실패: ${error.message}`);
+
+  revalidatePath(`/org/${session.orgId}/missions/${id}/edit`);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -928,11 +969,7 @@ export async function createPackFromPresetAction(
   }
 
   // 3) 팩 생성 (DRAFT)
-  const koDate = new Date().toLocaleDateString("ko-KR", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
+  const koDate = fmtFullDateKst(new Date().toISOString());
   const packName = `${preset.name} (${koDate})`;
 
   const packRow: Record<string, unknown> = {

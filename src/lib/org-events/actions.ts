@@ -103,8 +103,11 @@ function parseParkingsJson(raw: unknown): ParkingItem[] {
         const o = row as Record<string, unknown>;
         const name = clampString(String(o.name ?? ""), 100);
         const address = clampString(String(o.address ?? ""), 200);
+        const imageRaw = clampString(String(o.image_url ?? ""), 500);
         if (!name && !address) return null;
-        return { name: name ?? "", address: address ?? "" };
+        const item: ParkingItem = { name: name ?? "", address: address ?? "" };
+        if (imageRaw) item.image_url = imageRaw;
+        return item;
       })
       .filter((v): v is ParkingItem => v !== null)
       .slice(0, MAX_PARKING_ITEMS);
@@ -127,8 +130,11 @@ function parseParkingsJson(raw: unknown): ParkingItem[] {
 function extractEventFields(formData: FormData): {
   name: string | null;
   description: string | null;
-  starts_at: string | null;
-  ends_at: string | null;
+  // undefined = form 에서 키 자체를 안 보냄 → "변경 의도 없음, 기존 값 보존"
+  // null     = 명시적으로 비움
+  // string   = 새 값
+  starts_at: string | null | undefined;
+  ends_at: string | null | undefined;
   cover_image_url: string | null;
   status: OrgEventStatus | null;
   allow_self_register: boolean | null;
@@ -136,8 +142,11 @@ function extractEventFields(formData: FormData): {
   invitation_body: string | null;
   invitation_location: string | null;
   invitation_address: string | null;
+  invitation_location_image_url: string | null;
   invitation_dress_code: string | null;
   invitation_parkings: ParkingItem[];
+  invitation_host: string | null;
+  invitation_organizer: string | null;
 } {
   const rawStatus = String(formData.get("status") ?? "").trim();
   const rawSelfReg = formData.get("allow_self_register");
@@ -149,12 +158,15 @@ function extractEventFields(formData: FormData): {
   return {
     name: clampString(String(formData.get("name") ?? ""), 100),
     description: clampString(String(formData.get("description") ?? ""), 2000),
-    starts_at: parseIsoOrNull(
-      formData.get("starts_at") ? String(formData.get("starts_at")) : null
-    ),
-    ends_at: parseIsoOrNull(
-      formData.get("ends_at") ? String(formData.get("ends_at")) : null
-    ),
+    // form 에 키 자체가 없으면 undefined (변경 안 함). 키가 있으면 parse.
+    starts_at:
+      formData.get("starts_at") === null
+        ? undefined
+        : parseIsoOrNull(String(formData.get("starts_at"))),
+    ends_at:
+      formData.get("ends_at") === null
+        ? undefined
+        : parseIsoOrNull(String(formData.get("ends_at"))),
     cover_image_url: clampString(
       String(formData.get("cover_image_url") ?? ""),
       500
@@ -177,11 +189,23 @@ function extractEventFields(formData: FormData): {
       String(formData.get("invitation_address") ?? ""),
       300
     ),
+    invitation_location_image_url: clampString(
+      String(formData.get("invitation_location_image_url") ?? ""),
+      500
+    ),
     invitation_dress_code: clampString(
       String(formData.get("invitation_dress_code") ?? ""),
       500
     ),
     invitation_parkings: parseParkingsJson(formData.get("invitation_parkings_json")),
+    invitation_host: clampString(
+      String(formData.get("invitation_host") ?? ""),
+      100
+    ),
+    invitation_organizer: clampString(
+      String(formData.get("invitation_organizer") ?? ""),
+      200
+    ),
   };
 }
 
@@ -223,8 +247,9 @@ export async function createOrgEventAction(
       org_id: org.orgId,
       name: fields.name,
       description: fields.description,
-      starts_at: fields.starts_at,
-      ends_at: fields.ends_at,
+      // 신규 생성은 폼이 항상 starts_at 을 보내므로 undefined → null fallback.
+      starts_at: fields.starts_at ?? null,
+      ends_at: fields.ends_at ?? null,
       cover_image_url: fields.cover_image_url,
       status: "DRAFT",
     } satisfies Row)
@@ -263,6 +288,18 @@ export async function updateOrgEventAction(
     }
   }
 
+  // 🕒 진단 로그 — 시각 필드가 update 되는 모든 호출을 추적.
+  // 누가 어떤 값으로 starts_at 을 갱신하는지 Vercel 로그에서 확인.
+  if (fields.starts_at !== undefined || fields.ends_at !== undefined) {
+    const before = await loadOrgEventById(eventId);
+    console.log("[org-events/update] time fields touched", {
+      eventId,
+      from: { starts: before?.starts_at, ends: before?.ends_at },
+      to: { starts: fields.starts_at, ends: fields.ends_at },
+      stack: new Error().stack?.split("\n").slice(2, 6).join(" | "),
+    });
+  }
+
   const supabase = await createClient();
   const resp = (await (
     supabase.from("org_events" as never) as unknown as {
@@ -274,8 +311,9 @@ export async function updateOrgEventAction(
     .update({
       name: fields.name,
       description: fields.description,
-      starts_at: fields.starts_at,
-      ends_at: fields.ends_at,
+      // undefined = form 에서 안 보냄 → spread 에서 제외 → DB 값 보존.
+      ...(fields.starts_at !== undefined ? { starts_at: fields.starts_at } : {}),
+      ...(fields.ends_at !== undefined ? { ends_at: fields.ends_at } : {}),
       cover_image_url: fields.cover_image_url,
       ...(fields.status ? { status: fields.status } : {}),
       ...(fields.allow_self_register !== null
@@ -285,11 +323,14 @@ export async function updateOrgEventAction(
       invitation_body: fields.invitation_body,
       invitation_location: fields.invitation_location,
       invitation_address: fields.invitation_address,
+      invitation_location_image_url: fields.invitation_location_image_url,
       invitation_dress_code: fields.invitation_dress_code,
       invitation_parkings:
         fields.invitation_parkings.length > 0
           ? fields.invitation_parkings
           : null,
+      invitation_host: fields.invitation_host,
+      invitation_organizer: fields.invitation_organizer,
     } satisfies Row)
     .eq("id", eventId)) as { error: SbErr };
 

@@ -20,6 +20,7 @@ import {
   BroadcastTriggerPanel,
   CancelBroadcastButton,
 } from "./trigger-panel";
+import { fmtDateTimeKst } from "@/lib/datetime/kst";
 
 export const dynamic = "force-dynamic";
 
@@ -257,7 +258,7 @@ export default async function BroadcastConsolePage({
                       </p>
                       <p className="text-[11px] text-[#6B6560]">
                         {scopeLabel(b.target_scope)} ·{" "}
-                        {new Date(b.fires_at).toLocaleString("ko-KR")}
+                        {fmtDateTimeKst(b.fires_at)}
                       </p>
                     </div>
                     <BroadcastCountdown expiresAt={b.expires_at} />
@@ -336,14 +337,12 @@ export default async function BroadcastConsolePage({
                           </span>
                         </div>
                         <p className="mt-0.5 text-[11px] text-[#6B6560]">
-                          {new Date(b.fires_at).toLocaleString("ko-KR")} ·
+                          {fmtDateTimeKst(b.fires_at)} ·
                           지속 {Math.round(b.duration_sec / 60)}분
                           {b.cancelled_at && (
                             <>
                               {" "}· 취소 {" "}
-                              {new Date(b.cancelled_at).toLocaleString(
-                                "ko-KR"
-                              )}
+                              {fmtDateTimeKst(b.cancelled_at)}
                             </>
                           )}
                         </p>

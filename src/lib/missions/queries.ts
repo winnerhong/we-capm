@@ -334,6 +334,91 @@ export async function loadOrgMissionById(
   return resp.data ?? null;
 }
 
+/**
+ * 미션이 속한 스탬프북에 연결된 행사 중 가장 최근의 주최·주관 값을 반환.
+ * 미션의 invitation_host / invitation_organizer 초기 자동기입 default 로 사용.
+ * 연결된 행사가 없거나 둘 다 비어있으면 null 반환.
+ */
+export async function loadEventHostOrganizerDefaultsForMission(
+  orgMissionId: string
+): Promise<{ host: string; organizer: string } | null> {
+  if (!orgMissionId) return null;
+  const supabase = await createClient();
+
+  // 1) 미션 -> quest_pack_id
+  const missionResp = (await (
+    supabase.from("org_missions" as never) as unknown as {
+      select: (c: string) => {
+        eq: (k: string, v: string) => {
+          maybeSingle: () => Promise<
+            SbRespOne<{ quest_pack_id: string | null }>
+          >;
+        };
+      };
+    }
+  )
+    .select("quest_pack_id")
+    .eq("id", orgMissionId)
+    .maybeSingle()) as SbRespOne<{ quest_pack_id: string | null }>;
+
+  const packId = missionResp.data?.quest_pack_id;
+  if (!packId) return null;
+
+  // 2) quest_pack_id -> event_ids (M:N)
+  const linkResp = (await (
+    supabase.from("org_event_quest_packs" as never) as unknown as {
+      select: (c: string) => {
+        eq: (k: string, v: string) => Promise<SbResp<{ event_id: string }>>;
+      };
+    }
+  )
+    .select("event_id")
+    .eq("quest_pack_id", packId)) as SbResp<{ event_id: string }>;
+
+  const eventIds = (linkResp.data ?? []).map((r) => r.event_id).filter(Boolean);
+  if (eventIds.length === 0) return null;
+
+  // 3) 행사 중 가장 최근 시작 이벤트의 host/organizer
+  const eventsResp = (await (
+    supabase.from("org_events" as never) as unknown as {
+      select: (c: string) => {
+        in: (
+          k: string,
+          v: string[]
+        ) => {
+          order: (
+            k: string,
+            o: { ascending: boolean; nullsFirst?: boolean }
+          ) => {
+            limit: (
+              n: number
+            ) => Promise<
+              SbResp<{
+                invitation_host: string | null;
+                invitation_organizer: string | null;
+              }>
+            >;
+          };
+        };
+      };
+    }
+  )
+    .select("invitation_host,invitation_organizer")
+    .in("id", eventIds)
+    .order("starts_at", { ascending: false, nullsFirst: false })
+    .limit(1)) as SbResp<{
+    invitation_host: string | null;
+    invitation_organizer: string | null;
+  }>;
+
+  const row = eventsResp.data?.[0];
+  if (!row) return null;
+  const host = (row.invitation_host ?? "").trim();
+  const organizer = (row.invitation_organizer ?? "").trim();
+  if (!host && !organizer) return null;
+  return { host, organizer };
+}
+
 /* -------------------------------------------------------------------------- */
 /* Submissions                                                                */
 /* -------------------------------------------------------------------------- */

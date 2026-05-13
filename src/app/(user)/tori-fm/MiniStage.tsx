@@ -28,6 +28,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import type { ToriFmSessionRow } from "@/lib/missions/types";
 import { ListenerPresence } from "@/components/tori-fm/ListenerPresence";
+import { fmtShortDateKst } from "@/lib/datetime/kst";
 import { ScreenEffectsLayer } from "@/app/screen/tori-fm/[orgId]/vfx/ScreenEffectsLayer";
 import {
   anonLabelFromUserId,
@@ -115,10 +116,7 @@ function fmtRelative(iso: string): string {
   if (m < 60) return `${m}분 전`;
   const h = Math.floor(m / 60);
   if (h < 24) return `${h}시간 전`;
-  return new Date(iso).toLocaleDateString("ko-KR", {
-    month: "2-digit",
-    day: "2-digit",
-  });
+  return fmtShortDateKst(iso);
 }
 
 function fmtTimeRange(start: string, end: string): string {

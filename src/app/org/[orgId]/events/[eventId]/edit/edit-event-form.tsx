@@ -15,6 +15,7 @@ import {
   type ParkingItem,
 } from "@/lib/org-events/types";
 import { CoverImagePicker } from "@/components/cover-image-picker";
+import { fmtDateTimeKst } from "@/lib/datetime/kst";
 
 const INPUT_CLS =
   "w-full rounded-xl border border-[#D4E4BC] bg-[#FFF8F0] px-3 py-2.5 text-sm text-[#2C2C2C] focus:border-[#3A7A52] focus:outline-none focus:ring-2 focus:ring-[#3A7A52]/30";
@@ -129,14 +130,7 @@ function formatDuration(min: number): string {
 function formatDateTimeKo(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "-";
-  return d.toLocaleString("ko-KR", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    weekday: "short",
-  });
+  return fmtDateTimeKst(iso);
 }
 
 export function EditEventForm({
@@ -158,8 +152,11 @@ export function EditEventForm({
     invitation_body: string;
     invitation_location: string;
     invitation_address: string;
+    invitation_location_image_url: string;
     invitation_dress_code: string;
     invitation_parkings: ParkingItem[];
+    invitation_host: string;
+    invitation_organizer: string;
   };
 }) {
   const router = useRouter();
@@ -189,12 +186,17 @@ export function EditEventForm({
   const [invBody, setInvBody] = useState(initial.invitation_body);
   const [invLocation, setInvLocation] = useState(initial.invitation_location);
   const [invAddress, setInvAddress] = useState(initial.invitation_address);
+  const [invLocationImage, setInvLocationImage] = useState(
+    initial.invitation_location_image_url
+  );
   const [invDressCode, setInvDressCode] = useState(initial.invitation_dress_code);
   const [invParkings, setInvParkings] = useState<ParkingItem[]>(
     initial.invitation_parkings.length > 0
       ? initial.invitation_parkings
       : []
   );
+  const [invHost, setInvHost] = useState(initial.invitation_host);
+  const [invOrganizer, setInvOrganizer] = useState(initial.invitation_organizer);
 
   const updateParking = (idx: number, patch: Partial<ParkingItem>) => {
     setInvParkings((prev) =>
@@ -223,6 +225,19 @@ export function EditEventForm({
     const end = new Date(start.getTime() + durationMin * 60 * 1000);
     return toLocalIsoMinute(end);
   }, [startsAt, durationMin]);
+
+  // 사용자가 시각 필드를 만지지 않았으면 starts_at/ends_at 을 절대 update 에
+  // 넣지 않는다 — round-trip 마다 9h 가 깎이던 버그를 봉합.
+  // 비교 기준: form mount 시점의 KST 분리값. 5분 스냅 등 자동 정규화로 인해
+  // 비교 결과가 false 가 될 가능성도 있어 보수적으로 "사용자가 정말 안 바꿨을 때만"
+  // 변경 없음으로 판정.
+  const initialStartsAtLocal = `${initParts.date}T${pad(initParts.hour)}:${pad(initParts.min)}`;
+  const initialDurationMin =
+    initialStart && initialEnd ? diffMinutes(initialStart, initialEnd) : null;
+  const timeUnchanged =
+    startsAt === initialStartsAtLocal &&
+    initialDurationMin !== null &&
+    durationMin === initialDurationMin;
 
   function handleDelete() {
     if (isDeleting || isPending) return;
@@ -285,8 +300,12 @@ export function EditEventForm({
 
     fd.set("name", trimmed);
     fd.set("description", description.trim());
-    fd.set("starts_at", toKstIso(startsAt));
-    fd.set("ends_at", toKstIso(endsAt));
+    // ⏰ 사용자가 시각/기간을 정말 변경했을 때만 starts_at/ends_at 을 보낸다.
+    // 안 보내면 server action 이 update payload 에서 해당 필드를 제외 → DB 보존.
+    if (!timeUnchanged) {
+      fd.set("starts_at", toKstIso(startsAt));
+      fd.set("ends_at", toKstIso(endsAt));
+    }
     fd.set("cover_image_url", coverUrl.trim());
     fd.set("status", status);
     // 체크박스 전용: backend 가 "on" / 미전송으로 true/false 판단하는 관례와 동일.
@@ -295,10 +314,21 @@ export function EditEventForm({
     fd.set("invitation_body", invBody.trim());
     fd.set("invitation_location", invLocation.trim());
     fd.set("invitation_address", invAddress.trim());
+    fd.set("invitation_location_image_url", invLocationImage.trim());
     fd.set("invitation_dress_code", invDressCode.trim());
-    // 주차장: 빈 행 제외, JSON 직렬화
+    fd.set("invitation_host", invHost.trim());
+    fd.set("invitation_organizer", invOrganizer.trim());
+    // 주차장: 빈 행 제외, JSON 직렬화 (사진은 비어있으면 키 자체 제외)
     const cleanedParkings = invParkings
-      .map((p) => ({ name: p.name.trim(), address: p.address.trim() }))
+      .map((p) => {
+        const item: Record<string, string> = {
+          name: p.name.trim(),
+          address: p.address.trim(),
+        };
+        const img = (p.image_url ?? "").trim();
+        if (img) item.image_url = img;
+        return item;
+      })
       .filter((p) => p.name || p.address);
     fd.set("invitation_parkings_json", JSON.stringify(cleanedParkings));
 
@@ -623,6 +653,22 @@ export function EditEventForm({
                 </p>
               </div>
 
+              {/* 🖼 행사장 사진 — 입구/간판 등. 초대장 "오시는 길" 카드에 노출됨. */}
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-[#2D5A3D]">
+                  🖼 행사장 사진 (선택)
+                </label>
+                <CoverImagePicker
+                  value={invLocationImage}
+                  onChange={(url) => setInvLocationImage(url)}
+                  pathPrefix={`events/${eventId}/location`}
+                  compact
+                />
+                <p className="mt-1 text-[10px] text-[#8B7F75]">
+                  💡 입구/간판 사진을 올리면 초대장 &quot;오시는 길&quot; 카드 아래에 노출됩니다.
+                </p>
+              </div>
+
               <div>
                 <label
                   htmlFor="invitation_dress_code"
@@ -644,6 +690,44 @@ export function EditEventForm({
                 <p className="mt-1 text-[10px] text-[#8B7F75]">
                   💡 줄바꿈이 그대로 초대장에 표시돼요.
                 </p>
+              </div>
+
+              {/* 🏫 주최 / 🎯 주관 — 자유 입력. 비우면 초대장에서 줄 자체 숨김. */}
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label
+                    htmlFor="invitation_host"
+                    className="mb-1 block text-xs font-semibold text-[#2D5A3D]"
+                  >
+                    🏫 주최 (선택)
+                  </label>
+                  <input
+                    id="invitation_host"
+                    type="text"
+                    maxLength={100}
+                    value={invHost}
+                    onChange={(e) => setInvHost(e.target.value)}
+                    placeholder="예) 구미혜당학교"
+                    className={INPUT_CLS}
+                  />
+                </div>
+                <div>
+                  <label
+                    htmlFor="invitation_organizer"
+                    className="mb-1 block text-xs font-semibold text-[#2D5A3D]"
+                  >
+                    🎯 주관 (선택)
+                  </label>
+                  <input
+                    id="invitation_organizer"
+                    type="text"
+                    maxLength={200}
+                    value={invOrganizer}
+                    onChange={(e) => setInvOrganizer(e.target.value)}
+                    placeholder="예) 위너키즈스포츠 [위너기획]"
+                    className={INPUT_CLS}
+                  />
+                </div>
               </div>
 
               {/* 🅿 주차장 N개 */}
@@ -706,6 +790,21 @@ export function EditEventForm({
                           placeholder="주소 (예: 대구 북구 침산동 1129-1)"
                           className={`${INPUT_CLS} mt-1.5`}
                         />
+                        <div className="mt-2">
+                          <label className="mb-1 block text-[10px] font-semibold text-[#2D5A3D]">
+                            🖼 사진 (선택)
+                          </label>
+                          <CoverImagePicker
+                            value={p.image_url ?? ""}
+                            onChange={(url) =>
+                              updateParking(idx, {
+                                image_url: url.trim() || undefined,
+                              })
+                            }
+                            pathPrefix={`events/${eventId}/parkings`}
+                            compact
+                          />
+                        </div>
                       </li>
                     ))}
                   </ul>

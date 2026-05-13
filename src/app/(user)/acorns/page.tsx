@@ -9,6 +9,7 @@ import {
   type AcornTransactionRow,
 } from "@/lib/app-user/queries";
 import { AcornIcon } from "@/components/acorn-icon";
+import { fmtDateTimeKst } from "@/lib/datetime/kst";
 
 export const dynamic = "force-dynamic";
 
@@ -26,14 +27,7 @@ const REASON_META: Record<AcornReason, { label: string; icon: ReactNode }> = {
 
 function formatWhen(iso: string): string {
   try {
-    const d = new Date(iso);
-    return d.toLocaleString("ko-KR", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    return fmtDateTimeKst(iso);
   } catch {
     return iso;
   }

@@ -27,10 +27,16 @@ export interface OrgEventRow {
   invitation_location: string | null;
   /** 초대장 상세 주소 — 도로명/지번 (지도 검색에 사용). */
   invitation_address: string | null;
+  /** 초대장 행사장 안내 이미지 — Storage public URL. 비우면 노출 안 함. */
+  invitation_location_image_url: string | null;
   /** 복장·준비물 안내. */
   invitation_dress_code: string | null;
   /** 초대장 주차장 — 최대 5개. */
   invitation_parkings: ParkingItem[] | null;
+  /** 초대장 주최 (자유 입력). 예: "구미혜당학교". 비우면 줄 자체 숨김. */
+  invitation_host: string | null;
+  /** 초대장 주관 (자유 입력). 예: "위너키즈스포츠 [위너기획]". */
+  invitation_organizer: string | null;
   /** 초대장 발행 시점. null=초안. */
   invitation_published_at: string | null;
   created_at: string;
@@ -41,6 +47,8 @@ export interface OrgEventRow {
 export interface ParkingItem {
   name: string;
   address: string;
+  /** 입구·간판 사진 (선택). Storage public URL. */
+  image_url?: string;
 }
 
 /** 초대장 주차장 최대 개수. */

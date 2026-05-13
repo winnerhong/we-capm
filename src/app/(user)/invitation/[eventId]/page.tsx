@@ -3,13 +3,10 @@ import { notFound, redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { getAppUser } from "@/lib/user-auth-guard";
 import { loadOrgEventById } from "@/lib/org-events/queries";
-import { loadAppUserById, loadChildrenForUser } from "@/lib/app-user/queries";
-import { loadOrgHomepageBanner } from "@/lib/org-banner/queries";
-import { HomepageBannerDisplay } from "@/components/homepage-banner-display";
+import { loadAppUserById } from "@/lib/app-user/queries";
 import { loadPartnerDisplayNameForOrg } from "@/lib/org-partner";
 import { loadTimelineSlots } from "@/lib/event-timeline/queries";
-import { SLOT_KIND_META } from "@/lib/event-timeline/types";
-import { createClient } from "@/lib/supabase/server";
+import { TimelineCollapsible } from "./timeline-collapsible";
 // 시간 포맷은 KST 강제 (SSR/CSR 일치 보장).
 import {
   fmtAmPmClockKst,
@@ -52,23 +49,37 @@ function fmtSlotTime(iso: string): string {
 function computeSlotDisplayTimes(
   eventStartsAt: string | null,
   slots: Array<{ starts_at: string; ends_at: string | null }>
-): string[] {
+): Array<{ start: string; end: string | null; durationMin: number | null }> {
   if (!eventStartsAt || slots.length === 0) {
-    return slots.map((s) => fmtSlotTime(s.starts_at));
+    return slots.map((s) => ({
+      start: fmtSlotTime(s.starts_at),
+      end: s.ends_at ? fmtSlotTime(s.ends_at) : null,
+      durationMin: null,
+    }));
   }
   const startMs = new Date(eventStartsAt).getTime();
   if (!Number.isFinite(startMs)) {
-    return slots.map((s) => fmtSlotTime(s.starts_at));
+    return slots.map((s) => ({
+      start: fmtSlotTime(s.starts_at),
+      end: s.ends_at ? fmtSlotTime(s.ends_at) : null,
+      durationMin: null,
+    }));
   }
   let cursor = startMs;
-  const out: string[] = [];
+  const out: Array<{ start: string; end: string | null; durationMin: number | null }> = [];
   for (const s of slots) {
-    out.push(fmtSlotTime(new Date(cursor).toISOString()));
     const sMs = new Date(s.starts_at).getTime();
     const eMs = s.ends_at ? new Date(s.ends_at).getTime() : NaN;
-    const dur =
+    const durMs =
       Number.isFinite(sMs) && Number.isFinite(eMs) && eMs > sMs ? eMs - sMs : 0;
-    cursor += dur;
+    const slotStart = cursor;
+    const slotEnd = cursor + durMs;
+    out.push({
+      start: fmtSlotTime(new Date(slotStart).toISOString()),
+      end: durMs > 0 ? fmtSlotTime(new Date(slotEnd).toISOString()) : null,
+      durationMin: durMs > 0 ? Math.round(durMs / 60000) : null,
+    });
+    cursor = slotEnd;
   }
   return out;
 }
@@ -158,16 +169,12 @@ export default async function EventInvitationPage({
     redirect(`/user-login?return=/invitation/${eventId}`);
   }
 
-  const [event, user, children] = await Promise.all([
+  const [event, user] = await Promise.all([
     loadOrgEventById(eventId),
     loadAppUserById(session.id),
-    loadChildrenForUser(session.id),
   ]);
 
   if (!event) notFound();
-
-  // 하단 홈페이지 배너 — 기관 설정값 (모든 필드 빈 값이면 자동 비노출)
-  const homepageBanner = await loadOrgHomepageBanner(event.org_id);
 
   // 행사 미발행 — 초안 안내
   if (!event.invitation_published_at) {
@@ -183,39 +190,8 @@ export default async function EventInvitationPage({
     () => null
   );
 
-  // 기관(어린이집/학교) 실제 이름 — partner_orgs.org_name. 푸터의 "이 초대합니다" 주체.
-  const supabase = await createClient();
-  const orgRowResp = (await (
-    supabase.from("partner_orgs" as never) as unknown as {
-      select: (c: string) => {
-        eq: (k: string, v: string) => {
-          maybeSingle: () => Promise<{
-            data: { org_name: string | null } | null;
-          }>;
-        };
-      };
-    }
-  )
-    .select("org_name")
-    .eq("id", event.org_id)
-    .maybeSingle()) as { data: { org_name: string | null } | null };
-  const inviterOrgName = orgRowResp.data?.org_name?.trim() || orgName || "";
-
   // 타임테이블 — 행사 전체 흐름을 모두 노출 (참가자가 미리 보고 준비할 수 있도록)
   const slots = await loadTimelineSlots(eventId).catch(() => []);
-
-  // 자녀 이름 추출 (원생만)
-  const enrolledNames = children
-    .filter((c) => c.is_enrolled)
-    .map((c) => c.name);
-  const greetName =
-    enrolledNames.length === 0
-      ? user?.parent_name || "보호자"
-      : enrolledNames.length === 1
-        ? enrolledNames[0]
-        : enrolledNames.length === 2
-          ? enrolledNames.join(" · ")
-          : `${enrolledNames[0]} · ${enrolledNames[1]} 외 ${enrolledNames.length - 2}명`;
 
   const dateLabel = fmtFullDate(event.starts_at);
   const startClock = fmtClock(event.starts_at);
@@ -256,7 +232,7 @@ export default async function EventInvitationPage({
   return (
     <div className="min-h-dvh bg-[#FFFDF8]">
       {/* ─── Hero — 풀스크린 커버 + 행사명 ─── */}
-      <section className="relative flex min-h-[80vh] w-full items-center justify-center overflow-hidden">
+      <section className="relative flex min-h-[24vh] w-full items-center justify-center overflow-hidden">
         {event.cover_image_url ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -322,6 +298,24 @@ export default async function EventInvitationPage({
               <span className="text-white/70">(20분 전)</span>
             </p>
           )}
+          {(event.invitation_host || event.invitation_organizer) && (
+            <div className="mt-2 space-y-0.5 text-xs text-white/90 drop-shadow">
+              {event.invitation_host && (
+                <p>
+                  <span aria-hidden>🏫</span>{" "}
+                  <span className="text-white/75">주최:</span>{" "}
+                  <span className="font-bold">{event.invitation_host}</span>
+                </p>
+              )}
+              {event.invitation_organizer && (
+                <p>
+                  <span aria-hidden>🎯</span>{" "}
+                  <span className="text-white/75">주관:</span>{" "}
+                  {event.invitation_organizer}
+                </p>
+              )}
+            </div>
+          )}
           {(location || address) && (
             <div className="mt-1 inline-flex flex-wrap items-center justify-center gap-1.5 text-xs text-white/90 drop-shadow">
               <span aria-hidden>📍</span>
@@ -378,50 +372,52 @@ export default async function EventInvitationPage({
           <span className="h-px w-10 bg-current" />
         </div>
 
-        <div className="space-y-4 rounded-2xl border border-[#D4E4BC] bg-white p-5 shadow-sm">
+        <div className="space-y-2 rounded-2xl bg-gradient-to-br from-[#2D5A3D] to-[#3A7A52] p-4 text-white shadow-md">
           {dateLabel !== "-" && (
-            <DetailRow icon="📅" label="날짜" value={dateLabel} large />
+            <DetailRow icon="📅" label="날짜" value={dateLabel} dark />
           )}
           {timeLabel && (
-            <DetailRow icon="⏰" label="일시" value={timeLabel} />
+            <DetailRow icon="⏰" label="일시" value={timeLabel} dark />
           )}
           {earlyArrivalRow && (
-            <DetailRow icon="🚪" label="입장가능시간" value={earlyArrivalRow} />
+            <DetailRow
+              icon="🚪"
+              label="입장"
+              value={earlyArrivalRow}
+              dark
+            />
           )}
           {/* 장소 — 비어있어도 placeholder 로 노출해 운영자가 비어있음을 인지하게 함 */}
-          <div className="flex items-start gap-3">
-            <span aria-hidden className="text-xl">
+          <div className="flex items-start gap-2">
+            <span aria-hidden className="shrink-0 text-base leading-snug">
               📍
             </span>
-            <div className="min-w-0 flex-1">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-[#8B7F75]">
-                장소
-              </p>
+            <div className="min-w-0 flex-1 text-sm leading-snug">
+              <span className="text-white/70">장소:</span>{" "}
               {location ? (
-                <p className="mt-0.5 text-base font-bold text-[#2C2C2C]">
-                  {location}
-                </p>
+                <span className="font-bold text-white">{location}</span>
               ) : !address ? (
-                <p className="mt-0.5 text-sm italic text-[#B0A89D]">
+                <span className="italic text-white/60">
                   장소 안내가 곧 업데이트됩니다
-                </p>
+                </span>
               ) : null}
               {address && (
-                <p className="mt-0.5 text-sm font-semibold text-[#6B6560]">
+                <span className="text-white/85">
+                  {location ? " · " : ""}
                   {address}
-                </p>
+                </span>
               )}
             </div>
             {(address || location) && (
               <CopyButton
                 text={address || location || ""}
-                label="📋 주소복사"
-                className="shrink-0 self-start rounded-full border border-[#D4E4BC] bg-[#F5F1E8] px-2.5 py-1 text-[10px] font-bold text-[#2D5A3D] shadow-sm hover:bg-[#E8DDC8]"
+                label="📋 복사"
+                className="shrink-0 self-start rounded-full border border-white/30 bg-white/15 px-2 py-0.5 text-[10px] font-bold text-white shadow-sm backdrop-blur-sm hover:bg-white/25"
               />
             )}
           </div>
           {dressCode && (
-            <DetailRow icon="🎒" label="준비물" value={dressCode} multiline />
+            <DetailRow icon="🎒" label="준비물" value={dressCode} multiline dark />
           )}
         </div>
       </section>
@@ -433,7 +429,7 @@ export default async function EventInvitationPage({
           <div className="rounded-2xl border border-[#D4E4BC] bg-white p-5 shadow-sm">
             <h2 className="flex items-center gap-2 text-sm font-bold text-[#2D5A3D]">
               <span aria-hidden>🗺</span>
-              <span>오시는 길</span>
+              <span>행사장 오시는 길</span>
             </h2>
 
             <div className="mt-3 flex items-start justify-between gap-2">
@@ -477,6 +473,17 @@ export default async function EventInvitationPage({
                 <span>네이버지도</span>
               </a>
             </div>
+
+            {/* 행사장 사진 — 입구/간판 등 */}
+            {event.invitation_location_image_url && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={event.invitation_location_image_url}
+                alt={location ? `${location} 행사장 사진` : "행사장 사진"}
+                className="mt-3 w-full rounded-xl border border-[#D4E4BC] object-cover shadow-sm"
+                loading="lazy"
+              />
+            )}
           </div>
 
           {/* 주차장 카드들 */}
@@ -513,6 +520,15 @@ export default async function EventInvitationPage({
                         {p.address}
                       </p>
                     )}
+                    {p.image_url && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={p.image_url}
+                        alt={p.name ? `${p.name} 사진` : `제${idx + 1}주차장 사진`}
+                        className="mt-2 w-full rounded-lg border border-[#E5D3B8] object-cover shadow-sm"
+                        loading="lazy"
+                      />
+                    )}
                     <div className="mt-3 grid grid-cols-3 gap-1.5">
                       <a
                         href={pUrls.naver}
@@ -548,30 +564,7 @@ export default async function EventInvitationPage({
         </section>
       )}
 
-      {/* ─── 개인화 인사 ─── */}
-      <section className="mx-auto max-w-md px-6 py-10">
-        <div className="rounded-3xl border-2 border-emerald-200 bg-gradient-to-br from-emerald-50/60 via-white to-[#FAE7D0]/40 p-8 text-center shadow-md">
-          <p className="text-4xl" aria-hidden>
-            🎒
-          </p>
-          <p className="mt-4 text-2xl font-extrabold text-[#2D5A3D] sm:text-3xl">
-            {greetName}
-          </p>
-          <p className="mt-2 text-base font-bold text-[#2D5A3D]">
-            가족을 초대합니다
-          </p>
-          {user?.phone && (
-            <p className="mt-3 font-mono text-[11px] text-[#8B7F75]">
-              보호자{" "}
-              {user.phone.length === 11
-                ? `${user.phone.slice(0, 3)}-${user.phone.slice(3, 7)}-${user.phone.slice(7)}`
-                : user.phone}
-            </p>
-          )}
-        </div>
-      </section>
-
-      {/* ─── 타임테이블 — 전체 노출. 시간은 event.starts_at + 누적 길이로 재계산. ─── */}
+      {/* ─── 타임테이블 — 4개까지 보이고 "전체 보기" 토글로 펼침. ─── */}
       {slots.length > 0 && (() => {
         const slotTimes = computeSlotDisplayTimes(event.starts_at, slots);
         return (
@@ -580,80 +573,10 @@ export default async function EventInvitationPage({
               <span aria-hidden>🕐</span>
               <span>그날의 흐름</span>
             </h2>
-            <ol className="relative space-y-3 border-l-2 border-emerald-200 pl-5">
-              {slots.map((slot, idx) => {
-                const meta = SLOT_KIND_META[slot.slot_kind];
-                const emoji = slot.icon_emoji || meta?.defaultEmoji || "🌲";
-                return (
-                  <li
-                    key={slot.id}
-                    className="relative rounded-xl border border-[#D4E4BC] bg-white p-3 shadow-sm"
-                  >
-                    <span
-                      aria-hidden
-                      className="absolute -left-[27px] top-3 inline-flex h-4 w-4 items-center justify-center rounded-full border-2 border-emerald-400 bg-white"
-                    >
-                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                    </span>
-                    <p className="text-xs font-semibold text-[#6B6560]">
-                      {slotTimes[idx]}
-                    </p>
-                    <p className="mt-0.5 text-sm font-bold text-[#2D5A3D]">
-                      {emoji} {slot.title || meta?.label || "활동"}
-                    </p>
-                  </li>
-                );
-              })}
-            </ol>
+            <TimelineCollapsible slots={slots} slotTimes={slotTimes} />
           </section>
         );
       })()}
-
-      {/* ─── CTA ─── */}
-      {/* 행사 LIVE 일 때만 "참여 확인 + 일정/미션/토리FM" 노출.
-          예정(DRAFT) 상태에서는 미션·FM 등 활성 기능은 아직 의미가 없어서 숨김. */}
-      {event.status === "LIVE" && (
-        <section className="mx-auto max-w-md px-6 py-8">
-          <Link
-            href="/home"
-            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#2D5A3D] to-[#3A7A52] px-6 py-4 text-base font-bold text-white shadow-lg transition hover:from-[#234a30] hover:to-[#2D5A3D]"
-          >
-            <span aria-hidden>🌲</span>
-            <span>참여 확인하기</span>
-            <span aria-hidden>→</span>
-          </Link>
-
-          <div className="mt-3 grid grid-cols-3 gap-2">
-            <Link
-              href="/schedule"
-              className="flex flex-col items-center gap-0.5 rounded-xl border border-[#D4E4BC] bg-white px-2 py-3 text-[11px] font-semibold text-[#2D5A3D] transition hover:bg-[#F5F1E8]"
-            >
-              <span className="text-base" aria-hidden>
-                📅
-              </span>
-              <span>일정</span>
-            </Link>
-            <Link
-              href="/stampbook"
-              className="flex flex-col items-center gap-0.5 rounded-xl border border-[#D4E4BC] bg-white px-2 py-3 text-[11px] font-semibold text-[#2D5A3D] transition hover:bg-[#F5F1E8]"
-            >
-              <span className="text-base" aria-hidden>
-                🎯
-              </span>
-              <span>미션</span>
-            </Link>
-            <Link
-              href="/tori-fm"
-              className="flex flex-col items-center gap-0.5 rounded-xl border border-[#D4E4BC] bg-white px-2 py-3 text-[11px] font-semibold text-[#2D5A3D] transition hover:bg-[#F5F1E8]"
-            >
-              <span className="text-base" aria-hidden>
-                📻
-              </span>
-              <span>토리FM</span>
-            </Link>
-          </div>
-        </section>
-      )}
 
       {/* DRAFT(예정) 행사 — 행사 시작 전 안내만 노출. 미션/FM 링크는 숨김. */}
       {event.status === "DRAFT" && (
@@ -669,22 +592,6 @@ export default async function EventInvitationPage({
         </section>
       )}
 
-      {/* ─── 하단 홈페이지 배너 (기관 admin 이 설정했을 때만) ─── */}
-      {homepageBanner && (
-        <section className="mx-auto max-w-md px-6 pt-4">
-          <HomepageBannerDisplay banner={homepageBanner} />
-        </section>
-      )}
-
-      {/* ─── 푸터 ─── */}
-      <footer className="mx-auto max-w-md px-6 pb-12 pt-6 text-center text-[11px] text-[#8B7F75]">
-        {inviterOrgName && (
-          <p className="font-semibold text-[#2D5A3D]">
-            🌲 {inviterOrgName} 이(가) 초대합니다
-          </p>
-        )}
-        <p className="mt-1">토리로 · 우리 아이의 행복한 추억</p>
-      </footer>
     </div>
   );
 }
@@ -698,6 +605,7 @@ function DetailRow({
   multiline = false,
   copyText,
   large = false,
+  dark = false,
 }: {
   icon: string;
   label: string;
@@ -707,31 +615,38 @@ function DetailRow({
   copyText?: string;
   /** true 면 값 글씨 크게. */
   large?: boolean;
+  /** 어두운(초록 그라데이션) 배경에서 흰 글씨 모드. */
+  dark?: boolean;
 }) {
+  const labelCls = dark ? "text-white/70" : "text-[#8B7F75]";
+  const valueCls = dark ? "text-white" : "text-[#2C2C2C]";
   return (
-    <div className="flex items-start gap-3">
-      <span aria-hidden className={large ? "text-2xl" : "text-xl"}>
+    <div className="flex items-start gap-2">
+      <span
+        aria-hidden
+        className={`shrink-0 leading-snug ${large ? "text-lg" : "text-base"}`}
+      >
         {icon}
       </span>
-      <div className="min-w-0 flex-1">
-        <p className="text-[10px] font-bold uppercase tracking-wider text-[#8B7F75]">
-          {label}
-        </p>
-        <p
-          className={`mt-0.5 font-bold text-[#2C2C2C] ${
-            large ? "text-lg" : "text-sm font-semibold"
-          } ${
-            multiline ? "whitespace-pre-line break-words leading-relaxed" : ""
-          }`}
-        >
-          {value}
-        </p>
-      </div>
+      <p
+        className={`min-w-0 flex-1 ${
+          large ? "text-base" : "text-sm"
+        } leading-snug ${
+          multiline ? "whitespace-pre-line break-words" : ""
+        }`}
+      >
+        <span className={labelCls}>{label}:</span>{" "}
+        <span className={`font-bold ${valueCls}`}>{value}</span>
+      </p>
       {copyText && (
         <CopyButton
           text={copyText}
-          label="📋 주소복사"
-          className="shrink-0 self-start rounded-full border border-[#D4E4BC] bg-[#F5F1E8] px-2.5 py-1 text-[10px] font-bold text-[#2D5A3D] shadow-sm hover:bg-[#E8DDC8]"
+          label="📋 복사"
+          className={
+            dark
+              ? "shrink-0 self-start rounded-full border border-white/30 bg-white/15 px-2 py-0.5 text-[10px] font-bold text-white shadow-sm backdrop-blur-sm hover:bg-white/25"
+              : "shrink-0 self-start rounded-full border border-[#D4E4BC] bg-[#F5F1E8] px-2 py-0.5 text-[10px] font-bold text-[#2D5A3D] shadow-sm hover:bg-[#E8DDC8]"
+          }
         />
       )}
     </div>

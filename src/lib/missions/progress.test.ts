@@ -40,6 +40,8 @@ function mkMission(overrides: Partial<OrgMissionRow> = {}): OrgMissionRow {
     geofence_lng: null,
     geofence_radius_m: null,
     is_active: true,
+    invitation_host: null,
+    invitation_organizer: null,
     created_at: "2026-01-01T00:00:00Z",
     updated_at: "2026-01-01T00:00:00Z",
     ...overrides,

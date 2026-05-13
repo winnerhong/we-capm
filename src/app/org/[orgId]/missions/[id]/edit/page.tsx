@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { requireOrg } from "@/lib/org-auth-guard";
 import {
   loadContributionsByOrg,
+  loadEventHostOrganizerDefaultsForMission,
   loadOrgMissionById,
   loadOrgMissionsByQuestPack,
   loadOrgQuestPackById,
@@ -13,6 +14,7 @@ import {
   type MissionKind,
 } from "@/lib/missions/types";
 import { ProposeDialog } from "./propose-dialog";
+import { HostOrganizerCard } from "./host-organizer-card";
 import { PhotoOrgMissionEditor } from "./editors/PhotoOrgMissionEditor";
 import { QrQuizOrgMissionEditor } from "./editors/QrQuizOrgMissionEditor";
 import { FinalRewardOrgMissionEditor } from "./editors/FinalRewardOrgMissionEditor";
@@ -75,6 +77,10 @@ export default async function EditOrgMissionPage({
   const existingContribution =
     allContributions.find((c) => c.source_org_mission_id === mission.id) ??
     null;
+
+  // 연결된 행사의 주최·주관 — 미션 편집화면의 자동채움 default 로 노출
+  const eventHostOrganizerDefaults =
+    await loadEventHostOrganizerDefaultsForMission(mission.id).catch(() => null);
 
   const kindMeta = MISSION_KIND_META[mission.kind];
   const isSupported = SUPPORTED_KINDS.has(mission.kind);
@@ -162,6 +168,14 @@ export default async function EditOrgMissionPage({
           </div>
         </div>
       </header>
+
+      {/* 주최·주관 — 행사 값에서 자동채움 가능 */}
+      <HostOrganizerCard
+        missionId={mission.id}
+        initialHost={mission.invitation_host ?? ""}
+        initialOrganizer={mission.invitation_organizer ?? ""}
+        eventDefaults={eventHostOrganizerDefaults}
+      />
 
       {/* Editor */}
       {!isSupported ? (

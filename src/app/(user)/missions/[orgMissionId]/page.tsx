@@ -41,6 +41,7 @@ import { CoopRunner } from "./runners/CoopRunner";
 import { CoopRefresher } from "./runners/CoopRefresher";
 import { BroadcastRunner } from "./runners/BroadcastRunner";
 import { AcornIcon } from "@/components/acorn-icon";
+import { fmtDateTimeKst } from "@/lib/datetime/kst";
 
 export const dynamic = "force-dynamic";
 
@@ -62,13 +63,7 @@ async function safeQuery<T>(
 
 function formatDateTime(iso: string): string {
   try {
-    return new Date(iso).toLocaleString("ko-KR", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    return fmtDateTimeKst(iso);
   } catch {
     return iso;
   }
@@ -147,6 +142,28 @@ export default async function MissionRunnerPage({
             <p className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-[#FAE7D0] px-2 py-0.5 text-[11px] font-bold text-[#6B4423]">
               <AcornIcon className="text-[#6B4423]" /> +{mission.acorns}
             </p>
+          )}
+          {(mission.invitation_host || mission.invitation_organizer) && (
+            <div className="mt-2 space-y-0.5 rounded-xl bg-gradient-to-br from-[#2D5A3D]/95 to-[#3A7A52]/95 px-3 py-2 text-[11px] text-white shadow-sm">
+              {mission.invitation_host && (
+                <p className="flex items-start gap-1.5">
+                  <span aria-hidden>🏫</span>
+                  <span>
+                    <span className="font-semibold text-white/75">주최:</span>{" "}
+                    <b>{mission.invitation_host}</b>
+                  </span>
+                </p>
+              )}
+              {mission.invitation_organizer && (
+                <p className="flex items-start gap-1.5">
+                  <span aria-hidden>🎯</span>
+                  <span>
+                    <span className="font-semibold text-white/75">주관:</span>{" "}
+                    {mission.invitation_organizer}
+                  </span>
+                </p>
+              )}
+            </div>
           )}
         </div>
       </div>

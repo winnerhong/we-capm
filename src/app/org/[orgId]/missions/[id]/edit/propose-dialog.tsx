@@ -12,6 +12,7 @@ import {
   type PartnerMissionRow,
 } from "@/lib/missions/types";
 import { AcornIcon } from "@/components/acorn-icon";
+import { fmtDateTimeKst } from "@/lib/datetime/kst";
 
 interface Props {
   currentOrgMission: OrgMissionRow;
@@ -180,7 +181,7 @@ export function ProposeDialog({
               <p className="font-semibold text-violet-900">지사 답변</p>
               <p className="mt-0.5 text-[10px] text-zinc-500">
                 검토자: {existing.reviewed_by ?? "-"} ·{" "}
-                {new Date(existing.reviewed_at).toLocaleString("ko-KR")}
+                {fmtDateTimeKst(existing.reviewed_at)}
               </p>
               {existing.review_note && (
                 <p className="mt-1 whitespace-pre-wrap text-zinc-700">

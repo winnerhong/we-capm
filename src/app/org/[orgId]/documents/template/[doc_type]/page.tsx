@@ -11,6 +11,7 @@ import { FacilityConsentTemplate } from "@/lib/org-documents/templates/facility-
 import { PrivacyConsentTemplate } from "@/lib/org-documents/templates/privacy-consent";
 import { JsonTemplateRenderer } from "@/lib/org-documents/templates/json-renderer";
 import { isTemplatedDocType } from "@/lib/org-documents/template-json-schema";
+import { fmtFullDateKst } from "@/lib/datetime/kst";
 
 export const dynamic = "force-dynamic";
 
@@ -119,11 +120,7 @@ export default async function OrgDocumentTemplatePage({ params }: PageProps) {
                 )}
               </p>
               <p className="mt-0.5 text-[11px] text-[#8B7F75]">
-                {new Date(custom.uploaded_at).toLocaleDateString("ko-KR", {
-                  year: "numeric",
-                  month: "2-digit",
-                  day: "2-digit",
-                })}{" "}
+                {fmtFullDateKst(custom.uploaded_at)}{" "}
                 게시
               </p>
             </div>

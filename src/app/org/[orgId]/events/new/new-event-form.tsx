@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { createOrgEventAction } from "@/lib/org-events/actions";
 import { CoverImagePicker } from "@/components/cover-image-picker";
+import { fmtDateTimeKst } from "@/lib/datetime/kst";
 
 const INPUT_CLS =
   "w-full rounded-xl border border-[#D4E4BC] bg-[#FFF8F0] px-3 py-2.5 text-sm text-[#2C2C2C] focus:border-[#3A7A52] focus:outline-none focus:ring-2 focus:ring-[#3A7A52]/30";
@@ -51,14 +52,7 @@ function formatDuration(min: number): string {
 function formatDateTimeKo(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "-";
-  return d.toLocaleString("ko-KR", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    weekday: "short",
-  });
+  return fmtDateTimeKst(iso);
 }
 
 export function NewEventForm({ orgId }: { orgId: string }) {

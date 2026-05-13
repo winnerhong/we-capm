@@ -18,6 +18,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { sendChatMessageAction } from "@/lib/tori-fm/actions";
 import type { FmChatMessageRow } from "@/lib/tori-fm/types";
+import { fmtClockKstAlways } from "@/lib/datetime/kst";
 
 const MAX_BUFFER = 50;
 const THROTTLE_MS = 2000;
@@ -39,10 +40,7 @@ function senderInitial(name: string): string {
 
 function timeLabel(iso: string): string {
   try {
-    return new Date(iso).toLocaleTimeString("ko-KR", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    return fmtClockKstAlways(iso);
   } catch {
     return "";
   }

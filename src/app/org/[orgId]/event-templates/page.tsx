@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireOrg } from "@/lib/org-auth-guard";
 import { listAvailableTemplatesForOrg } from "@/lib/event-templates/queries";
 import { createClient } from "@/lib/supabase/server";
+import { fmtFullDateKst } from "@/lib/datetime/kst";
 
 export const dynamic = "force-dynamic";
 
@@ -59,11 +60,7 @@ async function countItems(templateIds: string[]): Promise<Map<string, number>> {
 
 function fmtDate(iso: string): string {
   try {
-    return new Date(iso).toLocaleDateString("ko-KR", {
-      year: "2-digit",
-      month: "2-digit",
-      day: "2-digit",
-    });
+    return fmtFullDateKst(iso);
   } catch {
     return iso;
   }

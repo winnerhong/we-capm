@@ -143,7 +143,12 @@ export default async function UserLoginPage({
         {/* Card */}
         <section className="rounded-3xl border border-[#D4E4BC] bg-white/80 p-6 shadow-sm backdrop-blur-sm">
           <Suspense fallback={<div className="h-40" aria-hidden />}>
-            <LoginForm initialError={initialError} />
+            <LoginForm
+              initialError={initialError}
+              // 라이브 이벤트가 정확히 1개일 때만 자동 안내. 여러 개면 사용자가
+              // home 에서 직접 선택하도록 둠.
+              liveEventId={liveEvents.length === 1 ? liveEvents[0].id : null}
+            />
           </Suspense>
         </section>
 

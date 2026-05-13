@@ -17,6 +17,7 @@ import type {
 import { SUBMISSION_STATUS_META } from "@/lib/missions/types";
 import { submitMissionAction } from "../../actions";
 import { AcornIcon } from "@/components/acorn-icon";
+import { fmtDateTimeKst } from "@/lib/datetime/kst";
 
 interface Props {
   mission: OrgMissionRow;
@@ -29,13 +30,7 @@ const MAX_PHOTOS = 5;
 
 function formatDateTime(iso: string): string {
   try {
-    return new Date(iso).toLocaleString("ko-KR", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    return fmtDateTimeKst(iso);
   } catch {
     return iso;
   }

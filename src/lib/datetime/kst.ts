@@ -114,6 +114,37 @@ export function fmtKoreanLongDateKst(iso: string | null | undefined): string {
   return `${year}년 ${month}월 ${day}일 (${WEEKDAY[weekday]})`;
 }
 
+/** "MM.DD" — 짧은 월/일 라벨. */
+export function fmtShortDateKst(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const { month, day } = partsKst(d);
+  return `${pad2(month)}.${pad2(day)}`;
+}
+
+/** "MM.DD ~ MM.DD" / "~ MM.DD" / "MM.DD ~" / "상시" — 시작/종료 범위. */
+export function fmtDateRangeKst(
+  startIso: string | null | undefined,
+  endIso: string | null | undefined
+): string {
+  const s = startIso ? fmtShortDateKst(startIso) : "";
+  const e = endIso ? fmtShortDateKst(endIso) : "";
+  if (s && e) return `${s} ~ ${e}`;
+  if (e) return `~ ${e}`;
+  if (s) return `${s} ~`;
+  return "상시";
+}
+
+/** "2026.05.16 09:50" — 풀 날짜 + 시계. */
+export function fmtDateTimeKst(iso: string | null | undefined): string {
+  if (!iso) return "-";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "-";
+  const { year, month, day, hour, minute } = partsKst(d);
+  return `${year}.${pad2(month)}.${pad2(day)} ${pad2(hour)}:${pad2(minute)}`;
+}
+
 /** "오전 09:30" / "오후 02:15" — 시계 라벨. */
 export function fmtAmPmClockKst(iso: string | null | undefined): string {
   if (!iso) return "";

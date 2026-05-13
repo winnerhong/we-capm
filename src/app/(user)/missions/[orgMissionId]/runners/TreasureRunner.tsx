@@ -17,6 +17,7 @@ import {
   submitMissionAction,
   unlockTreasureStepAction,
 } from "../../actions";
+import { fmtDateTimeKst } from "@/lib/datetime/kst";
 
 interface Props {
   mission: OrgMissionRow;
@@ -26,12 +27,7 @@ interface Props {
 
 function formatDateTime(iso: string): string {
   try {
-    return new Date(iso).toLocaleString("ko-KR", {
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    return fmtDateTimeKst(iso);
   } catch {
     return iso;
   }

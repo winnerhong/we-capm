@@ -52,16 +52,22 @@ export async function updatePartnerHomepageBannerAction(
       return { ok: false, error: "이 지사 소속 기관이 아니에요" };
     }
 
+    const subtitle = clamp(formData.get("homepage_banner_subtitle"), 200);
     const text = clamp(formData.get("homepage_banner_text"), 200);
     const url = sanitizeUrl(formData.get("homepage_banner_url"));
     const imageUrl = sanitizeUrl(formData.get("homepage_banner_image_url"));
+    const footerBrand = clamp(formData.get("homepage_banner_footer_brand"), 100);
+    const footerMeta = clamp(formData.get("homepage_banner_footer_meta"), 500);
 
     const { error } = await sb
       .from("partner_orgs")
       .update({
+        homepage_banner_subtitle: subtitle,
         homepage_banner_text: text,
         homepage_banner_url: url,
         homepage_banner_image_url: imageUrl,
+        homepage_banner_footer_brand: footerBrand,
+        homepage_banner_footer_meta: footerMeta,
       } as Row)
       .eq("id", orgId);
 

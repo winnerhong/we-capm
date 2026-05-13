@@ -7,6 +7,7 @@ import { userHasAnyLiveEvent } from "@/lib/org-events/queries";
 import { createClient } from "@/lib/supabase/server";
 import type { MissionFinalRedemptionRow } from "@/lib/missions/types";
 import { AcornIcon } from "@/components/acorn-icon";
+import { fmtDateTimeKst } from "@/lib/datetime/kst";
 
 export const dynamic = "force-dynamic";
 
@@ -34,13 +35,7 @@ async function loadRedemption(
 
 function formatDateTime(iso: string): string {
   try {
-    return new Date(iso).toLocaleString("ko-KR", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    return fmtDateTimeKst(iso);
   } catch {
     return iso;
   }

@@ -235,6 +235,8 @@ export interface OrgMissionRow {
   geofence_lng: number | null;
   geofence_radius_m: number | null;
   is_active: boolean;
+  invitation_host: string | null;
+  invitation_organizer: string | null;
   created_at: string;
   updated_at: string;
 }

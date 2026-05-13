@@ -13,6 +13,7 @@ import { computePackProgress, type PackProgress } from "@/lib/missions/progress"
 import type { OrgQuestPackRow } from "@/lib/missions/types";
 import { QUEST_PACK_STATUS_META } from "@/lib/missions/types";
 import { AcornIcon } from "@/components/acorn-icon";
+import { fmtDateRangeKst } from "@/lib/datetime/kst";
 
 export const dynamic = "force-dynamic";
 
@@ -60,17 +61,7 @@ function matchesFilter(p: EnrichedPack, filter: FilterKey): boolean {
   }
 }
 
-function formatDateRange(starts: string | null, ends: string | null): string {
-  const fmt = (iso: string) =>
-    new Date(iso).toLocaleDateString("ko-KR", {
-      month: "2-digit",
-      day: "2-digit",
-    });
-  if (starts && ends) return `${fmt(starts)} ~ ${fmt(ends)}`;
-  if (ends) return `~ ${fmt(ends)}`;
-  if (starts) return `${fmt(starts)} ~`;
-  return "상시";
-}
+const formatDateRange = fmtDateRangeKst;
 
 export default async function StampbookListPage({
   searchParams,

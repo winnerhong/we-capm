@@ -17,6 +17,7 @@ import {
   linkFmSessionToEventAction,
   unlinkFmSessionFromEventAction,
 } from "@/lib/org-events/actions";
+import { fmtDateTimeKst } from "@/lib/datetime/kst";
 
 export type FmSessionOption = {
   id: string;
@@ -40,12 +41,7 @@ function fmtDateTime(iso: string | null): string {
   if (!iso) return "-";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "-";
-  return d.toLocaleString("ko-KR", {
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return fmtDateTimeKst(iso);
 }
 
 function categorize(s: FmSessionOption): Bucket {

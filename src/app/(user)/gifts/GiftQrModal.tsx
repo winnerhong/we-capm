@@ -13,6 +13,7 @@ import {
   formatCouponCode,
   type UserGiftRow,
 } from "@/lib/gifts/types";
+import { fmtDateTimeKst, fmtFullDateKst } from "@/lib/datetime/kst";
 
 interface Props {
   gift: UserGiftRow;
@@ -24,24 +25,14 @@ function formatDateTime(iso: string | null): string {
   if (!iso) return "—";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleString("ko-KR", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return fmtDateTimeKst(iso);
 }
 
 function formatDate(iso: string | null): string {
   if (!iso) return "—";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleDateString("ko-KR", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
+  return fmtFullDateKst(iso);
 }
 
 export function GiftQrModal({ gift, userId, onClose }: Props) {

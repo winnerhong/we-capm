@@ -7,6 +7,7 @@ import {
   type OrgProgramRow,
   type OrgProgramStatus,
 } from "@/lib/org-programs/types";
+import { fmtFullDateKst } from "@/lib/datetime/kst";
 
 const STATUS_TABS: Array<{ key: "ALL" | OrgProgramStatus; label: string }> = [
   { key: "ALL", label: "전체" },
@@ -24,11 +25,7 @@ function formatWon(n: number | null | undefined): string {
 function formatDate(iso: string | null | undefined): string {
   if (!iso) return "-";
   try {
-    return new Date(iso).toLocaleDateString("ko-KR", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    });
+    return fmtFullDateKst(iso);
   } catch {
     return "-";
   }

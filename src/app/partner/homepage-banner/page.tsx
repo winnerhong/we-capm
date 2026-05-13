@@ -13,9 +13,12 @@ export const dynamic = "force-dynamic";
 type OrgRow = {
   id: string;
   org_name: string;
+  homepage_banner_subtitle: string | null;
   homepage_banner_text: string | null;
   homepage_banner_url: string | null;
   homepage_banner_image_url: string | null;
+  homepage_banner_footer_brand: string | null;
+  homepage_banner_footer_meta: string | null;
 };
 
 export default async function PartnerHomepageBannerPage() {
@@ -28,7 +31,7 @@ export default async function PartnerHomepageBannerPage() {
   const { data, error } = await sb
     .from("partner_orgs")
     .select(
-      "id,org_name,homepage_banner_text,homepage_banner_url,homepage_banner_image_url"
+      "id,org_name,homepage_banner_subtitle,homepage_banner_text,homepage_banner_url,homepage_banner_image_url,homepage_banner_footer_brand,homepage_banner_footer_meta"
     )
     .eq("partner_id", partner.id)
     .order("org_name", { ascending: true });
@@ -106,9 +109,12 @@ export default async function PartnerHomepageBannerPage() {
                 <PartnerHomepageBannerEditor
                   orgId={o.id}
                   initial={{
+                    subtitle: o.homepage_banner_subtitle ?? "",
                     text: o.homepage_banner_text ?? "",
                     url: o.homepage_banner_url ?? "",
                     imageUrl: o.homepage_banner_image_url ?? "",
+                    footerBrand: o.homepage_banner_footer_brand ?? "",
+                    footerMeta: o.homepage_banner_footer_meta ?? "",
                   }}
                 />
               </div>

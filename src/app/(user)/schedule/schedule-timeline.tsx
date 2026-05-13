@@ -65,6 +65,18 @@ function fmtCountdown(minutes: number): string {
   return `${h}시간 ${m}분 후 시작`;
 }
 
+/** "20분" / "1시간" / "1시간 30분" — 슬롯 소요시간 라벨. */
+function fmtSlotDuration(startsAt: string, endsAt: string | null): string | null {
+  if (!endsAt) return null;
+  const ms = new Date(endsAt).getTime() - new Date(startsAt).getTime();
+  if (!Number.isFinite(ms) || ms <= 0) return null;
+  const min = Math.round(ms / 60000);
+  if (min < 60) return `${min}분`;
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return m === 0 ? `${h}시간` : `${h}시간 ${m}분`;
+}
+
 /**
  * 슬롯의 실제 표시 시각을 행사 시작 시각 + 누적 길이로 재계산.
  *
@@ -284,6 +296,10 @@ function CurrentSlotBanner({ slot }: { slot: SlotWithStatus }) {
         </span>
         <span className="text-[11px] font-semibold text-amber-700">
           {fmtClock(slot.starts_at)} ~ {fmtClock(slot.effectiveEndsAt)}
+          {(() => {
+            const d = fmtSlotDuration(slot.starts_at, slot.effectiveEndsAt);
+            return d ? ` (${d})` : "";
+          })()}
         </span>
       </div>
       <div className="mt-3 flex items-start gap-3">
@@ -357,6 +373,23 @@ function SlotRow({ slot }: { slot: SlotWithStatus }) {
             {fmtClock(slot.starts_at)}
             {slot.ends_at && ` ~ ${fmtClock(slot.ends_at)}`}
           </span>
+          {(() => {
+            const d = fmtSlotDuration(slot.starts_at, slot.ends_at);
+            if (!d) return null;
+            return (
+              <span
+                className={`text-[10px] font-semibold ${
+                  isPast
+                    ? "text-zinc-500"
+                    : isCurrent
+                      ? "text-amber-700"
+                      : "text-[#6B6560]"
+                }`}
+              >
+                ({d})
+              </span>
+            );
+          })()}
           <span
             className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${
               isPast

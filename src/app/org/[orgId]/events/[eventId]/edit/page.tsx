@@ -80,8 +80,12 @@ export default async function EditOrgEventPage({
           invitation_body: event.invitation_body ?? "",
           invitation_location: event.invitation_location ?? "",
           invitation_address: event.invitation_address ?? "",
+          invitation_location_image_url:
+            event.invitation_location_image_url ?? "",
           invitation_dress_code: event.invitation_dress_code ?? "",
           invitation_parkings: event.invitation_parkings ?? [],
+          invitation_host: event.invitation_host ?? "",
+          invitation_organizer: event.invitation_organizer ?? "",
         }}
       />
     </div>

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireAppUser } from "@/lib/user-auth-guard";
 import { getAcornBalance, loadChildrenForUser } from "@/lib/app-user/queries";
-import { userHasAnyLiveEvent } from "@/lib/org-events/queries";
+import { loadActiveEventsForUser } from "@/lib/org-events/queries";
 import { isToritalkEnabled } from "@/lib/toritalk/queries";
 import { loadOrgHomepageBanner } from "@/lib/org-banner/queries";
 import { AcornIcon } from "@/components/acorn-icon";
@@ -35,10 +35,14 @@ export default async function UserLayout({
   children: React.ReactNode;
 }) {
   const user = await requireAppUser();
-  const [acornBalance, hasLive, kids, toritalkOn, homepageBanner] =
+  const [acornBalance, liveEvents, kids, toritalkOn, homepageBanner] =
     await Promise.all([
       safeQuery("getAcornBalance", () => getAcornBalance(user.id), 0),
-      safeQuery("userHasAnyLiveEvent", () => userHasAnyLiveEvent(user.id), false),
+      safeQuery(
+        "loadActiveEventsForUser",
+        () => loadActiveEventsForUser(user.id),
+        []
+      ),
       safeQuery("loadChildrenForUser", () => loadChildrenForUser(user.id), []),
       safeQuery("isToritalkEnabled", () => isToritalkEnabled(user.orgId), false),
       safeQuery(
@@ -47,6 +51,9 @@ export default async function UserLayout({
         null
       ),
     ]);
+  const hasLive = liveEvents.length > 0;
+  // 헤더 "초대장" 버튼이 가리킬 행사 — LIVE 중 가장 최근 1개.
+  const firstLiveEventId = liveEvents[0]?.id ?? null;
 
   // 아바타 글자 우선순위:
   //   1) 원생(is_enrolled=true) 자녀의 첫 글자 — "홍유빈" → "홍"
@@ -77,6 +84,18 @@ export default async function UserLayout({
           </Link>
 
           <div className="ml-auto flex items-center gap-2">
+            {firstLiveEventId && (
+              <Link
+                href={`/invitation/${firstLiveEventId}`}
+                className="inline-flex items-center gap-1 rounded-full border border-[#D4E4BC] bg-[#FFF8F0] px-2.5 py-1 text-[11px] font-semibold text-[#2D5A3D] shadow-sm transition hover:bg-[#FAE7D0]"
+                aria-label="초대장 보기"
+                title="초대장 보기"
+              >
+                <span aria-hidden>💌</span>
+                <span>초대장</span>
+              </Link>
+            )}
+
             <span
               className="inline-flex items-center gap-1 rounded-full border border-[#D4E4BC] bg-[#E8F0E4] px-3 py-1 text-sm font-bold text-[#2D5A3D]"
               aria-label={`도토리 잔액 ${acornBalance}`}

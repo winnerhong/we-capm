@@ -14,6 +14,7 @@ import {
   type OrgDocType,
   type OrgDocumentRow,
 } from "@/lib/org-documents/types";
+import { fmtFullDateKst } from "@/lib/datetime/kst";
 
 export const dynamic = "force-dynamic";
 
@@ -49,11 +50,7 @@ const PHASE_META: Record<
 function fmtDate(iso: string | null | undefined) {
   if (!iso) return "";
   try {
-    return new Date(iso).toLocaleDateString("ko-KR", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    });
+    return fmtFullDateKst(iso);
   } catch {
     return iso;
   }
