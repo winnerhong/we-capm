@@ -1,5 +1,9 @@
+"use client";
+
+import { useMemo } from "react";
 import type { ControlRoomSnapshot } from "@/lib/control-room/types";
 import { fmtClockKstAlways } from "@/lib/datetime/kst";
+import { useLightbox, type LightboxItem } from "@/components/photo-lightbox";
 import styles from "../control-room.module.css";
 
 type Props = {
@@ -11,11 +15,23 @@ type Props = {
  * 📸 사진 월 — 최근 제출된 사진을 갤러리로 표시.
  * - 행사 진행 중 운영자가 한눈에 "지금 어떤 사진들이 올라오고 있나" 볼 수 있게.
  * - 각 사진 hover/tap 시 미션·가족·시각 메타정보 노출.
+ * - 사진 클릭 시 확대 모달.
  * - TV 모드: 더 큰 그리드.
  */
 export function PhotoWallTile({ items, isTvMode }: Props) {
   const limit = isTvMode ? 18 : 12;
   const list = items.slice(0, limit);
+
+  const lightboxItems: LightboxItem[] = useMemo(
+    () =>
+      list.map((p) => ({
+        url: p.url,
+        caption: `${p.missionIcon ?? "📷"} ${p.missionTitle}`,
+        subCaption: `${p.userDisplayName} · ${fmtClockKstAlways(p.submittedAt)}`,
+      })),
+    [list]
+  );
+  const { openAt, lightbox } = useLightbox(lightboxItems);
 
   return (
     <div className={`${styles.surface} flex h-full flex-col p-5`}>
@@ -46,21 +62,28 @@ export function PhotoWallTile({ items, isTvMode }: Props) {
             isTvMode ? "grid-cols-6" : "grid-cols-3 md:grid-cols-4"
           }`}
         >
-          {list.map((p) => (
+          {list.map((p, i) => (
             <li
               key={p.submissionId}
               className="group relative aspect-square overflow-hidden rounded-md border border-[#1f2a24] bg-[#0e1513]"
               title={`${p.userDisplayName} · ${p.missionTitle} · ${fmtClockKstAlways(p.submittedAt)}`}
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={p.url}
-                alt={p.missionTitle}
-                className="h-full w-full object-cover transition-transform group-hover:scale-105"
-                loading="lazy"
-              />
+              <button
+                type="button"
+                onClick={() => openAt(i)}
+                aria-label="사진 확대 보기"
+                className="block h-full w-full cursor-zoom-in"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={p.url}
+                  alt={p.missionTitle}
+                  className="h-full w-full object-cover transition-transform group-hover:scale-105"
+                  loading="lazy"
+                />
+              </button>
               {/* hover/tap overlay */}
-              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent p-1.5 opacity-0 transition-opacity group-hover:opacity-100">
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent p-1.5 opacity-0 transition-opacity group-hover:opacity-100">
                 <div className="truncate text-[10px] font-bold text-[#e8f0e4]">
                   {p.missionIcon ?? "📷"} {p.missionTitle}
                 </div>
@@ -72,12 +95,12 @@ export function PhotoWallTile({ items, isTvMode }: Props) {
                 </div>
               </div>
               {p.status === "PENDING_REVIEW" && (
-                <span className="absolute right-1 top-1 rounded-full bg-amber-500/90 px-1.5 py-0.5 text-[8px] font-bold text-white">
+                <span className="pointer-events-none absolute right-1 top-1 rounded-full bg-amber-500/90 px-1.5 py-0.5 text-[8px] font-bold text-white">
                   검수
                 </span>
               )}
               {p.status === "REJECTED" && (
-                <span className="absolute right-1 top-1 rounded-full bg-rose-500/90 px-1.5 py-0.5 text-[8px] font-bold text-white">
+                <span className="pointer-events-none absolute right-1 top-1 rounded-full bg-rose-500/90 px-1.5 py-0.5 text-[8px] font-bold text-white">
                   반려
                 </span>
               )}
@@ -85,6 +108,7 @@ export function PhotoWallTile({ items, isTvMode }: Props) {
           ))}
         </ul>
       )}
+      {lightbox}
     </div>
   );
 }

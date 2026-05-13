@@ -8,6 +8,7 @@ import type {
   FamilyMissionCellState,
 } from "@/lib/control-room/types";
 import { fmtClockKstAlways } from "@/lib/datetime/kst";
+import { useLightbox, type LightboxItem } from "@/components/photo-lightbox";
 import styles from "../control-room.module.css";
 
 type Props = {
@@ -90,6 +91,18 @@ export function FamilyGridTile({ grid, photos, isTvMode }: Props) {
   }, [previewRow, photos]);
 
   const isPinned = selectedUserId !== null;
+
+  // 사진 클릭 → 확대 모달. 현재 previewRow 의 사진 시퀀스를 보여줌.
+  const lightboxItems: LightboxItem[] = useMemo(
+    () =>
+      previewPhotos.map((p) => ({
+        url: p.url,
+        caption: previewRow?.displayName,
+        subCaption: `${p.missionTitle} · ${fmtClockKstAlways(p.submittedAt)}`,
+      })),
+    [previewPhotos, previewRow]
+  );
+  const { openAt, lightbox } = useLightbox(lightboxItems);
 
   // 반 필터 적용. null=전체, "__no_class__"=반 없음, 그 외는 정확한 매칭.
   const rowsToShow = useMemo(() => {
@@ -348,26 +361,36 @@ export function FamilyGridTile({ grid, photos, isTvMode }: Props) {
                 })}
               </ul>
 
-              {/* 이 가족의 사진 */}
+              {/* 이 가족의 사진 — 클릭 시 확대 모달 */}
               {previewPhotos.length > 0 && (
                 <>
                   <div className="mt-3 text-[10px] font-semibold text-[#7FA892]">
                     📸 올린 사진 ({previewPhotos.length})
+                    <span className="ml-1 font-normal text-[#5e7a6c]">
+                      · 클릭하면 확대
+                    </span>
                   </div>
                   <ul className="mt-1 grid grid-cols-3 gap-1">
-                    {previewPhotos.slice(0, 6).map((p) => (
+                    {previewPhotos.slice(0, 6).map((p, i) => (
                       <li
                         key={p.submissionId}
                         className="aspect-square overflow-hidden rounded border border-[#1a2320]"
                         title={`${p.missionTitle} · ${fmtClockKstAlways(p.submittedAt)}`}
                       >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={p.url}
-                          alt={p.missionTitle}
-                          className="h-full w-full object-cover"
-                          loading="lazy"
-                        />
+                        <button
+                          type="button"
+                          onClick={() => openAt(i)}
+                          className="block h-full w-full cursor-zoom-in transition hover:scale-105"
+                          aria-label="사진 확대 보기"
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={p.url}
+                            alt={p.missionTitle}
+                            className="h-full w-full object-cover"
+                            loading="lazy"
+                          />
+                        </button>
                       </li>
                     ))}
                   </ul>
@@ -388,6 +411,7 @@ export function FamilyGridTile({ grid, photos, isTvMode }: Props) {
           )}
         </div>
       )}
+      {lightbox}
     </div>
   );
 }
