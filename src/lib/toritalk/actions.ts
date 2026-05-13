@@ -73,6 +73,24 @@ export async function createRoomAction(formData: FormData): Promise<string> {
   if (!name) throw new Error("방 이름을 입력해 주세요");
 
   const sb = await tx();
+
+  // 같은 이름의 활성 방이 이미 있으면 그것을 재사용 — 중복 생성 방지.
+  // (대소문자 무시·공백 trim 으로 비교)
+  const normalized = name.toLowerCase().trim();
+  const { data: existing } = await sb
+    .from("toritalk_rooms")
+    .select("id,name")
+    .eq("org_id", org.orgId)
+    .eq("archived", false);
+  const found = ((existing ?? []) as Array<{ id: string; name: string }>).find(
+    (r) => (r.name ?? "").toLowerCase().trim() === normalized
+  );
+  if (found) {
+    throw new Error(
+      `이미 "${name}" 방이 있어요. 같은 이름의 방을 또 만들 수 없습니다.`
+    );
+  }
+
   const { data, error } = await sb
     .from("toritalk_rooms")
     .insert({
@@ -84,7 +102,16 @@ export async function createRoomAction(formData: FormData): Promise<string> {
     .select("id")
     .single();
 
-  if (error || !data) throw new Error(error?.message ?? "방 생성 실패");
+  if (error || !data) {
+    // DB 측 unique 인덱스 충돌(23505) → 친절한 메시지로 변환
+    const msg = error?.message ?? "방 생성 실패";
+    if (msg.includes("uq_toritalk_rooms_active_norm") || error?.code === "23505") {
+      throw new Error(
+        `이미 "${name}" 방이 있어요. 같은 이름의 방을 또 만들 수 없습니다.`
+      );
+    }
+    throw new Error(msg);
+  }
 
   revalidatePath(`/org/${org.orgId}/toritalk`);
   return (data as { id: string }).id;
