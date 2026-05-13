@@ -15,12 +15,15 @@ export function RemoveFromEventButton({
   userId,
   displayName,
   variant = "table",
+  iconOnly = false,
 }: {
   orgId: string;
   eventId: string;
   userId: string;
   displayName: string;
   variant?: "table" | "card";
+  /** 테이블 좁은 폭에서 아이콘만 노출. */
+  iconOnly?: boolean;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -55,11 +58,13 @@ export function RemoveFromEventButton({
         className={
           variant === "card"
             ? "inline-flex h-8 items-center justify-center gap-1 rounded-md border border-amber-300 bg-amber-50 px-3 text-[11px] font-semibold leading-none text-amber-800 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
-            : "inline-flex h-7 items-center justify-center gap-0.5 whitespace-nowrap rounded-md border border-amber-300 bg-amber-50 px-2 text-[11px] font-semibold leading-none text-amber-800 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
+            : iconOnly
+              ? "inline-flex h-7 w-7 items-center justify-center rounded-md border border-amber-300 bg-amber-50 text-[13px] leading-none text-amber-800 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
+              : "inline-flex h-7 items-center justify-center gap-0.5 whitespace-nowrap rounded-md border border-amber-300 bg-amber-50 px-2 text-[11px] font-semibold leading-none text-amber-800 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
         }
       >
         <span aria-hidden>{isPending ? "⏳" : "🚫"}</span>
-        <span>행사제외</span>
+        {!iconOnly && <span>행사제외</span>}
       </button>
       {error && (
         <span

@@ -13,6 +13,8 @@ type Props = {
   current: AttendanceStatus | null;
   /** 선택 버튼 크기 — "sm" 테이블용 / "md" 모바일 카드 */
   size?: "sm" | "md";
+  /** 라벨 숨기고 아이콘만 — 테이블 좁은 폭에서 사용 */
+  iconOnly?: boolean;
 };
 
 const OPTIONS: Array<{
@@ -45,7 +47,12 @@ const OPTIONS: Array<{
  * 3버튼 출석 토글 (참석 · 늦음 · 미참석).
  * 같은 상태 재선택 시 해제(null).
  */
-export function AttendanceToggle({ userId, current, size = "sm" }: Props) {
+export function AttendanceToggle({
+  userId,
+  current,
+  size = "sm",
+  iconOnly = false,
+}: Props) {
   const router = useRouter();
   const [pending, start] = useTransition();
 
@@ -66,7 +73,9 @@ export function AttendanceToggle({ userId, current, size = "sm" }: Props) {
   const btnBase =
     size === "md"
       ? "inline-flex h-9 min-w-[52px] items-center justify-center gap-0.5 rounded-lg border px-2 text-[11px] font-bold leading-none transition disabled:opacity-50"
-      : "inline-flex h-7 min-w-[42px] items-center justify-center gap-0.5 rounded-md border px-1.5 text-[10px] font-bold leading-none transition disabled:opacity-50";
+      : iconOnly
+        ? "inline-flex h-7 w-7 items-center justify-center rounded-md border text-[14px] leading-none transition disabled:opacity-50"
+        : "inline-flex h-7 min-w-[42px] items-center justify-center gap-0.5 rounded-md border px-1.5 text-[10px] font-bold leading-none transition disabled:opacity-50";
 
   const inactiveCls =
     "border-[#D4E4BC] bg-white text-[#6B6560] hover:border-[#2D5A3D] hover:text-[#2D5A3D]";
@@ -87,7 +96,7 @@ export function AttendanceToggle({ userId, current, size = "sm" }: Props) {
             className={`${btnBase} ${isActive ? o.activeCls : inactiveCls}`}
           >
             <span aria-hidden>{o.icon}</span>
-            <span>{o.label}</span>
+            {!iconOnly && <span>{o.label}</span>}
           </button>
         );
       })}

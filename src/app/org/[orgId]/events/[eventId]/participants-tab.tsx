@@ -275,7 +275,7 @@ export function ParticipantsTab({
           {/* 데스크탑 테이블 */}
           <div className="hidden overflow-hidden rounded-2xl border border-[#D4E4BC] bg-white shadow-sm md:block">
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[1080px] text-sm">
+              <table className="w-full min-w-[720px] text-sm">
                 <thead className="bg-[#F4EFE8] text-[#6B4423]">
                   <tr>
                     <th className="px-2 py-2 text-center text-[10px] font-bold">
@@ -323,6 +323,7 @@ export function ParticipantsTab({
                             userId={r.id}
                             current={attendanceToday}
                             size="sm"
+                            iconOnly
                           />
                         </td>
                         <td className="px-2 py-2">
@@ -378,6 +379,7 @@ export function ParticipantsTab({
                               userId={r.id}
                               displayName={name}
                               variant="table"
+                              iconOnly
                             />
                             <UserRowActions
                               orgId={orgId}
@@ -386,6 +388,7 @@ export function ParticipantsTab({
                               status={r.status}
                               variant="table"
                               hideSuspend
+                              iconOnly
                             />
                           </div>
                         </td>

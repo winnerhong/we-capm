@@ -21,6 +21,8 @@ type Props = {
    * 기본 false (기관 전체 /users 페이지에서는 표시).
    */
   hideSuspend?: boolean;
+  /** 테이블 좁은 폭에서 아이콘만 노출. variant=table 일 때만 적용. */
+  iconOnly?: boolean;
 };
 
 export function UserRowActions({
@@ -30,6 +32,7 @@ export function UserRowActions({
   status,
   variant = "table",
   hideSuspend = false,
+  iconOnly = false,
 }: Props) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -62,8 +65,9 @@ export function UserRowActions({
     });
   };
 
-  const base =
-    "inline-flex h-7 items-center justify-center rounded-md px-2 text-[11px] font-semibold leading-none whitespace-nowrap transition disabled:opacity-50";
+  const base = iconOnly
+    ? "inline-flex h-7 w-7 items-center justify-center rounded-md text-[13px] leading-none transition disabled:opacity-50"
+    : "inline-flex h-7 items-center justify-center rounded-md px-2 text-[11px] font-semibold leading-none whitespace-nowrap transition disabled:opacity-50";
   const cardBase =
     "inline-flex h-8 flex-1 items-center justify-center rounded-md px-2 text-[11px] font-semibold leading-none transition disabled:opacity-50";
 
@@ -76,9 +80,11 @@ export function UserRowActions({
           type="button"
           onClick={() => setStatus("SUSPENDED")}
           disabled={pending}
+          title="비활성화"
+          aria-label="비활성화"
           className={`${cls} border border-[#E5D3B8] bg-[#FFF8F0] text-[#B8860B] hover:bg-[#FFE9C7]`}
         >
-          비활성화
+          {iconOnly && variant === "table" ? "💤" : "비활성화"}
         </button>
       );
     }
@@ -88,9 +94,11 @@ export function UserRowActions({
           type="button"
           onClick={() => setStatus("ACTIVE")}
           disabled={pending}
+          title="활성화"
+          aria-label="활성화"
           className={`${cls} bg-[#2D5A3D] text-white hover:bg-[#3A7A52]`}
         >
-          활성화
+          {iconOnly && variant === "table" ? "✅" : "활성화"}
         </button>
       );
     }
@@ -100,9 +108,11 @@ export function UserRowActions({
         type="button"
         onClick={() => setStatus("ACTIVE")}
         disabled={pending}
+        title="활성화"
+        aria-label="활성화"
         className={`${cls} border border-[#D4E4BC] bg-white text-[#2D5A3D] hover:bg-[#E8F0E4]`}
       >
-        활성화
+        {iconOnly && variant === "table" ? "✅" : "활성화"}
       </button>
     );
   })();
@@ -145,9 +155,10 @@ export function UserRowActions({
           target="_blank"
           rel="noopener"
           title={`${userName}님으로 새 창에서 로그인`}
-          className={`${base} gap-0.5 border border-violet-300 bg-violet-50 text-violet-800 hover:bg-violet-100`}
+          aria-label="로그인"
+          className={`${base} ${iconOnly ? "" : "gap-0.5"} border border-violet-300 bg-violet-50 text-violet-800 hover:bg-violet-100`}
         >
-          🔑 로그인↗
+          {iconOnly ? "🔑" : "🔑 로그인↗"}
         </a>
       ) : null}
       {!hideSuspend && statusButton}
@@ -155,9 +166,11 @@ export function UserRowActions({
         type="button"
         onClick={onDelete}
         disabled={pending}
+        title="삭제"
+        aria-label="삭제"
         className={`${base} border border-red-200 bg-white text-red-600 hover:bg-red-50`}
       >
-        삭제
+        {iconOnly ? "🗑" : "삭제"}
       </button>
     </div>
   );
