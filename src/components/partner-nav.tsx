@@ -36,6 +36,7 @@ const NAV_GROUPS: NavGroup[] = [
       "/partner/stampbook-presets",
       "/partner/features",
       "/partner/event-templates",
+      "/partner/homepage-banner",
     ],
     items: [
       {
@@ -85,6 +86,12 @@ const NAV_GROUPS: NavGroup[] = [
         href: "/partner/missions/contributions",
         icon: "💌",
         allowedRoles: ["OWNER", "MANAGER", "STAFF"],
+      },
+      {
+        label: "하단 홈페이지 배너",
+        href: "/partner/homepage-banner",
+        icon: "🔗",
+        allowedRoles: ["OWNER", "MANAGER"],
       },
     ],
   },
