@@ -14,6 +14,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
 import { requireOrg } from "@/lib/org-auth-guard";
 import { createClient } from "@/lib/supabase/server";
+import { toIsoKstFromLocalInput } from "@/lib/datetime/kst";
 import {
   loadFmSessionById,
   loadOrgMissionById,
@@ -355,13 +356,14 @@ export async function createFmSessionAction(
     throw new Error("시작·종료 일시를 모두 입력해 주세요");
   }
 
-  // datetime-local(YYYY-MM-DDTHH:mm) → 로컬타임으로 파싱 → ISO.
-  const start = new Date(scheduledStartRaw);
-  const end = new Date(scheduledEndRaw);
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+  // datetime-local(YYYY-MM-DDTHH:mm) → KST 가정 → UTC ISO. Vercel(UTC)
+  // 환경에서 new Date(raw) 가 UTC 로 해석해 9시간 어긋나던 버그 fix.
+  const startIso = toIsoKstFromLocalInput(scheduledStartRaw);
+  const endIso = toIsoKstFromLocalInput(scheduledEndRaw);
+  if (!startIso || !endIso) {
     throw new Error("일시 형식이 올바르지 않아요");
   }
-  if (end.getTime() <= start.getTime()) {
+  if (Date.parse(endIso) <= Date.parse(startIso)) {
     throw new Error("종료 일시는 시작 일시보다 뒤여야 해요");
   }
 
@@ -370,8 +372,8 @@ export async function createFmSessionAction(
   const row: Row = {
     org_id: org.orgId,
     name,
-    scheduled_start: start.toISOString(),
-    scheduled_end: end.toISOString(),
+    scheduled_start: startIso,
+    scheduled_end: endIso,
     is_live: false,
     event_id: eventIdRaw || null,
   };
@@ -755,12 +757,13 @@ export async function updateFmSessionAction(
     throw new Error("시작·종료 일시를 모두 입력해 주세요");
   }
 
-  const start = new Date(scheduledStartRaw);
-  const end = new Date(scheduledEndRaw);
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+  // datetime-local → KST 가정 → UTC ISO (Vercel UTC 환경 9h 오프셋 버그 fix)
+  const startIso = toIsoKstFromLocalInput(scheduledStartRaw);
+  const endIso = toIsoKstFromLocalInput(scheduledEndRaw);
+  if (!startIso || !endIso) {
     throw new Error("일시 형식이 올바르지 않아요");
   }
-  if (end.getTime() <= start.getTime()) {
+  if (Date.parse(endIso) <= Date.parse(startIso)) {
     throw new Error("종료 일시는 시작 일시보다 뒤여야 해요");
   }
 
@@ -780,8 +783,8 @@ export async function updateFmSessionAction(
   )
     .update({
       name,
-      scheduled_start: start.toISOString(),
-      scheduled_end: end.toISOString(),
+      scheduled_start: startIso,
+      scheduled_end: endIso,
       updated_at: new Date().toISOString(),
     })
     .eq("id", sessionId)) as { error: SbErr };

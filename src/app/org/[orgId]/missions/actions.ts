@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireOrg } from "@/lib/org-auth-guard";
+import { toIsoKstFromLocalInput } from "@/lib/datetime/kst";
 import { loadAvailableMissionsForOrg } from "@/lib/missions/queries";
 import type {
   ApprovalMode,
@@ -62,6 +63,10 @@ function floatOrNull(value: FormDataEntryValue | null): number | null {
 function toIsoOrNull(value: FormDataEntryValue | null): string | null {
   const s = str(value);
   if (s === "") return null;
+  // datetime-local 형식이면 KST 로 가정 (Vercel UTC 환경에서 new Date() 가
+  // 9시간 어긋나는 버그 방지). timezone 표기가 이미 있으면 그대로 통과.
+  const kst = toIsoKstFromLocalInput(s);
+  if (kst) return kst;
   const d = new Date(s);
   if (Number.isNaN(d.getTime())) return null;
   return d.toISOString();

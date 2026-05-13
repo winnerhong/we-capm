@@ -60,11 +60,27 @@ function clampString(
 /**
  * ISO 문자열 파싱 검증 — 빈 값/"null"/파싱 실패 시 null.
  */
+/**
+ * datetime-local 입력 또는 ISO 문자열을 KST 기준 UTC ISO 로 정규화.
+ *
+ * 중요: timezone 표기가 없는 datetime-local 값("2026-05-16T13:00") 은
+ * 기본 Date.parse 가 "서버의 로컬 시간" 으로 해석한다. Vercel(UTC) 에서는
+ * 13:00 UTC = 22:00 KST 로 저장되어 사용자가 입력한 13:00 KST 와 9시간 어긋남.
+ *
+ * 해결: timezone 표기가 없으면 +09:00 (KST) 으로 가정한 뒤 ISO 화.
+ */
 function parseIsoOrNull(raw: string | null | undefined): string | null {
   if (!raw) return null;
   const trimmed = String(raw).trim();
   if (!trimmed || trimmed === "null") return null;
-  const t = Date.parse(trimmed);
+
+  // datetime-local 형식("YYYY-MM-DDTHH:MM" 또는 "YYYY-MM-DDTHH:MM:SS") 이고
+  // timezone 마커(Z 또는 +HH:MM / -HH:MM) 가 없으면 KST 로 가정.
+  const looksLocal =
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?$/.test(trimmed);
+  const candidate = looksLocal ? `${trimmed.length === 16 ? `${trimmed}:00` : trimmed}+09:00` : trimmed;
+
+  const t = Date.parse(candidate);
   if (!Number.isFinite(t)) return null;
   return new Date(t).toISOString();
 }

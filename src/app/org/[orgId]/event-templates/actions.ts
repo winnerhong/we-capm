@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireOrg } from "@/lib/org-auth-guard";
 import { hasFeature } from "@/lib/features/guard";
+import { toIsoKstFromLocalInput } from "@/lib/datetime/kst";
 import {
   getTemplateById,
   listTemplateItems,
@@ -77,15 +78,13 @@ export async function importEventTemplateAction(
   if (!startsAtStr) return { ok: false, message: "시작 일시를 입력해주세요." };
   if (!endsAtStr) return { ok: false, message: "종료 일시를 입력해주세요." };
 
-  let startsAt: string;
-  let endsAt: string;
-  try {
-    startsAt = new Date(startsAtStr).toISOString();
-    endsAt = new Date(endsAtStr).toISOString();
-  } catch {
+  // datetime-local → KST 가정 → UTC ISO. Vercel(UTC) 에서 new Date() 가
+  // 9시간 어긋나던 버그 방지.
+  const startsAt = toIsoKstFromLocalInput(startsAtStr) ?? null;
+  const endsAt = toIsoKstFromLocalInput(endsAtStr) ?? null;
+  if (!startsAt || !endsAt)
     return { ok: false, message: "일시 형식이 올바르지 않습니다." };
-  }
-  if (new Date(endsAt).getTime() < new Date(startsAt).getTime())
+  if (Date.parse(endsAt) < Date.parse(startsAt))
     return { ok: false, message: "종료 일시는 시작 일시 이후여야 합니다." };
 
   // 3) 행사 INSERT
