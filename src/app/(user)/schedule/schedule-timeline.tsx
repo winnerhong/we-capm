@@ -14,6 +14,10 @@ import {
   SLOT_KIND_META,
   type TimelineSlotRow,
 } from "@/lib/event-timeline/types";
+import {
+  fmtClockKstAlways,
+  fmtFullDateKst,
+} from "@/lib/datetime/kst";
 
 interface Props {
   eventId: string;
@@ -33,30 +37,23 @@ interface SlotWithStatus extends TimelineSlotRow {
   startsInMinutes: number;
 }
 
-function fmtDay(iso: string | null): string {
-  if (!iso) return "";
-  try {
-    return new Date(iso).toLocaleDateString("ko-KR", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      weekday: "short",
-    });
-  } catch {
-    return "";
-  }
-}
+// KST 강제 — 브라우저 timezone 과 무관하게 항상 한국 시간으로 표시.
+// (예전 로컬 fmtClock/fmtDay 는 toLocaleTimeString 의 기본 timeZone 을 썼는데,
+//  Vercel/UTC 환경의 SSR 결과와 클라이언트 결과가 어긋날 수 있었음.)
+const fmtDay = (iso: string | null): string =>
+  iso ? fmtFullDateKst(iso) : "";
+const fmtClock = (iso: string): string => fmtClockKstAlways(iso);
 
-function fmtClock(iso: string): string {
-  try {
-    return new Date(iso).toLocaleTimeString("ko-KR", {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    });
-  } catch {
-    return "";
-  }
+// "지금 21:00:48" 처럼 초까지 포함된 KST 시계.
+const KST_CLOCK_S = new Intl.DateTimeFormat("ko-KR", {
+  timeZone: "Asia/Seoul",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hour12: false,
+});
+function fmtClockSecKst(ms: number): string {
+  return KST_CLOCK_S.format(new Date(ms));
 }
 
 function fmtCountdown(minutes: number): string {
@@ -197,13 +194,7 @@ export function ScheduleTimeline({
           </p>
         )}
         <p className="mt-3 font-mono text-[11px] tabular-nums text-[#D4E4BC]">
-          ⏱ 지금{" "}
-          {new Date(now).toLocaleTimeString("ko-KR", {
-            hour: "2-digit",
-            minute: "2-digit",
-            second: "2-digit",
-            hour12: false,
-          })}
+          ⏱ 지금 {fmtClockSecKst(now)}
         </p>
       </header>
 
