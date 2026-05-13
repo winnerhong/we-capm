@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import type { TrailRow, TrailStopRow } from "@/lib/trails/types";
+import { loadOrgTrailByQrCode } from "@/lib/trails/queries";
+import type { OrgTrailRow, TrailRow, TrailStopRow } from "@/lib/trails/types";
 import { MISSION_TYPE_META } from "@/lib/trails/types";
 import { MissionForm } from "./mission-form";
 import { TrailProgress } from "./trail-progress";
@@ -59,7 +60,53 @@ export default async function TrailCodePage({
     return <TrailOverview trail={trailBySlug} />;
   }
 
+  // 3) org_trails (기관 자체 코스) qr_code 매칭 — 간단 안내 페이지
+  const orgTrail = await loadOrgTrailByQrCode(code);
+  if (orgTrail) {
+    return <OrgTrailView trail={orgTrail} />;
+  }
+
   notFound();
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// 뷰 3: 기관 자체 코스 — 간단 안내 (이미지·제목·설명만, 미션/스코어 없음)
+// ─────────────────────────────────────────────────────────────────────────
+function OrgTrailView({ trail }: { trail: OrgTrailRow }) {
+  return (
+    <div className="mx-auto min-h-dvh max-w-md bg-[#FFFDF8] px-4 py-6">
+      <header className="mb-4 text-center">
+        <p className="inline-flex items-center gap-1 rounded-full border border-[#D4E4BC] bg-[#F5F1E8] px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-[#2D5A3D]">
+          🗺️ 기관 자체 코스
+        </p>
+      </header>
+      {trail.cover_image_url && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={trail.cover_image_url}
+          alt={trail.name}
+          className="mb-4 w-full rounded-2xl border border-[#D4E4BC] object-cover shadow-sm"
+        />
+      )}
+      <h1 className="text-center text-xl font-extrabold text-[#2D5A3D]">
+        {trail.name}
+      </h1>
+      {trail.description && (
+        <p className="mt-3 whitespace-pre-line break-words rounded-2xl border border-[#D4E4BC] bg-white p-4 text-sm leading-relaxed text-[#3D3A36] shadow-sm">
+          {trail.description}
+        </p>
+      )}
+      <div className="mt-6 text-center">
+        <Link
+          href="/home"
+          className="inline-flex items-center gap-1.5 rounded-xl border border-[#D4E4BC] bg-white px-4 py-2.5 text-sm font-semibold text-[#2D5A3D] hover:bg-[#F5F1E8]"
+        >
+          <span aria-hidden>🏠</span>
+          <span>홈으로</span>
+        </Link>
+      </div>
+    </div>
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────

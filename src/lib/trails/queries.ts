@@ -1,8 +1,9 @@
 // server-only: @/lib/supabase/server를 참조하므로 클라이언트 번들에 포함 불가
 import { createClient } from "@/lib/supabase/server";
-import type { TrailRow } from "@/lib/trails/types";
+import type { OrgTrailRow, TrailRow } from "@/lib/trails/types";
 
 type SbResp<T> = { data: T[] | null; error: unknown };
+type SbRespOne<T> = { data: T | null; error: unknown };
 
 /**
  * 기관(org) 포털용: 해당 기관에 노출되어야 할 모든 숲길을 반환한다.
@@ -78,4 +79,80 @@ export async function loadTrailsAssignedToOrg(
   }
 
   return Array.from(map.values());
+}
+
+/**
+ * 기관 자체 코스 목록 — 해당 기관이 직접 등록한 org_trails.
+ * display_order ASC, 같으면 created_at DESC.
+ */
+export async function loadOrgTrails(orgId: string): Promise<OrgTrailRow[]> {
+  if (!orgId) return [];
+  const supabase = await createClient();
+  const resp = (await (
+    supabase.from("org_trails" as never) as unknown as {
+      select: (c: string) => {
+        eq: (k: string, v: string) => {
+          order: (
+            c: string,
+            o: { ascending: boolean }
+          ) => {
+            order: (
+              c: string,
+              o: { ascending: boolean }
+            ) => Promise<SbResp<OrgTrailRow>>;
+          };
+        };
+      };
+    }
+  )
+    .select("*")
+    .eq("org_id", orgId)
+    .order("display_order", { ascending: true })
+    .order("created_at", { ascending: false })) as SbResp<OrgTrailRow>;
+
+  return resp.data ?? [];
+}
+
+/** 단건 조회 — 편집 페이지용. 권한 체크는 호출부 책임. */
+export async function loadOrgTrailById(
+  id: string
+): Promise<OrgTrailRow | null> {
+  if (!id) return null;
+  const supabase = await createClient();
+  const resp = (await (
+    supabase.from("org_trails" as never) as unknown as {
+      select: (c: string) => {
+        eq: (k: string, v: string) => {
+          maybeSingle: () => Promise<SbRespOne<OrgTrailRow>>;
+        };
+      };
+    }
+  )
+    .select("*")
+    .eq("id", id)
+    .maybeSingle()) as SbRespOne<OrgTrailRow>;
+
+  return resp.data ?? null;
+}
+
+/** QR 코드(qr_code 8자리 문자열) 로 자체 코스 조회 — /trail/[code] 라우트에서 사용. */
+export async function loadOrgTrailByQrCode(
+  qrCode: string
+): Promise<OrgTrailRow | null> {
+  if (!qrCode) return null;
+  const supabase = await createClient();
+  const resp = (await (
+    supabase.from("org_trails" as never) as unknown as {
+      select: (c: string) => {
+        eq: (k: string, v: string) => {
+          maybeSingle: () => Promise<SbRespOne<OrgTrailRow>>;
+        };
+      };
+    }
+  )
+    .select("*")
+    .eq("qr_code", qrCode)
+    .maybeSingle()) as SbRespOne<OrgTrailRow>;
+
+  return resp.data ?? null;
 }

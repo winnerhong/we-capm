@@ -66,6 +66,23 @@ export interface TrailRow {
   updated_at: string;
 }
 
+/**
+ * 기관이 직접 등록한 자체 코스 — 간단 버전 (이미지·제목·설명만).
+ * partner_trails 와는 별개 스키마. QR/지점/슬롯 등 풀 기능은 미지원.
+ */
+export interface OrgTrailRow {
+  id: string;
+  org_id: string;
+  name: string;
+  description: string | null;
+  cover_image_url: string | null;
+  display_order: number;
+  /** 8자리 영숫자 QR 코드. 스캔 URL = /trail/{qr_code}. 기존 행은 null 가능. */
+  qr_code: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface TrailAssignmentRow {
   id: string;
   trail_id: string;

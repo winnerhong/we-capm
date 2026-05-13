@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { requirePartner } from "@/lib/auth-guard";
 import { createClient } from "@/lib/supabase/server";
@@ -7,8 +8,16 @@ import {
   type TrailRow,
   type TrailStopRow,
 } from "@/lib/trails/types";
-import { generateQrDataUrl } from "@/lib/trails/qr-code";
+import { generateQrSvg } from "@/lib/trails/qr-code";
 import { PrintButton } from "./print-button";
+
+async function getRequestBaseUrl(): Promise<string> {
+  const h = await headers();
+  const host = h.get("host");
+  if (!host) return "";
+  const proto = h.get("x-forwarded-proto") ?? "https";
+  return `${proto}://${host}`;
+}
 
 export const dynamic = "force-dynamic";
 
@@ -72,11 +81,13 @@ export default async function TrailQrPrintPage({
   const layout: Layout = rawLayout === "card" ? "card" : "a4";
   const stops = await loadStops(id);
 
-  // Parallel QR generation
-  const qrDataUrls = await Promise.all(
-    stops.map((s) => generateQrDataUrl(s.qr_code))
+  // Parallel QR generation — SVG (벡터 — A3/A0 등 어떤 크기로 인쇄해도 깨지지 않음)
+  // baseUrl 을 명시적으로 전달해 절대 URL 보장 (폰 카메라 스캔 시 동작).
+  const baseUrl = await getRequestBaseUrl();
+  const qrSvgs = await Promise.all(
+    stops.map((s) => generateQrSvg(s.qr_code, { baseUrl }))
   );
-  const stopsWithQr = stops.map((s, i) => ({ ...s, qrDataUrl: qrDataUrls[i] }));
+  const stopsWithQr = stops.map((s, i) => ({ ...s, qrSvg: qrSvgs[i] }));
 
   return (
     <div className="mx-auto max-w-5xl space-y-5">
@@ -158,7 +169,8 @@ export default async function TrailQrPrintPage({
       <style>{`
         @media print {
           body { background: white !important; }
-          @page { size: A4; margin: 10mm; }
+          /* @page size 미지정 — 사용자의 인쇄 다이얼로그 선택(A4/A3/Letter 등) 그대로 사용 */
+          @page { margin: 10mm; }
           .page-break { page-break-after: always; break-after: page; }
           .page-break:last-child { page-break-after: auto; break-after: auto; }
         }
@@ -167,7 +179,7 @@ export default async function TrailQrPrintPage({
   );
 }
 
-type StopWithQr = TrailStopRow & { qrDataUrl: string };
+type StopWithQr = TrailStopRow & { qrSvg: string };
 
 function A4Layout({
   trail,
@@ -199,11 +211,11 @@ function A4Layout({
                 {s.description}
               </p>
             )}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={s.qrDataUrl}
-              alt={`${s.name} QR`}
-              className="mt-6 h-64 w-64 rounded-2xl border-4 border-[#2D5A3D] bg-white p-2 shadow-sm"
+            <div
+              role="img"
+              aria-label={`${s.name} QR`}
+              dangerouslySetInnerHTML={{ __html: s.qrSvg }}
+              className="mt-6 h-64 w-64 rounded-2xl border-4 border-[#2D5A3D] bg-white p-2 shadow-sm [&>svg]:h-full [&>svg]:w-full print:h-[260mm] print:w-[260mm]"
             />
             <div className="mt-4 text-[10px] text-[#6B6560]">
               📱 카메라로 QR을 스캔해 미션을 완료하세요
@@ -256,11 +268,11 @@ function CardLayout({
                   key={s.id}
                   className="flex flex-col items-center rounded-xl border border-[#D4E4BC] bg-white p-3 text-center"
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={s.qrDataUrl}
-                    alt={`${s.name} QR`}
-                    className="h-28 w-28 rounded-lg border-2 border-[#2D5A3D] bg-white p-1"
+                  <div
+                    role="img"
+                    aria-label={`${s.name} QR`}
+                    dangerouslySetInnerHTML={{ __html: s.qrSvg }}
+                    className="h-28 w-28 rounded-lg border-2 border-[#2D5A3D] bg-white p-1 [&>svg]:h-full [&>svg]:w-full"
                   />
                   <div className="mt-2 line-clamp-1 text-xs font-bold text-[#2C2C2C]">
                     #{s.order}. {s.name}

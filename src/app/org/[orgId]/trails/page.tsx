@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireOrg } from "@/lib/org-auth-guard";
-import { loadTrailsAssignedToOrg } from "@/lib/trails/queries";
+import { loadOrgTrails, loadTrailsAssignedToOrg } from "@/lib/trails/queries";
 import { DIFFICULTY_META, type TrailDifficulty } from "@/lib/trails/types";
 import { loadPartnerDisplayNameForOrg } from "@/lib/org-partner";
 
@@ -18,10 +18,11 @@ export default async function OrgTrailsPage({
   params: Promise<{ orgId: string }>;
 }) {
   const { orgId } = await params;
-  const org = await requireOrg();
+  await requireOrg();
 
-  const [trails, partnerName] = await Promise.all([
+  const [trails, ownTrails, partnerName] = await Promise.all([
     loadTrailsAssignedToOrg(orgId),
+    loadOrgTrails(orgId),
     loadPartnerDisplayNameForOrg(orgId),
   ]);
 
@@ -34,9 +35,105 @@ export default async function OrgTrailsPage({
           <span>My 코스관리</span>
         </h1>
         <p className="mt-2 text-sm text-[#6B6560]">
-          {partnerName}에서 개발한 코스를 확인하세요
+          {partnerName}에서 개발한 코스 + 우리 기관 자체 코스를 확인하세요
         </p>
       </header>
+
+      {/* 자체 코스 섹션 — 우리 기관이 직접 등록 */}
+      <section className="mb-8">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="flex items-center gap-2 text-lg font-bold text-[#2D5A3D]">
+            <span aria-hidden>📌</span>
+            <span>우리 기관 자체 코스</span>
+            <span className="rounded-full bg-[#E8F0E4] px-2 py-0.5 text-[11px] font-semibold text-[#2D5A3D]">
+              {ownTrails.length}
+            </span>
+          </h2>
+          <Link
+            href={`/org/${orgId}/trails/own/new`}
+            className="inline-flex items-center gap-1 rounded-xl bg-[#2D5A3D] px-3 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-[#234a30]"
+          >
+            ➕ 코스 등록
+          </Link>
+        </div>
+
+        {ownTrails.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-[#D4E4BC] bg-white p-6 text-center">
+            <div className="mb-2 text-4xl" aria-hidden>
+              🗺️
+            </div>
+            <p className="text-sm font-semibold text-[#2D5A3D]">
+              자체 코스를 등록하면 여기에 표시돼요
+            </p>
+            <p className="mt-1 text-xs text-[#6B6560]">
+              어린이집 둘레길, 마을 산책로 등 직접 만든 코스를 사진과 함께 올려보세요.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+            {ownTrails.map((t) => (
+              <article
+                key={t.id}
+                className="flex flex-col overflow-hidden rounded-2xl border border-[#D4E4BC] bg-white shadow-sm transition-shadow hover:shadow-md"
+              >
+                <div className="aspect-[4/3] w-full overflow-hidden bg-[#E8F0E4]">
+                  {t.cover_image_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={t.cover_image_url}
+                      alt={t.name}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center text-5xl">
+                      🗺️
+                    </div>
+                  )}
+                </div>
+                <div className="flex flex-1 flex-col gap-2 p-4">
+                  <span className="inline-flex w-fit items-center gap-1 rounded-full border border-[#D4E4BC] bg-[#F5F1E8] px-2 py-0.5 text-[10px] font-semibold text-[#2D5A3D]">
+                    📌 자체
+                  </span>
+                  <h3 className="line-clamp-2 text-sm font-bold text-[#2C2C2C]">
+                    {t.name}
+                  </h3>
+                  {t.description && (
+                    <p className="line-clamp-3 whitespace-pre-line text-xs text-[#6B6560]">
+                      {t.description}
+                    </p>
+                  )}
+                  <div className="mt-auto flex items-center gap-2 pt-3">
+                    <Link
+                      href={`/org/${orgId}/trails/own/${t.id}/qr`}
+                      className="inline-flex flex-1 items-center justify-center gap-1 rounded-xl bg-[#2D5A3D] px-3 py-2 text-xs font-bold text-white transition hover:bg-[#4A7C59]"
+                    >
+                      🎫 QR 보기
+                    </Link>
+                    <Link
+                      href={`/org/${orgId}/trails/own/${t.id}/edit`}
+                      className="inline-flex items-center justify-center gap-1 rounded-xl border border-[#D4E4BC] bg-white px-3 py-2 text-xs font-bold text-[#2D5A3D] transition hover:bg-[#F5F1E8]"
+                    >
+                      ✏️ 편집
+                    </Link>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* 지사 배포 코스 */}
+      <section>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="flex items-center gap-2 text-lg font-bold text-[#2D5A3D]">
+            <span aria-hidden>🏢</span>
+            <span>{partnerName} 배포 코스</span>
+            <span className="rounded-full bg-[#E8F0E4] px-2 py-0.5 text-[11px] font-semibold text-[#2D5A3D]">
+              {trails.length}
+            </span>
+          </h2>
+        </div>
 
       {trails.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-[#D4E4BC] bg-white p-10 text-center">
@@ -125,6 +222,7 @@ export default async function OrgTrailsPage({
           })}
         </div>
       )}
+      </section>
     </div>
   );
 }
