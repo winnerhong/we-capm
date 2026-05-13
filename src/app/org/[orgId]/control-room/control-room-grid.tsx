@@ -35,7 +35,7 @@ export async function ControlRoomGrid({ snapshot, orgId, isTvMode }: Props) {
         className={`mx-auto flex flex-col ${
           isTvMode
             ? "max-w-[3840px] gap-[1.25em] p-[1.25em]"
-            : "max-w-[1600px] gap-4 p-4 md:p-6"
+            : "max-w-[1600px] gap-2.5 p-3 md:gap-3 md:p-4"
         }`}
       >
         {/* row 1: Header */}
@@ -44,7 +44,7 @@ export async function ControlRoomGrid({ snapshot, orgId, isTvMode }: Props) {
         {/* row 2: 3 stats tiles — 모바일 1열, md 이상 3열 */}
         <div
           className={`grid grid-cols-1 md:grid-cols-3 ${
-            isTvMode ? "gap-[1.25em]" : "gap-4"
+            isTvMode ? "gap-[1.25em]" : "gap-3"
           }`}
         >
           <ParticipantsTile snapshot={snapshot} orgId={orgId} />
@@ -60,7 +60,7 @@ export async function ControlRoomGrid({ snapshot, orgId, isTvMode }: Props) {
         {/* row 2.5: Phase 1 관제 — 🎯 미션별 진행률 + 📸 사진 월 */}
         <div
           className={`grid grid-cols-1 md:grid-cols-2 ${
-            isTvMode ? "gap-[1.25em]" : "gap-4"
+            isTvMode ? "gap-[1.25em]" : "gap-3"
           }`}
         >
           <MissionProgressTile
@@ -82,7 +82,7 @@ export async function ControlRoomGrid({ snapshot, orgId, isTvMode }: Props) {
         {/* row 3: Activity Feed + Leaderboard — 모바일 1열, md 이상 2열 */}
         <div
           className={`grid grid-cols-1 md:grid-cols-2 ${
-            isTvMode ? "gap-[1.25em]" : "gap-4"
+            isTvMode ? "gap-[1.25em]" : "gap-3"
           }`}
         >
           <ActivityFeedTile

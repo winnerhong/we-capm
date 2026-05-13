@@ -26,7 +26,7 @@ export function MissionProgressTile({ items, isTvMode }: Props) {
   const sorted = items.slice().sort((a, b) => b.completionPct - a.completionPct);
 
   return (
-    <div className={`${styles.surface} flex h-full flex-col p-5`}>
+    <div className={`${styles.surface} flex flex-col p-4`}>
       <div className="mb-3 flex items-center gap-2">
         <span className="text-base" aria-hidden>
           🎯
