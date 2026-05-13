@@ -14,6 +14,7 @@ import { HeatmapTile } from "./widgets/heatmap-tile";
 import { PhotoWallTile } from "./widgets/photo-wall-tile";
 import { MissionProgressTile } from "./widgets/mission-progress-tile";
 import { FamilyGridTile } from "./widgets/family-grid-tile";
+import { LiveAttemptsTile } from "./widgets/live-attempts-tile";
 
 type Props = {
   snapshot: ControlRoomSnapshot;
@@ -47,6 +48,11 @@ export function ControlRoomGrid({ snapshot, orgId, isTvMode }: Props) {
           <StampsTile stamps={snapshot.stamps} isTvMode={isTvMode} />
           <AcornsTile acorns={snapshot.acorns} isTvMode={isTvMode} />
           <FmTile snapshot={snapshot} />
+        </div>
+
+        {/* row 2.3: Phase 2 — 🔴 라이브 수행 (정체 가족 강조) */}
+        <div className="grid grid-cols-1">
+          <LiveAttemptsTile live={snapshot.live} isTvMode={isTvMode} />
         </div>
 
         {/* row 2.5: Phase 1 관제 — 📸 사진 월 + 🎯 미션별 진행률 */}

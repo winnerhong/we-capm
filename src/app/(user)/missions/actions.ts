@@ -12,6 +12,7 @@ import {
   loadUserSubmissionForMission,
   sumAcornsForPack,
 } from "@/lib/missions/queries";
+import { markAttemptCompletedAction } from "@/lib/missions/attempt-actions";
 import { computeTier } from "@/lib/missions/progress";
 import {
   capAcornAmount,
@@ -532,6 +533,10 @@ async function submitMissionActionInner(
   }
 
   const submissionId = insertResp.data.id;
+
+  // 관제 telemetry — mission_attempts 의 해당 가족 row 를 완료로 마킹.
+  // silent fail (table 누락이어도 제출은 정상).
+  await markAttemptCompletedAction(mission.id, user.id, submissionId);
 
   // RADIO: 모더레이션 큐에 자동 인큐
   if (mission.kind === "RADIO") {

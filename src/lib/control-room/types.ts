@@ -140,6 +140,35 @@ export interface ControlRoomFamilyGrid {
   rows: ControlRoomFamilyRow[];
 }
 
+/**
+ * Phase 2 관제 — 라이브 미션 수행 현황.
+ *  - "지금 N분째 OOO 미션 진행 중인 가족" 표시용.
+ *  - last_seen_at 이 최근 3분 이내이고 completed_submission_id IS NULL.
+ */
+export interface ControlRoomLiveAttempt {
+  attemptId: string;
+  userId: string;
+  userDisplayName: string;
+  missionId: string;
+  missionTitle: string;
+  missionIcon: string | null;
+  missionKind: string;
+  openedAt: string;
+  lastSeenAt: string;
+  /** 클라이언트 표시용 — 서버 now() 기준 경과 분 (반올림). */
+  elapsedMinutes: number;
+  /** opened_at 이 stuckThreshold 보다 오래됐고 last_seen 신선하면 true. */
+  stuck: boolean;
+}
+
+export interface ControlRoomLive {
+  attempts: ControlRoomLiveAttempt[]; // active, 최신 last_seen 순
+  /** 정체 의심 — opened_at >= STUCK_MIN 이상 + last_seen 신선. */
+  stuckCount: number;
+  /** 활동 중인 distinct user 수. */
+  activeFamilies: number;
+}
+
 export interface ControlRoomSnapshot {
   orgName: string;
   serverNowIso: string;
@@ -171,4 +200,6 @@ export interface ControlRoomSnapshot {
   photoWall: ControlRoomPhotoItem[]; // 최근 30장
   missionProgress: ControlRoomMissionProgressRow[]; // 활성 미션 전부
   familyGrid: ControlRoomFamilyGrid;
+  // Phase 2 — 라이브 수행 telemetry
+  live: ControlRoomLive;
 }

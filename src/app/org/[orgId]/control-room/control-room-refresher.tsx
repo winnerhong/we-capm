@@ -91,6 +91,16 @@ export function ControlRoomRefresher({
         } as never,
         scheduleRefresh as never
       )
+      .on(
+        "postgres_changes" as never,
+        {
+          event: "*",
+          schema: "public",
+          table: "mission_attempts",
+          filter: `org_id=eq.${orgId}`,
+        } as never,
+        scheduleRefresh as never
+      )
       .subscribe();
 
     if (pollMs && pollMs > 0) {

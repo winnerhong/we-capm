@@ -30,6 +30,7 @@ import {
   type RadioMissionConfig,
   type TreasureMissionConfig,
 } from "@/lib/missions/types";
+import { MissionAttemptHeartbeat } from "./MissionAttemptHeartbeat";
 import { PhotoRunner } from "./runners/PhotoRunner";
 import { QrQuizRunner } from "./runners/QrQuizRunner";
 import { FinalRewardRunner } from "./runners/FinalRewardRunner";
@@ -573,6 +574,8 @@ export default async function MissionRunnerPage({
     <div className="space-y-5">
       {header}
       {runnerBody}
+      {/* 관제 telemetry — 화면에 보이지 않음. */}
+      <MissionAttemptHeartbeat orgMissionId={mission.id} />
     </div>
   );
 }

@@ -18,6 +18,8 @@ import type {
   ControlRoomHeatmap,
   ControlRoomHeatmapHour,
   ControlRoomLeaderItem,
+  ControlRoomLive,
+  ControlRoomLiveAttempt,
   ControlRoomMissionProgressRow,
   ControlRoomPendingItem,
   ControlRoomPhotoItem,
@@ -236,6 +238,11 @@ const EMPTY_SNAPSHOT_BASE = {
     missions: [],
     rows: [],
   } as import("./types").ControlRoomFamilyGrid,
+  live: {
+    attempts: [],
+    stuckCount: 0,
+    activeFamilies: 0,
+  } as import("./types").ControlRoomLive,
   // heatmap 은 호출 시점 기준 24칸을 만들어야 하므로 이 상수엔 포함하지 않는다.
   // 사용부에서 `emptyHeatmap()` 을 호출해 덮어씌운다.
 };
@@ -280,7 +287,7 @@ export async function loadControlRoomSnapshot(
   // (stamps 의 avgPackCompletePct 계산 시 분모로도 재사용.)
   const participantUserIds = await loadParticipantUserIds(supabase, orgId);
 
-  // 14개 서브쿼리 병렬 실행 — 각각 내부에서 try/catch 로 실패 격리.
+  // 15개 서브쿼리 병렬 실행 — 각각 내부에서 try/catch 로 실패 격리.
   const [
     liveEvents,
     participants,
@@ -296,6 +303,7 @@ export async function loadControlRoomSnapshot(
     photoWall,
     missionProgress,
     familyGrid,
+    live,
   ] = await Promise.all([
     loadLiveEvents(supabase, orgId),
     loadParticipants(supabase, orgId, todayIso),
@@ -311,6 +319,7 @@ export async function loadControlRoomSnapshot(
     loadPhotoWall(supabase, orgId),
     loadMissionProgress(supabase, orgId, participantUserIds.length),
     loadFamilyGrid(supabase, orgId, participantUserIds),
+    loadLiveAttempts(supabase, orgId),
   ]);
 
   return {
@@ -332,6 +341,7 @@ export async function loadControlRoomSnapshot(
     photoWall,
     missionProgress,
     familyGrid,
+    live,
   };
 }
 
@@ -2470,5 +2480,194 @@ async function loadFamilyGrid(
   } catch (e) {
     console.error("[control-room/loadFamilyGrid] throw", e);
     return { missions: [], rows: [] };
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/* 15) Phase 2 — 라이브 미션 수행 telemetry                                    */
+/* -------------------------------------------------------------------------- */
+
+const LIVE_FRESH_MS = 3 * 60 * 1000; // 3분 — heartbeat 신선 임계
+const STUCK_MS = 10 * 60 * 1000; // 10분 — 정체 의심 임계
+
+/**
+ * "지금 미션 수행 중" telemetry — mission_attempts 테이블 기반.
+ * - 표 누락(마이그레이션 미실행) 시 안전하게 빈값 반환.
+ * - 신선 = last_seen_at >= now()-3min, 미완료(completed_submission_id IS NULL).
+ */
+async function loadLiveAttempts(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  orgId: string
+): Promise<ControlRoomLive> {
+  const empty: ControlRoomLive = {
+    attempts: [],
+    stuckCount: 0,
+    activeFamilies: 0,
+  };
+  try {
+    const nowMs = Date.now();
+    const freshCutoffIso = new Date(nowMs - LIVE_FRESH_MS).toISOString();
+
+    type AttemptRow = {
+      id: string;
+      user_id: string;
+      org_mission_id: string;
+      opened_at: string;
+      last_seen_at: string;
+      completed_submission_id: string | null;
+    };
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sb = supabase as any;
+    const { data, error } = await sb
+      .from("mission_attempts")
+      .select(
+        "id, user_id, org_mission_id, opened_at, last_seen_at, completed_submission_id"
+      )
+      .eq("org_id", orgId)
+      .is("completed_submission_id", null)
+      .gte("last_seen_at", freshCutoffIso)
+      .order("last_seen_at", { ascending: false })
+      .limit(50);
+
+    if (error) {
+      console.error("[control-room/loadLiveAttempts] err", error.message);
+      return empty;
+    }
+    const attempts = (data ?? []) as AttemptRow[];
+    if (attempts.length === 0) return empty;
+
+    const userIds = Array.from(new Set(attempts.map((a) => a.user_id)));
+    const missionIds = Array.from(new Set(attempts.map((a) => a.org_mission_id)));
+
+    // 미션·유저·자녀 일괄 조회
+    const nameMap = new Map<string, string>();
+    const enrolledMap = new Map<string, string[]>();
+    const allChildrenMap = new Map<string, string[]>();
+    type MissionMeta = { title: string; icon: string | null; kind: string };
+    const missionMap = new Map<string, MissionMeta>();
+
+    await Promise.all([
+      (async () => {
+        try {
+          const r = (await (
+            supabase.from("app_users" as never) as unknown as {
+              select: (c: string) => {
+                in: (
+                  k: string,
+                  v: string[]
+                ) => Promise<SbResp<AppUserLiteRow>>;
+              };
+            }
+          )
+            .select("id, parent_name")
+            .in("id", userIds)) as SbResp<AppUserLiteRow>;
+          for (const u of r.data ?? []) nameMap.set(u.id, u.parent_name);
+        } catch {
+          /* ignore */
+        }
+      })(),
+      (async () => {
+        try {
+          const r = (await (
+            supabase.from("app_children" as never) as unknown as {
+              select: (c: string) => {
+                in: (
+                  k: string,
+                  v: string[]
+                ) => {
+                  order: (
+                    c: string,
+                    o: { ascending: boolean }
+                  ) => Promise<SbResp<AppChildLiteRow>>;
+                };
+              };
+            }
+          )
+            .select("user_id, name, is_enrolled, created_at")
+            .in("user_id", userIds)
+            .order("created_at", { ascending: true })) as SbResp<AppChildLiteRow>;
+          for (const c of r.data ?? []) {
+            const all = allChildrenMap.get(c.user_id) ?? [];
+            all.push(c.name);
+            allChildrenMap.set(c.user_id, all);
+            if (c.is_enrolled) {
+              const en = enrolledMap.get(c.user_id) ?? [];
+              en.push(c.name);
+              enrolledMap.set(c.user_id, en);
+            }
+          }
+        } catch {
+          /* ignore */
+        }
+      })(),
+      (async () => {
+        try {
+          type MRow = {
+            id: string;
+            title: string;
+            icon: string | null;
+            kind: string;
+          };
+          const r = (await (
+            supabase.from("org_missions" as never) as unknown as {
+              select: (c: string) => {
+                in: (k: string, v: string[]) => Promise<SbResp<MRow>>;
+              };
+            }
+          )
+            .select("id, title, icon, kind")
+            .in("id", missionIds)) as SbResp<MRow>;
+          for (const m of r.data ?? []) {
+            missionMap.set(m.id, {
+              title: m.title,
+              icon: m.icon,
+              kind: m.kind,
+            });
+          }
+        } catch {
+          /* ignore */
+        }
+      })(),
+    ]);
+
+    let stuckCount = 0;
+    const items: ControlRoomLiveAttempt[] = attempts.map((a) => {
+      const openedMs = new Date(a.opened_at).getTime();
+      const elapsedMinutes = Math.max(
+        0,
+        Math.round((nowMs - openedMs) / 60_000)
+      );
+      const stuck = nowMs - openedMs >= STUCK_MS;
+      if (stuck) stuckCount += 1;
+      const m = missionMap.get(a.org_mission_id);
+      const parentName = nameMap.get(a.user_id) || "보호자";
+      return {
+        attemptId: a.id,
+        userId: a.user_id,
+        userDisplayName: formatFamilyDisplayName(
+          parentName,
+          enrolledMap.get(a.user_id) ?? [],
+          allChildrenMap.get(a.user_id) ?? []
+        ),
+        missionId: a.org_mission_id,
+        missionTitle: m?.title ?? "(미션)",
+        missionIcon: m?.icon ?? null,
+        missionKind: m?.kind ?? "",
+        openedAt: a.opened_at,
+        lastSeenAt: a.last_seen_at,
+        elapsedMinutes,
+        stuck,
+      };
+    });
+
+    return {
+      attempts: items,
+      stuckCount,
+      activeFamilies: userIds.length,
+    };
+  } catch (e) {
+    console.error("[control-room/loadLiveAttempts] throw", e);
+    return empty;
   }
 }
