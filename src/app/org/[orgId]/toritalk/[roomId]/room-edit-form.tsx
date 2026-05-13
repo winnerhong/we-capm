@@ -44,6 +44,8 @@ export function RoomEditForm({
   const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(
     null
   );
+  // 접기/펼치기 — 채팅창을 더 빨리 보고 싶을 때 방 설정 숨김. 기본 접힘.
+  const [expanded, setExpanded] = useState(false);
 
   // 노출 안 하면 셀프 입장도 자동 해제 (의미 모순)
   const handleIsListedChange = (next: boolean) => {
@@ -110,9 +112,30 @@ export function RoomEditForm({
   };
 
   return (
-    <section className="rounded-2xl border-2 border-[#D4E4BC] bg-white p-5 shadow-sm">
-      <h2 className="text-base font-bold text-[#2D5A3D]">방 설정</h2>
-      <form onSubmit={save} className="mt-4 space-y-3">
+    <section className="rounded-2xl border-2 border-[#D4E4BC] bg-white shadow-sm">
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        aria-expanded={expanded}
+        className="flex w-full items-center justify-between gap-2 rounded-2xl px-5 py-4 text-left transition hover:bg-[#FFF8F0]"
+      >
+        <h2 className="text-base font-bold text-[#2D5A3D]">⚙️ 방 설정</h2>
+        <span
+          className="flex items-center gap-1.5 text-xs font-semibold text-[#6B6560]"
+          aria-hidden
+        >
+          {expanded ? "접기" : "펼치기"}
+          <span
+            className={`inline-block transition-transform ${
+              expanded ? "rotate-180" : ""
+            }`}
+          >
+            ▼
+          </span>
+        </span>
+      </button>
+      {!expanded ? null : (
+      <form onSubmit={save} className="space-y-3 px-5 pb-5">
         <div>
           <label className="block text-xs font-semibold text-[#6B6560]">
             방 이름
@@ -241,6 +264,7 @@ export function RoomEditForm({
           </p>
         )}
       </form>
+      )}
     </section>
   );
 }

@@ -41,6 +41,8 @@ export function RoomMembersPanel({
   const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(
     null
   );
+  // 접기/펼치기 — 기본 접힘. 채팅창에 빨리 닿기 위함.
+  const [expanded, setExpanded] = useState(false);
 
   const slotsLeft = Math.max(0, maxMembers - members.length);
 
@@ -103,10 +105,32 @@ export function RoomMembersPanel({
   };
 
   return (
-    <section className="space-y-4 rounded-2xl border-2 border-[#D4E4BC] bg-white p-5 shadow-sm">
-      <h2 className="text-base font-bold text-[#2D5A3D]">
-        멤버 ({members.length}/{maxMembers}명)
-      </h2>
+    <section className="rounded-2xl border-2 border-[#D4E4BC] bg-white shadow-sm">
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        aria-expanded={expanded}
+        className="flex w-full items-center justify-between gap-2 rounded-2xl px-5 py-4 text-left transition hover:bg-[#FFF8F0]"
+      >
+        <h2 className="text-base font-bold text-[#2D5A3D]">
+          👥 멤버 ({members.length}/{maxMembers}명)
+        </h2>
+        <span
+          className="flex items-center gap-1.5 text-xs font-semibold text-[#6B6560]"
+          aria-hidden
+        >
+          {expanded ? "접기" : "펼치기"}
+          <span
+            className={`inline-block transition-transform ${
+              expanded ? "rotate-180" : ""
+            }`}
+          >
+            ▼
+          </span>
+        </span>
+      </button>
+      {!expanded ? null : (
+      <div className="space-y-4 px-5 pb-5">
 
       {/* 현재 멤버 */}
       {members.length === 0 ? (
@@ -235,6 +259,8 @@ export function RoomMembersPanel({
         >
           {msg.kind === "ok" ? "✅" : "⚠"} {msg.text}
         </p>
+      )}
+      </div>
       )}
     </section>
   );
