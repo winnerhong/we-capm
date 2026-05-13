@@ -38,21 +38,58 @@ function pad(n: number): string {
   return n < 10 ? `0${n}` : `${n}`;
 }
 
+/**
+ * Asia/Seoul 기준으로 Date 의 분리 필드를 반환.
+ * 브라우저·서버 timezone 무관 — Vercel(UTC) SSR 과 KST 클라이언트 결과 동일.
+ */
+function partsKst(d: Date): {
+  year: number;
+  month: number;
+  day: number;
+  hour: number;
+  minute: number;
+} {
+  const f = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+  const map: Record<string, string> = {};
+  for (const p of f.formatToParts(d)) {
+    if (p.type !== "literal") map[p.type] = p.value;
+  }
+  return {
+    year: Number(map.year),
+    month: Number(map.month),
+    day: Number(map.day),
+    hour: Number(map.hour === "24" ? "00" : map.hour),
+    minute: Number(map.minute),
+  };
+}
+
+/** DB ISO → datetime-local input 값. KST 기준 분리. */
 function toLocalDateTimeValue(iso: string | null): string {
   if (!iso) return "";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  const { year, month, day, hour, minute } = partsKst(d);
+  return `${year}-${pad(month)}-${pad(day)}T${pad(hour)}:${pad(minute)}`;
 }
 
+/** Date → datetime-local 문자열. KST 기준. 종료 시각 자동 계산 미리보기용. */
 function toLocalIsoMinute(d: Date): string {
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  const { year, month, day, hour, minute } = partsKst(d);
+  return `${year}-${pad(month)}-${pad(day)}T${pad(hour)}:${pad(minute)}`;
 }
 
 const HOUR_OPTIONS = Array.from({ length: 24 }, (_, i) => i);
 const MIN_OPTIONS = Array.from({ length: 12 }, (_, i) => i * 5);
 
-/** 초기 ISO → 날짜/시/분(5분 스냅) 분리. */
+/** 초기 ISO → 날짜/시/분(5분 스냅) 분리. KST 강제. */
 function splitInitialDateTime(iso: string | null): {
   date: string;
   hour: number;
@@ -61,10 +98,11 @@ function splitInitialDateTime(iso: string | null): {
   if (!iso) return { date: "", hour: 9, min: 0 };
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return { date: "", hour: 9, min: 0 };
+  const { year, month, day, hour, minute } = partsKst(d);
   return {
-    date: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
-    hour: d.getHours(),
-    min: Math.round(d.getMinutes() / 5) * 5, // 5분 스냅
+    date: `${year}-${pad(month)}-${pad(day)}`,
+    hour,
+    min: Math.round(minute / 5) * 5, // 5분 스냅
   };
 }
 
