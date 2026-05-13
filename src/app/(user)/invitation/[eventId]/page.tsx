@@ -383,33 +383,38 @@ export default async function EventInvitationPage({
           {earlyArrivalRow && (
             <DetailRow icon="🚪" label="입장가능시간" value={earlyArrivalRow} />
           )}
-          {(location || address) && (
-            <div className="flex items-start gap-3">
-              <span aria-hidden className="text-xl">
-                📍
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-[#8B7F75]">
-                  장소
+          {/* 장소 — 비어있어도 placeholder 로 노출해 운영자가 비어있음을 인지하게 함 */}
+          <div className="flex items-start gap-3">
+            <span aria-hidden className="text-xl">
+              📍
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-[#8B7F75]">
+                장소
+              </p>
+              {location ? (
+                <p className="mt-0.5 text-base font-bold text-[#2C2C2C]">
+                  {location}
                 </p>
-                {location && (
-                  <p className="mt-0.5 text-base font-bold text-[#2C2C2C]">
-                    {location}
-                  </p>
-                )}
-                {address && (
-                  <p className="mt-0.5 text-sm font-semibold text-[#6B6560]">
-                    {address}
-                  </p>
-                )}
-              </div>
+              ) : !address ? (
+                <p className="mt-0.5 text-sm italic text-[#B0A89D]">
+                  장소 안내가 곧 업데이트됩니다
+                </p>
+              ) : null}
+              {address && (
+                <p className="mt-0.5 text-sm font-semibold text-[#6B6560]">
+                  {address}
+                </p>
+              )}
+            </div>
+            {(address || location) && (
               <CopyButton
                 text={address || location || ""}
                 label="📋 주소복사"
                 className="shrink-0 self-start rounded-full border border-[#D4E4BC] bg-[#F5F1E8] px-2.5 py-1 text-[10px] font-bold text-[#2D5A3D] shadow-sm hover:bg-[#E8DDC8]"
               />
-            </div>
-          )}
+            )}
+          </div>
           {dressCode && (
             <DetailRow icon="🎒" label="준비물" value={dressCode} multiline />
           )}

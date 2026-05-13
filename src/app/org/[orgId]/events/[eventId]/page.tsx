@@ -329,6 +329,42 @@ export default async function OrgEventDetailPage({
       <section>
         {tab === "overview" ? (
           <>
+            {/* 초대장 정보 미완성 안내 — 장소·주차장이 비어있으면 admin 에게 알림 */}
+            {(() => {
+              const hasLocation =
+                Boolean(event.invitation_location?.trim()) ||
+                Boolean(event.invitation_address?.trim());
+              const hasParking = (event.invitation_parkings ?? []).some(
+                (p) => p.name?.trim() || p.address?.trim()
+              );
+              if (hasLocation && hasParking) return null;
+              const missing: string[] = [];
+              if (!hasLocation) missing.push("📍 장소·주소");
+              if (!hasParking) missing.push("🅿 주차장");
+              return (
+                <div className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border-2 border-amber-300 bg-amber-50 px-4 py-3 shadow-sm">
+                  <span className="text-2xl" aria-hidden>
+                    ⚠️
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-bold text-amber-900">
+                      초대장 정보가 비어있어요
+                    </p>
+                    <p className="mt-0.5 text-xs text-amber-800">
+                      참가자에게 안내될 <b>{missing.join(", ")}</b> 정보가 아직
+                      입력되지 않았어요. [정보 수정]에서 추가해주세요.
+                    </p>
+                  </div>
+                  <Link
+                    href={`/org/${orgId}/events/${eventId}/edit`}
+                    className="shrink-0 rounded-xl bg-amber-500 px-3 py-2 text-xs font-bold text-white shadow-sm hover:bg-amber-600"
+                  >
+                    ✏️ 정보 수정
+                  </Link>
+                </div>
+              );
+            })()}
+
             <InvitationCardShare
               eventId={eventId}
               eventName={event.name}
