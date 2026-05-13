@@ -55,17 +55,17 @@ export function ControlRoomGrid({ snapshot, orgId, isTvMode }: Props) {
           <LiveAttemptsTile live={snapshot.live} isTvMode={isTvMode} />
         </div>
 
-        {/* row 2.5: Phase 1 관제 — 📸 사진 월 + 🎯 미션별 진행률 */}
+        {/* row 2.5: Phase 1 관제 — 🎯 미션별 진행률 + 📸 사진 월 */}
         <div
           className={`grid grid-cols-1 md:grid-cols-2 ${
             isTvMode ? "gap-[1.25em]" : "gap-4"
           }`}
         >
-          <PhotoWallTile items={snapshot.photoWall} isTvMode={isTvMode} />
           <MissionProgressTile
             items={snapshot.missionProgress}
             isTvMode={isTvMode}
           />
+          <PhotoWallTile items={snapshot.photoWall} isTvMode={isTvMode} />
         </div>
 
         {/* row 2.7: Phase 1 관제 — 👥 가족 × 미션 매트릭스 (가로 풀폭) */}
