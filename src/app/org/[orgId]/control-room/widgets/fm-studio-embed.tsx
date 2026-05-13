@@ -110,7 +110,16 @@ export async function FmStudioEmbed({ orgId }: { orgId: string }) {
   }));
 
   return (
-    <section aria-label="토리FM 라이브 스튜디오" className="contents">
+    // 성능: content-visibility:auto 로 화면 밖이면 paint 스킵 →
+    // 페이지 끝까지 스크롤 안 했을 때 FM 콘솔 렌더 비용 차감.
+    // contain-intrinsic-size 로 lay out 시 미리 자리 잡아 점프 방지.
+    <section
+      aria-label="토리FM 라이브 스튜디오"
+      style={{
+        contentVisibility: "auto",
+        containIntrinsicSize: "900px 1400px",
+      }}
+    >
       <LiveStudioConsole
         orgId={orgId}
         sessionId={liveSession.id}
