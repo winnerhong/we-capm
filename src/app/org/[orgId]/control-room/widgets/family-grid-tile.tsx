@@ -44,21 +44,30 @@ const STATE_META: Record<
  * - 가족 행 클릭 → 우측 패널에 그 가족의 사진/상태 자세히.
  */
 export function FamilyGridTile({ grid, photos, isTvMode }: Props) {
+  // 클릭으로 "고정" 한 가족. ✕ 누를 때까지 유지.
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  // 마우스 호버로 "미리보기" — 행 이름 위에 올리면 우측 패널이 그 가족으로.
+  // 클릭으로 고정된 가족이 있으면 hover 미리보기는 무시 (의도된 고정 보호).
+  const [hoveredUserId, setHoveredUserId] = useState<string | null>(null);
 
-  const selectedRow = useMemo(
-    () => (selectedUserId ? grid.rows.find((r) => r.userId === selectedUserId) ?? null : null),
-    [selectedUserId, grid.rows]
+  // 표시할 가족 결정 — 클릭 고정이 우선, 없으면 호버.
+  const previewUserId = selectedUserId ?? hoveredUserId;
+
+  const previewRow = useMemo(
+    () =>
+      previewUserId
+        ? grid.rows.find((r) => r.userId === previewUserId) ?? null
+        : null,
+    [previewUserId, grid.rows]
   );
 
-  const selectedPhotos = useMemo(() => {
-    if (!selectedRow) return [];
+  const previewPhotos = useMemo(() => {
+    if (!previewRow) return [];
     // photo wall 에 그 가족의 사진들만 필터 — userDisplayName 매칭.
-    // (display name 이 같은 다른 가족이 거의 없다는 가정. 정확한 매칭 위해
-    //  앞으로 photoWall row 에 userId 를 추가하는 게 더 안전하지만 일단 표시명 기준)
-    return photos.filter((p) => p.userDisplayName === selectedRow.displayName);
-  }, [selectedRow, photos]);
+    return photos.filter((p) => p.userDisplayName === previewRow.displayName);
+  }, [previewRow, photos]);
 
+  const isPinned = selectedUserId !== null;
   const rowsToShow = grid.rows;
 
   return (
@@ -115,14 +124,26 @@ export function FamilyGridTile({ grid, photos, isTvMode }: Props) {
               <tbody>
                 {rowsToShow.slice(0, isTvMode ? 20 : 14).map((r) => {
                   const isSelected = r.userId === selectedUserId;
+                  const isHovered =
+                    !selectedUserId && r.userId === hoveredUserId;
                   return (
                     <tr
                       key={r.userId}
                       onClick={() =>
                         setSelectedUserId(isSelected ? null : r.userId)
                       }
+                      onMouseEnter={() => setHoveredUserId(r.userId)}
+                      onMouseLeave={() =>
+                        setHoveredUserId((prev) =>
+                          prev === r.userId ? null : prev
+                        )
+                      }
                       className={`cursor-pointer border-t border-[#1a2320] transition hover:bg-[#0e1513] ${
-                        isSelected ? "bg-[#11251c]" : ""
+                        isSelected
+                          ? "bg-[#11251c]"
+                          : isHovered
+                            ? "bg-[#0e1513]"
+                            : ""
                       }`}
                     >
                       <td className="sticky left-0 bg-inherit px-2 py-1.5 font-semibold text-[#e8f0e4]">
@@ -169,33 +190,57 @@ export function FamilyGridTile({ grid, photos, isTvMode }: Props) {
             </table>
           </div>
 
-          {/* 우측: 드릴다운 */}
-          {selectedRow && (
-            <aside className="w-full shrink-0 rounded-lg border border-[#1f2a24] bg-[#0e1513] p-3 lg:w-[260px]">
+          {/* 우측: 드릴다운 — hover 미리보기 + click 고정 */}
+          {previewRow ? (
+            <aside
+              className={`w-full shrink-0 rounded-lg border bg-[#0e1513] p-3 lg:w-[260px] ${
+                isPinned
+                  ? "border-emerald-500/40 ring-1 ring-emerald-500/20"
+                  : "border-[#1f2a24] opacity-95"
+              }`}
+              onMouseEnter={() => {
+                // 패널 위에 마우스 올린 동안엔 hover 유지 (행을 떠도 사라지지 않게).
+                if (!isPinned) setHoveredUserId(previewRow.userId);
+              }}
+              onMouseLeave={() => {
+                if (!isPinned) setHoveredUserId(null);
+              }}
+            >
               <div className="mb-2 flex items-center justify-between gap-2">
-                <h3 className="truncate text-sm font-bold text-[#e8f0e4]">
-                  {selectedRow.displayName}
-                </h3>
-                <button
-                  type="button"
-                  onClick={() => setSelectedUserId(null)}
-                  className="rounded-full px-1.5 text-[10px] text-[#7FA892] hover:bg-[#1a2320]"
-                  aria-label="닫기"
-                >
-                  ✕
-                </button>
+                <div className="min-w-0">
+                  <h3 className="truncate text-sm font-bold text-[#e8f0e4]">
+                    {previewRow.displayName}
+                  </h3>
+                  <span
+                    className={`text-[9px] font-semibold ${
+                      isPinned ? "text-emerald-300" : "text-[#7FA892]"
+                    }`}
+                  >
+                    {isPinned ? "📌 고정됨" : "👁 미리보기 (클릭 = 고정)"}
+                  </span>
+                </div>
+                {isPinned && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedUserId(null)}
+                    className="rounded-full px-1.5 text-[10px] text-[#7FA892] hover:bg-[#1a2320]"
+                    aria-label="고정 해제"
+                  >
+                    ✕
+                  </button>
+                )}
               </div>
               <p className="text-[10px] text-[#7FA892]">
-                ✓ {selectedRow.doneCount}/{grid.missions.length} 미션 완료 ·{" "}
+                ✓ {previewRow.doneCount}/{grid.missions.length} 미션 완료 ·{" "}
                 <span className={styles.neonAmber}>
-                  🌰 {selectedRow.totalAcorns}
+                  🌰 {previewRow.totalAcorns}
                 </span>
               </p>
 
               {/* 미션별 상태 리스트 */}
               <ul className="mt-3 space-y-1">
                 {grid.missions.map((m) => {
-                  const state = selectedRow.perMission[m.id];
+                  const state = previewRow.perMission[m.id];
                   return (
                     <li
                       key={m.id}
@@ -221,13 +266,13 @@ export function FamilyGridTile({ grid, photos, isTvMode }: Props) {
               </ul>
 
               {/* 이 가족의 사진 */}
-              {selectedPhotos.length > 0 && (
+              {previewPhotos.length > 0 && (
                 <>
                   <div className="mt-3 text-[10px] font-semibold text-[#7FA892]">
-                    📸 올린 사진 ({selectedPhotos.length})
+                    📸 올린 사진 ({previewPhotos.length})
                   </div>
                   <ul className="mt-1 grid grid-cols-3 gap-1">
-                    {selectedPhotos.slice(0, 6).map((p) => (
+                    {previewPhotos.slice(0, 6).map((p) => (
                       <li
                         key={p.submissionId}
                         className="aspect-square overflow-hidden rounded border border-[#1a2320]"
@@ -245,6 +290,17 @@ export function FamilyGridTile({ grid, photos, isTvMode }: Props) {
                   </ul>
                 </>
               )}
+            </aside>
+          ) : (
+            // 아무 행도 hover/click 안 됐을 때 자리 차지용 안내 카드 (lg+ 만).
+            <aside className="hidden w-full shrink-0 rounded-lg border border-dashed border-[#1f2a24] bg-[#0e1513]/60 p-3 lg:block lg:w-[260px]">
+              <p className="text-center text-[10px] text-[#5e7a6c]">
+                👈 왼쪽 가족 이름 위에 마우스를 올리면
+                <br />
+                미리보기가 표시됩니다.
+                <br />
+                <span className="text-[#7FA892]">클릭하면 고정됩니다.</span>
+              </p>
             </aside>
           )}
         </div>
