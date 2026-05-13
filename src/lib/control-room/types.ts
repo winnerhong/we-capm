@@ -132,6 +132,8 @@ export interface ControlRoomFamilyRow {
   doneCount: number;
   /** missionId → 셀 상태. 미션 목록은 missionsForGrid 와 동일 순서. */
   perMission: Record<string, FamilyMissionCellState>;
+  /** 자녀들의 반명 (unique). 형제가 다른 반이면 여러 개. 없으면 빈 배열. */
+  classNames: string[];
 }
 
 export interface ControlRoomFamilyGrid {

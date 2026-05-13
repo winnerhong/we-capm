@@ -49,6 +49,28 @@ export function FamilyGridTile({ grid, photos, isTvMode }: Props) {
   // 마우스 호버로 "미리보기" — 행 이름 위에 올리면 우측 패널이 그 가족으로.
   // 클릭으로 고정된 가족이 있으면 hover 미리보기는 무시 (의도된 고정 보호).
   const [hoveredUserId, setHoveredUserId] = useState<string | null>(null);
+  // 반별 필터 — null=전체, 그 외는 정확한 class_name 매칭(혹은 "없음" 가상값).
+  const [classFilter, setClassFilter] = useState<string | null>(null);
+
+  // 모든 반 이름 + 각 반의 가족 수 집계 (필터 칩 표시용).
+  const classOptions = useMemo(() => {
+    const counts = new Map<string, number>();
+    let noClassCount = 0;
+    for (const r of grid.rows) {
+      if (r.classNames.length === 0) {
+        noClassCount += 1;
+        continue;
+      }
+      // 가족 1명이 여러 반에 속해 있으면 각 반에 한번씩 카운트.
+      for (const cn of r.classNames) {
+        counts.set(cn, (counts.get(cn) ?? 0) + 1);
+      }
+    }
+    const list = Array.from(counts.entries())
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => a.name.localeCompare(b.name, "ko"));
+    return { list, noClassCount };
+  }, [grid.rows]);
 
   // 표시할 가족 결정 — 클릭 고정이 우선, 없으면 호버.
   const previewUserId = selectedUserId ?? hoveredUserId;
@@ -68,7 +90,15 @@ export function FamilyGridTile({ grid, photos, isTvMode }: Props) {
   }, [previewRow, photos]);
 
   const isPinned = selectedUserId !== null;
-  const rowsToShow = grid.rows;
+
+  // 반 필터 적용. null=전체, "__no_class__"=반 없음, 그 외는 정확한 매칭.
+  const rowsToShow = useMemo(() => {
+    if (!classFilter) return grid.rows;
+    if (classFilter === "__no_class__") {
+      return grid.rows.filter((r) => r.classNames.length === 0);
+    }
+    return grid.rows.filter((r) => r.classNames.includes(classFilter));
+  }, [grid.rows, classFilter]);
 
   return (
     <div className={`${styles.surface} flex h-full flex-col p-5`}>
@@ -80,9 +110,46 @@ export function FamilyGridTile({ grid, photos, isTvMode }: Props) {
           가족별 진행
         </h2>
         <span className="ml-auto font-mono text-xs text-[#7FA892]">
-          {grid.rows.length}
+          {classFilter
+            ? `${rowsToShow.length}/${grid.rows.length}`
+            : grid.rows.length}
         </span>
       </div>
+
+      {/* 반별 필터 칩 — 반 데이터가 하나도 없으면 숨김 */}
+      {(classOptions.list.length > 0 || classOptions.noClassCount > 0) && (
+        <div className="mb-3 flex flex-wrap gap-1.5">
+          <ClassChip
+            label="전체"
+            count={grid.rows.length}
+            active={classFilter === null}
+            onClick={() => setClassFilter(null)}
+          />
+          {classOptions.list.map((c) => (
+            <ClassChip
+              key={c.name}
+              label={`🐰 ${c.name}`}
+              count={c.count}
+              active={classFilter === c.name}
+              onClick={() =>
+                setClassFilter((prev) => (prev === c.name ? null : c.name))
+              }
+            />
+          ))}
+          {classOptions.noClassCount > 0 && (
+            <ClassChip
+              label="반 미지정"
+              count={classOptions.noClassCount}
+              active={classFilter === "__no_class__"}
+              onClick={() =>
+                setClassFilter((prev) =>
+                  prev === "__no_class__" ? null : "__no_class__"
+                )
+              }
+            />
+          )}
+        </div>
+      )}
 
       {grid.rows.length === 0 || grid.missions.length === 0 ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-2 py-10 text-center">
@@ -240,6 +307,18 @@ export function FamilyGridTile({ grid, photos, isTvMode }: Props) {
                   🌰 {previewRow.totalAcorns}
                 </span>
               </p>
+              {previewRow.classNames.length > 0 && (
+                <div className="mt-1 flex flex-wrap gap-1">
+                  {previewRow.classNames.map((cn) => (
+                    <span
+                      key={cn}
+                      className="inline-flex items-center rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[9px] font-bold text-emerald-300 ring-1 ring-emerald-500/30"
+                    >
+                      🐰 {cn}
+                    </span>
+                  ))}
+                </div>
+              )}
 
               {/* 미션별 상태 리스트 */}
               <ul className="mt-3 space-y-1">
@@ -310,5 +389,34 @@ export function FamilyGridTile({ grid, photos, isTvMode }: Props) {
         </div>
       )}
     </div>
+  );
+}
+
+function ClassChip({
+  label,
+  count,
+  active,
+  onClick,
+}: {
+  label: string;
+  count: number;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-semibold transition ${
+        active
+          ? "border-emerald-400 bg-emerald-500/20 text-emerald-200"
+          : "border-[#1f2a24] bg-[#0e1513] text-[#7FA892] hover:border-[#2d4439] hover:text-[#a8c3b3]"
+      }`}
+    >
+      <span>{label}</span>
+      <span className="font-mono text-[9px] tabular-nums opacity-80">
+        {count}
+      </span>
+    </button>
   );
 }

@@ -2431,10 +2431,11 @@ async function loadFamilyGrid(
       }
     }
 
-    // 4) 사용자 정보 (parent_name + children) — 표시명·정렬용
+    // 4) 사용자 정보 (parent_name + children + class_name) — 표시명·정렬·필터용
     const nameMap = new Map<string, string>();
     const enrolledMap = new Map<string, string[]>();
     const allChildrenMap = new Map<string, string[]>();
+    const classNamesMap = new Map<string, Set<string>>();
     await Promise.all([
       (async () => {
         try {
@@ -2457,6 +2458,14 @@ async function loadFamilyGrid(
       })(),
       (async () => {
         try {
+          // class_name 도 함께 가져옴 (반별 필터용).
+          type ChildClassRow = {
+            user_id: string;
+            name: string;
+            is_enrolled: boolean | null;
+            class_name: string | null;
+            created_at: string;
+          };
           const r = (await (
             supabase.from("app_children" as never) as unknown as {
               select: (c: string) => {
@@ -2467,16 +2476,16 @@ async function loadFamilyGrid(
                   order: (
                     c: string,
                     o: { ascending: boolean }
-                  ) => Promise<SbResp<AppChildLiteRow>>;
+                  ) => Promise<SbResp<ChildClassRow>>;
                 };
               };
             }
           )
-            .select("user_id, name, is_enrolled, created_at")
+            .select("user_id, name, is_enrolled, class_name, created_at")
             .in("user_id", participantUserIds)
             .order("created_at", {
               ascending: true,
-            })) as SbResp<AppChildLiteRow>;
+            })) as SbResp<ChildClassRow>;
           for (const c of r.data ?? []) {
             const all = allChildrenMap.get(c.user_id) ?? [];
             all.push(c.name);
@@ -2485,6 +2494,12 @@ async function loadFamilyGrid(
               const en = enrolledMap.get(c.user_id) ?? [];
               en.push(c.name);
               enrolledMap.set(c.user_id, en);
+            }
+            const cn = (c.class_name ?? "").trim();
+            if (cn) {
+              const set = classNamesMap.get(c.user_id) ?? new Set<string>();
+              set.add(cn);
+              classNamesMap.set(c.user_id, set);
             }
           }
         } catch (e) {
@@ -2513,6 +2528,7 @@ async function loadFamilyGrid(
         totalAcorns: acornsMap.get(uid) ?? 0,
         doneCount,
         perMission,
+        classNames: Array.from(classNamesMap.get(uid) ?? new Set<string>()),
       };
     });
 
