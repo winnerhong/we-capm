@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { compressImage } from "@/lib/image-compress";
 import type {
   BroadcastMissionConfig,
   MissionBroadcastRow,
@@ -62,16 +63,24 @@ export function BroadcastRunner({
 
       setUploading(true);
       setErrorMsg(null);
-      setUploadStatus("업로드 중...");
+      setUploadStatus("압축 중...");
 
       // 참가자는 Supabase Auth 세션이 없어 storage RLS 우회용 서버 액션 사용.
-      const fd = new FormData();
-      fd.set("file", file);
-      const result = await uploadMissionPhotoAction(mission.id, fd);
-      if (result.ok) {
-        setPhotoUrl(result.url);
-      } else {
-        setErrorMsg(`업로드 실패: ${result.error}`);
+      // 원본 사진은 보통 3~8MB → 서버 5MB 제한 통과 위해 클라이언트에서 500KB 압축.
+      try {
+        const compressed = await compressImage(file, { maxKb: 500 });
+        setUploadStatus("업로드 중...");
+        const fd = new FormData();
+        fd.append("file", compressed, compressed.name || "photo.jpg");
+        const result = await uploadMissionPhotoAction(mission.id, fd);
+        if (result.ok) {
+          setPhotoUrl(result.url);
+        } else {
+          setErrorMsg(`업로드 실패: ${result.error}`);
+        }
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        setErrorMsg(`업로드 실패: ${msg}`);
       }
       setUploading(false);
       setUploadStatus(null);

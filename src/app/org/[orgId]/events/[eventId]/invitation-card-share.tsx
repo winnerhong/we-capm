@@ -3,6 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { setInvitationPublishedAction } from "@/lib/org-events/actions";
+import { InvitationQrButton } from "@/components/invitation-qr-button";
 
 type Props = {
   eventId: string;
@@ -173,6 +174,7 @@ export function InvitationCardShare({
               <span aria-hidden>💬</span>
               <span>카톡으로 공유</span>
             </button>
+            <InvitationQrButton url={url} eventName={eventName} />
             <a
               href={url}
               target="_blank"

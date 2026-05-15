@@ -8,6 +8,7 @@
 
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { compressImage } from "@/lib/image-compress";
 import {
   replaceMissionPhotosAction,
   uploadMissionPhotoAction,
@@ -50,10 +51,23 @@ export function SubmittedPhotos({
     if (files.length === 0) return;
     const file = files[0];
     setUploading(true);
-    setUploadStatus("업로드 중…");
+    setUploadStatus("압축 중…");
     setMsg(null);
+    let compressed: File;
+    try {
+      compressed = await compressImage(file, { maxKb: 500 });
+    } catch (e) {
+      setUploading(false);
+      setUploadStatus(null);
+      setMsg({
+        kind: "error",
+        text: e instanceof Error ? e.message : "사진 처리 실패",
+      });
+      return;
+    }
+    setUploadStatus("업로드 중…");
     const fd = new FormData();
-    fd.set("file", file);
+    fd.append("file", compressed, compressed.name || "photo.jpg");
     const uploadResult = await uploadMissionPhotoAction(missionId, fd);
     if (!uploadResult.ok) {
       setUploading(false);
@@ -99,15 +113,24 @@ export function SubmittedPhotos({
     const total = files.length;
     for (let i = 0; i < files.length; i++) {
       const f = files[i];
-      setUploadStatus(`업로드 중 ${i + 1}/${total}…`);
-      const fd = new FormData();
-      fd.set("file", f);
-      const result = await uploadMissionPhotoAction(missionId, fd);
-      if (result.ok) {
-        newUrls.push(result.url);
-        succeeded++;
-      } else {
-        setMsg({ kind: "error", text: result.error });
+      try {
+        setUploadStatus(`압축 중 ${i + 1}/${total}…`);
+        const compressed = await compressImage(f, { maxKb: 500 });
+        setUploadStatus(`업로드 중 ${i + 1}/${total}…`);
+        const fd = new FormData();
+        fd.append("file", compressed, compressed.name || "photo.jpg");
+        const result = await uploadMissionPhotoAction(missionId, fd);
+        if (result.ok) {
+          newUrls.push(result.url);
+          succeeded++;
+        } else {
+          setMsg({ kind: "error", text: result.error });
+        }
+      } catch (e) {
+        setMsg({
+          kind: "error",
+          text: e instanceof Error ? e.message : "사진 처리 실패",
+        });
       }
     }
     setUploading(false);

@@ -266,22 +266,21 @@ export function TreasureRunner({ mission, config, initialProgress }: Props) {
         </section>
       )}
 
-      {/* 최종 관문 (모든 단계 해제 시) */}
+      {/* QR 보물 스캔 (모든 단계 해제 시) */}
       {allStepsCleared && (
         <section className="rounded-3xl border-2 border-amber-400 bg-gradient-to-br from-amber-50 via-white to-amber-100/50 p-5 shadow-sm">
           <p className="text-center text-5xl" aria-hidden>
             🎯
           </p>
-          <h3 className="mt-2 text-center text-lg font-bold text-amber-900">
-            최종 관문
+          <h3 className="mt-2 text-center text-lg font-bold leading-relaxed text-amber-900">
+            QR 보물을 찾으셨나요??
+            <br />
+            QR을 스캔해 주세요!!
           </h3>
-          <p className="mt-1 text-center text-sm text-amber-800">
-            마지막 장소의 QR 코드를 스캔해 완료하세요
-          </p>
           <div className="mt-4">
             <QrScanner
               expectPrefix="tr_"
-              buttonLabel="🎁 최종 QR 스캔"
+              buttonLabel="🎁 QR 보물 스캔"
               onScan={(text) => handleFinalScan(text.trim())}
               onError={(msg) => setErrorMsg(msg)}
             />
@@ -312,39 +311,6 @@ export function TreasureRunner({ mission, config, initialProgress }: Props) {
         </div>
       )}
 
-      {/* 이미 해제한 단계 목록 */}
-      {unlockedCount > 0 && (
-        <section className="rounded-3xl border border-[#D4E4BC] bg-white/80 p-4 shadow-sm">
-          <p className="text-[11px] font-bold uppercase tracking-wide text-[#6B6560]">
-            해제한 단계
-          </p>
-          <ul className="mt-2 space-y-1.5">
-            {sortedSteps
-              .filter((s) => unlockedOrders.has(s.order))
-              .map((s) => {
-                const p = progress.find((r) => r.step_order === s.order);
-                return (
-                  <li
-                    key={s.order}
-                    className="flex items-center gap-2 rounded-2xl bg-[#E8F0E4] px-3 py-2"
-                  >
-                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#2D5A3D] text-[11px] font-bold text-white">
-                      {s.order}
-                    </span>
-                    <span className="min-w-0 flex-1 truncate text-[12px] font-semibold text-[#2D5A3D]">
-                      {s.hint_text}
-                    </span>
-                    {p?.unlocked_at && (
-                      <span className="shrink-0 text-[10px] font-semibold text-[#6B6560]">
-                        {formatDateTime(p.unlocked_at)}
-                      </span>
-                    )}
-                  </li>
-                );
-              })}
-          </ul>
-        </section>
-      )}
     </div>
   );
 }

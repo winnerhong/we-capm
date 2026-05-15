@@ -6,6 +6,7 @@
 
 import { useCallback, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { compressImage } from "@/lib/image-compress";
 import type {
   MissionSubmissionRow,
   OrgMissionRow,
@@ -74,18 +75,30 @@ export function PhotoApprovalRunner({ mission, config, existing }: Props) {
 
       // 서버 액션(admin client) 으로 업로드 — 토리로 참가자는 Supabase Auth 세션이
       // 없어 storage RLS 를 통과할 수 없으므로 클라이언트 직접 업로드는 사용 불가.
+      // 원본 사진(3~8MB) 이 서버 5MB 제한에 걸리지 않도록 클라이언트에서 500KB 이하로 압축.
       const uploaded: string[] = [];
       for (let i = 0; i < toProcess.length; i++) {
         const file = toProcess[i];
-        setUploadStatus(`업로드 중 (${i + 1}/${toProcess.length})...`);
-        const fd = new FormData();
-        fd.set("file", file);
-        const result = await uploadMissionPhotoAction(mission.id, fd);
-        if (result.ok) {
-          uploaded.push(result.url);
-        } else {
-          console.error("[PhotoApprovalRunner] upload failed", result.error);
-          setErrorMsg(`업로드 실패: ${result.error}`);
+        try {
+          setUploadStatus(`압축 중 (${i + 1}/${toProcess.length})...`);
+          const compressed = await compressImage(file, { maxKb: 500 });
+          setUploadStatus(`업로드 중 (${i + 1}/${toProcess.length})...`);
+          const fd = new FormData();
+          fd.append("file", compressed, compressed.name || "photo.jpg");
+          const result = await uploadMissionPhotoAction(mission.id, fd);
+          if (result.ok) {
+            uploaded.push(result.url);
+          } else {
+            console.error(
+              "[PhotoApprovalRunner] upload failed",
+              result.error
+            );
+            setErrorMsg(`업로드 실패: ${result.error}`);
+          }
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          console.error("[PhotoApprovalRunner] upload threw", msg);
+          setErrorMsg(`업로드 실패: ${msg}`);
         }
       }
 

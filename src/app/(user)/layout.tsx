@@ -161,6 +161,9 @@ export default async function UserLayout({
               icon={<AcornIcon size={20} />}
             />
           )}
+          {hasLive && (
+            <TabItem href="/tori-fm" label="라디오" icon="📻" />
+          )}
           {hasLive && <TabItem href="/gifts" label="선물함" icon="🎁" />}
           <TabItem href="/profile" label="내 정보" icon="👤" />
         </ul>
