@@ -11,6 +11,7 @@ import {
   QUEST_PACK_STATUS_META,
   type OrgMissionRow,
 } from "@/lib/missions/types";
+import { StampQrButton } from "./stamp-qr-button";
 
 export const dynamic = "force-dynamic";
 
@@ -202,6 +203,19 @@ export default async function OrgQuestPackPreviewPage({
   );
 }
 
+function getMissionQrToken(m: OrgMissionRow): string {
+  const cfg = (m.config_json ?? {}) as Record<string, unknown>;
+  if (m.kind === "QR_QUIZ") {
+    const t = cfg.qr_token;
+    return typeof t === "string" ? t.trim() : "";
+  }
+  if (m.kind === "TREASURE") {
+    const t = cfg.final_qr_token;
+    return typeof t === "string" ? t.trim() : "";
+  }
+  return "";
+}
+
 function StampGrid({ missions }: { missions: OrgMissionRow[] }) {
   if (missions.length === 0) {
     return (
@@ -220,12 +234,21 @@ function StampGrid({ missions }: { missions: OrgMissionRow[] }) {
     >
       {missions.map((m, idx) => {
         const meta = MISSION_KIND_META[m.kind];
+        const qrToken = getMissionQrToken(m);
         return (
           <div
             key={m.id}
-            className="flex aspect-square flex-col items-center justify-center gap-1 rounded-xl border-2 border-[#D4E4BC] bg-white p-1.5 text-center shadow-sm"
+            className="relative flex aspect-square flex-col items-center justify-center gap-1 rounded-xl border-2 border-[#D4E4BC] bg-white p-1.5 text-center shadow-sm"
             aria-label={`${idx + 1}번 ${meta.label}: ${m.title}`}
           >
+            {qrToken && (
+              <StampQrButton
+                token={qrToken}
+                filenameBase={m.title || meta.label}
+                missionTitle={m.title || meta.label}
+                index={idx + 1}
+              />
+            )}
             <span className="text-2xl md:text-3xl" aria-hidden>
               {m.icon || meta.icon}
             </span>

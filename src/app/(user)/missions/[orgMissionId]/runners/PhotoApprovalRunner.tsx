@@ -6,8 +6,6 @@
 
 import { useCallback, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
-import { compressImage } from "@/lib/image-compress";
 import type {
   MissionSubmissionRow,
   OrgMissionRow,
@@ -15,7 +13,7 @@ import type {
   PhotoApprovalSubmissionPayload,
 } from "@/lib/missions/types";
 import { SUBMISSION_STATUS_META } from "@/lib/missions/types";
-import { submitMissionAction } from "../../actions";
+import { submitMissionAction, uploadMissionPhotoAction } from "../../actions";
 import { AcornIcon } from "@/components/acorn-icon";
 import { fmtDateTimeKst } from "@/lib/datetime/kst";
 
@@ -25,8 +23,6 @@ interface Props {
   existing?: MissionSubmissionRow | null;
 }
 
-const BUCKET = "submission-photos";
-const MAX_PHOTOS = 5;
 
 function formatDateTime(iso: string): string {
   try {
@@ -66,9 +62,9 @@ export function PhotoApprovalRunner({ mission, config, existing }: Props) {
       );
       if (list.length === 0) return;
 
-      const remaining = MAX_PHOTOS - photos.length;
+      const remaining = minPhotos - photos.length;
       if (remaining <= 0) {
-        setErrorMsg(`최대 ${MAX_PHOTOS}장까지 올릴 수 있어요`);
+        setErrorMsg(`사진 ${minPhotos}장이면 충분해요`);
         return;
       }
       const toProcess = list.slice(0, remaining);
@@ -76,36 +72,21 @@ export function PhotoApprovalRunner({ mission, config, existing }: Props) {
       setUploading(true);
       setErrorMsg(null);
 
-      const supabase = createClient();
+      // 서버 액션(admin client) 으로 업로드 — 토리로 참가자는 Supabase Auth 세션이
+      // 없어 storage RLS 를 통과할 수 없으므로 클라이언트 직접 업로드는 사용 불가.
       const uploaded: string[] = [];
-      let doneCount = 0;
-
-      for (const file of toProcess) {
-        try {
-          setUploadStatus(
-            `압축 중 (${doneCount + 1}/${toProcess.length})...`
-          );
-          const compressed = await compressImage(file, { maxKb: 500 });
-          setUploadStatus(
-            `업로드 중 (${doneCount + 1}/${toProcess.length})...`
-          );
-          const rand = Math.random().toString(36).slice(2, 8);
-          const path = `missions/${mission.id}/${Date.now()}-${rand}.jpg`;
-          const { error } = await supabase.storage
-            .from(BUCKET)
-            .upload(path, compressed, {
-              contentType: compressed.type,
-              upsert: false,
-            });
-          if (error) throw error;
-          const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
-          uploaded.push(data.publicUrl);
-        } catch (e) {
-          const msg = e instanceof Error ? e.message : String(e);
-          console.error("[PhotoApprovalRunner] upload failed", msg);
-          setErrorMsg(`업로드 실패: ${msg}`);
+      for (let i = 0; i < toProcess.length; i++) {
+        const file = toProcess[i];
+        setUploadStatus(`업로드 중 (${i + 1}/${toProcess.length})...`);
+        const fd = new FormData();
+        fd.set("file", file);
+        const result = await uploadMissionPhotoAction(mission.id, fd);
+        if (result.ok) {
+          uploaded.push(result.url);
+        } else {
+          console.error("[PhotoApprovalRunner] upload failed", result.error);
+          setErrorMsg(`업로드 실패: ${result.error}`);
         }
-        doneCount += 1;
       }
 
       if (uploaded.length > 0) {
@@ -252,7 +233,7 @@ export function PhotoApprovalRunner({ mission, config, existing }: Props) {
         <>
           <section className="rounded-3xl border border-[#D4E4BC] bg-white p-4 shadow-sm">
             <p className="text-sm font-bold text-[#2D5A3D]">
-              📷 사진 ({photos.length}/{MAX_PHOTOS})
+              📷 사진 ({photos.length}/{minPhotos})
             </p>
 
             {photos.length > 0 && (
@@ -285,7 +266,7 @@ export function PhotoApprovalRunner({ mission, config, existing }: Props) {
               </ul>
             )}
 
-            {photos.length < MAX_PHOTOS && (
+            {photos.length < minPhotos && (
               <button
                 type="button"
                 onClick={() => fileRef.current?.click()}

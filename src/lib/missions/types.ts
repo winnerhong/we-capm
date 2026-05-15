@@ -63,6 +63,12 @@ export interface FinalRewardMissionConfig {
   }>;
   redemption_ttl_hours: number;
   scope: "QUEST_PACK" | "ALL_PACKS";
+  /**
+   * true 면 최종 보상 발급 시 선물함(user_gifts)에도 미러링 row 를 만들어
+   * 참가자가 선물함 탭에서 동일한 보상을 받을 수 있게 한다.
+   * mission_final_redemptions 와 별개로 독립 QR 발급 (멱등 key: (mission_reward, redemption_id, user_id)).
+   */
+  show_in_gift_box?: boolean;
 }
 
 // Stubs — kinds not in Phase 1 MVP still need their shapes for the union.

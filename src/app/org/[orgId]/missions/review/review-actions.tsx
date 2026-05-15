@@ -30,12 +30,11 @@ export function ReviewActions({ submissionId, tab }: Props) {
     if (isPending) return;
     setMsg(null);
     startTransition(async () => {
-      try {
-        await approveSubmissionAction(submissionId);
+      const result = await approveSubmissionAction(submissionId);
+      if (result.ok) {
         router.refresh();
-      } catch (e) {
-        const message = e instanceof Error ? e.message : "승인에 실패했어요";
-        setMsg(message);
+      } else {
+        setMsg(result.error);
       }
     });
   }
@@ -49,14 +48,13 @@ export function ReviewActions({ submissionId, tab }: Props) {
     }
     setMsg(null);
     startTransition(async () => {
-      try {
-        await rejectSubmissionAction(submissionId, trimmed);
+      const result = await rejectSubmissionAction(submissionId, trimmed);
+      if (result.ok) {
         setRejectOpen(false);
         setReason("");
         router.refresh();
-      } catch (e) {
-        const message = e instanceof Error ? e.message : "반려에 실패했어요";
-        setMsg(message);
+      } else {
+        setMsg(result.error);
       }
     });
   }

@@ -2031,15 +2031,18 @@ async function loadPhotoWall(
       submitted_at: string;
       payload_json: { photo_urls?: string[] } | null;
     };
+    // 관제실에서 운영자가 부적절한 사진을 'REVOKED' 로 마킹하면 사진 월에서 제외.
     const subResp = (await (
       supabase.from("mission_submissions" as never) as unknown as {
         select: (c: string) => {
           in: (k: string, v: string[]) => {
-            order: (
-              c: string,
-              o: { ascending: boolean }
-            ) => {
-              limit: (n: number) => Promise<SbResp<SubRow>>;
+            neq: (k: string, v: string) => {
+              order: (
+                c: string,
+                o: { ascending: boolean }
+              ) => {
+                limit: (n: number) => Promise<SbResp<SubRow>>;
+              };
             };
           };
         };
@@ -2047,6 +2050,7 @@ async function loadPhotoWall(
     )
       .select("id, org_mission_id, user_id, status, submitted_at, payload_json")
       .in("org_mission_id", missionIds)
+      .neq("status", "REVOKED")
       .order("submitted_at", { ascending: false })
       .limit(60)) as SbResp<SubRow>;
 

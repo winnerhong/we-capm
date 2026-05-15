@@ -16,6 +16,19 @@ async function loadOrgName(orgId: string): Promise<string> {
   return (data as { org_name?: string } | null)?.org_name ?? "기관";
 }
 
+async function safeQuery<T>(
+  label: string,
+  fn: () => Promise<T>,
+  fallback: T
+): Promise<T> {
+  try {
+    return await fn();
+  } catch (e) {
+    console.error(`[org-toritalk-chat/${label}] threw`, e);
+    return fallback;
+  }
+}
+
 export default async function OrgToritalkAdminChatPage({
   params,
 }: {
@@ -26,12 +39,12 @@ export default async function OrgToritalkAdminChatPage({
   if (org.orgId !== orgId)
     redirect(`/org/${org.orgId}/toritalk/${roomId}/chat`);
 
-  const room = await loadRoom(roomId);
+  const room = await safeQuery("loadRoom", () => loadRoom(roomId), null);
   if (!room || room.org_id !== orgId) notFound();
 
   const [initialMessages, orgName] = await Promise.all([
-    loadRoomMessages(roomId, 200),
-    loadOrgName(orgId),
+    safeQuery("loadRoomMessages", () => loadRoomMessages(roomId, 200), []),
+    safeQuery("loadOrgName", () => loadOrgName(orgId), "기관"),
   ]);
 
   return (

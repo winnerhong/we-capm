@@ -18,6 +18,8 @@ import {
   capAcornAmount,
   loadAcornCapContext,
 } from "@/lib/missions/acorn-cap";
+import { loadAppUserById } from "@/lib/app-user/queries";
+import { grantGiftAction } from "@/lib/gifts/actions";
 import type {
   BroadcastMissionConfig,
   FinalRewardMissionConfig,
@@ -685,6 +687,114 @@ async function submitMissionActionInner(
 }
 
 /* -------------------------------------------------------------------------- */
+/* replaceMissionPhotosAction — 완료한 사진 미션의 사진만 교체                  */
+/* -------------------------------------------------------------------------- */
+/**
+ * 이미 제출(승인) 된 사진 미션의 사진 URL 만 교체.
+ *  - 도토리·상태(AUTO_APPROVED/APPROVED 등) 그대로 유지
+ *  - PHOTO / PHOTO_APPROVAL kind 만 허용
+ *  - 본인 제출만 수정 가능
+ *  - payload_json.photo_urls 와 caption (옵션) 교체
+ *
+ * "더 잘 나온 사진으로 바꾸기" 가족 친화 UX. 도토리 회수 없음.
+ */
+export type ReplacePhotosResult =
+  | { ok: true }
+  | { ok: false; error: string };
+
+export async function replaceMissionPhotosAction(
+  orgMissionId: string,
+  payload: { photo_urls: string[]; caption?: string }
+): Promise<ReplacePhotosResult> {
+  try {
+    const user = await requireAppUser();
+    if (!orgMissionId) return { ok: false, error: "미션을 찾을 수 없어요" };
+
+    const urls = (payload?.photo_urls ?? []).filter(
+      (u): u is string => typeof u === "string" && u.length > 0
+    );
+    if (urls.length === 0) {
+      return { ok: false, error: "사진을 1장 이상 올려주세요" };
+    }
+
+    const mission = await loadOrgMissionById(orgMissionId);
+    if (!mission) return { ok: false, error: "미션을 찾을 수 없어요" };
+    if (mission.org_id !== user.orgId) {
+      return { ok: false, error: "다른 기관의 미션은 수정할 수 없어요" };
+    }
+    if (mission.kind !== "PHOTO" && mission.kind !== "PHOTO_APPROVAL") {
+      return { ok: false, error: "사진 교체가 지원되지 않는 미션이에요" };
+    }
+
+    const existing = await loadUserSubmissionForMission(user.id, mission.id);
+    if (!existing) {
+      return { ok: false, error: "제출 내역을 찾을 수 없어요" };
+    }
+    // 본인 제출 보호 — loadUserSubmissionForMission 은 본인 것만 반환하지만 방어적으로 한번 더.
+    if (existing.user_id !== user.id) {
+      return { ok: false, error: "본인의 제출만 수정할 수 있어요" };
+    }
+
+    // 사진 장수 정책 — kind 별 min/max 만족 확인.
+    const cfg = (mission.config_json ?? {}) as Record<string, unknown>;
+    const minPhotos =
+      mission.kind === "PHOTO"
+        ? Math.max(1, (cfg as Partial<PhotoMissionConfig>).min_photos ?? 1)
+        : Math.max(1, (cfg as Partial<PhotoApprovalMissionConfig>).min_photos ?? 1);
+    if (urls.length < minPhotos) {
+      return {
+        ok: false,
+        error: `사진을 ${minPhotos}장 이상 올려주세요`,
+      };
+    }
+
+    const caption =
+      typeof payload?.caption === "string" ? payload.caption.trim() : "";
+    const existingPayload = (existing.payload_json ?? {}) as Record<
+      string,
+      unknown
+    >;
+    const nextPayload: Record<string, unknown> = {
+      ...existingPayload,
+      photo_urls: urls,
+    };
+    if (caption) nextPayload.caption = caption;
+    else delete nextPayload.caption;
+
+    const supabase = await createClient();
+    const { error } = await (
+      supabase.from("mission_submissions" as never) as unknown as {
+        update: (r: Row) => {
+          eq: (k: string, v: string) => Promise<{ error: { message: string } | null }>;
+        };
+      }
+    )
+      .update({ payload_json: nextPayload })
+      .eq("id", existing.id);
+
+    if (error) {
+      console.error("[replaceMissionPhotos] update", error);
+      return { ok: false, error: "사진 교체에 실패했어요" };
+    }
+
+    revalidatePath(`/missions/${mission.id}`);
+    if (mission.quest_pack_id) {
+      revalidatePath(`/stampbook/${mission.quest_pack_id}`);
+    }
+    revalidatePath("/stampbook");
+    revalidatePath("/home");
+
+    return { ok: true };
+  } catch (e) {
+    console.error("[replaceMissionPhotos] threw", e);
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : "사진 교체에 실패했어요",
+    };
+  }
+}
+
+/* -------------------------------------------------------------------------- */
 /* unlockTreasureStepAction                                                   */
 /* -------------------------------------------------------------------------- */
 
@@ -894,8 +1004,35 @@ export async function issueFinalRewardAction(
     );
   }
 
+  const redemptionId = insertResp.data.id;
+
+  // 선물함 미러링 — config.show_in_gift_box=true 면 user_gifts 에도 행 생성.
+  // 참가자가 선물함 탭에서 동일 보상을 받을 수 있게.
+  if (config.show_in_gift_box) {
+    try {
+      const appUser = await loadAppUserById(user.id);
+      const userName = appUser?.parent_name ?? "참가자";
+      const days = Math.max(1, Math.ceil(ttlHours / 24));
+      await grantGiftAction({
+        userId: user.id,
+        orgId: user.orgId,
+        sourceType: "mission_reward",
+        sourceId: redemptionId,
+        displayName: userName,
+        giftLabel: tier.reward_desc || `${tier.label} 달성 보상`,
+        message: `🏆 ${tier.label} 달성! 누적 도토리 ${totalAcorns}개`,
+        expiresInDays: days,
+      });
+    } catch (e) {
+      // 선물함 미러링 실패해도 최종 보상 발급 자체는 성공으로 처리.
+      // (mission_final_redemptions 는 이미 insert 됨)
+      console.error("[missions/issue-reward] gift mirror failed", e);
+    }
+  }
+
   revalidatePath(`/stampbook/${packId}`);
   revalidatePath(`/missions/${orgMissionId}`);
+  if (config.show_in_gift_box) revalidatePath("/gifts");
 
-  return { redemptionId: insertResp.data.id, qrToken };
+  return { redemptionId, qrToken };
 }

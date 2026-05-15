@@ -966,13 +966,11 @@ function AdminClearButton({
       return;
     }
     startTransition(async () => {
-      try {
-        const r = await adminClearRoomMessagesAction(roomId);
+      const r = await adminClearRoomMessagesAction(roomId);
+      if (r.ok) {
         onCleared(r.deletedCount);
-      } catch (err) {
-        alert(
-          err instanceof Error ? `⚠ ${err.message}` : "⚠ 일괄 삭제에 실패했어요"
-        );
+      } else {
+        alert(`⚠ ${r.error}`);
       }
     });
   };

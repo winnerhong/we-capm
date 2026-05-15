@@ -1,9 +1,11 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import type { ControlRoomSnapshot } from "@/lib/control-room/types";
 import { fmtClockKstAlways } from "@/lib/datetime/kst";
 import { useLightbox, type LightboxItem } from "@/components/photo-lightbox";
+import { deletePhotoFromWallAction } from "../actions";
 import styles from "../control-room.module.css";
 
 type Props = {
@@ -19,8 +21,11 @@ type Props = {
  * - TV 모드: 더 큰 그리드.
  */
 export function PhotoWallTile({ items, isTvMode }: Props) {
+  const router = useRouter();
   const limit = isTvMode ? 18 : 12;
   const list = items.slice(0, limit);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [, startTransition] = useTransition();
 
   const lightboxItems: LightboxItem[] = useMemo(
     () =>
@@ -32,6 +37,28 @@ export function PhotoWallTile({ items, isTvMode }: Props) {
     [list]
   );
   const { openAt, lightbox } = useLightbox(lightboxItems);
+
+  function handleDelete(p: (typeof list)[number]) {
+    if (
+      !window.confirm(
+        `이 사진을 사진 월에서 삭제할까요?\n\n` +
+          `${p.missionTitle}\n${p.userDisplayName} · ${fmtClockKstAlways(p.submittedAt)}\n\n` +
+          `삭제하면 관제실·결과 화면에 더 이상 노출되지 않아요. (도토리는 회수되지 않음)`
+      )
+    ) {
+      return;
+    }
+    setDeletingId(p.submissionId);
+    startTransition(async () => {
+      const result = await deletePhotoFromWallAction(p.submissionId);
+      setDeletingId(null);
+      if (!result.ok) {
+        window.alert(result.error);
+        return;
+      }
+      router.refresh();
+    });
+  }
 
   return (
     <div className={`${styles.surface} flex flex-col p-4`}>
@@ -103,6 +130,22 @@ export function PhotoWallTile({ items, isTvMode }: Props) {
                 <span className="pointer-events-none absolute right-1 top-1 rounded-full bg-rose-500/90 px-1.5 py-0.5 text-[8px] font-bold text-white">
                   반려
                 </span>
+              )}
+              {/* 운영자 삭제 버튼 — TV 모드에서는 숨김 */}
+              {!isTvMode && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDelete(p);
+                  }}
+                  disabled={deletingId === p.submissionId}
+                  aria-label="사진 삭제"
+                  title="사진을 사진 월에서 삭제 (운영자 전용)"
+                  className="absolute left-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-xs text-white opacity-0 backdrop-blur-sm transition-opacity hover:bg-rose-600 group-hover:opacity-100 disabled:opacity-50"
+                >
+                  {deletingId === p.submissionId ? "⏳" : "🗑"}
+                </button>
               )}
             </li>
           ))}

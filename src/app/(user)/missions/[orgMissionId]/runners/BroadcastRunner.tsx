@@ -2,19 +2,15 @@
 
 import { useCallback, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
-import { compressImage } from "@/lib/image-compress";
 import type {
   BroadcastMissionConfig,
   MissionBroadcastRow,
   MissionSubmissionRow,
   OrgMissionRow,
 } from "@/lib/missions/types";
-import { submitMissionAction } from "../../actions";
+import { submitMissionAction, uploadMissionPhotoAction } from "../../actions";
 import { Countdown } from "./Countdown";
 import { AcornIcon } from "@/components/acorn-icon";
-
-const BUCKET = "submission-photos";
 
 interface Props {
   mission: OrgMissionRow;
@@ -66,32 +62,21 @@ export function BroadcastRunner({
 
       setUploading(true);
       setErrorMsg(null);
-      setUploadStatus("압축 중...");
+      setUploadStatus("업로드 중...");
 
-      try {
-        const compressed = await compressImage(file, { maxKb: 500 });
-        setUploadStatus("업로드 중...");
-        const supabase = createClient();
-        const rand = Math.random().toString(36).slice(2, 8);
-        const path = `broadcasts/${broadcast.id}/${Date.now()}-${rand}.jpg`;
-        const { error } = await supabase.storage
-          .from(BUCKET)
-          .upload(path, compressed, {
-            contentType: compressed.type,
-            upsert: false,
-          });
-        if (error) throw error;
-        const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
-        setPhotoUrl(data.publicUrl);
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        setErrorMsg(`업로드 실패: ${msg}`);
-      } finally {
-        setUploading(false);
-        setUploadStatus(null);
+      // 참가자는 Supabase Auth 세션이 없어 storage RLS 우회용 서버 액션 사용.
+      const fd = new FormData();
+      fd.set("file", file);
+      const result = await uploadMissionPhotoAction(mission.id, fd);
+      if (result.ok) {
+        setPhotoUrl(result.url);
+      } else {
+        setErrorMsg(`업로드 실패: ${result.error}`);
       }
+      setUploading(false);
+      setUploadStatus(null);
     },
-    [broadcast.id]
+    [mission.id]
   );
 
   const handleSubmit = () => {

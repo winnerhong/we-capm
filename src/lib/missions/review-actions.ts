@@ -97,9 +97,30 @@ async function updateSubmissionStatus(
 /* 1) approveSubmissionAction                                                 */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * 검토 결과 — throw 대신 ok/error 형태로 반환.
+ *
+ * Next.js production 빌드는 server action 의 throw 메시지를 마스킹해서
+ * "An error occurred in the Server Components render." 로 노출되므로,
+ * 사용자에게 실제 사유를 보여주려면 throw 대신 결과 객체를 반환해야 한다.
+ */
+export type ReviewResult = { ok: true } | { ok: false; error: string };
+
 export async function approveSubmissionAction(
   submissionId: string
-): Promise<void> {
+): Promise<ReviewResult> {
+  return approveSubmissionActionInner(submissionId).catch((e: unknown) => {
+    console.error("[review-actions/approve] threw", e);
+    return {
+      ok: false as const,
+      error: e instanceof Error ? e.message : "승인에 실패했어요",
+    };
+  });
+}
+
+async function approveSubmissionActionInner(
+  submissionId: string
+): Promise<ReviewResult> {
   const org = await requireOrg();
   const result = await approveSubmissionCore({
     submissionId,
@@ -140,6 +161,7 @@ export async function approveSubmissionAction(
   revalidatePath(`/org/${org.orgId}/missions/radio`);
   revalidatePath("/stampbook");
   revalidatePath("/home");
+  return { ok: true };
 }
 
 /* -------------------------------------------------------------------------- */
@@ -149,7 +171,22 @@ export async function approveSubmissionAction(
 export async function rejectSubmissionAction(
   submissionId: string,
   reason: string
-): Promise<void> {
+): Promise<ReviewResult> {
+  return rejectSubmissionActionInner(submissionId, reason).catch(
+    (e: unknown) => {
+      console.error("[review-actions/reject] threw", e);
+      return {
+        ok: false as const,
+        error: e instanceof Error ? e.message : "반려에 실패했어요",
+      };
+    }
+  );
+}
+
+async function rejectSubmissionActionInner(
+  submissionId: string,
+  reason: string
+): Promise<ReviewResult> {
   const org = await requireOrg();
   if (!submissionId) throw new Error("submissionId가 비어 있어요");
   const trimmed = (reason ?? "").trim();
@@ -167,7 +204,7 @@ export async function rejectSubmissionAction(
 
   if (submission.status === "REJECTED") {
     revalidatePath(`/org/${org.orgId}/missions/review`);
-    return; // idempotent
+    return { ok: true }; // idempotent
   }
   if (
     submission.status !== "SUBMITTED" &&
@@ -185,6 +222,7 @@ export async function rejectSubmissionAction(
   if (updErr) throw new Error(`반려 실패: ${updErr.message}`);
 
   revalidatePath(`/org/${org.orgId}/missions/review`);
+  return { ok: true };
 }
 
 /* -------------------------------------------------------------------------- */

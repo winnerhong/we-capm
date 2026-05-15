@@ -10,6 +10,13 @@ import { requireAppUser } from "@/lib/user-auth-guard";
 
 type Row = Record<string, unknown>;
 
+// 소프트 삭제 시 content placeholder.
+// 스키마의 CHECK (length(content) BETWEEN 1 AND 2000) 제약을 만족시키면서
+// 직접 DB 를 들여다보는 운영자에게도 의미가 전달되도록 짧은 마커 문자열을 사용.
+// 클라이언트는 deleted_at IS NOT NULL 인 행을 "삭제된 메시지" 로 렌더하므로
+// 이 텍스트는 사용자에게 직접 노출되지 않음.
+const DELETED_CONTENT_PLACEHOLDER = "[deleted]";
+
 async function tx() {
   const supabase = await createClient();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -488,7 +495,7 @@ export async function deleteMessageAction(messageId: string): Promise<void> {
   const { error } = await sb
     .from("toritalk_messages")
     .update({
-      content: "",
+      content: DELETED_CONTENT_PLACEHOLDER,
       deleted_at: new Date().toISOString(),
     } as Row)
     .eq("id", messageId);
@@ -569,7 +576,7 @@ export async function adminDeleteAnyMessageAction(
   const { error } = await sb
     .from("toritalk_messages")
     .update({
-      content: "",
+      content: DELETED_CONTENT_PLACEHOLDER,
       deleted_at: new Date().toISOString(),
     } as Row)
     .eq("id", messageId);
@@ -579,41 +586,58 @@ export async function adminDeleteAnyMessageAction(
 /**
  * 기관 admin 권한 — 방의 모든 메시지를 일괄 소프트 삭제.
  * 새 행사 시작 전·이전 차수 정리할 때 사용. 멤버십·방 자체는 유지.
+ *
+ * throw 대신 result 객체 반환 — production 빌드가 throw 메시지를 마스킹하므로.
  */
+export type AdminClearRoomMessagesResult =
+  | { ok: true; deletedCount: number }
+  | { ok: false; error: string };
+
 export async function adminClearRoomMessagesAction(
   roomId: string
-): Promise<{ deletedCount: number }> {
-  const org = await requireOrg();
-  const sb = await tx();
+): Promise<AdminClearRoomMessagesResult> {
+  try {
+    const org = await requireOrg();
+    const sb = await tx();
 
-  const { data: room } = await sb
-    .from("toritalk_rooms")
-    .select("id,org_id")
-    .eq("id", roomId)
-    .maybeSingle();
-  const r = room as { id: string; org_id: string } | null;
-  if (!r || r.org_id !== org.orgId) {
-    throw new Error("우리 기관 방만 정리할 수 있어요");
+    const { data: room } = await sb
+      .from("toritalk_rooms")
+      .select("id,org_id")
+      .eq("id", roomId)
+      .maybeSingle();
+    const r = room as { id: string; org_id: string } | null;
+    if (!r || r.org_id !== org.orgId) {
+      return { ok: false, error: "우리 기관 방만 정리할 수 있어요" };
+    }
+
+    // 삭제 대상 카운트 (미삭제 메시지만)
+    const { count } = await sb
+      .from("toritalk_messages")
+      .select("id", { count: "exact", head: true })
+      .eq("room_id", roomId)
+      .is("deleted_at", null);
+
+    const { error } = await sb
+      .from("toritalk_messages")
+      .update({
+        content: DELETED_CONTENT_PLACEHOLDER,
+        deleted_at: new Date().toISOString(),
+      } as Row)
+      .eq("room_id", roomId)
+      .is("deleted_at", null);
+    if (error) {
+      console.error("[adminClearRoomMessages] update", error);
+      return { ok: false, error: `정리에 실패했어요: ${error.message}` };
+    }
+
+    return { ok: true, deletedCount: Number(count ?? 0) };
+  } catch (e) {
+    console.error("[adminClearRoomMessages] threw", e);
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : "일괄 삭제에 실패했어요",
+    };
   }
-
-  // 삭제 대상 카운트 (미삭제 메시지만)
-  const { count } = await sb
-    .from("toritalk_messages")
-    .select("id", { count: "exact", head: true })
-    .eq("room_id", roomId)
-    .is("deleted_at", null);
-
-  const { error } = await sb
-    .from("toritalk_messages")
-    .update({
-      content: "",
-      deleted_at: new Date().toISOString(),
-    } as Row)
-    .eq("room_id", roomId)
-    .is("deleted_at", null);
-  if (error) throw new Error(error.message);
-
-  return { deletedCount: Number(count ?? 0) };
 }
 
 /**
@@ -645,7 +669,7 @@ export async function deleteOrgMessageAction(
   const { error } = await sb
     .from("toritalk_messages")
     .update({
-      content: "",
+      content: DELETED_CONTENT_PLACEHOLDER,
       deleted_at: new Date().toISOString(),
     } as Row)
     .eq("id", messageId);

@@ -15,6 +15,22 @@ import { RoomMembersPanel } from "./room-members-panel";
 
 export const dynamic = "force-dynamic";
 
+// 개별 쿼리 실패가 전체 페이지를 막지 않도록 safeQuery 로 분리.
+// production 빌드는 server component throw 메시지를 마스킹하므로 fallback 으로
+// 페이지를 살리고 console.error 로 Vercel 로그에 원인 남김.
+async function safeQuery<T>(
+  label: string,
+  fn: () => Promise<T>,
+  fallback: T
+): Promise<T> {
+  try {
+    return await fn();
+  } catch (e) {
+    console.error(`[org-toritalk-room/${label}] threw`, e);
+    return fallback;
+  }
+}
+
 export default async function OrgToritalkRoomDetailPage({
   params,
 }: {
@@ -24,14 +40,15 @@ export default async function OrgToritalkRoomDetailPage({
   const org = await requireOrg();
   if (org.orgId !== orgId) redirect(`/org/${org.orgId}/toritalk`);
 
-  const room = await loadRoom(roomId);
+  const room = await safeQuery("loadRoom", () => loadRoom(roomId), null);
   if (!room || room.org_id !== orgId) notFound();
 
   const [members, allOrgUsers, initialMessages, orgName] = await Promise.all([
-    loadRoomMembersWithProfile(roomId),
-    loadOrgAppUsers(orgId),
-    loadRoomMessages(roomId, 200),
-    loadOrgNameById(orgId, "기관"),
+    safeQuery("loadRoomMembersWithProfile", () =>
+      loadRoomMembersWithProfile(roomId), []),
+    safeQuery("loadOrgAppUsers", () => loadOrgAppUsers(orgId), []),
+    safeQuery("loadRoomMessages", () => loadRoomMessages(roomId, 200), []),
+    safeQuery("loadOrgNameById", () => loadOrgNameById(orgId, "기관"), "기관"),
   ]);
 
   const memberIdSet = new Set(members.map((m) => m.user_id));

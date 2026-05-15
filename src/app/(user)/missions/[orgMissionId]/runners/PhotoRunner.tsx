@@ -26,7 +26,8 @@ export function PhotoRunner({ mission, config }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
 
   const minPhotos = Math.max(1, config.min_photos ?? 1);
-  const maxPhotos = 5; // 안전하게 5장 제한
+  // 운영자 설정값이 곧 필요 장수. min == max 로 다뤄 "0/N" 표시도 일치.
+  const maxPhotos = minPhotos;
   const requireCaption = Boolean(config.require_caption);
 
   const handleFileUpload = useCallback(
@@ -38,7 +39,7 @@ export function PhotoRunner({ mission, config }: Props) {
 
       const remaining = maxPhotos - photos.length;
       if (remaining <= 0) {
-        setErrorMsg(`최대 ${maxPhotos}장까지 올릴 수 있어요`);
+        setErrorMsg(`사진 ${maxPhotos}장이면 충분해요`);
         return;
       }
       const toProcess = list.slice(0, remaining);

@@ -62,7 +62,9 @@ function parseConfig(raw: Record<string, unknown>): FinalRewardMissionConfig {
   const scopeRaw = typeof raw.scope === "string" ? raw.scope : "QUEST_PACK";
   const scope: "QUEST_PACK" | "ALL_PACKS" =
     scopeRaw === "ALL_PACKS" ? "ALL_PACKS" : "QUEST_PACK";
-  return { tiers, redemption_ttl_hours, scope };
+  const show_in_gift_box =
+    typeof raw.show_in_gift_box === "boolean" ? raw.show_in_gift_box : false;
+  return { tiers, redemption_ttl_hours, scope, show_in_gift_box };
 }
 
 export function FinalRewardOrgMissionEditor({ mission, siblings }: Props) {
@@ -104,6 +106,9 @@ export function FinalRewardOrgMissionEditor({ mission, siblings }: Props) {
   );
   const [scope, setScope] = useState<"QUEST_PACK" | "ALL_PACKS">(
     initialConfig.scope ?? "QUEST_PACK"
+  );
+  const [showInGiftBox, setShowInGiftBox] = useState<boolean>(
+    initialConfig.show_in_gift_box ?? false
   );
 
   // 공통 배포 필드
@@ -163,6 +168,7 @@ export function FinalRewardOrgMissionEditor({ mission, siblings }: Props) {
       tiers: cleanTiers,
       redemption_ttl_hours: Math.max(1, parseInt(ttlHours, 10) || 24),
       scope,
+      show_in_gift_box: showInGiftBox,
     };
   }
 
@@ -472,6 +478,32 @@ export function FinalRewardOrgMissionEditor({ mission, siblings }: Props) {
                 ))}
               </div>
             </fieldset>
+
+            {/* 선물함 미러링 토글 — 발급된 보상이 참가자 선물함 탭에도 노출 */}
+            <div className="rounded-xl border border-[#D4E4BC] bg-[#FFF8F0] p-3">
+              <label className="flex cursor-pointer items-start gap-3">
+                <input
+                  type="checkbox"
+                  checked={showInGiftBox}
+                  onChange={(e) => {
+                    setShowInGiftBox(e.target.checked);
+                    markDirty();
+                  }}
+                  className="mt-0.5 h-4 w-4 flex-shrink-0 rounded border-[#D4E4BC] text-[#2D5A3D] focus:ring-[#2D5A3D]"
+                />
+                <div className="min-w-0">
+                  <p className="flex items-center gap-1.5 text-sm font-bold text-[#2D5A3D]">
+                    <span aria-hidden>🎁</span>
+                    <span>선물함에도 표시</span>
+                  </p>
+                  <p className="mt-1 text-[11px] leading-relaxed text-[#6B6560]">
+                    켜면 참가자가 보상을 발급받을 때 <b>선물함 탭</b>에도 동일한
+                    보상이 자동으로 추가됩니다. 참가자는 선물함의 QR 로도 수령할
+                    수 있어요. (멱등 보장 — 중복 발급 안 됨)
+                  </p>
+                </div>
+              </label>
+            </div>
           </div>
         </section>
 

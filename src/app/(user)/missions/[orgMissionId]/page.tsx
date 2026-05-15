@@ -31,6 +31,8 @@ import {
   type TreasureMissionConfig,
 } from "@/lib/missions/types";
 import { MissionAttemptHeartbeat } from "./MissionAttemptHeartbeat";
+import { SubmittedPhotos } from "./submitted-photos";
+import { resignSubmissionPhotoUrls } from "@/lib/missions/resign-photos";
 import { PhotoRunner } from "./runners/PhotoRunner";
 import { QrQuizRunner } from "./runners/QrQuizRunner";
 import { FinalRewardRunner } from "./runners/FinalRewardRunner";
@@ -151,6 +153,53 @@ export default async function MissionRunnerPage({
   // 이미 APPROVED/PENDING/SUBMITTED → 결과 화면
   if (isDone && existing) {
     const statusMeta = SUBMISSION_STATUS_META[existing.status];
+    // 참가자 결과 화면 — 기술적 상태("자동 승인") 대신 친근한 문구로 표시.
+    // 상태별 톤은 유지(완료/검토 대기/반려).
+    const friendlyLabel =
+      existing.status === "AUTO_APPROVED" || existing.status === "APPROVED"
+        ? "완료하였습니다"
+        : existing.status === "SUBMITTED" || existing.status === "PENDING_REVIEW"
+          ? "제출 완료 · 검토 중"
+          : existing.status === "REJECTED"
+            ? "반려되었어요"
+            : statusMeta.label;
+    // 사진 미션이면 제출한 사진 갤러리 + 사진 교체 버튼 노출.
+    const isPhotoKind =
+      mission.kind === "PHOTO" || mission.kind === "PHOTO_APPROVAL";
+    const existingPayload = (existing.payload_json ?? {}) as {
+      photo_urls?: unknown;
+      caption?: unknown;
+    };
+    const rawSubmittedUrls = Array.isArray(existingPayload.photo_urls)
+      ? existingPayload.photo_urls.filter(
+          (u): u is string => typeof u === "string" && u.length > 0
+        )
+      : [];
+    // 사설 버킷 signed URL 은 24시간 만료 — 페이지 표시 직전 재서명.
+    const submittedUrls = await safeQuery(
+      "resignSubmissionPhotoUrls",
+      () => resignSubmissionPhotoUrls(rawSubmittedUrls),
+      rawSubmittedUrls
+    );
+    const submittedCaption =
+      typeof existingPayload.caption === "string" ? existingPayload.caption : "";
+    // kind 별 사진 장수 정책
+    const cfg = (mission.config_json ?? {}) as Record<string, unknown>;
+    const minPhotos =
+      mission.kind === "PHOTO"
+        ? Math.max(
+            1,
+            (cfg as Partial<PhotoMissionConfig>).min_photos ?? 1
+          )
+        : mission.kind === "PHOTO_APPROVAL"
+          ? Math.max(
+              1,
+              (cfg as Partial<PhotoApprovalMissionConfig>).min_photos ?? 1
+            )
+          : 1;
+    // 운영자 설정한 min_photos 가 곧 필요 장수 — min == max 로 다룸.
+    const maxPhotos = minPhotos;
+
     return (
       <div className="space-y-4">
         {header}
@@ -161,7 +210,7 @@ export default async function MissionRunnerPage({
           <p className="text-4xl" aria-hidden>
             {statusMeta.icon}
           </p>
-          <h2 className="mt-2 text-lg font-bold">{statusMeta.label}</h2>
+          <h2 className="mt-2 text-lg font-bold">{friendlyLabel}</h2>
           <p className="mt-1 text-xs">
             제출 시각: {formatDateTime(existing.submitted_at)}
           </p>
@@ -177,6 +226,16 @@ export default async function MissionRunnerPage({
             </p>
           )}
         </section>
+
+        {isPhotoKind && submittedUrls.length > 0 && (
+          <SubmittedPhotos
+            missionId={mission.id}
+            initialUrls={submittedUrls}
+            initialCaption={submittedCaption}
+            minPhotos={minPhotos}
+            maxPhotos={maxPhotos}
+          />
+        )}
 
         <Link
           href={backHref}

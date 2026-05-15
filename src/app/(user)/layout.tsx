@@ -2,10 +2,8 @@ import Link from "next/link";
 import { requireAppUser } from "@/lib/user-auth-guard";
 import { getAcornBalance, loadChildrenForUser } from "@/lib/app-user/queries";
 import { loadActiveEventsForUser } from "@/lib/org-events/queries";
-import { isToritalkEnabled } from "@/lib/toritalk/queries";
 import { loadOrgHomepageBanner } from "@/lib/org-banner/queries";
 import { AcornIcon } from "@/components/acorn-icon";
-import { WinnerTalkIcon } from "@/components/winner-talk-icon";
 import { HomepageBannerDisplay } from "@/components/homepage-banner-display";
 import { OrgPresenceTracker } from "@/components/presence/org-presence-tracker";
 import { PinnedNoticeBanner } from "./PinnedNoticeBanner";
@@ -35,7 +33,7 @@ export default async function UserLayout({
   children: React.ReactNode;
 }) {
   const user = await requireAppUser();
-  const [acornBalance, liveEvents, kids, toritalkOn, homepageBanner] =
+  const [acornBalance, liveEvents, kids, homepageBanner] =
     await Promise.all([
       safeQuery("getAcornBalance", () => getAcornBalance(user.id), 0),
       safeQuery(
@@ -44,7 +42,6 @@ export default async function UserLayout({
         []
       ),
       safeQuery("loadChildrenForUser", () => loadChildrenForUser(user.id), []),
-      safeQuery("isToritalkEnabled", () => isToritalkEnabled(user.orgId), false),
       safeQuery(
         "loadOrgHomepageBanner",
         () => loadOrgHomepageBanner(user.orgId),
@@ -151,8 +148,9 @@ export default async function UserLayout({
         className="fixed inset-x-0 bottom-0 z-40 border-t border-[#D4E4BC]/60 bg-white/95 backdrop-blur-md"
         aria-label="주요 메뉴"
       >
-        {/* LIVE 행사가 없으면 스탬프/선물/토리톡 탭 모두 숨김 — 행사 시작 후 활성화.
-            토리톡은 LIVE 행사 + 기관 활성화 둘 다 필요. */}
+        {/* LIVE 행사가 없으면 스탬프/선물 탭 숨김 — 행사 시작 후 활성화.
+            토리톡 탭은 의도적으로 하단 메뉴에서 제외 — 기능은 그대로(/tori-talk
+            직접 접근 / 헤더 등 다른 경로로 진입 가능). */}
         <ul className="mx-auto flex max-w-md items-stretch">
           <TabItem href="/home" label="홈" icon="🏠" />
           <TabItem href="/schedule" label="일정" icon="📅" />
@@ -161,13 +159,6 @@ export default async function UserLayout({
               href="/stamps"
               label="스탬프"
               icon={<AcornIcon size={20} />}
-            />
-          )}
-          {hasLive && toritalkOn && (
-            <TabItem
-              href="/tori-talk"
-              label="토리톡"
-              icon={<WinnerTalkIcon size={22} />}
             />
           )}
           {hasLive && <TabItem href="/gifts" label="선물함" icon="🎁" />}
