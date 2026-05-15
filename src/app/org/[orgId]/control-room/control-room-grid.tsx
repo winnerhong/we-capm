@@ -97,7 +97,7 @@ export async function ControlRoomGrid({ snapshot, orgId, isTvMode }: Props) {
 
         {/* row 4: Pending — 채팅은 FM 임베드와 중복이라 제거. Pending 만 풀폭. */}
         <div className="grid grid-cols-1">
-          <PendingTile snapshot={snapshot} />
+          <PendingTile snapshot={snapshot} orgId={orgId} isTvMode={isTvMode} />
         </div>
 
         {/* row 5: Broadcast(12, fullwidth) — 핑크 네온 액션 강조 */}

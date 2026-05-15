@@ -1,7 +1,12 @@
+import Link from "next/link";
 import type { ControlRoomSnapshot } from "@/lib/control-room/types";
 import styles from "../control-room.module.css";
 
-type Props = { snapshot: ControlRoomSnapshot };
+type Props = {
+  snapshot: ControlRoomSnapshot;
+  orgId: string;
+  isTvMode: boolean;
+};
 
 function elapsedLabel(iso: string, nowMs: number): string {
   const t = new Date(iso).getTime();
@@ -19,11 +24,12 @@ function oldestColor(min: number | null): string {
   return "#39FF88";
 }
 
-export function PendingTile({ snapshot }: Props) {
+export function PendingTile({ snapshot, orgId, isTvMode }: Props) {
   const { total, oldestWaitingMinutes, items } = snapshot.pending;
   const list = items.slice(0, 5);
   const now = new Date(snapshot.serverNowIso).getTime();
   const oldestHex = oldestColor(oldestWaitingMinutes);
+  const reviewHref = `/org/${orgId}/missions/review`;
 
   return (
     <div className={`${styles.surface} flex flex-col p-4`}>
@@ -34,6 +40,15 @@ export function PendingTile({ snapshot }: Props) {
         <h2 className="text-xs font-semibold tracking-[0.15em] text-[#a8b8d0]">
           검토 대기
         </h2>
+        {!isTvMode && total > 0 && (
+          <Link
+            href={reviewHref}
+            className="ml-auto inline-flex items-center gap-1 rounded-full border border-[#FFC83D]/40 bg-[#FFC83D]/10 px-2.5 py-1 text-[11px] font-bold text-[#FFC83D] transition hover:bg-[#FFC83D]/20"
+          >
+            ✅ 검수하러 가기
+            <span aria-hidden>›</span>
+          </Link>
+        )}
       </div>
 
       {total === 0 ? (
@@ -73,25 +88,40 @@ export function PendingTile({ snapshot }: Props) {
           </div>
 
           <ul className="flex flex-col gap-2 overflow-hidden">
-            {list.map((it) => (
-              <li
-                key={it.id}
-                className="flex items-start justify-between gap-3 rounded-lg border border-[#1a2a52] bg-[#0a1839] px-3 py-2"
-              >
-                <div className="min-w-0">
-                  <div className="truncate text-sm font-semibold text-[#f4ecd8]">
-                    {it.missionTitle}
+            {list.map((it) => {
+              const inner = (
+                <>
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-semibold text-[#f4ecd8]">
+                      {it.missionTitle}
+                    </div>
+                    <div className="truncate text-[11px] text-[#a8b8d0]">
+                      {it.submitterName}
+                      {it.packName ? ` · ${it.packName}` : ""}
+                    </div>
                   </div>
-                  <div className="truncate text-[11px] text-[#a8b8d0]">
-                    {it.submitterName}
-                    {it.packName ? ` · ${it.packName}` : ""}
+                  <div className="shrink-0 font-mono text-xs font-bold text-[#FFC83D]">
+                    {elapsedLabel(it.submittedAt, now)}
                   </div>
-                </div>
-                <div className="shrink-0 font-mono text-xs font-bold text-[#FFC83D]">
-                  {elapsedLabel(it.submittedAt, now)}
-                </div>
-              </li>
-            ))}
+                </>
+              );
+              return (
+                <li key={it.id}>
+                  {isTvMode ? (
+                    <div className="flex items-start justify-between gap-3 rounded-lg border border-[#1a2a52] bg-[#0a1839] px-3 py-2">
+                      {inner}
+                    </div>
+                  ) : (
+                    <Link
+                      href={reviewHref}
+                      className="flex items-start justify-between gap-3 rounded-lg border border-[#1a2a52] bg-[#0a1839] px-3 py-2 transition hover:border-[#FFC83D]/50 hover:bg-[#0e1f4d]"
+                    >
+                      {inner}
+                    </Link>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         </>
       )}

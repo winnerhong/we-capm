@@ -6,6 +6,7 @@
 import type { ReviewSubmissionItem } from "@/lib/missions/review-queries";
 import type { ReviewTab } from "./review-layout";
 import { ReviewActions } from "./review-actions";
+import { ReviewPhotoThumb } from "./review-photo-thumb";
 import {
   formatAgo,
   waitTone,
@@ -137,20 +138,13 @@ export function ReviewItemCard({ item, tab }: Props) {
       {/* payload 미리보기 */}
       <div className="mt-3 space-y-2">
         {firstImage && (
-          <a
-            href={firstImage}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="block overflow-hidden rounded-xl border border-[#D4E4BC] bg-[#F5F1E8] focus:outline-none focus:ring-2 focus:ring-[#2D5A3D]/40"
-            aria-label="제출 이미지 크게 보기"
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={firstImage}
-              alt="제출 이미지"
-              className="h-48 w-full object-cover md:h-56"
-            />
-          </a>
+          <ReviewPhotoThumb
+            url={firstImage}
+            caption={`${item.missionIcon ?? "📷"} ${item.missionTitle}`}
+            subCaption={`${item.submitterDisplayName}${
+              item.childName ? ` · ${item.childName}` : ""
+            }`}
+          />
         )}
 
         {kind === "RADIO" && (songTitle || artist || story) && (

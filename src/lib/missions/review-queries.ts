@@ -176,6 +176,8 @@ async function assembleItems(
   const parentNameMap = new Map<string, string | null>();
   const childNameMap = new Map<string, string>();
   const packNameMap = new Map<string, string>();
+  // 제출자별 등원(is_enrolled=true) 자녀 이름들 — "홍유빈,유준 가족" 형태로 사용.
+  const enrolledChildrenByUser = new Map<string, string[]>();
 
   await Promise.all([
     (async () => {
@@ -228,6 +230,55 @@ async function assembleItems(
         logSbError(`${tag}/children throw`, e);
       }
     })(),
+    // 제출자별 등원 자녀들 — 표시명 "{자녀1},{자녀2} 가족" 용.
+    (async () => {
+      if (userIds.length === 0) return;
+      try {
+        type ChildEnrolledRow = {
+          user_id: string;
+          name: string;
+          is_enrolled: boolean;
+          created_at: string;
+        };
+        const resp = (await (
+          supabase.from("app_children" as never) as unknown as {
+            select: (c: string) => {
+              in: (
+                k: string,
+                v: string[]
+              ) => Promise<SbResp<ChildEnrolledRow>>;
+            };
+          }
+        )
+          .select("user_id, name, is_enrolled, created_at")
+          .in("user_id", userIds)) as SbResp<ChildEnrolledRow>;
+
+        if (resp.error) {
+          logSbError(`${tag}/enrolled-children`, resp.error);
+          return;
+        }
+        // user_id 별 그룹화 — 등원 자녀만, created_at ASC 정렬
+        const grouped = new Map<string, ChildEnrolledRow[]>();
+        for (const c of resp.data ?? []) {
+          if (!c.is_enrolled) continue;
+          if (!c.name?.trim()) continue;
+          const arr = grouped.get(c.user_id) ?? [];
+          arr.push(c);
+          grouped.set(c.user_id, arr);
+        }
+        for (const [uid, arr] of grouped.entries()) {
+          arr.sort((a, b) =>
+            (a.created_at ?? "").localeCompare(b.created_at ?? "")
+          );
+          enrolledChildrenByUser.set(
+            uid,
+            arr.map((c) => c.name.trim())
+          );
+        }
+      } catch (e) {
+        logSbError(`${tag}/enrolled-children throw`, e);
+      }
+    })(),
     (async () => {
       if (packIds.length === 0) return;
       try {
@@ -277,6 +328,13 @@ async function assembleItems(
       }
     }
 
+    // 등원 자녀가 있으면 "홍유빈,유준 가족", 아니면 "{parent_name} 가족" 으로 fallback.
+    const enrolledNames = enrolledChildrenByUser.get(s.user_id) ?? [];
+    const submitterDisplayName =
+      enrolledNames.length > 0
+        ? `${enrolledNames.join(",")} 가족`
+        : `${parentName} 가족`;
+
     return {
       id: s.id,
       status: s.status as ReviewSubmissionItem["status"],
@@ -287,7 +345,7 @@ async function assembleItems(
       defaultAcorns: mission?.acorns ?? 0,
       awardedAcorns: s.awarded_acorns ?? null,
       submitterUserId: s.user_id,
-      submitterDisplayName: `${parentName} 가족`,
+      submitterDisplayName,
       childName,
       submittedAt: s.submitted_at,
       reviewedAt: s.reviewed_at ?? null,
