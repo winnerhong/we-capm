@@ -2,7 +2,6 @@
 
 import { useCallback, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 import { compressImage } from "@/lib/image-compress";
 import type {
   CoopMissionConfig,
@@ -17,10 +16,9 @@ import {
   joinCoopSessionAction,
   uploadCoopSharedPhotoAction,
 } from "@/lib/missions/coop-actions";
+import { uploadMissionPhotoAction } from "../../actions";
 import { Countdown } from "./Countdown";
 import { AcornIcon } from "@/components/acorn-icon";
-
-const BUCKET = "submission-photos";
 
 interface KidOption {
   id: string;
@@ -173,20 +171,17 @@ export function CoopRunner({
         const compressed = await compressImage(file, { maxKb: 500 });
         setUploadStatus("업로드 중...");
 
-        const supabase = createClient();
-        const rand = Math.random().toString(36).slice(2, 8);
-        const path = `coop/${session.id}/${Date.now()}-${rand}.jpg`;
-        const { error } = await supabase.storage
-          .from(BUCKET)
-          .upload(path, compressed, {
-            contentType: compressed.type,
-            upsert: false,
-          });
-        if (error) throw error;
-        const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
-        const publicUrl = data.publicUrl;
+        // 서버 액션(admin client) 으로 업로드 — 토리로 참가자는 Supabase Auth 세션이
+        // 없어 storage RLS 를 통과할 수 없으므로 클라이언트 직접 업로드는 사용 불가.
+        const fd = new FormData();
+        fd.append("file", compressed, compressed.name || "photo.jpg");
+        const result = await uploadMissionPhotoAction(mission.id, fd);
+        if (!result.ok) {
+          setErrorMsg(`업로드 실패: ${result.error}`);
+          return;
+        }
 
-        await uploadCoopSharedPhotoAction(session.id, publicUrl);
+        await uploadCoopSharedPhotoAction(session.id, result.url);
         router.refresh();
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
@@ -196,7 +191,7 @@ export function CoopRunner({
         setUploadStatus(null);
       }
     },
-    [session, router]
+    [session, mission.id, router]
   );
 
   /* ------------------------------------------------------------ */
