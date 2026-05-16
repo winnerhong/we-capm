@@ -76,30 +76,34 @@ export function TreasureRunner({ mission, config, initialProgress }: Props) {
   ) => {
     setErrorMsg(null);
     unlockTransition(async () => {
-      try {
-        await unlockTreasureStepAction(mission.id, stepOrder, method, answer);
-        // 서버에서 insert 되었으니 로컬도 갱신 (낙관적)
-        setProgress((prev) => {
-          if (prev.some((p) => p.step_order === stepOrder)) return prev;
-          return [
-            ...prev,
-            {
-              id: `tmp-${stepOrder}`,
-              org_mission_id: mission.id,
-              user_id: "",
-              step_order: stepOrder,
-              unlocked_at: new Date().toISOString(),
-              unlock_method: method,
-            },
-          ];
-        });
-        setAnswerInput("");
-        flashToast(`${stepOrder}단계 해제!`);
-        router.refresh();
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        setErrorMsg(msg);
+      const result = await unlockTreasureStepAction(
+        mission.id,
+        stepOrder,
+        method,
+        answer
+      );
+      if (!result.ok) {
+        setErrorMsg(result.error);
+        return;
       }
+      // 서버에서 insert 되었으니 로컬도 갱신 (낙관적)
+      setProgress((prev) => {
+        if (prev.some((p) => p.step_order === stepOrder)) return prev;
+        return [
+          ...prev,
+          {
+            id: `tmp-${stepOrder}`,
+            org_mission_id: mission.id,
+            user_id: "",
+            step_order: stepOrder,
+            unlocked_at: new Date().toISOString(),
+            unlock_method: method,
+          },
+        ];
+      });
+      setAnswerInput("");
+      flashToast(`${stepOrder}단계 해제!`);
+      router.refresh();
     });
   };
 

@@ -799,113 +799,130 @@ export async function replaceMissionPhotosAction(
 /* -------------------------------------------------------------------------- */
 
 /**
+ * 보물찾기 특정 단계 해제 결과 — production throw 마스킹 방지를 위해 결과 객체 반환.
+ *
+ * Next.js production 빌드는 server action throw 를 generic 메시지로 가린다.
+ * 사용자에게 진짜 사유("정답이 아니에요" 등) 를 보여주려면 throw 가 아닌
+ * ok/error 결과 객체로 돌려야 한다.
+ */
+export type UnlockTreasureStepResult =
+  | { ok: true }
+  | { ok: false; error: string };
+
+/**
  * 보물찾기 특정 단계를 해제한다.
  *  - AUTO : 이전 단계가 모두 해제된 상태에서만 허용
  *  - QR / ANSWER : answer 가 step.answer 와 일치해야 함
  *                  (ANSWER 는 trim + case-insensitive, QR 은 정확히 일치)
  *  - 이미 해제된 단계라면 조용히 return (멱등)
+ *  - step.order 는 editor 가 0 또는 1 부터 시작할 수 있어 0 이상 허용.
  */
 export async function unlockTreasureStepAction(
   orgMissionId: string,
   stepOrder: number,
   method: TreasureUnlockMethod,
   answer?: string
-): Promise<void> {
-  const user = await requireAppUser();
-  if (!orgMissionId) throw new Error("미션을 찾을 수 없어요");
-  if (!Number.isInteger(stepOrder) || stepOrder < 1) {
-    throw new Error("잘못된 단계 번호에요");
-  }
+): Promise<UnlockTreasureStepResult> {
+  const fail = (error: string, extra?: unknown): UnlockTreasureStepResult => {
+    console.error("[missions/unlock-treasure] fail", { error, extra });
+    return { ok: false, error };
+  };
 
-  const mission = await loadOrgMissionById(orgMissionId);
-  if (!mission) throw new Error("미션을 찾을 수 없어요");
-  if (mission.org_id !== user.orgId) {
-    throw new Error("다른 기관의 미션이에요");
-  }
-  if (mission.kind !== "TREASURE") {
-    throw new Error("보물찾기 미션이 아니에요");
-  }
-  if (!mission.is_active) {
-    throw new Error("현재 진행할 수 없는 미션이에요");
-  }
-
-  const cfg = (mission.config_json ?? {}) as Partial<TreasureMissionConfig>;
-  const steps = Array.isArray(cfg.steps) ? cfg.steps : [];
-  const step = steps.find((s) => s.order === stepOrder);
-  if (!step) throw new Error("해당 단계를 찾을 수 없어요");
-
-  // unlock_rule / method 일치 검증
-  if (step.unlock_rule !== method) {
-    throw new Error("이 단계는 다른 방식으로 해제해야 해요");
-  }
-
-  // 답 검증
-  if (method === "QR") {
-    const expected = (step.answer ?? "").trim();
-    const got = (answer ?? "").trim();
-    if (!expected || got !== expected) {
-      throw new Error("이 단계의 QR 코드가 아니에요");
+  try {
+    const user = await requireAppUser();
+    if (!orgMissionId) return fail("미션을 찾을 수 없어요");
+    if (!Number.isInteger(stepOrder) || stepOrder < 0) {
+      return fail("잘못된 단계 번호에요");
     }
-  } else if (method === "ANSWER") {
-    const expected = (step.answer ?? "").trim();
-    const got = (answer ?? "").trim();
-    if (!expected) {
-      throw new Error("이 단계는 정답이 설정되지 않았어요");
+
+    const mission = await loadOrgMissionById(orgMissionId);
+    if (!mission) return fail("미션을 찾을 수 없어요");
+    if (mission.org_id !== user.orgId) {
+      return fail("다른 기관의 미션이에요");
     }
-    if (got.toLowerCase() !== expected.toLowerCase()) {
-      throw new Error("정답이 아니에요. 다시 시도해 주세요");
+    if (mission.kind !== "TREASURE") {
+      return fail("보물찾기 미션이 아니에요");
     }
-  }
-  // AUTO 는 별도 검증 없음 — 이전 단계 완료 조건만
-
-  // 이전 단계가 모두 해제되어 있는지 (건너뛰기 방지)
-  const progress = await loadTreasureProgress(user.id, mission.id);
-  const unlockedSet = new Set(progress.map((r) => r.step_order));
-  const sortedOrders = steps
-    .map((s) => s.order)
-    .sort((a, b) => a - b);
-  for (const o of sortedOrders) {
-    if (o >= stepOrder) break;
-    if (!unlockedSet.has(o)) {
-      throw new Error(`${o}단계를 먼저 풀어주세요`);
+    if (!mission.is_active) {
+      return fail("현재 진행할 수 없는 미션이에요");
     }
-  }
 
-  // 이미 해제됐다면 멱등
-  if (unlockedSet.has(stepOrder)) {
-    revalidatePath(`/missions/${mission.id}`);
-    return;
-  }
+    const cfg = (mission.config_json ?? {}) as Partial<TreasureMissionConfig>;
+    const steps = Array.isArray(cfg.steps) ? cfg.steps : [];
+    const step = steps.find((s) => s.order === stepOrder);
+    if (!step) return fail("해당 단계를 찾을 수 없어요");
 
-  const supabase = await createClient();
-
-  // INSERT (UNIQUE(org_mission_id, user_id, step_order) 로 중복 방지)
-  const insertResp = (await (
-    supabase.from("mission_treasure_progress" as never) as unknown as {
-      insert: (r: Row) => Promise<{
-        error: { message: string; code?: string } | null;
-      }>;
+    if (step.unlock_rule !== method) {
+      return fail("이 단계는 다른 방식으로 해제해야 해요");
     }
-  ).insert({
-    org_mission_id: mission.id,
-    user_id: user.id,
-    step_order: stepOrder,
-    unlock_method: method,
-  })) as { error: { message: string; code?: string } | null };
 
-  if (insertResp.error) {
-    // UNIQUE violation (23505) 은 동시성 충돌 — 무해하게 처리
-    if (insertResp.error.code === "23505") {
+    if (method === "QR") {
+      const expected = (step.answer ?? "").trim();
+      const got = (answer ?? "").trim();
+      if (!expected || got !== expected) {
+        return fail("이 단계의 QR 코드가 아니에요");
+      }
+    } else if (method === "ANSWER") {
+      const expected = (step.answer ?? "").trim();
+      const got = (answer ?? "").trim();
+      if (!expected) {
+        return fail("이 단계는 정답이 설정되지 않았어요");
+      }
+      if (got.toLowerCase() !== expected.toLowerCase()) {
+        return fail("정답이 아니에요. 다시 시도해 주세요");
+      }
+    }
+
+    const progress = await loadTreasureProgress(user.id, mission.id);
+    const unlockedSet = new Set(progress.map((r) => r.step_order));
+    const sortedOrders = steps.map((s) => s.order).sort((a, b) => a - b);
+    for (const o of sortedOrders) {
+      if (o >= stepOrder) break;
+      if (!unlockedSet.has(o)) {
+        return fail(`${o}단계를 먼저 풀어주세요`);
+      }
+    }
+
+    if (unlockedSet.has(stepOrder)) {
       revalidatePath(`/missions/${mission.id}`);
-      return;
+      return { ok: true };
     }
-    console.error("[missions/unlock-treasure] error", insertResp.error);
-    throw new Error(
-      `단계 해제 실패: ${insertResp.error.message ?? "unknown"}`
-    );
-  }
 
-  revalidatePath(`/missions/${mission.id}`);
+    const supabase = await createClient();
+
+    const insertResp = (await (
+      supabase.from("mission_treasure_progress" as never) as unknown as {
+        insert: (r: Row) => Promise<{
+          error: { message: string; code?: string } | null;
+        }>;
+      }
+    ).insert({
+      org_mission_id: mission.id,
+      user_id: user.id,
+      step_order: stepOrder,
+      unlock_method: method,
+    })) as { error: { message: string; code?: string } | null };
+
+    if (insertResp.error) {
+      if (insertResp.error.code === "23505") {
+        revalidatePath(`/missions/${mission.id}`);
+        return { ok: true };
+      }
+      return fail(
+        `단계 해제 실패: ${insertResp.error.message ?? "unknown"}`,
+        insertResp.error
+      );
+    }
+
+    revalidatePath(`/missions/${mission.id}`);
+    return { ok: true };
+  } catch (e) {
+    console.error("[missions/unlock-treasure] unexpected throw", e);
+    return {
+      ok: false,
+      error: e instanceof Error ? `예외: ${e.message}` : "알 수 없는 오류",
+    };
+  }
 }
 
 /* -------------------------------------------------------------------------- */
