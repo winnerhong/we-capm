@@ -28,7 +28,6 @@ import { LiveStudioPanel, type PlayingItem } from "./LiveStudioPanel";
 import { DjChatPanel } from "./DjChatPanel";
 import { RequestModerationList } from "./RequestModerationList";
 import { BroadcastQueueCard } from "./BroadcastQueueCard";
-import { StoryQueueCard } from "./StoryQueueCard";
 import { RequestsWithHearts } from "@/app/(user)/tori-fm/RequestsWithHearts";
 import type { FmChatMessageRow, FmRequestRow } from "@/lib/tori-fm/types";
 import type { RpsRoomRow } from "@/lib/rps/types";
@@ -67,8 +66,6 @@ interface Props {
   initialPlayingGroup?: FmRequestRow[];
   /** RequestsWithHearts (참가자와 동일 통합 리스트) — OPEN 신청곡 + 사연 모두. */
   initialOpenRequests: FmRequestRow[];
-  /** StoryQueueCard 용 — story_only 의 PENDING/APPROVED/QUEUED 만. */
-  initialStoryRequests: FmRequestRow[];
   // RPS 통합 (옵셔널)
   eventId?: string | null;
   initialRpsRoom?: RpsRoomRow | null;
@@ -98,7 +95,6 @@ export function LiveStudioConsole({
   initialPlayingRequest,
   initialPlayingGroup = [],
   initialOpenRequests,
-  initialStoryRequests,
   eventId = null,
   initialRpsRoom = null,
   embedded = false,
@@ -231,16 +227,8 @@ export function LiveStudioConsole({
           />
         </div>
 
-        {/* Zone B-2: 인기 사연 큐 (rose 톤) — 익명 사연 하트순 */}
-        <div className="xl:col-span-3">
-          <StoryQueueCard
-            sessionId={sessionId}
-            initialItems={initialStoryRequests}
-          />
-        </div>
-
-        {/* Zone B-3: 오늘 들어온 신청곡 (amber 톤) */}
-        <div className="xl:col-span-3">
+        {/* Zone B-3: 오늘 들어온 신청곡 (amber 톤) — 사연 카드 제거 후 9/12 확장 */}
+        <div className="xl:col-span-9">
           <RequestsWithHearts
             sessionId={sessionId}
             initialRequests={initialOpenRequests}
@@ -248,18 +236,6 @@ export function LiveStudioConsole({
             filterKind="song_request"
             theme="dark"
             title={`🎵 오늘 들어온 신청곡 (${initialOpenRequests.filter((r) => r.kind !== "story_only" && r.status !== "HIDDEN").length})`}
-          />
-        </div>
-
-        {/* Zone B-4: 사연 (indigo 톤) */}
-        <div className="xl:col-span-3">
-          <RequestsWithHearts
-            sessionId={sessionId}
-            initialRequests={initialOpenRequests}
-            heartedIds={[]}
-            filterKind="story_only"
-            theme="dark"
-            title={`💌 사연 (${initialOpenRequests.filter((r) => r.kind === "story_only" && r.status !== "HIDDEN").length})`}
           />
         </div>
 

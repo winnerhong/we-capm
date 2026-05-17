@@ -92,14 +92,6 @@ export async function FmStudioEmbed({ orgId }: { orgId: string }) {
       : (playingRequest.child_name ?? null)
     : (nowPlaying?.user?.parent_name ?? null);
 
-  const initialStoryRequests = liveAllRequests.filter(
-    (r) =>
-      r.kind === "story_only" &&
-      (r.status === "PENDING" ||
-        r.status === "APPROVED" ||
-        r.status === "QUEUED")
-  );
-
   const playingStoryItems = playingGroup.map((r) => ({
     id: r.id,
     story: r.story,
@@ -148,7 +140,6 @@ export async function FmStudioEmbed({ orgId }: { orgId: string }) {
         initialPlayingRequest={playingRequest}
         initialPlayingGroup={playingGroup}
         initialOpenRequests={liveAllRequests}
-        initialStoryRequests={initialStoryRequests}
         eventId={liveSession.event_id ?? null}
         initialRpsRoom={initialRpsRoom}
         embedded
