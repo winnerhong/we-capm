@@ -137,6 +137,10 @@ export interface ControlRoomFamilyRow {
    * 자녀 메타 없으면 빈 배열.
    */
   children: Array<{ name: string; className: string | null }>;
+  /** 보호자 이름 — 검색용 (displayName 에 묻혀 있어도 별도로 노출). */
+  parentName: string;
+  /** 보호자 전화번호(숫자만) — 검색용. 없으면 빈 문자열. */
+  phone: string;
 }
 
 export interface ControlRoomFamilyGrid {

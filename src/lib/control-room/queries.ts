@@ -2314,8 +2314,9 @@ async function loadFamilyGrid(
       }
     }
 
-    // 4) 사용자 정보 (parent_name + children + class_name) — 표시명·정렬·필터용
+    // 4) 사용자 정보 (parent_name + phone + children + class_name) — 표시명·정렬·필터·검색용
     const nameMap = new Map<string, string>();
+    const phoneMap = new Map<string, string>();
     const enrolledMap = new Map<string, string[]>();
     const allChildrenMap = new Map<string, string[]>();
     const classNamesMap = new Map<string, Set<string>>();
@@ -2325,6 +2326,7 @@ async function loadFamilyGrid(
       string,
       Array<{ name: string; className: string | null }>
     >();
+    type UserWithPhone = { id: string; parent_name: string; phone: string | null };
     await Promise.all([
       (async () => {
         try {
@@ -2334,13 +2336,16 @@ async function loadFamilyGrid(
                 in: (
                   k: string,
                   v: string[]
-                ) => Promise<SbResp<AppUserLiteRow>>;
+                ) => Promise<SbResp<UserWithPhone>>;
               };
             }
           )
-            .select("id, parent_name")
-            .in("id", participantUserIds)) as SbResp<AppUserLiteRow>;
-          for (const u of r.data ?? []) nameMap.set(u.id, u.parent_name);
+            .select("id, parent_name, phone")
+            .in("id", participantUserIds)) as SbResp<UserWithPhone>;
+          for (const u of r.data ?? []) {
+            nameMap.set(u.id, u.parent_name);
+            phoneMap.set(u.id, (u.phone ?? "").replace(/\D/g, ""));
+          }
         } catch (e) {
           console.error("[control-room/loadFamilyGrid] users", e);
         }
@@ -2426,6 +2431,8 @@ async function loadFamilyGrid(
         perMission,
         classNames: Array.from(classNamesMap.get(uid) ?? new Set<string>()),
         children: childrenMetaMap.get(uid) ?? [],
+        parentName,
+        phone: phoneMap.get(uid) ?? "",
       };
     });
 

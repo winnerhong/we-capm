@@ -69,6 +69,8 @@ export function FamilyGridTile({
   );
   // 반별 필터 — null=전체, 그 외는 정확한 class_name 매칭(혹은 "없음" 가상값).
   const [classFilter, setClassFilter] = useState<string | null>(null);
+  // 검색어 — 이름/연락처/자녀 이름/반 부분 매칭. 비어있으면 필터 적용 안 함.
+  const [searchQuery, setSearchQuery] = useState("");
 
   // 모든 반 이름 + 각 반의 가족 수 집계 (필터 칩 표시용).
   const classOptions = useMemo(() => {
@@ -121,14 +123,44 @@ export function FamilyGridTile({
   );
   const { openAt, lightbox } = useLightbox(lightboxItems);
 
-  // 반 필터 적용. null=전체, "__no_class__"=반 없음, 그 외는 정확한 매칭.
+  // 반 필터 + 검색어 필터 적용. 둘 다 비어있으면 전체.
   const rowsToShow = useMemo(() => {
-    if (!classFilter) return grid.rows;
+    let rows = grid.rows;
+
+    // 1) 반 필터
     if (classFilter === "__no_class__") {
-      return grid.rows.filter((r) => r.classNames.length === 0);
+      rows = rows.filter((r) => r.classNames.length === 0);
+    } else if (classFilter) {
+      rows = rows.filter((r) => r.classNames.includes(classFilter));
     }
-    return grid.rows.filter((r) => r.classNames.includes(classFilter));
-  }, [grid.rows, classFilter]);
+
+    // 2) 검색어 — 보호자 이름 / 표시명 / 자녀 이름 / 반 이름 / 전화번호(숫자 부분 매칭).
+    //    공백 split 으로 모든 토큰 AND.
+    const q = searchQuery.trim();
+    if (q) {
+      const digits = q.replace(/\D/g, "");
+      const tokens = q
+        .toLowerCase()
+        .split(/\s+/)
+        .filter(Boolean);
+      rows = rows.filter((r) => {
+        const haystack = [
+          r.parentName,
+          r.displayName,
+          ...r.children.map((c) => c.name),
+          ...r.classNames,
+        ]
+          .join(" ")
+          .toLowerCase();
+        // 텍스트 토큰 모두 매칭 OR 숫자만 입력했다면 전화번호 부분 매칭.
+        const textMatch = tokens.every((t) => haystack.includes(t));
+        const phoneMatch = digits.length >= 2 && r.phone.includes(digits);
+        return textMatch || phoneMatch;
+      });
+    }
+
+    return rows;
+  }, [grid.rows, classFilter, searchQuery]);
 
   // 미션 헤더 hover/click → 상세 패널에 보여줄 데이터를 derivation.
   // 가족 미리보기가 활성이면 미션 상세는 무시 (가족 우선).
@@ -198,11 +230,42 @@ export function FamilyGridTile({
           🧲
         </span>
         <span className="ml-auto font-mono text-xs text-[#a8b8d0]">
-          {classFilter
+          {classFilter || searchQuery.trim()
             ? `${rowsToShow.length}/${grid.rows.length}`
             : grid.rows.length}
         </span>
       </button>
+
+      {/* 검색 input — 이름/연락처/자녀/반 부분 매칭. 한글 IME composition 도중 onChange 가 잘게 떨어져도
+          단순 substring 매칭이라 안전. */}
+      <div className="mb-2 flex items-center gap-2">
+        <div className="relative flex-1">
+          <span
+            aria-hidden
+            className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[12px] text-[#6b7c98]"
+          >
+            🔍
+          </span>
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="이름 · 연락처 · 자녀 · 반 검색"
+            aria-label="가족 검색"
+            className="w-full rounded-lg border border-[#243366] bg-[#0d1530] py-1.5 pl-8 pr-8 text-[12px] text-white placeholder:text-[#6b7c98] outline-none focus:border-[#4a6db8] focus:ring-1 focus:ring-[#4a6db8]/40"
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery("")}
+              aria-label="검색 지우기"
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-[11px] text-[#7a8aa8] hover:bg-white/10 hover:text-white"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+      </div>
 
       {/* 반별 필터 칩 — 반 데이터가 하나도 없으면 숨김 */}
       {(classOptions.list.length > 0 || classOptions.noClassCount > 0) && (
@@ -315,6 +378,16 @@ export function FamilyGridTile({
                 </tr>
               </thead>
               <tbody>
+                {rowsToShow.length === 0 && (
+                  <tr>
+                    <td
+                      colSpan={grid.missions.length + 2}
+                      className="px-3 py-6 text-center text-[12px] text-[#7a8aa8]"
+                    >
+                      🔍 검색 결과가 없어요
+                    </td>
+                  </tr>
+                )}
                 {rowsToShow.map((r, idx) => {
                   // 순위 — 반 필터 적용 시 필터된 그룹 안에서 재계산 (1-based).
                   const rank = idx + 1;
