@@ -18,7 +18,7 @@
 
 CREATE TABLE IF NOT EXISTS public.org_gift_templates (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  org_id uuid NOT NULL REFERENCES public.app_orgs(id) ON DELETE CASCADE,
+  org_id uuid NOT NULL REFERENCES public.partner_orgs(id) ON DELETE CASCADE,
   label text NOT NULL,
   message text NULL,
   gift_url text NULL,
