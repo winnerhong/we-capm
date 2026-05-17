@@ -1,25 +1,18 @@
 -- ============================================================
--- user_acorn_transactions.reason CHECK 확장
---   - FM_PLAYED        : 라디오 PLAYED 자동 보상
---   - FM_HEART         : 즉석 신청곡 하트
---   - FM_JUMP_FIRST    : 큐 #1 점프
---   - FM_CHEER_SEND    : NOW PLAYING 응원 소비
---   - FM_CHEER_RECEIVE : NOW PLAYING 응원 적립
+-- user_acorn_transactions.reason CHECK 제약 영구 제거
 --
--- 기존 INSERT 가 silently fail 하던 reasons 를 모두 허용.
--- 적용 후 잔액·원장 일관성은 새 응원/하트부터 정상화됨.
+-- 배경:
+--   기존 CHECK 제약은 신규 reason("FM_CHEER_SEND" 등) 을 거부해
+--   INSERT 가 silently fail. 그 결과 원장 row 가 비어 응원 카운트가
+--   항상 0 으로 사라지던 버그가 있었음.
+--
+-   확장하려고 새 리스트를 만들었지만 기존 production 데이터에 ALLOW
+--   리스트 밖의 legacy reason 값이 남아있어 DROP+ADD 가 23514 로 실패.
+--
+-- 결정:
+--   reason 값은 application 코드(AcornReason union + tori-fm/actions enum) 에서
+--   이미 통제되므로 DB 레벨 CHECK 는 필요 없음. 영구 제거.
 -- ============================================================
 
 ALTER TABLE public.user_acorn_transactions
   DROP CONSTRAINT IF EXISTS user_acorn_transactions_reason_check;
-
-ALTER TABLE public.user_acorn_transactions
-  ADD CONSTRAINT user_acorn_transactions_reason_check
-  CHECK (reason IN (
-    'STAMP_SLOT','STAMPBOOK_COMPLETE','CHALLENGE','ATTENDANCE',
-    'SPEND_COUPON','SPEND_DECORATION','ADMIN_GRANT','ADMIN_DEDUCT','OTHER',
-    'MISSION','MISSION_REVERSE',
-    'FM_BOOST','FM_BOOST_REFUND',
-    'FM_PLAYED','FM_HEART','FM_JUMP_FIRST',
-    'FM_CHEER_SEND','FM_CHEER_RECEIVE'
-  ));
