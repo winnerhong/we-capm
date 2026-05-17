@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   MISSION_KIND_META,
+  RADIO_REWARD_DEFAULTS,
   type ApprovalMode,
   type OrgMissionRow,
   type RadioMissionConfig,
@@ -34,7 +35,22 @@ function parseRadioConfig(raw: Record<string, unknown>): RadioMissionConfig {
     typeof raw.max_length === "number" && raw.max_length > 0
       ? Math.min(2000, Math.max(50, Math.floor(raw.max_length)))
       : 300;
-  return { prompt_song, prompt_story, max_length };
+  const clampReward = (v: unknown, fallback: number) =>
+    typeof v === "number" && v >= 0 && v <= 99
+      ? Math.floor(v)
+      : fallback;
+  const reward_song = clampReward(raw.reward_song, RADIO_REWARD_DEFAULTS.song);
+  const reward_story = clampReward(
+    raw.reward_story,
+    RADIO_REWARD_DEFAULTS.story
+  );
+  return {
+    prompt_song,
+    prompt_story,
+    max_length,
+    reward_song,
+    reward_story,
+  };
 }
 
 export function RadioOrgMissionEditor({ mission, siblings }: Props) {
@@ -61,6 +77,13 @@ export function RadioOrgMissionEditor({ mission, siblings }: Props) {
   const [promptSong, setPromptSong] = useState(initialConfig.prompt_song);
   const [promptStory, setPromptStory] = useState(initialConfig.prompt_story);
   const [maxLength, setMaxLength] = useState(String(initialConfig.max_length));
+  // PLAYED 시 도토리 보상 — 두 단계 (신청곡 + 사연 보너스).
+  const [rewardSong, setRewardSong] = useState(
+    String(initialConfig.reward_song ?? RADIO_REWARD_DEFAULTS.song)
+  );
+  const [rewardStory, setRewardStory] = useState(
+    String(initialConfig.reward_story ?? RADIO_REWARD_DEFAULTS.story)
+  );
 
   // 공통 배포 필드
   const [unlockRule, setUnlockRule] = useState<UnlockRule>(mission.unlock_rule);
@@ -88,10 +111,17 @@ export function RadioOrgMissionEditor({ mission, siblings }: Props) {
   }
 
   function buildConfig(): Record<string, unknown> {
+    const clampReward = (v: string, fallback: number) => {
+      const n = parseInt(v, 10);
+      if (Number.isNaN(n)) return fallback;
+      return Math.max(0, Math.min(99, n));
+    };
     return {
       prompt_song: promptSong.trim(),
       prompt_story: promptStory.trim(),
       max_length: Math.min(2000, Math.max(50, parseInt(maxLength, 10) || 300)),
+      reward_song: clampReward(rewardSong, RADIO_REWARD_DEFAULTS.song),
+      reward_story: clampReward(rewardStory, RADIO_REWARD_DEFAULTS.story),
     };
   }
 
@@ -305,6 +335,52 @@ export function RadioOrgMissionEditor({ mission, siblings }: Props) {
                 className={inputCls}
               />
             </Field>
+          </div>
+
+          {/* 송출 보상 — PLAYED(실제 송출) 시점 자동 지급. 신청곡 + 사연 보너스. */}
+          <div className="mt-4 rounded-xl border border-[#D4E4BC] bg-[#FFF8F0] p-3">
+            <p className="mb-1 text-xs font-bold text-[#2D5A3D]">
+              <AcornIcon size={14} /> 송출 보상 (도토리)
+            </p>
+            <p className="mb-3 text-[11px] text-[#6B6560]">
+              신청곡 기본 + 사연 함께 보냈을 때 추가 보너스. 합산 = 신청곡 +
+              사연. 각 0~99.
+            </p>
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <Field label="🎵 신청곡 (기본)" htmlFor="reward_song">
+                <input
+                  id="reward_song"
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  max={99}
+                  value={rewardSong}
+                  onChange={(e) => {
+                    setRewardSong(e.target.value);
+                    markDirty();
+                  }}
+                  className={inputCls}
+                />
+              </Field>
+              <Field label="📝 사연 보너스 (추가)" htmlFor="reward_story">
+                <input
+                  id="reward_story"
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  max={99}
+                  value={rewardStory}
+                  onChange={(e) => {
+                    setRewardStory(e.target.value);
+                    markDirty();
+                  }}
+                  className={inputCls}
+                />
+              </Field>
+            </div>
+            <p className="mt-2 text-[10px] text-[#8B7F75]">
+              예: 신청곡 1 + 사연 보너스 2 → 사연 함께 보내면 총 🌰 3 지급.
+            </p>
           </div>
         </section>
 

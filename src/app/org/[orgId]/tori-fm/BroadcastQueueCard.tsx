@@ -251,7 +251,7 @@ export function BroadcastQueueCard({
   return (
     <section
       aria-label="방송 대기 큐"
-      className="relative isolate flex h-full flex-col rounded-2xl border-l-[5px] border-l-teal-300/70 border-y border-y-white/10 border-r border-r-white/10 bg-teal-950/25 p-4 text-white shadow-xl shadow-teal-500/10 backdrop-blur-md transition-shadow duration-200 ease-out hover:-translate-y-0.5 hover:shadow-2xl hover:shadow-teal-500/20 md:p-5"
+      className="relative isolate flex h-full flex-col rounded-2xl border-l-[5px] border-l-teal-300/70 border-y border-y-white/10 border-r border-r-white/10 bg-[#101935] p-4 text-white shadow-md shadow-teal-500/10 md:p-5"
     >
       {/* 외곽 글로우 */}
       <div
@@ -359,11 +359,7 @@ export function BroadcastQueueCard({
             )}
 
             {isBundle ? (
-              <ul className="mt-3 max-h-64 space-y-2 overflow-y-auto pr-1
-                [&::-webkit-scrollbar]:w-1.5
-                [&::-webkit-scrollbar-track]:bg-transparent
-                [&::-webkit-scrollbar-thumb]:rounded-full
-                [&::-webkit-scrollbar-thumb]:bg-white/15">
+              <ul className="scroll-dark mt-3 max-h-64 space-y-2 overflow-y-auto pr-1">
                 {filledGroup.map((r) => {
                   const label = authorLabel(r) || "익명의 청취자";
                   return (
@@ -423,11 +419,7 @@ export function BroadcastQueueCard({
       })()}
 
       {/* 큐 리스트 */}
-      <div className="flex-1 overflow-y-auto pr-1
-        [&::-webkit-scrollbar]:w-1.5
-        [&::-webkit-scrollbar-track]:bg-transparent
-        [&::-webkit-scrollbar-thumb]:rounded-full
-        [&::-webkit-scrollbar-thumb]:bg-white/20">
+      <div className="scroll-dark flex-1 overflow-y-auto pr-1">
         {queue.length === 0 ? (
           <p className="rounded-2xl border border-dashed border-white/15 bg-white/[0.02] p-4 text-center text-xs text-white/55">
             큐가 비어있어요. 모더레이션에서{" "}
@@ -435,7 +427,7 @@ export function BroadcastQueueCard({
           </p>
         ) : (
           <ul className="space-y-2">
-            {queue.map((r, idx) => {
+            {queue.slice(0, 3).map((r, idx) => {
               const isFirst = idx === 0;
               const isBusy = busyId === r.id;
               const author = authorLabel(r);
@@ -477,6 +469,11 @@ export function BroadcastQueueCard({
                           </span>
                         )}
                       </div>
+                      {r.story?.trim() && (
+                        <p className="mt-1 line-clamp-1 text-[11px] italic text-white/70">
+                          &ldquo;{r.story.trim()}&rdquo;
+                        </p>
+                      )}
                       <p className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-white/55">
                         {author && (
                           <span className="rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-200/90 ring-1 ring-emerald-400/20">
@@ -525,6 +522,11 @@ export function BroadcastQueueCard({
                 </li>
               );
             })}
+            {queue.length > 3 && (
+              <li className="rounded-2xl border border-dashed border-white/15 px-3 py-2 text-center text-[11px] text-white/55">
+                ··· 외 {queue.length - 3}곡 더 대기 중
+              </li>
+            )}
           </ul>
         )}
       </div>

@@ -144,7 +144,7 @@ export function SpotlightTriggerBar({
   }
 
   return (
-    <section className="relative isolate flex flex-col rounded-xl border-l-[5px] border-l-amber-300/80 border-y border-y-white/10 border-r border-r-white/10 bg-amber-950/30 p-4 text-white shadow-xl shadow-amber-500/15 backdrop-blur-md transition-shadow duration-200 ease-out hover:-translate-y-0.5 hover:shadow-2xl hover:shadow-amber-500/25 md:p-5">
+    <section className="relative isolate flex flex-col rounded-xl border-l-[5px] border-l-amber-300/80 border-y border-y-white/10 border-r border-r-white/10 bg-amber-950/40 p-4 text-white shadow-md shadow-amber-500/15 md:p-5">
       {/* 외곽 글로우 — amber 컴팩트 톤 */}
       <div
         aria-hidden

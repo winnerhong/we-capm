@@ -15,6 +15,10 @@ import { loadChildrenForUser } from "@/lib/app-user/queries";
 import { loadFmSessionById } from "@/lib/missions/queries";
 import type { ReactionEmoji } from "@/lib/tori-fm/types";
 import { REACTION_EMOJIS } from "@/lib/tori-fm/types";
+import {
+  calcRadioPlayedReward,
+  type RadioMissionConfig,
+} from "@/lib/missions/types";
 
 type Row = Record<string, unknown>;
 type SbErr = { message: string; code?: string } | null;
@@ -29,6 +33,129 @@ function revalidateFm(sessionId?: string, orgId?: string): void {
   if (orgId && sessionId) {
     revalidatePath(`/org/${orgId}/tori-fm/${sessionId}`);
     revalidatePath(`/org/${orgId}/tori-fm`);
+  }
+}
+
+/**
+ * PLAYED 처리된 신청들에 도토리 자동 지급.
+ *  - org 의 첫 활성 RADIO 미션 config.reward_by_kind 사용 (미지정 시 디폴트 3/1/2)
+ *  - source_type='fm_request' + source_id=requestId + reason='FM_PLAYED' 중복 방지
+ *  - 한 건 실패는 다른 건에 영향 X (best-effort)
+ */
+async function awardRadioPlayedRewards(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  sessionId: string,
+  playedRequests: Array<{
+    id: string;
+    user_id: string;
+    kind: string | null;
+    story: string | null;
+  }>
+): Promise<void> {
+  if (playedRequests.length === 0) return;
+
+  // 1) 세션 → org_id 조회
+  const sessionResp = (await (
+    supabase.from("tori_fm_sessions" as never) as unknown as {
+      select: (c: string) => {
+        eq: (
+          k: string,
+          v: string
+        ) => {
+          maybeSingle: () => Promise<SbRespOne<{ org_id: string }>>;
+        };
+      };
+    }
+  )
+    .select("org_id")
+    .eq("id", sessionId)
+    .maybeSingle()) as SbRespOne<{ org_id: string }>;
+
+  const orgId = sessionResp.data?.org_id;
+  if (!orgId) return;
+
+  // 2) 그 org 의 활성 RADIO 미션 config 조회 (없으면 디폴트 적용)
+  const missionResp = (await (
+    supabase.from("org_missions" as never) as unknown as {
+      select: (c: string) => {
+        eq: (k: string, v: string) => {
+          eq: (k: string, v: string) => {
+            eq: (
+              k: string,
+              v: boolean
+            ) => {
+              limit: (
+                n: number
+              ) => Promise<
+                SbRespOne<{ config_json: Record<string, unknown> | null }>
+              >;
+            };
+          };
+        };
+      };
+    }
+  )
+    .select("config_json")
+    .eq("org_id", orgId)
+    .eq("kind", "RADIO")
+    .eq("is_active", true)
+    .limit(1)) as SbRespOne<{ config_json: Record<string, unknown> | null }>;
+
+  // limit(1) 라 maybeSingle 처럼 처리 — supabase 는 array 반환
+  const cfgRaw = Array.isArray(missionResp.data)
+    ? (missionResp.data[0] as { config_json: Record<string, unknown> | null } | undefined)?.config_json
+    : missionResp.data?.config_json;
+  const cfg = (cfgRaw ?? null) as RadioMissionConfig | null;
+
+  // 3) 각 신청에 대해 중복 방지 + INSERT
+  for (const req of playedRequests) {
+    if (!req.user_id) continue;
+    const amount = calcRadioPlayedReward(cfg, req.kind, req.story);
+    if (amount <= 0) continue;
+
+    // 중복 방지 — 이미 같은 source_id + reason 으로 transaction 존재하면 skip
+    const existResp = (await (
+      supabase.from("user_acorn_transactions" as never) as unknown as {
+        select: (c: string) => {
+          eq: (k: string, v: string) => {
+            eq: (k: string, v: string) => {
+              limit: (
+                n: number
+              ) => Promise<SbRespOne<{ id: string }>>;
+            };
+          };
+        };
+      }
+    )
+      .select("id")
+      .eq("source_id", req.id)
+      .eq("reason", "FM_PLAYED")
+      .limit(1)) as SbRespOne<{ id: string }>;
+
+    const existing = Array.isArray(existResp.data)
+      ? existResp.data[0]
+      : existResp.data;
+    if (existing) continue;
+
+    const insertResp = (await (
+      supabase.from("user_acorn_transactions" as never) as unknown as {
+        insert: (r: Row) => Promise<{ error: SbErr }>;
+      }
+    ).insert({
+      user_id: req.user_id,
+      amount,
+      reason: "FM_PLAYED",
+      source_type: "fm_request",
+      source_id: req.id,
+      memo: `FM played reward (${req.kind === "story_only" ? "story" : (req.story ?? "").trim() ? "song+story" : "song"})`,
+    } satisfies Row)) as { error: SbErr };
+
+    if (insertResp.error) {
+      console.error("[fm/played-reward] insert failed", {
+        requestId: req.id,
+        code: insertResp.error.code,
+      });
+    }
   }
 }
 
@@ -356,7 +483,10 @@ export async function submitSessionRequestAction(
 }
 
 /**
- * 신청곡 하트 토글 — 있으면 DELETE, 없으면 INSERT. 트리거가 heart_count 자동 증감.
+ * 신청곡 하트 토글 — 세션당 사용자 1개.
+ *  - 같은 신청 재클릭 = 토글 (취소 + 도토리 회수)
+ *  - 다른 신청 클릭 = 기존 하트 자동 이동 (기존 DELETE + 새 INSERT). 도토리 net 0.
+ *  - 하트 적립 시 user_acorn_transactions +1 (reason='FM_HEART').
  */
 export async function toggleRequestHeartAction(
   requestId: string
@@ -366,25 +496,92 @@ export async function toggleRequestHeartAction(
 
   const supabase = await createClient();
 
-  // 기존 하트 조회
-  const existing = (await (
-    supabase.from("tori_fm_request_hearts" as never) as unknown as {
+  // 1) 대상 신청의 session_id 조회 — 세션 단위 1회 제약에 사용.
+  const reqResp = (await (
+    supabase.from("tori_fm_requests" as never) as unknown as {
       select: (c: string) => {
-        eq: (k: string, v: string) => {
-          eq: (k: string, v: string) => {
-            maybeSingle: () => Promise<SbRespOne<{ id: string }>>;
-          };
+        eq: (
+          k: string,
+          v: string
+        ) => {
+          maybeSingle: () => Promise<SbRespOne<{ session_id: string }>>;
         };
       };
     }
   )
-    .select("id")
-    .eq("user_id", user.id)
-    .eq("request_id", requestId)
-    .maybeSingle()) as SbRespOne<{ id: string }>;
+    .select("session_id")
+    .eq("id", requestId)
+    .maybeSingle()) as SbRespOne<{ session_id: string }>;
 
-  if (existing.data?.id) {
-    // unheart
+  const sessionId = reqResp.data?.session_id;
+  if (!sessionId) throw new Error("신청곡을 찾을 수 없어요");
+
+  // 2) 같은 세션에서 사용자가 누른 모든 하트 조회.
+  //    tori_fm_request_hearts.request_id JOIN tori_fm_requests.session_id 가
+  //    안 되니, 같은 세션의 신청 id 들을 먼저 가져와서 in() 으로 거르기.
+  const sessionReqsResp = (await (
+    supabase.from("tori_fm_requests" as never) as unknown as {
+      select: (c: string) => {
+        eq: (
+          k: string,
+          v: string
+        ) => Promise<{ data: Array<{ id: string }> | null; error: SbErr }>;
+      };
+    }
+  )
+    .select("id")
+    .eq("session_id", sessionId)) as {
+    data: Array<{ id: string }> | null;
+    error: SbErr;
+  };
+  const sessionReqIds = (sessionReqsResp.data ?? []).map((r) => r.id);
+
+  const existingHeartsResp = (await (
+    supabase.from("tori_fm_request_hearts" as never) as unknown as {
+      select: (c: string) => {
+        eq: (k: string, v: string) => {
+          in: (
+            k: string,
+            v: string[]
+          ) => Promise<{
+            data: Array<{ id: string; request_id: string }> | null;
+            error: SbErr;
+          }>;
+        };
+      };
+    }
+  )
+    .select("id, request_id")
+    .eq("user_id", user.id)
+    .in("request_id", sessionReqIds)) as {
+    data: Array<{ id: string; request_id: string }> | null;
+    error: SbErr;
+  };
+  const existingHearts = existingHeartsResp.data ?? [];
+
+  // 헬퍼: source_id 의 FM_HEART transaction 한 건 회수 (있으면 DELETE).
+  const refundHeart = async (rid: string) => {
+    await (
+      supabase.from("user_acorn_transactions" as never) as unknown as {
+        delete: () => {
+          eq: (k: string, v: string) => {
+            eq: (k: string, v: string) => {
+              eq: (k: string, v: string) => Promise<{ error: SbErr }>;
+            };
+          };
+        };
+      }
+    )
+      .delete()
+      .eq("user_id", user.id)
+      .eq("source_id", rid)
+      .eq("reason", "FM_HEART");
+  };
+
+  // 3) 토글 분기.
+  const sameHeart = existingHearts.find((h) => h.request_id === requestId);
+  if (sameHeart) {
+    // 같은 신청 재클릭 → 취소 + 도토리 회수.
     const delResp = (await (
       supabase.from("tori_fm_request_hearts" as never) as unknown as {
         delete: () => {
@@ -393,20 +590,33 @@ export async function toggleRequestHeartAction(
       }
     )
       .delete()
-      .eq("id", existing.data.id)) as { error: SbErr };
-
+      .eq("id", sameHeart.id)) as { error: SbErr };
     if (delResp.error) {
       console.error("[fm/toggleHeart] delete error", {
         code: delResp.error.code,
       });
       throw new Error("하트 취소에 실패했어요");
     }
-
+    await refundHeart(requestId);
     revalidateFm(undefined, user.orgId);
     return { hearted: false };
   }
 
-  // heart — UNIQUE 충돌(23505) 은 멱등 성공으로 간주
+  // 다른 신청에 하트가 이미 있으면 — 기존 모두 DELETE + 도토리 회수.
+  for (const h of existingHearts) {
+    await (
+      supabase.from("tori_fm_request_hearts" as never) as unknown as {
+        delete: () => {
+          eq: (k: string, v: string) => Promise<{ error: SbErr }>;
+        };
+      }
+    )
+      .delete()
+      .eq("id", h.id);
+    await refundHeart(h.request_id);
+  }
+
+  // 새 하트 INSERT — UNIQUE 충돌(23505) 은 멱등 성공으로 간주.
   const insResp = (await (
     supabase.from("tori_fm_request_hearts" as never) as unknown as {
       insert: (r: Row) => Promise<{ error: SbErr }>;
@@ -421,6 +631,57 @@ export async function toggleRequestHeartAction(
       code: insResp.error.code,
     });
     throw new Error("하트 반영에 실패했어요");
+  }
+
+  // 도토리 +1 ledger — 중복 방지 후 INSERT.
+  const txExistResp = (await (
+    supabase.from("user_acorn_transactions" as never) as unknown as {
+      select: (c: string) => {
+        eq: (k: string, v: string) => {
+          eq: (k: string, v: string) => {
+            eq: (
+              k: string,
+              v: string
+            ) => {
+              limit: (
+                n: number
+              ) => Promise<{
+                data: Array<{ id: string }> | null;
+                error: SbErr;
+              }>;
+            };
+          };
+        };
+      };
+    }
+  )
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("source_id", requestId)
+    .eq("reason", "FM_HEART")
+    .limit(1)) as { data: Array<{ id: string }> | null; error: SbErr };
+
+  const alreadyAwarded =
+    Array.isArray(txExistResp.data) && txExistResp.data.length > 0;
+
+  if (!alreadyAwarded) {
+    const txInsert = (await (
+      supabase.from("user_acorn_transactions" as never) as unknown as {
+        insert: (r: Row) => Promise<{ error: SbErr }>;
+      }
+    ).insert({
+      user_id: user.id,
+      amount: 1,
+      reason: "FM_HEART",
+      source_type: "fm_request",
+      source_id: requestId,
+      memo: "FM heart reward",
+    } satisfies Row)) as { error: SbErr };
+    if (txInsert.error) {
+      console.error("[fm/toggleHeart] acorn tx insert failed", {
+        code: txInsert.error.code,
+      });
+    }
   }
 
   revalidateFm(undefined, user.orgId);
@@ -855,7 +1116,42 @@ export async function playNextFromQueueAction(
 
   const supabase = await createClient();
 
-  // 1) 현재 PLAYING 묶음 → PLAYED
+  // 1) 현재 PLAYING 묶음 → PLAYED.
+  //    먼저 PLAYING rows 들의 (id, user_id, kind, story) 를 미리 가져와서
+  //    PLAYED 처리 후 자동 도토리 지급에 사용.
+  const playingResp = (await (
+    supabase.from("tori_fm_requests" as never) as unknown as {
+      select: (c: string) => {
+        eq: (k: string, v: string) => {
+          eq: (
+            k: string,
+            v: string
+          ) => Promise<{
+            data: Array<{
+              id: string;
+              user_id: string;
+              kind: string | null;
+              story: string | null;
+            }> | null;
+            error: SbErr;
+          }>;
+        };
+      };
+    }
+  )
+    .select("id, user_id, kind, story")
+    .eq("session_id", sessionId)
+    .eq("status", "PLAYING")) as {
+    data: Array<{
+      id: string;
+      user_id: string;
+      kind: string | null;
+      story: string | null;
+    }> | null;
+    error: SbErr;
+  };
+  const playingRows = playingResp.data ?? [];
+
   await (
     supabase.from("tori_fm_requests" as never) as unknown as {
       update: (p: Row) => {
@@ -868,6 +1164,15 @@ export async function playNextFromQueueAction(
     .update({ status: "PLAYED", queue_position: null })
     .eq("session_id", sessionId)
     .eq("status", "PLAYING");
+
+  // 1.5) PLAYED 자동 도토리 지급 (best-effort, 실패해도 다음 곡 흐름 안 막음)
+  if (playingRows.length > 0) {
+    try {
+      await awardRadioPlayedRewards(supabase, sessionId, playingRows);
+    } catch (e) {
+      console.error("[fm/playNext] reward grant failed", e);
+    }
+  }
 
   // 2) 큐 첫 항목 (queue_position ASC) 조회 — kind/song_normalized 필요
   const nextResp = (await (
@@ -960,6 +1265,41 @@ export async function stopPlayingAction(sessionId: string): Promise<void> {
   await assertSessionOwnedByOrg(sessionId, org.orgId);
 
   const supabase = await createClient();
+
+  // PLAYING rows 사전 조회 (자동 도토리 지급용)
+  const playingResp = (await (
+    supabase.from("tori_fm_requests" as never) as unknown as {
+      select: (c: string) => {
+        eq: (k: string, v: string) => {
+          eq: (
+            k: string,
+            v: string
+          ) => Promise<{
+            data: Array<{
+              id: string;
+              user_id: string;
+              kind: string | null;
+              story: string | null;
+            }> | null;
+            error: SbErr;
+          }>;
+        };
+      };
+    }
+  )
+    .select("id, user_id, kind, story")
+    .eq("session_id", sessionId)
+    .eq("status", "PLAYING")) as {
+    data: Array<{
+      id: string;
+      user_id: string;
+      kind: string | null;
+      story: string | null;
+    }> | null;
+    error: SbErr;
+  };
+  const playingRows = playingResp.data ?? [];
+
   await (
     supabase.from("tori_fm_requests" as never) as unknown as {
       update: (p: Row) => {
@@ -972,6 +1312,14 @@ export async function stopPlayingAction(sessionId: string): Promise<void> {
     .update({ status: "PLAYED", queue_position: null })
     .eq("session_id", sessionId)
     .eq("status", "PLAYING");
+
+  if (playingRows.length > 0) {
+    try {
+      await awardRadioPlayedRewards(supabase, sessionId, playingRows);
+    } catch (e) {
+      console.error("[fm/stopPlaying] reward grant failed", e);
+    }
+  }
 
   revalidateFm(sessionId, org.orgId);
 }
@@ -1469,3 +1817,452 @@ async function refundAllBoostsForRequest(
     .update({ boost_amount: 0, last_boost_at: null })
     .eq("id", requestId);
 }
+
+/* ========================================================================== */
+/* 1순위 점프 (Jump to Queue #1) — 결제 시 큐 1번 자리로 직진                  */
+/* ========================================================================== */
+
+export type JumpFirstResult =
+  | { ok: true; newBalance: number; spent: number }
+  | { ok: false; error: string };
+
+/**
+ * 신청을 방송 큐 #1 으로 즉시 진입시킴.
+ *  - 가격: 현재 큐 1번의 boost_amount + 1 (큐 비어있으면 최소 1)
+ *  - 효과: 본인 신청 status → QUEUED, queue_position = 1
+ *          기존 모든 QUEUED 의 queue_position += 1 (한 칸씩 밀림)
+ *  - 검수 우회 — 호스트 승인 없이 자동 진입 (운영자 결정)
+ *  - 환불 정책 없음 (다른 사람이 다시 점프해서 밀려도 환불 X)
+ */
+export async function jumpToQueueFirstAction(
+  requestId: string,
+  amount: number
+): Promise<JumpFirstResult> {
+  try {
+    const user = await requireAppUser();
+    if (!requestId) return { ok: false, error: "신청곡을 찾을 수 없어요" };
+    if (!Number.isInteger(amount) || amount < 1) {
+      return { ok: false, error: "최소 1 도토리부터 가능해요" };
+    }
+    if (amount > BOOST_MAX) {
+      return {
+        ok: false,
+        error: `한 번에 ${BOOST_MAX.toLocaleString("ko-KR")} 도토리까지만 가능해요`,
+      };
+    }
+
+    const supabase = await createClient();
+
+    // 1) 신청 row 조회 + 소유권/상태 검증.
+    const reqResp = (await (
+      supabase.from("tori_fm_requests" as never) as unknown as {
+        select: (c: string) => {
+          eq: (k: string, v: string) => {
+            maybeSingle: () => Promise<
+              SbRespOne<{
+                id: string;
+                session_id: string;
+                user_id: string;
+                status: string;
+                boost_amount: number | null;
+              }>
+            >;
+          };
+        };
+      }
+    )
+      .select("id, session_id, user_id, status, boost_amount")
+      .eq("id", requestId)
+      .maybeSingle()) as SbRespOne<{
+      id: string;
+      session_id: string;
+      user_id: string;
+      status: string;
+      boost_amount: number | null;
+    }>;
+
+    const reqRow = reqResp.data;
+    if (!reqRow) return { ok: false, error: "신청곡을 찾을 수 없어요" };
+    if (reqRow.user_id !== user.id) {
+      return { ok: false, error: "본인 신청만 1순위로 올릴 수 있어요" };
+    }
+    if (
+      reqRow.status === "PLAYING" ||
+      reqRow.status === "PLAYED" ||
+      reqRow.status === "HIDDEN"
+    ) {
+      return { ok: false, error: "이미 처리된 신청은 올릴 수 없어요" };
+    }
+
+    // 2) 현재 보유 도토리 확인 → 차감.
+    const balResp = (await (
+      supabase.from("app_users" as never) as unknown as {
+        select: (c: string) => {
+          eq: (k: string, v: string) => {
+            maybeSingle: () => Promise<
+              SbRespOne<{ acorn_balance: number | null }>
+            >;
+          };
+        };
+      }
+    )
+      .select("acorn_balance")
+      .eq("id", user.id)
+      .maybeSingle()) as SbRespOne<{ acorn_balance: number | null }>;
+
+    const balance = balResp.data?.acorn_balance ?? 0;
+    if (balance < amount) {
+      return { ok: false, error: "보유 도토리가 부족해요" };
+    }
+    const newBalance = balance - amount;
+
+    await (
+      supabase.from("app_users" as never) as unknown as {
+        update: (p: Row) => {
+          eq: (k: string, v: string) => Promise<{ error: SbErr }>;
+        };
+      }
+    )
+      .update({ acorn_balance: newBalance })
+      .eq("id", user.id);
+
+    // 3) 큐 transaction ledger (차감).
+    await (
+      supabase.from("user_acorn_transactions" as never) as unknown as {
+        insert: (r: Row) => Promise<{ error: SbErr }>;
+      }
+    ).insert({
+      user_id: user.id,
+      amount: -amount,
+      reason: "FM_JUMP_FIRST",
+      source_type: "fm_request",
+      source_id: requestId,
+      memo: `FM jump-to-queue-first ${amount}`,
+    } satisfies Row);
+
+    // 4) 같은 세션의 모든 QUEUED 의 queue_position += 1 (한 칸씩 밀림).
+    //    Postgres 의 atomic update 가 없으면 SELECT → 각 row UPDATE.
+    const queuedResp = (await (
+      supabase.from("tori_fm_requests" as never) as unknown as {
+        select: (c: string) => {
+          eq: (k: string, v: string) => {
+            eq: (
+              k: string,
+              v: string
+            ) => Promise<{
+              data: Array<{ id: string; queue_position: number | null }> | null;
+              error: SbErr;
+            }>;
+          };
+        };
+      }
+    )
+      .select("id, queue_position")
+      .eq("session_id", reqRow.session_id)
+      .eq("status", "QUEUED")) as {
+      data: Array<{ id: string; queue_position: number | null }> | null;
+      error: SbErr;
+    };
+
+    const queuedRows = queuedResp.data ?? [];
+    for (const q of queuedRows) {
+      if (q.id === requestId) continue;
+      const newPos = (q.queue_position ?? 0) + 1;
+      await (
+        supabase.from("tori_fm_requests" as never) as unknown as {
+          update: (p: Row) => {
+            eq: (k: string, v: string) => Promise<{ error: SbErr }>;
+          };
+        }
+      )
+        .update({ queue_position: newPos })
+        .eq("id", q.id);
+    }
+
+    // 5) 본인 신청 → QUEUED + queue_position = 1 + boost_amount 누적.
+    const newBoost = (reqRow.boost_amount ?? 0) + amount;
+    const updResp = (await (
+      supabase.from("tori_fm_requests" as never) as unknown as {
+        update: (p: Row) => {
+          eq: (k: string, v: string) => Promise<{ error: SbErr }>;
+        };
+      }
+    )
+      .update({
+        status: "QUEUED",
+        queue_position: 1,
+        boost_amount: newBoost,
+        last_boost_at: new Date().toISOString(),
+      })
+      .eq("id", requestId)) as { error: SbErr };
+
+    if (updResp.error) {
+      return { ok: false, error: "1순위 진입 실패. 잠시 후 다시 시도해 주세요" };
+    }
+
+    // 6) tori_fm_boosts ledger.
+    await (
+      supabase.from("tori_fm_boosts" as never) as unknown as {
+        insert: (r: Row) => Promise<{ error: SbErr }>;
+      }
+    ).insert({
+      request_id: requestId,
+      user_id: user.id,
+      kind: "CHARGE",
+      amount,
+    } satisfies Row);
+
+    revalidateFm(reqRow.session_id, user.orgId);
+    return { ok: true, newBalance, spent: amount };
+  } catch (err) {
+    console.error("[fm/jumpFirst] error", err);
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "1순위 진입 실패",
+    };
+  }
+}
+
+/* ========================================================================== */
+/* NOW PLAYING 응원 하트 — 누른 사람 -1 도토리, 신청자 +1 도토리                */
+/* ========================================================================== */
+
+export type CheerNowPlayingResult =
+  | { ok: true; newBalance: number; cheeredTotal: number }
+  | { ok: false; error: string };
+
+/**
+ * NOW PLAYING 카드의 응원 하트.
+ *  - 누른 사람: -1 도토리 (소비)
+ *  - 신청자: +1 도토리 (적립)
+ *  - 한 곡당 무제한 — 도토리 잔액이 자연 제한
+ *  - 본인 곡엔 응원 X (자기 도토리 무한 펌프 방지)
+ */
+export async function cheerNowPlayingAction(
+  requestId: string
+): Promise<CheerNowPlayingResult> {
+  try {
+    const user = await requireAppUser();
+    if (!requestId) return { ok: false, error: "신청곡을 찾을 수 없어요" };
+
+    const supabase = await createClient();
+
+    // 1) 대상 신청 조회 + PLAYING 상태/소유권 검증.
+    const reqResp = (await (
+      supabase.from("tori_fm_requests" as never) as unknown as {
+        select: (c: string) => {
+          eq: (k: string, v: string) => {
+            maybeSingle: () => Promise<
+              SbRespOne<{
+                id: string;
+                user_id: string;
+                status: string;
+              }>
+            >;
+          };
+        };
+      }
+    )
+      .select("id, user_id, status")
+      .eq("id", requestId)
+      .maybeSingle()) as SbRespOne<{
+      id: string;
+      user_id: string;
+      status: string;
+    }>;
+
+    const reqRow = reqResp.data;
+    if (!reqRow) return { ok: false, error: "신청곡을 찾을 수 없어요" };
+    if (reqRow.status !== "PLAYING") {
+      return { ok: false, error: "재생 중인 곡에만 응원할 수 있어요" };
+    }
+    if (reqRow.user_id === user.id) {
+      return { ok: false, error: "본인 곡에는 응원할 수 없어요" };
+    }
+
+    // 2) 누른 사람 잔액 확인.
+    const balResp = (await (
+      supabase.from("app_users" as never) as unknown as {
+        select: (c: string) => {
+          eq: (k: string, v: string) => {
+            maybeSingle: () => Promise<
+              SbRespOne<{ acorn_balance: number | null }>
+            >;
+          };
+        };
+      }
+    )
+      .select("acorn_balance")
+      .eq("id", user.id)
+      .maybeSingle()) as SbRespOne<{ acorn_balance: number | null }>;
+
+    const balance = balResp.data?.acorn_balance ?? 0;
+    if (balance < 1) {
+      return { ok: false, error: "도토리가 부족해요" };
+    }
+    const newBalance = balance - 1;
+
+    // 3) 누른 사람 -1.
+    await (
+      supabase.from("app_users" as never) as unknown as {
+        update: (p: Row) => {
+          eq: (k: string, v: string) => Promise<{ error: SbErr }>;
+        };
+      }
+    )
+      .update({ acorn_balance: newBalance })
+      .eq("id", user.id);
+
+    await (
+      supabase.from("user_acorn_transactions" as never) as unknown as {
+        insert: (r: Row) => Promise<{ error: SbErr }>;
+      }
+    ).insert({
+      user_id: user.id,
+      amount: -1,
+      reason: "FM_CHEER_SEND",
+      source_type: "fm_request",
+      source_id: requestId,
+      memo: "FM cheer send -1",
+    } satisfies Row);
+
+    // 4) 신청자 +1 (잔액 update + ledger).
+    const recvBalResp = (await (
+      supabase.from("app_users" as never) as unknown as {
+        select: (c: string) => {
+          eq: (k: string, v: string) => {
+            maybeSingle: () => Promise<
+              SbRespOne<{ acorn_balance: number | null }>
+            >;
+          };
+        };
+      }
+    )
+      .select("acorn_balance")
+      .eq("id", reqRow.user_id)
+      .maybeSingle()) as SbRespOne<{ acorn_balance: number | null }>;
+
+    const recvBal = recvBalResp.data?.acorn_balance ?? 0;
+    await (
+      supabase.from("app_users" as never) as unknown as {
+        update: (p: Row) => {
+          eq: (k: string, v: string) => Promise<{ error: SbErr }>;
+        };
+      }
+    )
+      .update({ acorn_balance: recvBal + 1 })
+      .eq("id", reqRow.user_id);
+
+    await (
+      supabase.from("user_acorn_transactions" as never) as unknown as {
+        insert: (r: Row) => Promise<{ error: SbErr }>;
+      }
+    ).insert({
+      user_id: reqRow.user_id,
+      amount: 1,
+      reason: "FM_CHEER_RECEIVE",
+      source_type: "fm_request",
+      source_id: requestId,
+      memo: `FM cheer received from ${user.id.slice(0, 8)}`,
+    } satisfies Row);
+
+    // 5) 신청자가 이 곡에서 누적 받은 응원 카운트 — 단순 SELECT (전체 FM_CHEER_RECEIVE 수).
+    const cheerCountResp = (await (
+      supabase.from("user_acorn_transactions" as never) as unknown as {
+        select: (c: string, opts?: { count: "exact"; head?: boolean }) => {
+          eq: (k: string, v: string) => {
+            eq: (
+              k: string,
+              v: string
+            ) => Promise<{ count: number | null; error: SbErr }>;
+          };
+        };
+      }
+    )
+      .select("id", { count: "exact", head: true })
+      .eq("source_id", requestId)
+      .eq("reason", "FM_CHEER_RECEIVE")) as {
+      count: number | null;
+      error: SbErr;
+    };
+
+    return {
+      ok: true,
+      newBalance,
+      cheeredTotal: cheerCountResp.count ?? 0,
+    };
+  } catch (err) {
+    console.error("[fm/cheer] error", err);
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "응원 실패",
+    };
+  }
+}
+
+/**
+ * 신청 한 건의 누적 받은 응원 카운트 — 신청자 본인이 polling 으로 자기 곡의
+ * 받은 응원 카운트를 가져올 때 사용. RLS 때문에 신청자만 정확한 값을 받음
+ * (다른 사용자가 호출하면 0).
+ */
+export async function getCheerCountAction(
+  requestId: string
+): Promise<number> {
+  if (!requestId) return 0;
+  await requireAppUser();
+  const supabase = await createClient();
+  const resp = (await (
+    supabase.from("user_acorn_transactions" as never) as unknown as {
+      select: (c: string, opts?: { count: "exact"; head?: boolean }) => {
+        eq: (k: string, v: string) => {
+          eq: (
+            k: string,
+            v: string
+          ) => Promise<{ count: number | null; error: SbErr }>;
+        };
+      };
+    }
+  )
+    .select("id", { count: "exact", head: true })
+    .eq("source_id", requestId)
+    .eq("reason", "FM_CHEER_RECEIVE")) as {
+    count: number | null;
+    error: SbErr;
+  };
+  return resp.count ?? 0;
+}
+
+/**
+ * 본인이 특정 신청에 보낸 응원 횟수 — 본인 transaction 이라 RLS 무관, 항상 정확.
+ * 응원자가 페이지 reload 해도 자기가 보낸 응원 누적 복원에 사용.
+ */
+export async function getMyCheerSentCountAction(
+  requestId: string
+): Promise<number> {
+  if (!requestId) return 0;
+  const user = await requireAppUser();
+  const supabase = await createClient();
+  const resp = (await (
+    supabase.from("user_acorn_transactions" as never) as unknown as {
+      select: (c: string, opts?: { count: "exact"; head?: boolean }) => {
+        eq: (k: string, v: string) => {
+          eq: (k: string, v: string) => {
+            eq: (
+              k: string,
+              v: string
+            ) => Promise<{ count: number | null; error: SbErr }>;
+          };
+        };
+      };
+    }
+  )
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", user.id)
+    .eq("source_id", requestId)
+    .eq("reason", "FM_CHEER_SEND")) as {
+    count: number | null;
+    error: SbErr;
+  };
+  return resp.count ?? 0;
+}
+

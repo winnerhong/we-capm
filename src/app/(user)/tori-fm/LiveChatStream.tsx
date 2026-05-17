@@ -15,7 +15,7 @@ import {
 } from "@/lib/tori-fm/actions";
 import type { FmChatMessageRow } from "@/lib/tori-fm/types";
 
-const MAX_VISIBLE = 30; // 메모리 상한 — 스크롤로 과거 메시지 접근
+const MAX_VISIBLE = 200; // 메모리 상한 — 스크롤로 과거 메시지 접근
 
 interface Props {
   sessionId: string;
@@ -29,6 +29,11 @@ interface Props {
    *  - 'DJ'  : sender_type='DJ' 가 본인 메시지 (수정/삭제 액션은 user_id 없으므로 비노출)
    */
   viewerRole?: "USER" | "DJ";
+  /**
+   * true 면 자체 max-h 제한 대신 부모 컨테이너 높이 가득 채움 (h-full).
+   *  - DjChatPanel 처럼 부모가 flex-1 인 경우 적합.
+   */
+  fillHeight?: boolean;
 }
 
 /** 작성 시각 — 24시간 HH:MM. iso 가 잘못되면 빈 문자열. */
@@ -45,6 +50,7 @@ export function LiveChatStream({
   initialMessages = [],
   currentUserId = null,
   viewerRole = "USER",
+  fillHeight = false,
 }: Props) {
   const [messages, setMessages] = useState<FmChatMessageRow[]>(
     initialMessages.slice(-MAX_VISIBLE)
@@ -176,17 +182,9 @@ export function LiveChatStream({
   return (
     <div
       ref={listRef}
-      style={{
-        // Firefox 스크롤바
-        scrollbarWidth: "thin",
-        scrollbarColor: "rgba(255,255,255,0.2) transparent",
-      }}
-      className="pointer-events-auto max-h-56 overflow-y-auto rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2 backdrop-blur-md sm:max-h-72
-        [&::-webkit-scrollbar]:w-1.5
-        [&::-webkit-scrollbar-track]:bg-transparent
-        [&::-webkit-scrollbar-thumb]:rounded-full
-        [&::-webkit-scrollbar-thumb]:bg-white/20
-        hover:[&::-webkit-scrollbar-thumb]:bg-white/30"
+      className={`scroll-dark pointer-events-auto overflow-y-auto rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2 ${
+        fillHeight ? "h-full" : "max-h-56 sm:max-h-72"
+      }`}
       role="log"
       aria-live="polite"
       aria-label="실시간 청취자 채팅"

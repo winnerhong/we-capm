@@ -121,6 +121,46 @@ textarea::placeholder {
 .text-warm-gray { color: #6B6560; }
 .border-leaf { border-color: #D4E4BC; }
 
+/* ============================================================== */
+/* 다크 카드 안의 스크롤 영역 — Webkit + Firefox 통합 다크 스크롤바  */
+/* 적용:  className="... overflow-y-auto scroll-dark"               */
+/* @layer utilities 로 감싸 Tailwind v4 가 누락 없이 emit 하도록.    */
+/* ============================================================== */
+@layer utilities {
+  .scroll-dark {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.22) transparent;
+  }
+  .scroll-dark::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .scroll-dark::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scroll-dark::-webkit-scrollbar-thumb {
+    background-color: rgba(255, 255, 255, 0.22);
+    border-radius: 9999px;
+  }
+  .scroll-dark::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(255, 255, 255, 0.36);
+  }
+  .scroll-dark::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  /* number input 의 위/아래 spinner 화살표 숨김. -/+ 버튼이 별도 있을 때 사용.
+     적용:  className="... no-spinner" */
+  .no-spinner {
+    -moz-appearance: textfield;
+  }
+  .no-spinner::-webkit-inner-spin-button,
+  .no-spinner::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+}
+
 /* 접근성: 모션 최소화 선호 시 애니메이션 축소 */
 @media (prefers-reduced-motion: reduce) {
   *,

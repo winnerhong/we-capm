@@ -21,7 +21,9 @@
 // xl 미만(< 1280px): 모든 zone 이 세로 stack.
 // 콘솔 배경은 사연 모드에서 살짝 violet 톤으로 분기.
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 import { LiveStudioPanel, type PlayingItem } from "./LiveStudioPanel";
 import { DjChatPanel } from "./DjChatPanel";
 import { RequestModerationList } from "./RequestModerationList";
@@ -101,6 +103,33 @@ export function LiveStudioConsole({
   initialRpsRoom = null,
   embedded = false,
 }: Props) {
+  // Realtime auto-refresh — 호스트 ▶ 다음 곡 시 PLAYING row 변경되면 즉시
+  // router.refresh() 호출해서 server props (song/artist/story) 갱신.
+  // 이게 없으면 호스트가 router.refresh() 를 백그라운드로만 호출하므로 stale.
+  const router = useRouter();
+  useEffect(() => {
+    if (!sessionId) return;
+    const supa = createClient();
+    const channel = supa
+      .channel(`fm-host-console-${sessionId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "tori_fm_requests",
+          filter: `session_id=eq.${sessionId}`,
+        },
+        () => {
+          router.refresh();
+        }
+      )
+      .subscribe();
+    return () => {
+      void supa.removeChannel(channel);
+    };
+  }, [sessionId, router]);
+
   // 모달 상태 — mode 가 변할 때마다 key 를 증가시켜 HostRpsModal 을 강제 재마운트
   const [rpsState, setRpsState] = useState<{
     open: boolean;
@@ -144,9 +173,18 @@ export function LiveStudioConsole({
       }
     >
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-        {/* Zone A: 메인 스테이지 Hero — 좌측 9/12 (압도적 비중)
-            xl 에서 Zone B(큐 5개) 와 같은 max-height 로 동기화 — ON AIR 박스가
-            큐 5개 분량까지만 세로로 늘어나고 그 이상은 안 커지도록. */}
+        {/* Zone B: 방송 대기 큐 — 좌측 3/12. (사용자 요청: Hero 와 자리 교체) */}
+        <div className="xl:col-span-3 xl:max-h-[44rem]">
+          <BroadcastQueueCard
+            sessionId={sessionId}
+            initialQueued={initialQueuedRequests}
+            initialPlaying={initialPlayingRequest}
+            initialPlayingGroup={initialPlayingGroup}
+            compact
+          />
+        </div>
+
+        {/* Zone A: 메인 스테이지 Hero — 우측 9/12 */}
         <div className="xl:col-span-9 xl:max-h-[44rem]">
           <LiveStudioPanel
             sessionName={sessionName}
@@ -162,17 +200,6 @@ export function LiveStudioConsole({
             storyItems={playingStoryItems}
             orgId={orgId}
             controls={controls}
-          />
-        </div>
-
-        {/* Zone B: 방송 대기 큐 — 우측 3/12. max-height 로 5개 분량 캡 → 6개+ 스크롤. */}
-        <div className="xl:col-span-3 xl:max-h-[44rem]">
-          <BroadcastQueueCard
-            sessionId={sessionId}
-            initialQueued={initialQueuedRequests}
-            initialPlaying={initialPlayingRequest}
-            initialPlayingGroup={initialPlayingGroup}
-            compact
           />
         </div>
 
@@ -242,7 +269,7 @@ export function LiveStudioConsole({
           {/* RPS Launcher — emerald 톤, 글로우 그림자 */}
           <section
             aria-label="단체 가위바위보 서바이벌"
-            className="relative isolate rounded-2xl border-l-4 border-l-emerald-300/70 border-y border-y-white/10 border-r border-r-white/10 bg-emerald-950/30 p-4 text-white shadow-xl shadow-emerald-500/10 backdrop-blur-md transition-shadow duration-200 ease-out hover:-translate-y-0.5 hover:shadow-2xl hover:shadow-emerald-500/20 md:p-5"
+            className="relative isolate rounded-2xl border-l-4 border-l-emerald-300/70 border-y border-y-white/10 border-r border-r-white/10 bg-[#101935] p-4 text-white shadow-md shadow-emerald-500/10 md:p-5"
           >
             {/* 외곽 글로우 */}
             <div

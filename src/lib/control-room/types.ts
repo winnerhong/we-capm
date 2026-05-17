@@ -48,15 +48,6 @@ export interface ControlRoomAcorns {
   perHourLast6h: number; // 최근 6시간 amount > 0 합 / 6 (반올림)
 }
 
-export interface ControlRoomActivityItem {
-  id: string; // submission.id
-  missionTitle: string;
-  missionIcon: string | null;
-  userDisplayName: string; // "홍길동 가족" 형식
-  acornsAwarded: number; // submission.awarded_acorns (null → 0)
-  submittedAt: string; // ISO
-}
-
 export interface ControlRoomLeaderItem {
   userId: string;
   displayName: string; // "홍길동 가족"
@@ -140,6 +131,12 @@ export interface ControlRoomFamilyRow {
   perMission: Record<string, FamilyMissionCellState>;
   /** 자녀들의 반명 (unique). 형제가 다른 반이면 여러 개. 없으면 빈 배열. */
   classNames: string[];
+  /**
+   * 자녀별 (이름, 반) 매핑 — enrolled 만, created_at ASC 순.
+   * 형제가 다른 반일 때 "파랑반 김다민, 초록2반 김다나" 식 라벨에 사용.
+   * 자녀 메타 없으면 빈 배열.
+   */
+  children: Array<{ name: string; className: string | null }>;
 }
 
 export interface ControlRoomFamilyGrid {
@@ -199,7 +196,6 @@ export interface ControlRoomSnapshot {
   // Phase 2 widgets
   stamps: ControlRoomStamps;
   acorns: ControlRoomAcorns;
-  activityFeed: ControlRoomActivityItem[]; // 최신순 30건
   leaderboard: ControlRoomLeaderItem[]; // TOP 10
   // Phase 3 widgets
   broadcast: ControlRoomBroadcastStat;
@@ -210,4 +206,27 @@ export interface ControlRoomSnapshot {
   familyGrid: ControlRoomFamilyGrid;
   // Phase 2 — 라이브 수행 telemetry
   live: ControlRoomLive;
+  /** COOP 미션 세션 현황 (대기/매칭/완료 등) */
+  coopSessions: ControlRoomCoopSession[];
+}
+
+/**
+ * Phase 4 관제 — COOP(짝꿍) 세션 한 건.
+ * 사진월처럼 그리드 + 필터 + 페이지네이션으로 보기 위한 enriched 형태.
+ */
+export interface ControlRoomCoopSession {
+  sessionId: string;
+  missionId: string;
+  missionTitle: string;
+  missionIcon: string | null;
+  missionDisplayOrder: number;
+  pairCode: string;
+  state: string; // WAITING | PAIRED | A_DONE | B_DONE | COMPLETED | EXPIRED | CANCELLED
+  initiatorDisplayName: string;
+  partnerDisplayName: string | null;
+  sharedPhotoUrl: string | null;
+  expiresAt: string;
+  pairedAt: string | null;
+  completedAt: string | null;
+  createdAt: string;
 }

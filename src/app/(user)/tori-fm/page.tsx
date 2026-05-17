@@ -15,14 +15,22 @@ import {
   loadRadioQueueItemWithSubmission,
   loadFirstActiveOrgMissionByKind,
 } from "@/lib/missions/queries";
-import type { RadioSubmissionPayload } from "@/lib/missions/types";
+import {
+  RADIO_REWARD_DEFAULTS,
+  type RadioSubmissionPayload,
+} from "@/lib/missions/types";
 import {
   loadChatMessages,
   loadOpenSessionRequests,
   loadPlayingGroup,
+  loadQueuedRequests,
   loadTopHeartedRequests,
   loadTopSongs,
 } from "@/lib/tori-fm/queries";
+import {
+  getCheerCountAction,
+  getMyCheerSentCountAction,
+} from "@/lib/tori-fm/actions";
 import { anonLabelFromUserId } from "@/lib/tori-fm/types";
 import { loadOrgFmBrandName } from "@/lib/tori-fm/branding";
 import { LiveFmRefresher } from "./LiveFmRefresher";
@@ -30,6 +38,7 @@ import { MiniStage, type MiniStageNowPlaying } from "./MiniStage";
 import { RequestsWithHearts } from "./RequestsWithHearts";
 import { SubmitRequestDialog } from "./SubmitRequestDialog";
 import { TodayRankingSummary } from "./TodayRankingSummary";
+import { BroadcastQueueViewer } from "./BroadcastQueueViewer";
 
 export const dynamic = "force-dynamic";
 
@@ -81,6 +90,7 @@ export default async function ToriFmPage() {
     userHearted,
     playingGroup,
     topHearted,
+    queuedRequests,
   ] = await Promise.all([
     session ? loadChatMessages(session.id, 30) : Promise.resolve([]),
     session ? loadOpenSessionRequests(session.id) : Promise.resolve([]),
@@ -88,7 +98,19 @@ export default async function ToriFmPage() {
     Promise.resolve([] as string[]),
     session ? loadPlayingGroup(session.id) : Promise.resolve([]),
     session ? loadTopHeartedRequests(session.id, 5) : Promise.resolve([]),
+    session ? loadQueuedRequests(session.id) : Promise.resolve([]),
   ]);
+
+  // PLAYING 곡이 있으면 — 본인 곡이면 받은 응원, 그 외엔 본인이 보낸 응원 카운트 prefetch.
+  // MiniStage 의 초기 cheerCount 로 사용되어 깜빡임 방지.
+  const playingHeadForCheer = playingGroup[0] ?? null;
+  let initialCheerCount = 0;
+  if (playingHeadForCheer) {
+    initialCheerCount =
+      playingHeadForCheer.user_id === user.id
+        ? await getCheerCountAction(playingHeadForCheer.id)
+        : await getMyCheerSentCountAction(playingHeadForCheer.id);
+  }
 
   // 현재 재생 중 — PLAYING 묶음(같은 song_normalized) 우선, 없으면 current_queue_id 기반.
   // playingGroup 의 첫 row 가 head — 곡명/아티스트/kind 의 기준이 됨.
@@ -150,7 +172,7 @@ export default async function ToriFmPage() {
         </Link>
       </nav>
 
-      {/* 미니 전광판 — 라이브커머스 스타일 풀블리드 (행사 커버 + VFX + 드리프트 채팅 + 입력바) */}
+      {/* 미니 전광판 — 라이브커머스 스타일 풀블리드. middleSlot 으로 방송 대기 큐 노출. */}
       <MiniStage
         orgId={user.orgId}
         brandName={brandName}
@@ -158,6 +180,16 @@ export default async function ToriFmPage() {
         initialNowPlaying={initialNowPlaying}
         initialChatMessages={chatMessages}
         currentUserId={user.id}
+        initialCheerCount={initialCheerCount}
+        middleSlot={
+          session ? (
+            <BroadcastQueueViewer
+              sessionId={session.id}
+              initialQueued={queuedRequests}
+              myUserId={user.id}
+            />
+          ) : null
+        }
       />
 
       {/* 라디오 미션이 별도 활성화돼 있으면 부가 진입점 표시 (선택 경로).
@@ -182,6 +214,22 @@ export default async function ToriFmPage() {
             isLive={sessionLive}
             trendingSongs={trendingSongs}
             familyLabel={familyLabel}
+            rewardSong={(() => {
+              const cfg = (radioMission?.config_json ?? {}) as {
+                reward_song?: number;
+              };
+              return typeof cfg.reward_song === "number"
+                ? cfg.reward_song
+                : RADIO_REWARD_DEFAULTS.song;
+            })()}
+            rewardStory={(() => {
+              const cfg = (radioMission?.config_json ?? {}) as {
+                reward_story?: number;
+              };
+              return typeof cfg.reward_story === "number"
+                ? cfg.reward_story
+                : RADIO_REWARD_DEFAULTS.story;
+            })()}
           />
 
           <RequestsWithHearts
@@ -193,137 +241,8 @@ export default async function ToriFmPage() {
             acornBalance={acornBalance}
           />
 
-          {/* 오늘의 인기 신청곡 TOP — 하트 많은 순 (song_request 만, 최대 5) */}
-          {(() => {
-            const topSongsHearted = topHearted
-              .filter((r) => r.kind === "song_request")
-              .slice(0, 5);
-            if (topSongsHearted.length === 0) return null;
-            return (
-              <section
-                aria-label="오늘의 인기 신청곡 TOP"
-                className="rounded-3xl border-l-[5px] border-l-amber-300/50 border-y border-y-white/10 border-r border-r-white/10 bg-[#101935] p-4 shadow-xl shadow-amber-500/10 md:p-5"
-              >
-                <header className="mb-3 flex items-center gap-2">
-                  <span className="text-xl" aria-hidden>
-                    🎵
-                  </span>
-                  <h2 className="text-sm font-extrabold text-amber-100">
-                    오늘의 인기 신청곡 TOP {topSongsHearted.length}
-                  </h2>
-                </header>
-                <ol className="space-y-1.5">
-                  {topSongsHearted.map((r, idx) => {
-                    const medal =
-                      idx === 0
-                        ? "🥇"
-                        : idx === 1
-                          ? "🥈"
-                          : idx === 2
-                            ? "🥉"
-                            : null;
-                    return (
-                      <li
-                        key={r.id}
-                        className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2"
-                      >
-                        <span
-                          className="flex h-7 w-7 flex-shrink-0 items-center justify-center text-base"
-                          aria-label={`${idx + 1}위`}
-                        >
-                          {medal ? (
-                            medal
-                          ) : (
-                            <span className="text-[11px] font-bold text-white/70">
-                              {idx + 1}
-                            </span>
-                          )}
-                        </span>
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-bold text-white/95">
-                            🎵 {r.song_title?.trim() || "(사연만)"}
-                          </p>
-                          {r.artist && (
-                            <p className="truncate text-[11px] text-amber-200/80">
-                              — {r.artist}
-                            </p>
-                          )}
-                        </div>
-                        <span className="flex-shrink-0 rounded-full bg-rose-500/20 px-2 py-0.5 text-[11px] font-bold text-rose-200 ring-1 ring-rose-400/40">
-                          ❤ {r.heart_count}
-                        </span>
-                      </li>
-                    );
-                  })}
-                </ol>
-              </section>
-            );
-          })()}
-
-          {/* 오늘의 인기 사연 TOP — 하트 많은 순 (story_only 만, 최대 5).
-              warm 톤(보라/오렌지) — 음악 카드와 시각적으로 분리. */}
-          {(() => {
-            const topStoriesHearted = topHearted
-              .filter((r) => r.kind === "story_only")
-              .slice(0, 5);
-            if (topStoriesHearted.length === 0) return null;
-            return (
-              <section
-                aria-label="오늘의 인기 사연 TOP"
-                className="rounded-3xl border-l-[5px] border-l-violet-300/50 border-y border-y-white/10 border-r border-r-white/10 bg-[#1a1638] p-4 shadow-xl shadow-violet-500/15 md:p-5"
-              >
-                <header className="mb-3 flex items-center gap-2">
-                  <span className="text-xl" aria-hidden>
-                    💌
-                  </span>
-                  <h2 className="text-sm font-extrabold text-violet-100">
-                    오늘의 인기 사연 TOP {topStoriesHearted.length}
-                  </h2>
-                </header>
-                <ol className="space-y-1.5">
-                  {topStoriesHearted.map((r, idx) => {
-                    const medal =
-                      idx === 0
-                        ? "🥇"
-                        : idx === 1
-                          ? "🥈"
-                          : idx === 2
-                            ? "🥉"
-                            : null;
-                    return (
-                      <li
-                        key={r.id}
-                        className="flex items-start gap-2 rounded-2xl border border-violet-300/20 bg-white/[0.04] px-3 py-2.5"
-                      >
-                        <span
-                          className="flex h-7 w-7 flex-shrink-0 items-center justify-center text-base"
-                          aria-label={`${idx + 1}위`}
-                        >
-                          {medal ? (
-                            medal
-                          ) : (
-                            <span className="text-[11px] font-bold text-violet-200/80">
-                              {idx + 1}
-                            </span>
-                          )}
-                        </span>
-                        <blockquote className="min-w-0 flex-1 border-l-2 border-amber-300/40 pl-2.5 text-[12px] leading-relaxed text-white/90 line-clamp-2">
-                          {r.story?.trim() ? (
-                            <>&ldquo;{r.story}&rdquo;</>
-                          ) : (
-                            <span className="text-white/55">(사연 없음)</span>
-                          )}
-                        </blockquote>
-                        <span className="flex-shrink-0 rounded-full bg-rose-500/20 px-2 py-0.5 text-[11px] font-bold text-rose-200 ring-1 ring-rose-400/40">
-                          ❤ {r.heart_count}
-                        </span>
-                      </li>
-                    );
-                  })}
-                </ol>
-              </section>
-            );
-          })()}
+          {/* 오늘의 인기 신청곡/사연 TOP 별도 카드 제거됨 —
+              RequestsWithHearts 가 인기순 정렬 + 메달 prefix 로 흡수. */}
 
           <TodayRankingSummary sessionId={session.id} />
         </>

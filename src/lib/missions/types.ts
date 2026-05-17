@@ -101,6 +101,40 @@ export interface RadioMissionConfig {
   prompt_song: string;
   prompt_story: string;
   max_length: number;
+  /**
+   * PLAYED(실제 송출) 시점 보상 — 두 단계 분리:
+   *  - reward_song: 신청곡(곡명+가수) 기본 보상. 사연 없어도 받음.
+   *  - reward_story: 사연을 함께 보낸 경우 +보너스. 합산 = song + story.
+   * 미지정 시 RADIO_REWARD_DEFAULTS (song=1, story=2) 적용.
+   */
+  reward_song?: number;
+  reward_story?: number;
+}
+
+/** RADIO 미션 보상 디폴트값. */
+export const RADIO_REWARD_DEFAULTS = {
+  song: 1,
+  story: 2,
+} as const;
+
+/** 디폴트 합계 (신청곡 + 사연 둘 다) — UI 라벨 등에 사용. */
+export const RADIO_REWARD_DEFAULT =
+  RADIO_REWARD_DEFAULTS.song + RADIO_REWARD_DEFAULTS.story;
+
+/**
+ * 신청 row 한 건의 PLAYED 보상 계산.
+ *  - 신청곡 기본 보상 + (사연 있으면) 사연 보너스
+ *  - 사연 없으면 song 만, 사연 있으면 song + story.
+ */
+export function calcRadioPlayedReward(
+  cfg: RadioMissionConfig | null | undefined,
+  _kind?: string | null,
+  story?: string | null
+): number {
+  const song = cfg?.reward_song ?? RADIO_REWARD_DEFAULTS.song;
+  const storyBonus = cfg?.reward_story ?? RADIO_REWARD_DEFAULTS.story;
+  const hasStory = (story ?? "").trim().length > 0;
+  return hasStory ? song + storyBonus : song;
 }
 
 export type MissionConfig =
@@ -334,6 +368,11 @@ export const MISSION_KIND_META: Record<
     icon: string;
     shortDesc: string;
     defaultAcorns: number;
+    /**
+     * 사진 결과물을 갖는 미션 종류인지 — true 면 관제실 사진월에 자동 노출된다.
+     * 새 사진 kind 가 생기면 여기만 true 로 표시하면 사진월/사진 갤러리가 자동 흡수.
+     */
+    hasPhoto: boolean;
   }
 > = {
   PHOTO: {
@@ -341,50 +380,70 @@ export const MISSION_KIND_META: Record<
     icon: "📸",
     shortDesc: "포토존에서 사진 한 장",
     defaultAcorns: 2,
+    hasPhoto: true,
   },
   QR_QUIZ: {
     label: "QR 찍고 퀴즈",
     icon: "🔲",
     shortDesc: "구간별 QR 스캔 + 미니 퀴즈",
     defaultAcorns: 1,
+    hasPhoto: false,
   },
   PHOTO_APPROVAL: {
     label: "자연물 찾기",
     icon: "🍃",
     shortDesc: "나뭇잎·꽃잎 등 미션 사진",
     defaultAcorns: 3,
+    hasPhoto: true,
   },
   COOP: {
     label: "협동 미션",
     icon: "🤝",
     shortDesc: "두 가족이 함께 달성",
     defaultAcorns: 5,
+    hasPhoto: true,
   },
   BROADCAST: {
     label: "돌발 미션",
     icon: "⚡",
     shortDesc: "제한시간 내 전체 참여",
     defaultAcorns: 3,
+    hasPhoto: true,
   },
   TREASURE: {
     label: "보물찾기",
     icon: "🗺",
     shortDesc: "단계별 힌트 추적",
     defaultAcorns: 10,
+    hasPhoto: false,
   },
   RADIO: {
     label: "신청곡 & 사연",
     icon: "🎵",
     shortDesc: "토리FM에 사연 제출",
     defaultAcorns: 1,
+    hasPhoto: false,
   },
   FINAL_REWARD: {
     label: "최종 보상",
     icon: "🎁",
     shortDesc: "누적 도토리로 티어 달성",
     defaultAcorns: 0,
+    hasPhoto: false,
   },
 };
+
+/**
+ * 사진 결과물이 있는 미션 kind 들 — 사진월/사진 갤러리 화이트리스트의 단일 진실 출처.
+ * MISSION_KIND_META 에 hasPhoto:true 가 추가되면 자동으로 포함된다.
+ */
+export const PHOTO_BEARING_MISSION_KINDS: MissionKind[] = (
+  Object.entries(MISSION_KIND_META) as Array<
+    [MissionKind, (typeof MISSION_KIND_META)[MissionKind]]
+  >
+)
+  .filter(([, meta]) => meta.hasPhoto)
+  .map(([kind]) => kind);
 
 export const SUBMISSION_STATUS_META: Record<
   SubmissionStatus,

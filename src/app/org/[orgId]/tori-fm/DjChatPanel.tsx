@@ -38,11 +38,12 @@ export function DjChatPanel({ sessionId, initialMessages, currentStory = null }:
   const [input, setInput] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-  const [flashKey, setFlashKey] = useState(0);
+  // 새 메시지 INSERT 시 카드 외곽 글로우 1.5초 — key 재마운트(무거움) 대신
+  // className 토글 + onAnimationEnd 로 정리 (DOM 보존).
+  const [flashing, setFlashing] = useState(false);
   const lastSentRef = useRef(0);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
-  // Realtime — 새 채팅 INSERT 가 들어오면 카드 외곽에 sky 글로우 1.5초 발사
   useEffect(() => {
     if (!sessionId) return;
     const supa = createClient();
@@ -57,7 +58,7 @@ export function DjChatPanel({ sessionId, initialMessages, currentStory = null }:
           filter: `session_id=eq.${sessionId}`,
         } as never,
         (() => {
-          setFlashKey((k) => k + 1);
+          setFlashing(true);
         }) as never
       )
       .subscribe();
@@ -66,9 +67,7 @@ export function DjChatPanel({ sessionId, initialMessages, currentStory = null }:
     };
   }, [sessionId]);
 
-  // flashKey 가 바뀌면 React 가 key prop 변화로 인해 카드를 재마운트 → animation 재생.
-  // 1.5초 후 자동 종료는 CSS 의 `animation: ... forwards` 가 처리하므로 별도 cleanup 불필요.
-  // FLASH_MS 는 상수 일관성 차원에서 보존.
+  // FLASH_MS 는 CSS animation duration 과 의미적으로 매칭. 미사용 경고 회피.
   void FLASH_MS;
 
   const handleSend = useCallback(() => {
@@ -98,10 +97,10 @@ export function DjChatPanel({ sessionId, initialMessages, currentStory = null }:
 
   return (
     <section
-      key={flashKey}
       aria-label="라이브 채팅"
-      className={`relative isolate flex h-full flex-col rounded-2xl border-l-[5px] border-l-sky-300/70 border-y border-y-white/10 border-r border-r-white/10 bg-sky-950/25 p-4 text-white shadow-xl shadow-sky-500/10 backdrop-blur-md transition-shadow duration-200 ease-out hover:-translate-y-0.5 hover:shadow-2xl hover:shadow-sky-500/20 md:p-5 ${
-        flashKey > 0 ? "flash-glow-sky" : ""
+      onAnimationEnd={() => setFlashing(false)}
+      className={`relative isolate flex h-full max-h-[640px] flex-col rounded-2xl border-l-[5px] border-l-sky-300/70 border-y border-y-white/10 border-r border-r-white/10 bg-sky-950/40 p-4 text-white shadow-md shadow-sky-500/10 md:p-5 ${
+        flashing ? "flash-glow-sky" : ""
       }`}
     >
       {/* 외곽 글로우 */}
@@ -139,13 +138,16 @@ export function DjChatPanel({ sessionId, initialMessages, currentStory = null }:
         />
       </div>
 
-      {/* 채팅 스트림 — 참가자 컴포넌트 재활용. viewerRole='DJ' 로 본인(DJ) 메시지 우측 정렬. */}
-      <div className="flex-1">
+      {/* 채팅 스트림 — 참가자 컴포넌트 재활용. viewerRole='DJ' 로 본인(DJ) 메시지 우측 정렬.
+          fillHeight 로 입력 박스 위 빈 공간 모두 채움. min-h-0 는 flex-1 안에서
+          자식 overflow-y-auto 가 정상 동작하는 데 필수. */}
+      <div className="min-h-0 flex-1">
         <LiveChatStream
           sessionId={sessionId}
           initialMessages={initialMessages}
           currentUserId={null}
           viewerRole="DJ"
+          fillHeight
         />
       </div>
 

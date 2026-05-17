@@ -151,7 +151,7 @@ export function StoryQueueCard({ sessionId, initialItems }: Props) {
   return (
     <section
       aria-label="인기 사연 큐"
-      className="relative isolate rounded-2xl border-l-[5px] border-l-rose-300/70 border-y border-y-white/10 border-r border-r-white/10 bg-rose-950/25 p-4 text-white shadow-xl shadow-rose-500/10 backdrop-blur-md transition-shadow duration-200 ease-out hover:-translate-y-0.5 hover:shadow-2xl hover:shadow-rose-500/20"
+      className="relative isolate rounded-2xl border-l-[5px] border-l-rose-300/70 border-y border-y-white/10 border-r border-r-white/10 bg-[#101935] p-4 text-white shadow-md shadow-rose-500/10"
     >
       {/* 외곽 글로우 */}
       <div

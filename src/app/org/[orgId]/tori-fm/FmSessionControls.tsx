@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   startFmBroadcastAction,
@@ -30,19 +30,24 @@ export function FmSessionControls({
   playingCount,
 }: Props) {
   const router = useRouter();
-  const [isPending, startTransition] = useTransition();
+  // useTransition 대신 일반 state — startTransition 안에서 router.refresh() 까지
+  // 동기적으로 묶이면 RSC refetch+commit 까지 isPending 유지되어 버튼이 굼떠짐.
+  // server action 완료 즉시 isPending 해제 + router.refresh() 는 백그라운드.
+  const [isPending, setIsPending] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
-  function run(fn: () => Promise<unknown>) {
+  async function run(fn: () => Promise<unknown>) {
     setMsg(null);
-    startTransition(async () => {
-      try {
-        await fn();
-        router.refresh();
-      } catch (e) {
-        setMsg(e instanceof Error ? e.message : "처리 실패");
-      }
-    });
+    setIsPending(true);
+    try {
+      await fn();
+      // 즉시 enable — RSC refetch 는 백그라운드로 보냄.
+      setIsPending(false);
+      router.refresh();
+    } catch (e) {
+      setIsPending(false);
+      setMsg(e instanceof Error ? e.message : "처리 실패");
+    }
   }
 
   // 방송 종료 — "종료" 글자 입력 확인. 실수로 누르는 걸 막기 위함.

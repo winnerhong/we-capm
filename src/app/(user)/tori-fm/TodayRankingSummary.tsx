@@ -177,7 +177,7 @@ function StorySection({ rows }: { rows: FmTopStoryRow[] }) {
                   — {s.child_name || s.parent_name || "익명 친구"}
                 </p>
                 <p className="flex-none text-[10px] text-pink-300">
-                  ♥ {s.heart_count ?? 0}
+                  ♥ {(s.heart_count ?? 0) + (s.boost_amount ?? 0)}
                 </p>
               </div>
             </li>

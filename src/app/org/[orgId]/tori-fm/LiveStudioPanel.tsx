@@ -120,7 +120,7 @@ export function LiveStudioPanel({
         isStoryHero
           ? "border-l-violet-300/70"
           : "border-l-amber-300/70"
-      } border-y border-y-white/10 border-r border-r-white/10 text-white ${heroShadow} backdrop-blur-md transition-shadow duration-300 hover:-translate-y-0.5 hover:shadow-2xl`}
+      } border-y border-y-white/10 border-r border-r-white/10 text-white ${heroShadow}`}
     >
       {/* Hero 외곽 글로우 — 음악(amber) / 사연(rose+violet 합성) */}
       <div
@@ -262,11 +262,7 @@ export function LiveStudioPanel({
                     {/* 곡 묶음 모드 — 사연 카드 N개 (created_at ASC).
                         5개 넘으면 자연 스크롤. */}
                     {isBundleMode ? (
-                      <ul className="mt-3 max-h-64 space-y-2 overflow-y-auto pr-1
-                        [&::-webkit-scrollbar]:w-1.5
-                        [&::-webkit-scrollbar-track]:bg-transparent
-                        [&::-webkit-scrollbar-thumb]:rounded-full
-                        [&::-webkit-scrollbar-thumb]:bg-white/15">
+                      <ul className="scroll-dark mt-3 max-h-64 space-y-2 overflow-y-auto pr-1">
                         {filledStoryItems.map((it) => (
                           <li
                             key={it.id}

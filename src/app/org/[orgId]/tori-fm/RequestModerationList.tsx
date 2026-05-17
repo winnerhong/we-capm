@@ -29,7 +29,7 @@ interface Props {
 const PULSE_MS = 2000;
 const HOT_THRESHOLD = 3;
 
-type SortMode = "popular" | "recent" | "oldest" | "boost";
+type SortMode = "popular" | "recent" | "oldest";
 
 const SORT_OPTIONS: ReadonlyArray<{
   key: SortMode;
@@ -37,9 +37,8 @@ const SORT_OPTIONS: ReadonlyArray<{
   icon: string;
 }> = [
   { key: "popular", label: "인기", icon: "🔥" },
-  { key: "recent", label: "최신", icon: "🆕" },
   { key: "oldest", label: "오래된", icon: "⏳" },
-  { key: "boost", label: "경매", icon: "💎" },
+  { key: "recent", label: "최신", icon: "🆕" },
 ];
 
 function fmtAgo(iso: string, nowMs: number): string {
@@ -150,40 +149,27 @@ export function RequestModerationList({
   }, [items]);
 
   // 정렬 모드 — DJ 가 화면에서만 바꾸는 UI state (DB 영향 없음).
-  //  - popular : song_normalized 그룹 카운트 desc, tiebreaker 최신 created_at desc
+  //  - popular : popularity(heart+boost) desc — 참가자 화면과 동일 기준
   //  - recent  : created_at desc
   //  - oldest  : created_at asc
-  //  - boost   : boost_amount desc, last_boost_at desc
   const [sortMode, setSortMode] = useState<SortMode>("popular");
 
   const sortedItems = useMemo(() => {
     const arr = [...items];
     const toTime = (iso: string | null): number =>
       iso ? new Date(iso).getTime() : 0;
+    const popularity = (r: (typeof items)[number]) =>
+      (r.heart_count ?? 0) + (r.boost_amount ?? 0);
     if (sortMode === "recent") {
       arr.sort((a, b) => toTime(b.created_at) - toTime(a.created_at));
     } else if (sortMode === "oldest") {
       arr.sort((a, b) => toTime(a.created_at) - toTime(b.created_at));
-    } else if (sortMode === "boost") {
-      arr.sort((a, b) => {
-        if (b.boost_amount !== a.boost_amount) {
-          return b.boost_amount - a.boost_amount;
-        }
-        return toTime(b.last_boost_at) - toTime(a.last_boost_at);
-      });
     } else {
-      // popular — song_normalized 그룹 카운트 desc, tiebreaker 최신 desc
-      const groupCount = new Map<string, number>();
-      for (const r of arr) {
-        const k = r.song_normalized || normalize(r.song_title ?? "");
-        groupCount.set(k, (groupCount.get(k) ?? 0) + 1);
-      }
+      // popular — popularity(heart + boost) desc, tiebreaker 최신 desc.
+      //  참가자 화면 RequestsWithHearts 와 동일 기준 → 두 화면 순위 일치.
       arr.sort((a, b) => {
-        const ak = a.song_normalized || normalize(a.song_title ?? "");
-        const bk = b.song_normalized || normalize(b.song_title ?? "");
-        const aC = groupCount.get(ak) ?? 0;
-        const bC = groupCount.get(bk) ?? 0;
-        if (bC !== aC) return bC - aC;
+        const diff = popularity(b) - popularity(a);
+        if (diff !== 0) return diff;
         return toTime(b.created_at) - toTime(a.created_at);
       });
     }
@@ -225,7 +211,7 @@ export function RequestModerationList({
   return (
     <section
       aria-label="신청곡 모더레이션 큐"
-      className="relative isolate flex h-full flex-col rounded-2xl border-l-[6px] border-l-rose-400/80 border-y border-y-white/10 border-r border-r-white/10 bg-rose-950/30 p-4 text-white shadow-xl shadow-rose-500/15 backdrop-blur-md transition-shadow duration-200 ease-out hover:-translate-y-0.5 hover:shadow-2xl hover:shadow-rose-500/25 md:p-5"
+      className="relative isolate flex h-full max-h-[640px] flex-col rounded-2xl border-l-[6px] border-l-rose-400/80 border-y border-y-white/10 border-r border-r-white/10 bg-rose-950/40 p-4 text-white shadow-md shadow-rose-500/15 md:p-5"
     >
       {/* 외곽 글로우 — 결정 필요 카드라 살짝 더 강하게 */}
       <div
@@ -235,7 +221,7 @@ export function RequestModerationList({
       <header className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <h2 className="flex items-center gap-2 text-base font-bold text-rose-100">
           <span aria-hidden>🎵</span>
-          <span>즉석 신청곡</span>
+          <span>신청곡, 사연</span>
           <span className="rounded-full bg-rose-500/25 px-2 py-0.5 text-[10px] font-bold text-rose-100 ring-1 ring-rose-400/50">
             결정 필요 {items.length}
           </span>
@@ -279,20 +265,26 @@ export function RequestModerationList({
         </p>
       ) : (
         <ul
-          aria-description="3개 분량 까지 전부 노출 + 4번째부터 스크롤 (한 항목 ≈ 175px 기준)"
-          className="max-h-[34rem] w-full flex-1 space-y-2 overflow-y-auto pr-1
-          [&::-webkit-scrollbar]:w-1.5
-          [&::-webkit-scrollbar-track]:bg-transparent
-          [&::-webkit-scrollbar-thumb]:rounded-full
-          [&::-webkit-scrollbar-thumb]:bg-white/20"
+          aria-description="컨테이너 max-h 안에서 스크롤"
+          className="scroll-dark min-h-0 w-full flex-1 space-y-2 overflow-y-auto pr-1"
         >
-          {sortedItems.map((r) => {
+          {sortedItems.map((r, idx) => {
             const key = normalize(r.song_title ?? "");
             const count = hotCounts.get(key) ?? 0;
             const isHot = count >= HOT_THRESHOLD;
             const isPulse = pulseIds.has(r.id);
             const isBusy = pendingId === r.id;
             const storyPrefix = (r.story ?? "").slice(0, 50);
+            // 모든 정렬 모드에서 순위 prefix 노출 — 정렬 결과 순서대로.
+            const rankIcon =
+              idx === 0
+                ? "🥇"
+                : idx === 1
+                  ? "🥈"
+                  : idx === 2
+                    ? "🥉"
+                    : null;
+            const rankNum = idx === 3 || idx === 4 ? String(idx + 1) : null;
 
             return (
               <li
@@ -306,15 +298,39 @@ export function RequestModerationList({
                 }`}
               >
                 <div className="flex flex-wrap items-start justify-between gap-2">
+                  {rankIcon && (
+                    <span
+                      aria-label={`${idx + 1}위`}
+                      className="flex h-7 w-7 flex-shrink-0 items-center justify-center text-lg"
+                    >
+                      {rankIcon}
+                    </span>
+                  )}
+                  {rankNum && (
+                    <span
+                      aria-label={`${idx + 1}위`}
+                      className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-amber-400/20 text-[11px] font-bold text-amber-200"
+                    >
+                      {rankNum}
+                    </span>
+                  )}
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-1.5">
-                      <span className="truncate text-sm font-bold text-white/95">
-                        🎵 {r.song_title}
-                      </span>
-                      {r.artist && (
-                        <span className="text-[12px] text-amber-200/80">
-                          — {r.artist}
+                      {r.kind === "story_only" ? (
+                        <span className="rounded-full bg-violet-500/20 px-1.5 py-0.5 text-[10px] font-bold text-violet-200 ring-1 ring-violet-400/40">
+                          💌 사연
                         </span>
+                      ) : (
+                        <>
+                          <span className="truncate text-sm font-bold text-white/95">
+                            🎵 {r.song_title || "(제목 없음)"}
+                          </span>
+                          {r.artist && (
+                            <span className="text-[12px] text-amber-200/80">
+                              — {r.artist}
+                            </span>
+                          )}
+                        </>
                       )}
                       {isHot && (
                         <span className="rounded-full bg-rose-500 px-1.5 py-0.5 text-[10px] font-bold text-white shadow-md shadow-rose-500/40">

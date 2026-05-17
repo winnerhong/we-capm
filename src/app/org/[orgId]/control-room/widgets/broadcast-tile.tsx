@@ -36,19 +36,15 @@ export function BroadcastTile({ broadcast, orgId }: Props) {
       </div>
 
       {isEmpty ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-4 py-8 text-center">
-          <div className="text-5xl" aria-hidden>
-            📣
-          </div>
-          <div className="text-lg font-bold text-[#f4ecd8]">
+        /* 빈 상태 — 컴팩트 한 줄. 큰 padding/아이콘 대신 인라인으로
+           위젯이 화면 차지를 최소화. 내용 생기면 아래 분기로 자연스럽게 확장. */
+        <div className="flex flex-wrap items-center gap-2 py-1">
+          <span className="text-[12px] text-[#a8b8d0]">
             아직 발송 기록 없음
-          </div>
-          <div className="text-xs text-[#a8b8d0]">
-            지금 바로 첫 돌발 미션을 보내보세요
-          </div>
+          </span>
           <Link
             href={broadcastHref}
-            className={`${styles.broadcastPulse} mt-2 inline-flex items-center justify-center gap-2 rounded-xl bg-[#ff4d8a] px-6 py-3 text-sm font-bold text-[#0a0f0d] transition-transform hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-[#ff4d8a] focus:ring-offset-2 focus:ring-offset-[#0a0f0d]`}
+            className="ml-auto inline-flex items-center gap-1 rounded-lg bg-[#ff4d8a] px-2.5 py-1 text-[11px] font-bold text-[#0a0f0d] transition hover:bg-[#ff6699]"
           >
             <span aria-hidden>📣</span>
             <span>첫 돌발미션 보내기</span>

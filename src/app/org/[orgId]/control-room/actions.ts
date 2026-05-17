@@ -14,13 +14,16 @@ import {
   loadPendingReviews,
   type ReviewSubmissionItem,
 } from "@/lib/missions/review-queries";
+import { resignSubmissionPhotoUrls } from "@/lib/missions/resign-photos";
 
 type SbErr = { message: string } | null;
 
 /**
  * 관제실 인라인 검수 모달용 — pending 큐 전체를 한 번에 로드.
- * 모달 마운트 시 호출하고 결과 큐를 client state 로 들고 있다가
- * 승인/반려 처리하면 큐에서 제거.
+ *  - payload 안의 사진 URL (photo_urls / shared_photo_url / content)
+ *    을 모두 모아 admin client 로 일괄 재서명 (signed URL 24h 만료 대응).
+ *  - 모달 마운트 시 호출하고 결과 큐를 client state 로 들고 있다가
+ *    승인/반려 처리하면 큐에서 제거.
  */
 export async function loadPendingReviewsForControlRoomAction(): Promise<
   { ok: true; items: ReviewSubmissionItem[] } | { ok: false; error: string }
@@ -28,6 +31,73 @@ export async function loadPendingReviewsForControlRoomAction(): Promise<
   try {
     const session = await requireOrg();
     const items = await loadPendingReviews(session.orgId);
+
+    // payload 내 사진 URL 위치 평탄화 → 한 번에 resign → 같은 자리 교체
+    type Plan =
+      | { kind: "photo_urls"; itemIdx: number; arrIdx: number }
+      | { kind: "shared_photo_url"; itemIdx: number }
+      | { kind: "content"; itemIdx: number };
+    const plans: Plan[] = [];
+    const urls: string[] = [];
+
+    for (let i = 0; i < items.length; i++) {
+      const payload = items[i].payload as {
+        photo_urls?: unknown;
+        shared_photo_url?: unknown;
+        content?: unknown;
+        content_type?: unknown;
+      };
+      // photo_urls: string[]
+      if (Array.isArray(payload.photo_urls)) {
+        for (let j = 0; j < payload.photo_urls.length; j++) {
+          const u = payload.photo_urls[j];
+          if (typeof u === "string" && u) {
+            plans.push({ kind: "photo_urls", itemIdx: i, arrIdx: j });
+            urls.push(u);
+          }
+        }
+      }
+      // COOP: shared_photo_url
+      if (
+        typeof payload.shared_photo_url === "string" &&
+        payload.shared_photo_url
+      ) {
+        plans.push({ kind: "shared_photo_url", itemIdx: i });
+        urls.push(payload.shared_photo_url);
+      }
+      // BROADCAST: content_type=PHOTO 일 때 content 가 사진 URL
+      if (
+        payload.content_type === "PHOTO" &&
+        typeof payload.content === "string" &&
+        payload.content
+      ) {
+        plans.push({ kind: "content", itemIdx: i });
+        urls.push(payload.content);
+      }
+    }
+
+    if (urls.length > 0) {
+      const fresh = await resignSubmissionPhotoUrls(urls);
+      for (let k = 0; k < plans.length; k++) {
+        const p = plans[k];
+        const payload = items[p.itemIdx].payload as {
+          photo_urls?: string[];
+          shared_photo_url?: string;
+          content?: string;
+        };
+        if (
+          p.kind === "photo_urls" &&
+          Array.isArray(payload.photo_urls)
+        ) {
+          payload.photo_urls[p.arrIdx] = fresh[k];
+        } else if (p.kind === "shared_photo_url") {
+          payload.shared_photo_url = fresh[k];
+        } else if (p.kind === "content") {
+          payload.content = fresh[k];
+        }
+      }
+    }
+
     return { ok: true, items };
   } catch (e) {
     console.error("[control-room/loadPendingReviews] threw", e);

@@ -10,6 +10,7 @@
 import { useMemo, useState } from "react";
 import type { OrgMemberFamily } from "@/lib/org-members/queries";
 import { MemberDetailDrawer } from "./member-detail-drawer";
+import { AcornIcon } from "@/components/acorn-icon";
 
 type ViewMode = "family" | "child";
 
@@ -339,7 +340,9 @@ function FamilyList({
                 </p>
                 <p className="mt-1 text-[11px] text-[#8B7F75]">
                   가입 {formatDate(f.createdAt)}
-                  {" · "}🌰 {f.acornBalance.toLocaleString("ko-KR")}
+                  {" · "}
+                  <AcornIcon size={10} className="align-[-0.1em]" />{" "}
+                  {f.acornBalance.toLocaleString("ko-KR")}
                   {f.lastActivityAt && (
                     <>
                       {" · "}최근 활동 {formatDate(f.lastActivityAt)}

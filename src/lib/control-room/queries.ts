@@ -9,7 +9,6 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { startOfTodayKstIso } from "@/lib/time/kst";
 import type {
   ControlRoomAcorns,
-  ControlRoomActivityItem,
   ControlRoomBroadcastStat,
   ControlRoomChatMessage,
   ControlRoomFamilyGrid,
@@ -28,6 +27,7 @@ import type {
   ControlRoomStamps,
   FamilyMissionCellState,
 } from "./types";
+import { PHOTO_BEARING_MISSION_KINDS } from "@/lib/missions/types";
 
 type SbResp<T> = { data: T[] | null; error: unknown };
 type SbRespOne<T> = { data: T | null; error: unknown };
@@ -224,7 +224,6 @@ const EMPTY_SNAPSHOT_BASE = {
     awardedAllTime: 0,
     perHourLast6h: 0,
   } as ControlRoomAcorns,
-  activityFeed: [] as ControlRoomActivityItem[],
   leaderboard: [] as ControlRoomLeaderItem[],
   broadcast: {
     sentLast24h: 0,
@@ -244,6 +243,7 @@ const EMPTY_SNAPSHOT_BASE = {
     stuckCount: 0,
     activeFamilies: 0,
   } as import("./types").ControlRoomLive,
+  coopSessions: [] as import("./types").ControlRoomCoopSession[],
   // heatmap 은 호출 시점 기준 24칸을 만들어야 하므로 이 상수엔 포함하지 않는다.
   // 사용부에서 `emptyHeatmap()` 을 호출해 덮어씌운다.
 };
@@ -297,7 +297,6 @@ export async function loadControlRoomSnapshot(
     pending,
     stamps,
     acorns,
-    activityFeed,
     leaderboard,
     broadcastStats,
     heatmap,
@@ -305,6 +304,7 @@ export async function loadControlRoomSnapshot(
     missionProgress,
     familyGrid,
     live,
+    coopSessions,
   ] = await Promise.all([
     loadLiveEvents(supabase, orgId),
     loadParticipants(supabase, orgId, todayIso),
@@ -313,7 +313,6 @@ export async function loadControlRoomSnapshot(
     loadPending(supabase, orgId),
     loadStamps(supabase, orgId, todayIso, participantUserIds.length),
     loadAcorns(supabase, participantUserIds, todayIso, last6hIso),
-    loadActivityFeed(supabase, orgId),
     loadLeaderboard(supabase, participantUserIds, last30dIso),
     loadBroadcastStats(supabase, orgId, todayIso, participantUserIds.length),
     loadHeatmap(supabase, orgId, last24hIso),
@@ -321,6 +320,7 @@ export async function loadControlRoomSnapshot(
     loadMissionProgress(supabase, orgId, participantUserIds.length),
     loadFamilyGrid(supabase, orgId, participantUserIds),
     loadLiveAttempts(supabase, orgId),
+    loadCoopSessions(supabase, orgId),
   ]);
 
   return {
@@ -335,7 +335,6 @@ export async function loadControlRoomSnapshot(
     pending,
     stamps,
     acorns,
-    activityFeed,
     leaderboard,
     broadcast: broadcastStats,
     heatmap,
@@ -343,6 +342,7 @@ export async function loadControlRoomSnapshot(
     missionProgress,
     familyGrid,
     live,
+    coopSessions,
   };
 }
 
@@ -1207,182 +1207,6 @@ async function loadAcorns(
 }
 
 /* -------------------------------------------------------------------------- */
-/* 9) 활동 피드 (F) — mission_submissions APPROVED 최신 30건                   */
-/* -------------------------------------------------------------------------- */
-
-async function loadActivityFeed(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  orgId: string
-): Promise<ControlRoomActivityItem[]> {
-  try {
-    // 1) org_missions id / title / icon 맵
-    const missionsResp = (await (
-      supabase.from("org_missions" as never) as unknown as {
-        select: (c: string) => {
-          eq: (k: string, v: string) => Promise<SbResp<OrgMissionFullRow>>;
-        };
-      }
-    )
-      .select("id, title, icon, quest_pack_id")
-      .eq("org_id", orgId)) as SbResp<OrgMissionFullRow>;
-
-    if (missionsResp.error) {
-      console.error(
-        "[control-room/loadActivityFeed] missions error",
-        missionsResp.error
-      );
-      return [];
-    }
-    const missions = missionsResp.data ?? [];
-    if (missions.length === 0) return [];
-    const missionIds = missions.map((m) => m.id);
-    const missionMap = new Map<string, OrgMissionFullRow>();
-    for (const m of missions) missionMap.set(m.id, m);
-
-    // 2) 최신 30개 APPROVED 제출
-    const subResp = (await (
-      supabase.from("mission_submissions" as never) as unknown as {
-        select: (c: string) => {
-          in: (k: string, v: string[]) => {
-            in: (k: string, v: string[]) => {
-              order: (
-                c: string,
-                o: { ascending: boolean }
-              ) => {
-                limit: (n: number) => Promise<SbResp<SubmissionRow>>;
-              };
-            };
-          };
-        };
-      }
-    )
-      .select(
-        "id, org_mission_id, user_id, status, awarded_acorns, submitted_at"
-      )
-      .in("org_mission_id", missionIds)
-      .in("status", APPROVED_STATUSES as unknown as string[])
-      .order("submitted_at", { ascending: false })
-      .limit(30)) as SbResp<SubmissionRow>;
-
-    if (subResp.error) {
-      console.error(
-        "[control-room/loadActivityFeed] subs error",
-        subResp.error
-      );
-      return [];
-    }
-    const subs = subResp.data ?? [];
-    if (subs.length === 0) return [];
-
-    // 3) 제출 유저 parent_name + 자녀(원생) 이름 맵
-    const userIds = Array.from(new Set(subs.map((s) => s.user_id)));
-    const nameMap = new Map<string, string>();
-    const enrolledMap = new Map<string, string[]>();
-    const allChildrenMap = new Map<string, string[]>();
-
-    if (userIds.length > 0) {
-      await Promise.all([
-        (async () => {
-          try {
-            const usersResp = (await (
-              supabase.from("app_users" as never) as unknown as {
-                select: (c: string) => {
-                  in: (
-                    k: string,
-                    v: string[]
-                  ) => Promise<SbResp<AppUserLiteRow>>;
-                };
-              }
-            )
-              .select("id, parent_name")
-              .in("id", userIds)) as SbResp<AppUserLiteRow>;
-
-            if (usersResp.error) {
-              console.error(
-                "[control-room/loadActivityFeed] users error",
-                usersResp.error
-              );
-            } else {
-              for (const u of usersResp.data ?? [])
-                nameMap.set(u.id, u.parent_name);
-            }
-          } catch (e) {
-            console.error("[control-room/loadActivityFeed] users throw", e);
-          }
-        })(),
-        (async () => {
-          try {
-            const resp = (await (
-              supabase.from("app_children" as never) as unknown as {
-                select: (c: string) => {
-                  in: (
-                    k: string,
-                    v: string[]
-                  ) => {
-                    order: (
-                      c: string,
-                      o: { ascending: boolean }
-                    ) => Promise<SbResp<AppChildLiteRow>>;
-                  };
-                };
-              }
-            )
-              .select("user_id, name, is_enrolled, created_at")
-              .in("user_id", userIds)
-              .order("created_at", {
-                ascending: true,
-              })) as SbResp<AppChildLiteRow>;
-
-            if (resp.error) {
-              console.error(
-                "[control-room/loadActivityFeed] children error",
-                resp.error
-              );
-              return;
-            }
-            for (const c of resp.data ?? []) {
-              const all = allChildrenMap.get(c.user_id) ?? [];
-              all.push(c.name);
-              allChildrenMap.set(c.user_id, all);
-              if (c.is_enrolled) {
-                const en = enrolledMap.get(c.user_id) ?? [];
-                en.push(c.name);
-                enrolledMap.set(c.user_id, en);
-              }
-            }
-          } catch (e) {
-            console.error(
-              "[control-room/loadActivityFeed] children throw",
-              e
-            );
-          }
-        })(),
-      ]);
-    }
-
-    return subs.map((s) => {
-      const mission = missionMap.get(s.org_mission_id);
-      const parentName = nameMap.get(s.user_id) || "보호자";
-      return {
-        id: s.id,
-        missionTitle: mission?.title ?? "(삭제된 미션)",
-        missionIcon: mission?.icon ?? null,
-        userDisplayName: formatFamilyDisplayName(
-          parentName,
-          enrolledMap.get(s.user_id) ?? [],
-          allChildrenMap.get(s.user_id) ?? []
-        ),
-        acornsAwarded: s.awarded_acorns ?? 0,
-        submittedAt: s.submitted_at,
-      };
-    });
-  } catch (e) {
-    console.error("[control-room/loadActivityFeed] throw", e);
-    return [];
-  }
-}
-
-/* -------------------------------------------------------------------------- */
 /* 10) 리더보드 (G) — 최근 30일 도토리 누적 TOP 10                             */
 /* -------------------------------------------------------------------------- */
 
@@ -1989,7 +1813,8 @@ async function loadPhotoWall(
   orgId: string
 ): Promise<ControlRoomPhotoItem[]> {
   try {
-    // 1) org 의 사진 종류 미션 id + meta — PHOTO/PHOTO_APPROVAL/COOP/BROADCAST 모두 포함
+    // 1) org 의 사진 종류 미션 id + meta — MISSION_KIND_META.hasPhoto:true 인 kind 모두 포함.
+    //    새 사진 kind 가 META 에 추가되면 자동으로 여기에도 흡수됨.
     const missionResp = (await (
       supabase.from("org_missions" as never) as unknown as {
         select: (c: string) => {
@@ -2012,12 +1837,7 @@ async function loadPhotoWall(
     )
       .select("id, title, icon, kind, display_order")
       .eq("org_id", orgId)
-      .in("kind", [
-        "PHOTO",
-        "PHOTO_APPROVAL",
-        "COOP",
-        "BROADCAST",
-      ])) as SbResp<{
+      .in("kind", PHOTO_BEARING_MISSION_KINDS)) as SbResp<{
       id: string;
       title: string;
       icon: string | null;
@@ -2390,11 +2210,12 @@ async function loadFamilyGrid(
       return { missions: [], rows: [] };
     }
 
-    // 1) org active missions (컬럼)
+    // 1) org active missions (컬럼) — 스템프북 표시 순서 (display_order ASC)
     type MissionRow = {
       id: string;
       title: string;
       icon: string | null;
+      display_order: number | null;
       created_at: string;
     };
     const mResp = (await (
@@ -2411,19 +2232,31 @@ async function loadFamilyGrid(
         };
       }
     )
-      .select("id, title, icon, created_at")
+      .select("id, title, icon, display_order, created_at")
       .eq("org_id", orgId)
       .eq("is_active", true)
-      .order("created_at", { ascending: true })) as SbResp<MissionRow>;
+      .order("display_order", { ascending: true })) as SbResp<MissionRow>;
 
     if (mResp.error || !mResp.data) {
       return { missions: [], rows: [] };
     }
-    const missions = mResp.data.map((m) => ({
-      id: m.id,
-      title: m.title,
-      icon: m.icon,
-    }));
+    // display_order null 인 row 를 안전하게 뒤로 보내고, 동순위는 created_at 으로 안정 정렬.
+    const missions = mResp.data
+      .slice()
+      .sort((a, b) => {
+        const oa = a.display_order ?? Number.MAX_SAFE_INTEGER;
+        const ob = b.display_order ?? Number.MAX_SAFE_INTEGER;
+        if (oa !== ob) return oa - ob;
+        return (
+          new Date(a.created_at).getTime() -
+          new Date(b.created_at).getTime()
+        );
+      })
+      .map((m) => ({
+        id: m.id,
+        title: m.title,
+        icon: m.icon,
+      }));
     if (missions.length === 0) {
       return { missions: [], rows: [] };
     }
@@ -2486,6 +2319,12 @@ async function loadFamilyGrid(
     const enrolledMap = new Map<string, string[]>();
     const allChildrenMap = new Map<string, string[]>();
     const classNamesMap = new Map<string, Set<string>>();
+    // 자녀별 (이름, 반) 매핑 — enrolled 만, 입력 순서(created_at ASC) 유지.
+    // "파랑반 김다민, 초록2반 김다나" 식 라벨에 사용.
+    const childrenMetaMap = new Map<
+      string,
+      Array<{ name: string; className: string | null }>
+    >();
     await Promise.all([
       (async () => {
         try {
@@ -2544,6 +2383,13 @@ async function loadFamilyGrid(
               const en = enrolledMap.get(c.user_id) ?? [];
               en.push(c.name);
               enrolledMap.set(c.user_id, en);
+              // 자녀별 (이름, 반) — enrolled 만 채움, 순서 보존.
+              const meta = childrenMetaMap.get(c.user_id) ?? [];
+              meta.push({
+                name: c.name,
+                className: (c.class_name ?? "").trim() || null,
+              });
+              childrenMetaMap.set(c.user_id, meta);
             }
             const cn = (c.class_name ?? "").trim();
             if (cn) {
@@ -2579,12 +2425,14 @@ async function loadFamilyGrid(
         doneCount,
         perMission,
         classNames: Array.from(classNamesMap.get(uid) ?? new Set<string>()),
+        children: childrenMetaMap.get(uid) ?? [],
       };
     });
 
+    // 정렬: 도토리 DESC → 완료수 DESC → 이름 — 매트릭스 행 순서 = 가족 순위.
     rows.sort((a, b) => {
-      if (a.doneCount !== b.doneCount) return b.doneCount - a.doneCount;
       if (a.totalAcorns !== b.totalAcorns) return b.totalAcorns - a.totalAcorns;
+      if (a.doneCount !== b.doneCount) return b.doneCount - a.doneCount;
       return a.displayName.localeCompare(b.displayName, "ko");
     });
 
@@ -2781,5 +2629,260 @@ async function loadLiveAttempts(
   } catch (e) {
     console.error("[control-room/loadLiveAttempts] throw", e);
     return empty;
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/* 16) Phase 4 — COOP 짝꿍 세션 현황                                            */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * org 의 COOP 미션 세션들 — 최근순 최대 100건.
+ *  - 상태(WAITING/PAIRED/A_DONE/B_DONE/COMPLETED/EXPIRED/CANCELLED) 별
+ *    필터/통계는 클라이언트에서 처리.
+ *  - shared_photo_url 은 사설 버킷 signed URL — 24h 만료 대응 위해 재서명.
+ */
+async function loadCoopSessions(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  orgId: string
+): Promise<import("./types").ControlRoomCoopSession[]> {
+  try {
+    // 1) org 의 COOP 미션 메타 (id, title, icon, display_order)
+    const missionResp = (await (
+      supabase.from("org_missions" as never) as unknown as {
+        select: (c: string) => {
+          eq: (k: string, v: string) => {
+            eq: (
+              k: string,
+              v: string
+            ) => Promise<
+              SbResp<{
+                id: string;
+                title: string;
+                icon: string | null;
+                display_order: number | null;
+              }>
+            >;
+          };
+        };
+      }
+    )
+      .select("id, title, icon, display_order")
+      .eq("org_id", orgId)
+      .eq("kind", "COOP")) as SbResp<{
+      id: string;
+      title: string;
+      icon: string | null;
+      display_order: number | null;
+    }>;
+
+    if (missionResp.error) {
+      console.error("[control-room/loadCoopSessions] mission err", missionResp.error);
+      return [];
+    }
+    const missions = missionResp.data ?? [];
+    if (missions.length === 0) return [];
+    const missionMap = new Map(missions.map((m) => [m.id, m]));
+    const missionIds = missions.map((m) => m.id);
+
+    // 2) 세션 로드 — 최근순 100건
+    type SessionRow = {
+      id: string;
+      org_mission_id: string;
+      pair_code: string;
+      initiator_user_id: string;
+      partner_user_id: string | null;
+      state: string;
+      shared_photo_url: string | null;
+      expires_at: string;
+      paired_at: string | null;
+      completed_at: string | null;
+      created_at: string;
+    };
+    const sessResp = (await (
+      supabase.from("mission_coop_sessions" as never) as unknown as {
+        select: (c: string) => {
+          in: (
+            k: string,
+            v: string[]
+          ) => {
+            order: (
+              c: string,
+              o: { ascending: boolean }
+            ) => {
+              limit: (n: number) => Promise<SbResp<SessionRow>>;
+            };
+          };
+        };
+      }
+    )
+      .select(
+        "id, org_mission_id, pair_code, initiator_user_id, partner_user_id, state, shared_photo_url, expires_at, paired_at, completed_at, created_at"
+      )
+      .in("org_mission_id", missionIds)
+      .order("created_at", { ascending: false })
+      .limit(100)) as SbResp<SessionRow>;
+
+    if (sessResp.error) {
+      console.error("[control-room/loadCoopSessions] sess err", sessResp.error);
+      return [];
+    }
+    const sessions = sessResp.data ?? [];
+    if (sessions.length === 0) return [];
+
+    // 3) 가족 표시명 — formatFamilyDisplayName 와 동일 패턴
+    const userIds = Array.from(
+      new Set(
+        sessions.flatMap((s) =>
+          s.partner_user_id
+            ? [s.initiator_user_id, s.partner_user_id]
+            : [s.initiator_user_id]
+        )
+      )
+    );
+    const nameMap = new Map<string, string>();
+    const enrolledMap = new Map<string, string[]>();
+    const allChildrenMap = new Map<string, string[]>();
+
+    if (userIds.length > 0) {
+      await Promise.all([
+        (async () => {
+          try {
+            const r = (await (
+              supabase.from("app_users" as never) as unknown as {
+                select: (c: string) => {
+                  in: (
+                    k: string,
+                    v: string[]
+                  ) => Promise<SbResp<AppUserLiteRow>>;
+                };
+              }
+            )
+              .select("id, parent_name")
+              .in("id", userIds)) as SbResp<AppUserLiteRow>;
+            for (const u of r.data ?? []) nameMap.set(u.id, u.parent_name);
+          } catch (e) {
+            console.error("[control-room/loadCoopSessions] users", e);
+          }
+        })(),
+        (async () => {
+          try {
+            const r = (await (
+              supabase.from("app_children" as never) as unknown as {
+                select: (c: string) => {
+                  in: (
+                    k: string,
+                    v: string[]
+                  ) => {
+                    order: (
+                      c: string,
+                      o: { ascending: boolean }
+                    ) => Promise<SbResp<AppChildLiteRow>>;
+                  };
+                };
+              }
+            )
+              .select("user_id, name, is_enrolled, created_at")
+              .in("user_id", userIds)
+              .order("created_at", {
+                ascending: true,
+              })) as SbResp<AppChildLiteRow>;
+            for (const c of r.data ?? []) {
+              const all = allChildrenMap.get(c.user_id) ?? [];
+              all.push(c.name);
+              allChildrenMap.set(c.user_id, all);
+              if (c.is_enrolled) {
+                const en = enrolledMap.get(c.user_id) ?? [];
+                en.push(c.name);
+                enrolledMap.set(c.user_id, en);
+              }
+            }
+          } catch (e) {
+            console.error("[control-room/loadCoopSessions] children", e);
+          }
+        })(),
+      ]);
+    }
+
+    function displayFor(userId: string | null): string {
+      if (!userId) return "대기 중";
+      const parent = nameMap.get(userId) || "보호자";
+      return formatFamilyDisplayName(
+        parent,
+        enrolledMap.get(userId) ?? [],
+        allChildrenMap.get(userId) ?? []
+      );
+    }
+
+    // 4) 조립
+    const out: import("./types").ControlRoomCoopSession[] = sessions.map((s) => {
+      const mission = missionMap.get(s.org_mission_id);
+      return {
+        sessionId: s.id,
+        missionId: s.org_mission_id,
+        missionTitle: mission?.title ?? "(미션)",
+        missionIcon: mission?.icon ?? null,
+        missionDisplayOrder: mission?.display_order ?? 0,
+        pairCode: s.pair_code,
+        state: s.state,
+        initiatorDisplayName: displayFor(s.initiator_user_id),
+        partnerDisplayName: s.partner_user_id
+          ? displayFor(s.partner_user_id)
+          : null,
+        sharedPhotoUrl: s.shared_photo_url,
+        expiresAt: s.expires_at,
+        pairedAt: s.paired_at,
+        completedAt: s.completed_at,
+        createdAt: s.created_at,
+      };
+    });
+
+    // 5) shared_photo_url 재서명 (24h 만료 대응) — photoWall 와 동일 패턴
+    try {
+      const SUBMISSION_BUCKET = "submission-photos";
+      const marker = `/storage/v1/object/sign/${SUBMISSION_BUCKET}/`;
+      type Plan = { idx: number; path: string };
+      const plans: Plan[] = [];
+      for (let i = 0; i < out.length; i++) {
+        const u = out[i].sharedPhotoUrl;
+        if (!u) continue;
+        try {
+          const parsed = new URL(u);
+          const at = parsed.pathname.indexOf(marker);
+          if (at < 0) continue;
+          const path = decodeURIComponent(
+            parsed.pathname.slice(at + marker.length)
+          );
+          if (path) plans.push({ idx: i, path });
+        } catch {
+          /* invalid URL — skip */
+        }
+      }
+      if (plans.length > 0) {
+        const admin = createAdminClient();
+        const { data: signed } = await admin.storage
+          .from(SUBMISSION_BUCKET)
+          .createSignedUrls(
+            plans.map((p) => p.path),
+            60 * 60 * 6
+          );
+        const signedArr = (signed ?? []) as Array<{
+          path?: string;
+          signedUrl?: string;
+          error?: string | null;
+        }>;
+        for (let i = 0; i < plans.length; i++) {
+          const fresh = signedArr[i]?.signedUrl;
+          if (fresh) out[plans[i].idx].sharedPhotoUrl = fresh;
+        }
+      }
+    } catch (e) {
+      console.error("[control-room/loadCoopSessions] resign err", e);
+    }
+
+    return out;
+  } catch (e) {
+    console.error("[control-room/loadCoopSessions] throw", e);
+    return [];
   }
 }

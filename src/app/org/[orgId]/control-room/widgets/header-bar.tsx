@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ControlRoomSnapshot } from "@/lib/control-room/types";
 import styles from "../control-room.module.css";
 import { ServerClock } from "./server-clock";
+import { BroadcastInlineLauncher } from "./broadcast-inline-launcher";
 
 type Props = {
   snapshot: ControlRoomSnapshot;
@@ -34,7 +35,7 @@ export function HeaderBar({ snapshot, orgId, isTvMode }: Props) {
 
       <div className="flex flex-wrap items-center gap-3">
         {isLive ? (
-          <div className="flex items-center gap-2 rounded-full border border-[#3a1616] bg-[#1a0a0a] px-3 py-1.5">
+          <div className="flex max-w-full items-center gap-2 whitespace-nowrap rounded-full border border-[#3a1616] bg-[#1a0a0a] py-1.5 pl-3 pr-4">
             <span
               className={`${styles.liveDot} ${styles.livePulse}`}
               aria-hidden
@@ -45,7 +46,7 @@ export function HeaderBar({ snapshot, orgId, isTvMode }: Props) {
             <span className={`${styles.neonRed} text-sm font-mono font-bold`}>
               {snapshot.liveEventCount}
             </span>
-            <span className="text-xs text-[#c9c9c9]">
+            <span className="text-[13px] font-medium leading-snug tracking-tight text-[#e5e5e5]">
               {names.join(" · ")}
               {extra > 0 ? ` 외 ${extra}` : ""}
             </span>
@@ -59,12 +60,15 @@ export function HeaderBar({ snapshot, orgId, isTvMode }: Props) {
         <ServerClock serverNowIso={snapshot.serverNowIso} />
 
         {!isTvMode && (
-          <Link
-            href={`/org/${orgId}/control-room/tv`}
-            className={`rounded-xl border border-[#1a2a52] bg-[#0a1839] px-3 py-2 text-xs font-semibold ${styles.neonCyan} hover:bg-[#12244a]`}
-          >
-            📺 TV 모드
-          </Link>
+          <>
+            <BroadcastInlineLauncher orgId={orgId} />
+            <Link
+              href={`/org/${orgId}/control-room/tv`}
+              className={`rounded-xl border border-[#1a2a52] bg-[#0a1839] px-3 py-2 text-xs font-semibold ${styles.neonCyan} hover:bg-[#12244a]`}
+            >
+              📺 TV 모드
+            </Link>
+          </>
         )}
         {isTvMode && (
           <Link

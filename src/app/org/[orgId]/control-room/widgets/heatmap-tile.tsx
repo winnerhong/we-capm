@@ -34,31 +34,29 @@ export function HeatmapTile({ heatmap, isTvMode }: Props) {
         </h2>
       </div>
 
-      {/* 부제 */}
-      <div className="mb-3 flex items-center justify-between text-[11px] text-[#a8b8d0]">
-        <span>
-          총{" "}
-          <span className="font-mono font-semibold text-[#f4ecd8]">
-            {totalLast24h.toLocaleString("ko-KR")}
+      {/* 부제 — 빈 상태에서는 숨겨서 위젯 더 컴팩트하게 */}
+      {!isEmpty && (
+        <div className="mb-3 flex items-center justify-between text-[11px] text-[#a8b8d0]">
+          <span>
+            총{" "}
+            <span className="font-mono font-semibold text-[#f4ecd8]">
+              {totalLast24h.toLocaleString("ko-KR")}
+            </span>
+            건
           </span>
-          건
-        </span>
-        <span>
-          피크:{" "}
-          <span className="font-mono font-semibold text-[#f4ecd8]">
-            {peakHour ?? "—"}
+          <span>
+            피크:{" "}
+            <span className="font-mono font-semibold text-[#f4ecd8]">
+              {peakHour ?? "—"}
+            </span>
           </span>
-        </span>
-      </div>
+        </div>
+      )}
 
       {isEmpty ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-3 py-8 text-center">
-          <div className="text-5xl" aria-hidden>
-            🌱
-          </div>
-          <div className="text-sm text-[#a8b8d0]">
-            아직 조용한 24시간이에요
-          </div>
+        /* 빈 상태 — 컴팩트 한 줄. 큰 padding 제거. */
+        <div className="py-1 text-[12px] text-[#a8b8d0]">
+          🌱 아직 조용한 24시간이에요
         </div>
       ) : (
         <>

@@ -166,12 +166,6 @@ function buildGroups(
       badge: fmBadge ?? reviewBadge,
       items: [
         {
-          label: "토리FM 라이브 스튜디오",
-          href: `${base}/tori-fm`,
-          icon: "🎙",
-          badge: fmBadge,
-        },
-        {
           label: "토리톡 관리",
           href: `${base}/toritalk`,
           icon: "💬",
@@ -181,11 +175,8 @@ function buildGroups(
           href: `${base}/missions/broadcast`,
           icon: "📡",
         },
-        {
-          label: "신청곡 모더레이션",
-          href: `${base}/missions/radio`,
-          icon: "🎵",
-        },
+        // 토리FM 라이브 스튜디오 + 신청곡 모더레이션 메뉴 제거됨 —
+        // 관제실(/control-room) 안의 FmStudioEmbed 로 통합되어 별도 페이지 불필요.
         {
           label: "미션 제출 검수",
           href: `${base}/missions/review`,

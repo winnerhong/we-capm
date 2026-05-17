@@ -25,6 +25,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { ToriFmSessionRow } from "@/lib/missions/types";
 import { ListenerPresence } from "@/components/tori-fm/ListenerPresence";
@@ -39,6 +40,12 @@ import { ReactionBar } from "./ReactionBar";
 import { LiveChatComposer } from "./LiveChatComposer";
 import { LiveChatStream } from "./LiveChatStream";
 import { PlayerRpsModal } from "@/lib/rps/PlayerRpsModal";
+import {
+  cheerNowPlayingAction,
+  getCheerCountAction,
+  getMyCheerSentCountAction,
+} from "@/lib/tori-fm/actions";
+import { AcornIcon } from "@/components/acorn-icon";
 
 /** 같은 곡 묶음 사연 1건 (작성자 라벨은 서버에서 결정해 넘김). */
 export interface MiniStagePlayingItem {
@@ -49,6 +56,10 @@ export interface MiniStagePlayingItem {
 }
 
 export interface MiniStageNowPlaying {
+  /** PLAYING 신청의 request id — 응원 하트(cheer) 트리거에 사용. */
+  requestId?: string;
+  /** PLAYING 신청자의 user id — 본인 곡 응원 차단 판정. */
+  ownerUserId?: string;
   song: string;
   artist: string;
   story: string;
@@ -89,9 +100,19 @@ interface Props {
   initialChatMessages?: FmChatMessageRow[];
   /** 현재 로그인 유저 — 카톡 스타일에서 본인 메시지 우측 배치. */
   currentUserId?: string | null;
+  /** SSR 에서 prefetch 한 현재 PLAYING 곡의 받은/보낸 응원 카운트 초기값. */
+  initialCheerCount?: number;
+  /**
+   * NOW PLAYING 카드 아래, 채팅 위에 추가로 렌더할 노드.
+   * 보통 BroadcastQueueViewer (방송 대기 큐) 가 들어옴.
+   */
+  middleSlot?: React.ReactNode;
 }
 
-const POLL_FALLBACK_MS = 5_000;
+// Realtime 채널이 정상이면 거의 즉시 NOW PLAYING 이 바뀌지만, 일시적으로 끊겼을
+// 때 폴링 fallback 으로 보완. 5초 → 2초로 축소 — 호스트가 [▶ 다음 곡] 누른
+// 직후 참가자 화면이 더 빠르게 새 곡으로 전환.
+const POLL_FALLBACK_MS = 2_000;
 
 function fmtElapsed(startedAt: string | null, nowMs: number): string {
   if (!startedAt) return "";
@@ -142,11 +163,91 @@ export function MiniStage({
   initialNowPlaying,
   initialChatMessages = [],
   currentUserId = null,
+  initialCheerCount = 0,
+  middleSlot,
 }: Props) {
   const [session, setSession] = useState<ToriFmSessionRow | null>(initialSession);
   const [nowPlaying, setNowPlaying] = useState<MiniStageNowPlaying | null>(
     initialNowPlaying
   );
+  // refetch 안에서 최신 nowPlaying 을 참조해야 하지만, useCallback 의존성에 nowPlaying
+  // 을 넣으면 nowPlaying 갱신 시마다 refetch 재생성 → realtime 채널 재구독 발생 (heavy).
+  // ref 로 미러링해서 의존성 X 로 안정화.
+  const nowPlayingRef = useRef<MiniStageNowPlaying | null>(initialNowPlaying);
+  useEffect(() => {
+    nowPlayingRef.current = nowPlaying;
+  }, [nowPlaying]);
+
+  // NOW PLAYING 응원 하트 — 누른 사람 -1 도토리, 신청자 +1 도토리.
+  // cheerCount 는 현재 PLAYING 곡이 받은 누적 응원 (UI 표시용, 로컬 optimistic).
+  // initialCheerCount 로 SSR prefetch 값 받아 첫 paint 부터 정확한 값 표시.
+  const cheerRouter = useRouter();
+  const [cheerCount, setCheerCount] = useState(initialCheerCount);
+  const [cheerPending, setCheerPending] = useState(false);
+  const [cheerError, setCheerError] = useState<string | null>(null);
+  // 곡 바뀌면 에러만 클리어. 카운트는 0 리셋하지 않음 — 0 으로 잠시 보이고
+  // polling fetch 완료 후 갱신되면 "사라졌다 다시 뜬다" 처럼 보이므로.
+  // polling fetch 가 곧 정확한 값으로 덮어쓰기 때문에 stale 위험 없음.
+  useEffect(() => {
+    setCheerError(null);
+  }, [nowPlaying?.requestId]);
+
+  // 카운터 polling — 곡 마다 분기:
+  //  - 본인 신청 곡: 받은 응원 (FM_CHEER_RECEIVE) — RLS 로 신청자만 정확
+  //  - 다른 시청자: 본인이 보낸 응원 (FM_CHEER_SEND) — 자기 transaction, 재방문 시 복원
+  useEffect(() => {
+    const reqId = nowPlaying?.requestId;
+    const ownerId = nowPlaying?.ownerUserId;
+    if (!reqId || !currentUserId) return;
+    const isOwner = ownerId === currentUserId;
+    let cancelled = false;
+    const fetchCount = async () => {
+      try {
+        const n = isOwner
+          ? await getCheerCountAction(reqId)
+          : await getMyCheerSentCountAction(reqId);
+        if (!cancelled) setCheerCount(n);
+      } catch {
+        /* 폴링 실패는 조용히 무시 */
+      }
+    };
+    fetchCount();
+    // 본인 곡은 다른 사람 응원 빠르게 반영 위해 3초, 다른 시청자는 본인만 카운트 → 10초로 가볍게
+    const interval = isOwner ? 3_000 : 10_000;
+    const t = setInterval(fetchCount, interval);
+    return () => {
+      cancelled = true;
+      clearInterval(t);
+    };
+  }, [nowPlaying?.requestId, nowPlaying?.ownerUserId, currentUserId]);
+
+  async function handleCheer() {
+    if (cheerPending || !nowPlaying?.requestId) return;
+    if (nowPlaying.ownerUserId && nowPlaying.ownerUserId === currentUserId) {
+      setCheerError("본인 곡에는 응원할 수 없어요");
+      setTimeout(() => setCheerError(null), 2000);
+      return;
+    }
+    setCheerPending(true);
+    setCheerError(null);
+    // optimistic +1
+    setCheerCount((c) => c + 1);
+    const result = await cheerNowPlayingAction(nowPlaying.requestId);
+    setCheerPending(false);
+    if (!result.ok) {
+      // rollback
+      setCheerCount((c) => Math.max(0, c - 1));
+      setCheerError(result.error);
+      setTimeout(() => setCheerError(null), 2000);
+      return;
+    }
+    // 서버의 cheeredTotal 은 RLS 때문에 응원자 자신은 0 반환 →
+    // optimistic +1 이 0 으로 rollback 되어 "살짝 떴다 사라짐" 발생.
+    // 본인 곡이면 polling(3초)이 정확한 값으로 동기화하니 여기서 덮어쓰지 않음.
+    // 다른 시청자는 본인 클릭 누적 (optimistic) 만 표시.
+    // 상단 layout 의 도토리 잔액(server props) 즉시 갱신.
+    cheerRouter.refresh();
+  }
   // SSR/CSR 간 시각 불일치로 hydration mismatch 가 발생하지 않도록
   // 초기값은 null. 마운트 후 useEffect 에서 Date.now() 로 채우고 1초 간격 갱신.
   const [now, setNow] = useState<number | null>(null);
@@ -288,6 +389,8 @@ export function MiniStage({
           createdAt: r.created_at,
         }));
         setNowPlaying({
+          requestId: head.id,
+          ownerUserId: head.user_id,
           song: head.song_title?.trim() || "(사연만)",
           artist: head.artist ?? "",
           story: head.story ?? "",
@@ -302,8 +405,8 @@ export function MiniStage({
       }
     }
 
-    if (queueId && queueId === lastQueueIdRef.current && nowPlaying) return;
-
+    // PLAYING row 가 없는 경우(곡 전환 race 또는 정지 후) — nowPlaying 을 null 로
+    // 즉시 비워서 stale 표시 방지. queueId 비교 skip 제거.
     if (!queueId) {
       lastQueueIdRef.current = null;
       setNowPlaying(null);
@@ -357,7 +460,7 @@ export function MiniStage({
       isAnonymous: false,
       storyItems: [],
     });
-  }, [orgId, nowPlaying]);
+  }, [orgId]);
 
   /* ------------------------------------------------------------------------ */
   /* Realtime + 폴링 fallback                                                  */
@@ -549,9 +652,18 @@ export function MiniStage({
               if (isStoryMode) {
                 return (
                   <div className="w-full max-w-md rounded-3xl border border-amber-300/30 bg-gradient-to-br from-violet-900/40 via-purple-900/30 to-amber-900/40 p-5 shadow-2xl shadow-amber-500/20 backdrop-blur-md md:p-6">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-amber-200/90">
-                      💌 사연 읽는 중
-                    </p>
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-amber-200/90">
+                        💌 사연 읽는 중
+                      </p>
+                      <span
+                        aria-label="받은 응원"
+                        className="inline-flex items-center gap-1 rounded-full bg-rose-500/30 px-2 py-0.5 text-[11px] font-bold text-rose-100 ring-1 ring-rose-400/50"
+                      >
+                        <span aria-hidden className={cheerCount > 0 ? "animate-pulse" : ""}>❤</span>
+                        {cheerCount}
+                      </span>
+                    </div>
                     {nowPlaying.story ? (
                       <blockquote className="mt-3 border-l-4 border-amber-300/50 pl-4 text-xl font-semibold leading-relaxed text-amber-100 md:text-2xl">
                         <span aria-hidden className="mr-1 text-amber-300/70">
@@ -567,6 +679,13 @@ export function MiniStage({
                         — {nowPlaying.childName}
                       </p>
                     )}
+                    <CheerButton
+                      onClick={handleCheer}
+                      pending={cheerPending}
+                      count={cheerCount}
+                      error={cheerError}
+                      tone="story"
+                    />
                   </div>
                 );
               }
@@ -578,14 +697,25 @@ export function MiniStage({
 
               return (
                 <div className="w-full max-w-md rounded-3xl border border-white/10 bg-white/[0.04] p-5 shadow-2xl shadow-black/40 backdrop-blur-md">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-amber-300/90">
-                    ♪ Now Playing
-                    {isBundle && (
-                      <span className="ml-2 rounded-full bg-amber-400/20 px-2 py-0.5 text-[9px] font-extrabold tracking-wider text-amber-200 ring-1 ring-amber-300/40">
-                        사연 {filledItems.length}건
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-amber-300/90">
+                      ♪ Now Playing
+                      {isBundle && (
+                        <span className="ml-2 rounded-full bg-amber-400/20 px-2 py-0.5 text-[9px] font-extrabold tracking-wider text-amber-200 ring-1 ring-amber-300/40">
+                          사연 {filledItems.length}건
+                        </span>
+                      )}
+                    </p>
+                    {cheerCount > 0 && (
+                      <span
+                        aria-label="받은 응원"
+                        className="inline-flex items-center gap-1 rounded-full bg-rose-500/30 px-2 py-0.5 text-[11px] font-bold text-rose-100 ring-1 ring-rose-400/50"
+                      >
+                        <span aria-hidden className="animate-pulse">❤</span>
+                        {cheerCount}
                       </span>
                     )}
-                  </p>
+                  </div>
                   <h2 className="mt-2 break-words text-2xl font-extrabold tracking-tight text-amber-100 md:text-3xl">
                     {nowPlaying.song || "(제목 미입력)"}
                   </h2>
@@ -637,6 +767,13 @@ export function MiniStage({
                       )}
                     </>
                   )}
+                  <CheerButton
+                    onClick={handleCheer}
+                    pending={cheerPending}
+                    count={cheerCount}
+                    error={cheerError}
+                    tone="song"
+                  />
                 </div>
               );
             })()
@@ -668,6 +805,11 @@ export function MiniStage({
         )}
       </div>
 
+      {/* ④.5 NOW PLAYING 과 채팅 사이 슬롯 — BroadcastQueueViewer 등 */}
+      {middleSlot && (
+        <div className="relative z-20 px-3 sm:px-4">{middleSlot}</div>
+      )}
+
       {/* ⑤ 하단 액션 — 채팅 스트림(머무름) + 리액션 + 입력바 (항상 노출) */}
       <div className="relative z-20 mt-auto flex flex-col gap-2 p-3 sm:p-4">
         {sessionId && (
@@ -698,5 +840,58 @@ export function MiniStage({
         />
       )}
     </section>
+  );
+}
+
+/** NOW PLAYING 응원 하트 버튼 — 큰 amber 카드 안에 임베드. */
+function CheerButton({
+  onClick,
+  pending,
+  count,
+  error,
+  tone,
+}: {
+  onClick: () => void;
+  pending: boolean;
+  count: number;
+  error: string | null;
+  tone: "story" | "song";
+}) {
+  const bgCls =
+    tone === "story"
+      ? "from-rose-500 to-amber-500 shadow-rose-500/40"
+      : "from-rose-500 to-orange-500 shadow-rose-500/30";
+  return (
+    <div className="mt-4">
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={pending}
+        className={`flex w-full items-center justify-between rounded-2xl bg-gradient-to-r px-4 py-2.5 text-sm font-bold text-white shadow-md transition hover:opacity-90 active:scale-[0.98] disabled:opacity-60 ${bgCls}`}
+      >
+        <span className="inline-flex items-center gap-1.5">
+          <span aria-hidden className={pending ? "animate-pulse" : ""}>
+            ❤
+          </span>
+          응원하기
+          <span className="inline-flex items-center gap-0.5 rounded-full bg-white/20 px-1.5 py-0.5 text-[10px] font-bold">
+            <AcornIcon size={9} />
+            -1
+          </span>
+        </span>
+        <span className="inline-flex items-center gap-1 text-[11px] font-normal opacity-90">
+          <span aria-hidden>❤</span>
+          {count} 받음
+        </span>
+      </button>
+      {error && (
+        <p
+          role="alert"
+          className="mt-1 rounded-lg bg-rose-500/20 px-2 py-1 text-center text-[11px] font-semibold text-rose-100"
+        >
+          {error}
+        </p>
+      )}
+    </div>
   );
 }

@@ -1,5 +1,6 @@
 import type { ControlRoomSnapshot } from "@/lib/control-room/types";
 import styles from "../control-room.module.css";
+import { AcornIcon } from "@/components/acorn-icon";
 
 type Props = {
   items: ControlRoomSnapshot["leaderboard"];
@@ -63,13 +64,8 @@ export function LeaderboardTile({ items, isTvMode }: Props) {
       </div>
 
       {list.length === 0 ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-2 py-10 text-center">
-          <div className="text-5xl" aria-hidden>
-            🌱
-          </div>
-          <div className="text-sm text-[#a8b8d0]">
-            아직 집계된 도토리가 없어요
-          </div>
+        <div className="py-1 text-[12px] text-[#a8b8d0]">
+          🌱 아직 집계된 도토리가 없어요
         </div>
       ) : (
         <ul className="flex flex-col gap-2">
@@ -135,11 +131,12 @@ export function LeaderboardTile({ items, isTvMode }: Props) {
                 </div>
 
                 <span
-                  className={`shrink-0 font-mono text-sm font-bold tabular-nums ${
+                  className={`inline-flex shrink-0 items-center gap-1 font-mono text-sm font-bold tabular-nums ${
                     isTop3 ? styles.neonGreen : "text-[#c9c9c9]"
                   }`}
                 >
-                  {it.totalAcorns.toLocaleString("ko-KR")}🌰
+                  {it.totalAcorns.toLocaleString("ko-KR")}
+                  <AcornIcon size={13} />
                 </span>
               </li>
             );

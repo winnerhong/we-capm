@@ -196,16 +196,41 @@ export function RequestsWithHearts({
     [hearted, pendingIds]
   );
 
-  // kind 별로 분리 + HIDDEN 제외
+  // 정렬 모드 — 인기순(popularity) 디폴트 또는 최신순(created_at).
+  const [sortMode, setSortMode] = useState<"popular" | "recent">("popular");
+
+  // kind 별로 분리 + HIDDEN 제외. PLAYED 는 항상 뒤로, 그 안에서 sortMode 적용.
   const { songRows, storyRows } = useMemo(() => {
     const visible = requests.filter((r) => r.status !== "HIDDEN");
     const songs = visible.filter((r) => r.kind !== "story_only");
     const stories = visible.filter((r) => r.kind === "story_only");
-    return {
-      songRows: sortByCreatedDesc(songs),
-      storyRows: sortByCreatedDesc(stories),
+    const popularityOf = (r: FmRequestRow) =>
+      (r.heart_count ?? 0) + (r.boost_amount ?? 0);
+    const innerSort =
+      sortMode === "popular"
+        ? (a: FmRequestRow, b: FmRequestRow) => {
+            const diff = popularityOf(b) - popularityOf(a);
+            if (diff !== 0) return diff;
+            return (
+              new Date(b.created_at).getTime() -
+              new Date(a.created_at).getTime()
+            );
+          }
+        : (a: FmRequestRow, b: FmRequestRow) =>
+            new Date(b.created_at).getTime() -
+            new Date(a.created_at).getTime();
+    // PLAYED 우선 뒤로 (true=1, false=0 → false 가 먼저)
+    const sortFn = (a: FmRequestRow, b: FmRequestRow) => {
+      const aPlayed = a.status === "PLAYED" ? 1 : 0;
+      const bPlayed = b.status === "PLAYED" ? 1 : 0;
+      if (aPlayed !== bPlayed) return aPlayed - bPlayed;
+      return innerSort(a, b);
     };
-  }, [requests]);
+    return {
+      songRows: [...songs].sort(sortFn),
+      storyRows: [...stories].sort(sortFn),
+    };
+  }, [requests, sortMode]);
 
   const isDark = theme === "dark";
 
@@ -216,10 +241,41 @@ export function RequestsWithHearts({
     ? requests.find((r) => r.id === boostingId) ?? null
     : null;
 
+  // 인기 점수 = heart_count + boost_amount. 보내지 않은 상태(HIDDEN/PLAYED 등) 는 제외.
+  const popularityOf = (r: FmRequestRow) =>
+    (r.heart_count ?? 0) + (r.boost_amount ?? 0);
+  const activeRequests = requests.filter(
+    (r) =>
+      r.status === "PENDING" ||
+      r.status === "APPROVED" ||
+      r.status === "QUEUED"
+  );
+  const sortedByPopularity = [...activeRequests].sort(
+    (a, b) => popularityOf(b) - popularityOf(a)
+  );
+  const topScores = sortedByPopularity.slice(0, 3).map(popularityOf);
+  const myScore = boostRow ? popularityOf(boostRow) : 0;
+  // 1순위 점프 — 현재 방송 큐 #1 의 boost_amount + 본인이 이미 #1 인지.
+  const queuedSorted = requests
+    .filter((r) => r.status === "QUEUED")
+    .sort(
+      (a, b) =>
+        (a.queue_position ?? Number.MAX_SAFE_INTEGER) -
+        (b.queue_position ?? Number.MAX_SAFE_INTEGER)
+    );
+  const queueTopBoost = queuedSorted[0]?.boost_amount ?? 0;
+  const isMyselfQueueFirst = boostRow
+    ? queuedSorted[0]?.id === boostRow.id
+    : false;
+
   const boostModalEl =
     showBoost && boostRow ? (
       <BoostModal
         requestId={boostRow.id}
+        myScore={myScore}
+        topScores={topScores}
+        queueTopBoost={queueTopBoost}
+        isMyselfQueueFirst={isMyselfQueueFirst}
         songLabel={
           boostRow.song_title
             ? `🎵 ${boostRow.song_title}${boostRow.artist ? ` — ${boostRow.artist}` : ""}`
@@ -261,6 +317,8 @@ export function RequestsWithHearts({
           flashKey={flashKey}
           showBoost={showBoost}
           onBoost={setBoostingId}
+          sortMode={sortMode}
+          onSortChange={setSortMode}
         />
         {boostModalEl}
       </>
@@ -282,6 +340,8 @@ export function RequestsWithHearts({
           flashKey={flashKey}
           showBoost={showBoost}
           onBoost={setBoostingId}
+          sortMode={sortMode}
+          onSortChange={setSortMode}
         />
         {boostModalEl}
       </>
@@ -332,6 +392,8 @@ export function RequestsWithHearts({
           flashKey={flashKey}
           showBoost={showBoost}
           onBoost={setBoostingId}
+          sortMode={sortMode}
+          onSortChange={setSortMode}
         />
       )}
 
@@ -347,6 +409,8 @@ export function RequestsWithHearts({
           flashKey={flashKey}
           showBoost={showBoost}
           onBoost={setBoostingId}
+          sortMode={sortMode}
+          onSortChange={setSortMode}
         />
       )}
       {boostModalEl}
@@ -371,7 +435,62 @@ type SectionProps = {
   showBoost?: boolean;
   /** boost 모달 트리거 — request id 전달. */
   onBoost?: (requestId: string) => void;
+  /** 인기순 정렬 시 메달/순위 prefix 노출. */
+  sortMode?: "popular" | "recent";
+  /** 정렬 토글 핸들러 — 헤더 옆 토글 버튼. 없으면 토글 미노출. */
+  onSortChange?: (mode: "popular" | "recent") => void;
 };
+
+/**
+ * TOP 3 메달 + 4·5등 숫자 prefix. 6위부터는 null.
+ * sortMode === "popular" 일 때만 의미 있음.
+ */
+function rankPrefix(idx: number): { kind: "medal" | "num" | null; label: string } {
+  if (idx === 0) return { kind: "medal", label: "🥇" };
+  if (idx === 1) return { kind: "medal", label: "🥈" };
+  if (idx === 2) return { kind: "medal", label: "🥉" };
+  if (idx === 3 || idx === 4) return { kind: "num", label: String(idx + 1) };
+  return { kind: null, label: "" };
+}
+
+/** 정렬 토글 버튼 — 헤더 옆에 inline. */
+function SortToggle({
+  mode,
+  onChange,
+  isDark,
+}: {
+  mode: "popular" | "recent";
+  onChange: (m: "popular" | "recent") => void;
+  isDark: boolean;
+}) {
+  const baseBtn = isDark
+    ? "px-2 py-0.5 rounded-full text-[10px] font-bold transition"
+    : "px-2 py-0.5 rounded-full text-[10px] font-bold transition";
+  const activeCls = isDark
+    ? "bg-amber-400 text-[#0B1538]"
+    : "bg-violet-600 text-white";
+  const inactiveCls = isDark
+    ? "bg-white/10 text-white/70 hover:bg-white/15"
+    : "bg-[#F5F1E8] text-[#6B6560] hover:bg-violet-100";
+  return (
+    <div className="inline-flex items-center gap-1">
+      <button
+        type="button"
+        onClick={() => onChange("popular")}
+        className={`${baseBtn} ${mode === "popular" ? activeCls : inactiveCls}`}
+      >
+        🔥 인기
+      </button>
+      <button
+        type="button"
+        onClick={() => onChange("recent")}
+        className={`${baseBtn} ${mode === "recent" ? activeCls : inactiveCls}`}
+      >
+        🆕 최신
+      </button>
+    </div>
+  );
+}
 
 /**
  * boost 뱃지 + "끌어올리기" 버튼.
@@ -438,12 +557,13 @@ function SongRequestSection({
   flashKey = 0,
   showBoost = false,
   onBoost,
+  sortMode = "popular",
+  onSortChange,
 }: SectionProps) {
   if (isDark) {
     return (
       <section
-        key={flashKey}
-        className={`relative isolate rounded-2xl border-l-[5px] border-l-amber-300/70 border-y border-y-white/10 border-r border-r-white/10 bg-[#101935] p-4 text-white shadow-xl shadow-amber-500/10 transition-shadow duration-200 ease-out hover:-translate-y-0.5 hover:shadow-2xl hover:shadow-amber-500/20 ${
+        className={`relative isolate rounded-2xl border-l-[5px] border-l-amber-300/70 border-y border-y-white/10 border-r border-r-white/10 bg-[#101935] p-4 text-white shadow-md shadow-amber-500/10 ${
           flashKey > 0 ? "flash-glow-amber" : ""
         }`}
       >
@@ -452,8 +572,11 @@ function SongRequestSection({
           aria-hidden
           className="pointer-events-none absolute -inset-1 -z-10 rounded-3xl bg-amber-500/[0.06] blur-2xl"
         />
-        <header className="flex items-center justify-between gap-2">
+        <header className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="text-sm font-bold text-amber-100">{title}</h3>
+          {onSortChange && (
+            <SortToggle mode={sortMode} onChange={onSortChange} isDark={true} />
+          )}
         </header>
 
         {rows.length === 0 ? (
@@ -462,27 +585,34 @@ function SongRequestSection({
           </p>
         ) : (
           <ul
-            className="mt-3 max-h-[420px] space-y-2 overflow-y-auto pr-1
-              [&::-webkit-scrollbar]:w-1.5
-              [&::-webkit-scrollbar-track]:bg-transparent
-              [&::-webkit-scrollbar-thumb]:rounded-full
-              [&::-webkit-scrollbar-thumb]:bg-white/20"
+            className="scroll-dark mt-3 max-h-[420px] space-y-2 overflow-y-auto pr-1"
           >
-            {rows.map((r) => {
+            {rows.map((r, idx) => {
               const isHearted = !!hearted[r.id];
               const isPending = !!pendingIds[r.id];
+              const rank = sortMode === "popular" ? rankPrefix(idx) : { kind: null, label: "" };
               return (
                 <li
                   key={r.id}
                   className="rounded-2xl border border-l-4 border-l-amber-300/50 border-y-white/10 border-r-white/10 bg-[#1B2552] p-3"
                 >
                   <div className="flex items-start gap-3">
+                    {rank.kind === "medal" && (
+                      <span aria-label={`${idx + 1}위`} className="flex h-7 w-7 flex-shrink-0 items-center justify-center text-base">
+                        {rank.label}
+                      </span>
+                    )}
+                    {rank.kind === "num" && (
+                      <span aria-label={`${idx + 1}위`} className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-amber-400/20 text-[11px] font-bold text-amber-200">
+                        {rank.label}
+                      </span>
+                    )}
                     <div className="min-w-0 flex-1">
                       {/* 상태 뱃지 */}
                       <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
                         {r.status === "PLAYED" && (
-                          <span className="rounded-full bg-emerald-400/20 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-200">
-                            방송됨
+                          <span className="rounded-full bg-emerald-500/30 px-2 py-0.5 text-[10px] font-bold text-emerald-100 ring-1 ring-emerald-400/50">
+                            ✓ 방송된 곡입니다
                           </span>
                         )}
                         {r.status === "APPROVED" && (
@@ -536,7 +666,7 @@ function SongRequestSection({
                     <HeartButton
                       isHearted={isHearted}
                       isPending={isPending}
-                      count={r.heart_count ?? 0}
+                      count={(r.heart_count ?? 0) + (r.boost_amount ?? 0)}
                       tone="dark"
                       onClick={() => handleHeart(r.id)}
                     />
@@ -581,7 +711,7 @@ function SongRequestSection({
                     <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
                       {r.status === "PLAYED" && (
                         <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">
-                          방송됨
+                          ✓ 방송된 곡입니다
                         </span>
                       )}
                       {r.status === "APPROVED" && (
@@ -659,12 +789,13 @@ function StorySection({
   flashKey = 0,
   showBoost = false,
   onBoost,
+  sortMode = "popular",
+  onSortChange,
 }: SectionProps) {
   if (isDark) {
     return (
       <section
-        key={flashKey}
-        className={`relative isolate rounded-2xl border-l-[5px] border-l-indigo-300/70 border-y border-y-white/10 border-r border-r-white/10 bg-[#1a1638] p-4 text-white shadow-xl shadow-indigo-500/10 transition-shadow duration-200 ease-out hover:-translate-y-0.5 hover:shadow-2xl hover:shadow-indigo-500/20 ${
+        className={`relative isolate rounded-2xl border-l-[5px] border-l-indigo-300/70 border-y border-y-white/10 border-r border-r-white/10 bg-[#1a1638] p-4 text-white shadow-md shadow-indigo-500/10 ${
           flashKey > 0 ? "flash-glow-indigo" : ""
         }`}
       >
@@ -673,8 +804,11 @@ function StorySection({
           aria-hidden
           className="pointer-events-none absolute -inset-1 -z-10 rounded-3xl bg-indigo-500/[0.06] blur-2xl"
         />
-        <header className="flex items-center justify-between gap-2">
+        <header className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="text-sm font-bold text-indigo-100">{title}</h3>
+          {onSortChange && (
+            <SortToggle mode={sortMode} onChange={onSortChange} isDark={true} />
+          )}
         </header>
 
         {rows.length === 0 ? (
@@ -683,27 +817,34 @@ function StorySection({
           </p>
         ) : (
           <ul
-            className="mt-3 max-h-[420px] space-y-2 overflow-y-auto pr-1
-              [&::-webkit-scrollbar]:w-1.5
-              [&::-webkit-scrollbar-track]:bg-transparent
-              [&::-webkit-scrollbar-thumb]:rounded-full
-              [&::-webkit-scrollbar-thumb]:bg-white/20"
+            className="scroll-dark mt-3 max-h-[420px] space-y-2 overflow-y-auto pr-1"
           >
-            {rows.map((r) => {
+            {rows.map((r, idx) => {
               const isHearted = !!hearted[r.id];
               const isPending = !!pendingIds[r.id];
+              const rank = sortMode === "popular" ? rankPrefix(idx) : { kind: null, label: "" };
               return (
                 <li
                   key={r.id}
                   className="rounded-2xl border border-l-4 border-l-violet-300/50 border-y-white/10 border-r-white/10 bg-[#251D55] p-3"
                 >
                   <div className="flex items-start gap-3">
+                    {rank.kind === "medal" && (
+                      <span aria-label={`${idx + 1}위`} className="flex h-7 w-7 flex-shrink-0 items-center justify-center text-base">
+                        {rank.label}
+                      </span>
+                    )}
+                    {rank.kind === "num" && (
+                      <span aria-label={`${idx + 1}위`} className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-violet-400/20 text-[11px] font-bold text-violet-200">
+                        {rank.label}
+                      </span>
+                    )}
                     <div className="min-w-0 flex-1">
                       {/* 상태 뱃지 */}
                       <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
                         {r.status === "PLAYED" && (
-                          <span className="rounded-full bg-emerald-400/20 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-200">
-                            방송됨
+                          <span className="rounded-full bg-emerald-500/30 px-2 py-0.5 text-[10px] font-bold text-emerald-100 ring-1 ring-emerald-400/50">
+                            ✓ 방송된 곡입니다
                           </span>
                         )}
                         {r.status === "APPROVED" && (
@@ -726,9 +867,11 @@ function StorySection({
                         )}
                       </div>
 
-                      <blockquote className="border-l-2 border-violet-300/60 pl-3 text-[13px] leading-relaxed text-white/95">
-                        {r.story?.trim() || "(사연 없음)"}
-                      </blockquote>
+                      {r.story?.trim() && (
+                        <blockquote className="border-l-2 border-violet-300/60 pl-3 text-[13px] leading-relaxed text-white/95">
+                          “{r.story.trim()}”
+                        </blockquote>
+                      )}
                       <p className="mt-1.5 text-[10px] text-amber-200/80">
                         — {r.is_anonymous
                           ? anonLabelFromUserId(r.user_id)
@@ -745,7 +888,7 @@ function StorySection({
                     <HeartButton
                       isHearted={isHearted}
                       isPending={isPending}
-                      count={r.heart_count ?? 0}
+                      count={(r.heart_count ?? 0) + (r.boost_amount ?? 0)}
                       tone="dark"
                       onClick={() => handleHeart(r.id)}
                     />
@@ -790,7 +933,7 @@ function StorySection({
                     <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
                       {r.status === "PLAYED" && (
                         <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">
-                          방송됨
+                          ✓ 방송된 곡입니다
                         </span>
                       )}
                       {r.status === "APPROVED" && (

@@ -691,8 +691,8 @@ export function UsersTable({ orgId, rows, todayIso, events }: Props) {
           <option value="attendance:asc">📋 출석 (출석→결석)</option>
           <option value="class:asc">🐰 반 (가나다)</option>
           <option value="name:asc">🎒 원생명 (가나다)</option>
-          <option value="acorns:desc">🌰 도토리 많은순</option>
-          <option value="acorns:asc">🌰 도토리 적은순</option>
+          <option value="acorns:desc">도토리 많은순</option>
+          <option value="acorns:asc">도토리 적은순</option>
           <option value="recent:desc">📅 최근 접속 (최신순)</option>
           <option value="recent:asc">📅 최근 접속 (오래된순)</option>
           <option value="status:asc">상태 (활성→비활성)</option>

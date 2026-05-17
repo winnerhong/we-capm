@@ -2,19 +2,19 @@ import type { ControlRoomSnapshot } from "@/lib/control-room/types";
 import styles from "./control-room.module.css";
 import { HeaderBar } from "./widgets/header-bar";
 import { ParticipantsTile } from "./widgets/participants-tile";
-// FmTile · ChatTile 제거됨 — 토리FM 라이브 스튜디오가 페이지 하단에
-// 풀콘솔로 임베드되어 FM 세션·신청곡·채팅 모두 거기서 보임.
-import { PendingTile } from "./widgets/pending-tile";
+// FmTile · ChatTile · PendingTile · MissionProgressTile · LeaderboardTile 제거됨.
+//  - 토리FM 라이브 스튜디오가 페이지 하단 풀콘솔로 임베드 → FM/채팅 중복 회피
+//  - 검토 대기는 사진월/짝꿍 세션의 인라인 검수 모달로 흡수
+//  - 미션별 진행률은 가족 매트릭스 우측 평시 사이드/미션 헤더 hover 로 노출
+//  - 순위 TOP 10 은 가족 매트릭스 각 행 prefix 의 🥇🥈🥉/숫자 배지로 흡수
 import { StampsTile } from "./widgets/stamps-tile";
 import { AcornsTile } from "./widgets/acorns-tile";
-import { ActivityFeedTile } from "./widgets/activity-feed-tile";
-import { LeaderboardTile } from "./widgets/leaderboard-tile";
-import { BroadcastTile } from "./widgets/broadcast-tile";
 import { HeatmapTile } from "./widgets/heatmap-tile";
 import { PhotoWallTile } from "./widgets/photo-wall-tile";
-import { MissionProgressTile } from "./widgets/mission-progress-tile";
 import { FamilyGridTile } from "./widgets/family-grid-tile";
 import { LiveAttemptsTile } from "./widgets/live-attempts-tile";
+import { CoopSessionsTile } from "./widgets/coop-sessions-tile";
+import { PhotoCoopRow } from "./widgets/photo-coop-row";
 import { FmStudioEmbed } from "./widgets/fm-studio-embed";
 
 type Props = {
@@ -57,59 +57,37 @@ export async function ControlRoomGrid({ snapshot, orgId, isTvMode }: Props) {
           <LiveAttemptsTile live={snapshot.live} isTvMode={isTvMode} />
         </div>
 
-        {/* row 2.5: Phase 1 관제 — 🎯 미션별 진행률 + 📸 사진 월 */}
-        <div
-          className={`grid grid-cols-1 md:grid-cols-2 ${
-            isTvMode ? "gap-[1.25em]" : "gap-3"
-          }`}
-        >
-          <MissionProgressTile
-            items={snapshot.missionProgress}
-            isTvMode={isTvMode}
-          />
-          <PhotoWallTile items={snapshot.photoWall} isTvMode={isTvMode} />
-        </div>
-
-        {/* row 2.7: Phase 1 관제 — 👥 가족 × 미션 매트릭스 (가로 풀폭) */}
+        {/* row 2.5: 👥 가족 × 미션 매트릭스 (가로 풀폭) — 포토월/짝꿍세션보다 위 */}
         <div className="grid grid-cols-1">
           <FamilyGridTile
             grid={snapshot.familyGrid}
             photos={snapshot.photoWall}
+            missionProgress={snapshot.missionProgress}
             isTvMode={isTvMode}
           />
         </div>
 
-        {/* row 3: Activity Feed + Leaderboard — 모바일 1열, md 이상 2열 */}
-        <div
-          className={`grid grid-cols-1 md:grid-cols-2 ${
-            isTvMode ? "gap-[1.25em]" : "gap-3"
-          }`}
-        >
-          <ActivityFeedTile
-            items={snapshot.activityFeed}
-            isTvMode={isTvMode}
-          />
-          <LeaderboardTile
-            items={snapshot.leaderboard}
-            isTvMode={isTvMode}
-          />
-        </div>
+        {/* row 2.7: 📸 가족 사진 월 + 👫 짝꿍 세션 — 가로 반반.
+            짝꿍 자연 height 를 ResizeObserver 로 측정 → 포토월 wrapper 에 cap.
+            결과: 포토월은 짝꿍 "다음" 페이지네이션까지의 높이 안에서 내부 스크롤. */}
+        <PhotoCoopRow
+          isTvMode={isTvMode}
+          photoWall={
+            <PhotoWallTile items={snapshot.photoWall} isTvMode={isTvMode} />
+          }
+          coopSessions={
+            <CoopSessionsTile
+              items={snapshot.coopSessions}
+              isTvMode={isTvMode}
+            />
+          }
+        />
 
-        {/* row 4: Pending — 채팅은 FM 임베드와 중복이라 제거. Pending 만 풀폭. */}
-        <div className="grid grid-cols-1">
-          <PendingTile snapshot={snapshot} orgId={orgId} isTvMode={isTvMode} />
-        </div>
+        {/* row 3 제거됨 — 순위는 가족 매트릭스 각 행 prefix 의 🥇🥈🥉/숫자 배지로 흡수.
+            미션별 진행률은 가족 매트릭스 우측 평시 사이드/미션 헤더 hover 로 노출. */}
 
-        {/* row 5: Broadcast(12, fullwidth) — 핑크 네온 액션 강조 */}
-        <div className="grid grid-cols-1">
-          <BroadcastTile
-            broadcast={snapshot.broadcast}
-            orgId={orgId}
-            isTvMode={isTvMode}
-          />
-        </div>
-
-        {/* row 6: Heatmap(12, fullwidth) — 24h 시간대별 활동량 */}
+        {/* row 6: Heatmap(12, fullwidth) — 24h 시간대별 활동량
+            (돌발 미션 BroadcastTile 은 헤더 우측 작은 버튼으로 이동) */}
         <div className="grid grid-cols-1">
           <HeatmapTile heatmap={snapshot.heatmap} isTvMode={isTvMode} />
         </div>

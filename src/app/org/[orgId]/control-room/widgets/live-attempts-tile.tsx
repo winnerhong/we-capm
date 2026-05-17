@@ -43,19 +43,16 @@ export function LiveAttemptsTile({ live, isTvMode }: Props) {
       </div>
 
       {list.length === 0 ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-2 py-10 text-center">
-          <div className="text-5xl" aria-hidden>
-            🌿
-          </div>
-          <div className="text-sm text-[#a8b8d0]">
-            지금 수행 중인 미션이 없어요
-          </div>
-          <div className="text-[10px] text-[#7a8aa8]">
+        <div className="py-1 text-[12px] text-[#a8b8d0]">
+          🌿 지금 수행 중인 미션이 없어요
+          <span className="ml-1 text-[10px] text-[#7a8aa8]">
             (참가자가 미션 페이지를 열면 3분 이내 표시)
-          </div>
+          </span>
         </div>
       ) : (
-        <ul className="flex flex-col gap-1.5">
+        <ul
+          className="scroll-dark flex max-h-[420px] flex-col gap-1.5 overflow-y-auto pr-1"
+        >
           {list.map((a) => (
             <li
               key={a.attemptId}

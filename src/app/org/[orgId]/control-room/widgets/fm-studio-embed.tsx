@@ -61,7 +61,7 @@ export async function FmStudioEmbed({ orgId }: { orgId: string }) {
     liveSession.current_queue_id
       ? loadRadioQueueItemWithSubmission(liveSession.current_queue_id)
       : Promise.resolve(null),
-    loadChatMessages(liveSession.id, 50),
+    loadChatMessages(liveSession.id, 200),
     loadPendingRequests(liveSession.id),
     loadQueuedRequests(liveSession.id),
     loadPlayingGroup(liveSession.id),

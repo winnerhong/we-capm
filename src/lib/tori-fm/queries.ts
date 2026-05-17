@@ -266,7 +266,10 @@ export async function loadPlayingRequest(
 }
 
 /**
- * 세션 내 인기 신청곡 TOP — heart_count 내림차순, PENDING/APPROVED/QUEUED만 (방송됨 제외).
+ * 세션 내 인기 신청곡 TOP — popularity = heart_count + boost_amount 내림차순.
+ *  - PENDING/APPROVED/QUEUED만 (방송됨 제외)
+ *  - DB 컬럼 합산 정렬은 RPC 없이 어려워서 전체 조회 후 클라이언트 정렬.
+ *    한 세션 신청 수는 보통 수백 미만이라 부하 미미.
  */
 export async function loadTopHeartedRequests(
   sessionId: string,
@@ -278,24 +281,21 @@ export async function loadTopHeartedRequests(
     supabase.from("tori_fm_requests" as never) as unknown as {
       select: (c: string) => {
         eq: (k: string, v: string) => {
-          in: (k: string, v: string[]) => {
-            order: (
-              c: string,
-              o: { ascending: boolean }
-            ) => {
-              limit: (n: number) => Promise<SbResp<FmRequestRow>>;
-            };
-          };
+          in: (k: string, v: string[]) => Promise<SbResp<FmRequestRow>>;
         };
       };
     }
   )
     .select("*")
     .eq("session_id", sessionId)
-    .in("status", ["PENDING", "APPROVED", "QUEUED"])
-    .order("heart_count", { ascending: false })
-    .limit(Math.max(1, Math.min(limit, 20)))) as SbResp<FmRequestRow>;
-  return (resp.data ?? []).filter((r) => r.heart_count > 0);
+    .in("status", ["PENDING", "APPROVED", "QUEUED"])) as SbResp<FmRequestRow>;
+
+  const popularity = (r: FmRequestRow) =>
+    (r.heart_count ?? 0) + (r.boost_amount ?? 0);
+  return (resp.data ?? [])
+    .filter((r) => popularity(r) > 0)
+    .sort((a, b) => popularity(b) - popularity(a))
+    .slice(0, Math.max(1, Math.min(limit, 20)));
 }
 
 /* -------------------------------------------------------------------------- */

@@ -7,6 +7,7 @@ import type { ReviewSubmissionItem } from "@/lib/missions/review-queries";
 import type { ReviewTab } from "./review-layout";
 import { ReviewActions } from "./review-actions";
 import { ReviewPhotoThumb } from "./review-photo-thumb";
+import { AcornIcon } from "@/components/acorn-icon";
 import {
   formatAgo,
   waitTone,
@@ -109,7 +110,7 @@ export function ReviewItemCard({ item, tab }: Props) {
               </span>
             )}
             <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#2D5A3D]">
-              <span aria-hidden>🌰</span>
+              <AcornIcon size={11} />
               <span>
                 기본 {item.defaultAcorns}
                 {tab === "approved" && item.awardedAcorns !== null && (
@@ -213,7 +214,7 @@ export function ReviewItemCard({ item, tab }: Props) {
               <>
                 {" · +"}
                 <span className="font-bold">{item.awardedAcorns}</span>
-                <span aria-hidden>🌰</span>
+                <AcornIcon size={11} />
               </>
             )}
             {item.reviewedAt && (

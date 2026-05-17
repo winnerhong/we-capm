@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import type { OrgMemberDetail } from "@/lib/org-members/queries";
+import { AcornIcon } from "@/components/acorn-icon";
 
 type Props = {
   userId: string;
@@ -185,8 +186,9 @@ export function MemberDetailDrawer({
                   </div>
                   <div className="rounded-lg bg-amber-50 p-2">
                     <p className="text-[10px] text-amber-700">도토리</p>
-                    <p className="text-[11px] font-bold tabular-nums text-amber-800">
-                      🌰 {detail.acornBalance.toLocaleString("ko-KR")}
+                    <p className="inline-flex items-center gap-1 text-[11px] font-bold tabular-nums text-amber-800">
+                      <AcornIcon size={11} />{" "}
+                      {detail.acornBalance.toLocaleString("ko-KR")}
                     </p>
                   </div>
                 </div>
@@ -304,8 +306,9 @@ export function MemberDetailDrawer({
                             {s.missionTitle}
                           </span>
                           {s.awardedAcorns != null && s.awardedAcorns > 0 && (
-                            <span className="text-[10px] font-bold text-amber-700">
-                              +{s.awardedAcorns}🌰
+                            <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-amber-700">
+                              +{s.awardedAcorns}
+                              <AcornIcon size={10} />
                             </span>
                           )}
                           <span
@@ -325,8 +328,9 @@ export function MemberDetailDrawer({
 
               {/* 도토리 거래 */}
               <section className="rounded-2xl border border-[#D4E4BC] bg-white p-4">
-                <h3 className="text-xs font-bold text-[#2D5A3D]">
-                  🌰 도토리 거래 (최근 {detail.recentAcornTx.length}건)
+                <h3 className="inline-flex items-center gap-1 text-xs font-bold text-[#2D5A3D]">
+                  <AcornIcon size={12} /> 도토리 거래 (최근{" "}
+                  {detail.recentAcornTx.length}건)
                 </h3>
                 {detail.recentAcornTx.length === 0 ? (
                   <p className="mt-2 text-[11px] text-[#8B7F75]">

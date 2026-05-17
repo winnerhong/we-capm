@@ -8,6 +8,7 @@
 //  - ←/→ 이전/다음 네비게이션, ESC 닫기
 
 import {
+  memo,
   useCallback,
   useEffect,
   useMemo,
@@ -19,6 +20,7 @@ import {
   approveSubmissionAction,
   rejectSubmissionAction,
 } from "@/lib/missions/review-actions";
+import { AcornIcon } from "@/components/acorn-icon";
 import { loadPendingReviewsForControlRoomAction } from "../actions";
 import { useLightbox, type LightboxItem } from "@/components/photo-lightbox";
 import type { ReviewSubmissionItem } from "@/lib/missions/review-queries";
@@ -89,7 +91,7 @@ export function InlineReviewModal({
   const [currentIdx, setCurrentIdx] = useState(0);
   const [actionMsg, setActionMsg] = useState<string | null>(null);
   const [rejectOpen, setRejectOpen] = useState(false);
-  const [rejectReason, setRejectReason] = useState("");
+  // rejectReason 은 RejectReasonForm 내부 로컬 state — 매 키 입력에 부모 재렌더 방지.
   const [isPending, startTransition] = useTransition();
 
   // 마운트 시 큐 로드
@@ -129,7 +131,6 @@ export function InlineReviewModal({
       if (e.key === "Escape") {
         if (rejectOpen) {
           setRejectOpen(false);
-          setRejectReason("");
         } else {
           onClose();
         }
@@ -179,7 +180,6 @@ export function InlineReviewModal({
     );
     setActionMsg(null);
     setRejectOpen(false);
-    setRejectReason("");
   }, [currentIdx, queue.length]);
 
   const handleApprove = useCallback(() => {
@@ -196,24 +196,28 @@ export function InlineReviewModal({
     });
   }, [current, isPending, removeCurrentAndAdvance, router]);
 
-  const handleReject = useCallback(() => {
-    if (!current || isPending) return;
-    const reason = rejectReason.trim();
-    if (!reason) {
-      setActionMsg("반려 사유를 입력해 주세요");
-      return;
-    }
-    setActionMsg(null);
-    startTransition(async () => {
-      const result = await rejectSubmissionAction(current.id, reason);
-      if (result.ok) {
-        removeCurrentAndAdvance();
-        router.refresh();
-      } else {
-        setActionMsg(result.error);
+  // reason 은 RejectReasonForm 의 로컬 state 에서 전달됨.
+  const handleReject = useCallback(
+    (reasonRaw: string) => {
+      if (!current || isPending) return;
+      const reason = reasonRaw.trim();
+      if (!reason) {
+        setActionMsg("반려 사유를 입력해 주세요");
+        return;
       }
-    });
-  }, [current, isPending, rejectReason, removeCurrentAndAdvance, router]);
+      setActionMsg(null);
+      startTransition(async () => {
+        const result = await rejectSubmissionAction(current.id, reason);
+        if (result.ok) {
+          removeCurrentAndAdvance();
+          router.refresh();
+        } else {
+          setActionMsg(result.error);
+        }
+      });
+    },
+    [current, isPending, removeCurrentAndAdvance, router]
+  );
 
   const now = Date.now();
 
@@ -308,8 +312,8 @@ export function InlineReviewModal({
                         📚 {current.packName}
                       </span>
                     )}
-                    <span className="text-[11px] text-[#8B7F75]">
-                      🌰 기본 {current.defaultAcorns}
+                    <span className="inline-flex items-center gap-1 text-[11px] text-[#8B7F75]">
+                      <AcornIcon size={11} /> 기본 {current.defaultAcorns}
                     </span>
                   </div>
                 </div>
@@ -395,46 +399,15 @@ export function InlineReviewModal({
                     </button>
                   </div>
                 ) : (
-                  <div className="rounded-xl border border-rose-200 bg-rose-50/60 p-3">
-                    <label
-                      htmlFor={`inline-reject-${current.id}`}
-                      className="block text-[11px] font-semibold text-rose-900"
-                    >
-                      반려 사유를 적어 주세요
-                    </label>
-                    <textarea
-                      id={`inline-reject-${current.id}`}
-                      value={rejectReason}
-                      onChange={(e) => setRejectReason(e.target.value)}
-                      rows={3}
-                      disabled={isPending}
-                      autoFocus
-                      placeholder="예: 사진이 흐려요 · 미션과 달라요 · 다시 시도해 주세요"
-                      className="mt-2 w-full rounded-xl border border-rose-200 bg-white px-3 py-2 text-xs text-[#2C2C2C] focus:border-rose-500 focus:outline-none focus:ring-2 focus:ring-rose-500/30 disabled:opacity-50"
-                    />
-                    <div className="mt-2 flex justify-end gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setRejectOpen(false);
-                          setRejectReason("");
-                          setActionMsg(null);
-                        }}
-                        disabled={isPending}
-                        className="rounded-xl border border-[#D4E4BC] bg-white px-3 py-1.5 text-xs font-semibold text-[#2D5A3D] disabled:opacity-50"
-                      >
-                        취소
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleReject}
-                        disabled={isPending || !rejectReason.trim()}
-                        className="rounded-xl bg-rose-600 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        {isPending ? "처리 중..." : "반려 확정"}
-                      </button>
-                    </div>
-                  </div>
+                  <RejectReasonForm
+                    submissionId={current.id}
+                    isPending={isPending}
+                    onCancel={() => {
+                      setRejectOpen(false);
+                      setActionMsg(null);
+                    }}
+                    onConfirm={handleReject}
+                  />
                 )}
 
                 {actionMsg && (
@@ -457,3 +430,63 @@ export function InlineReviewModal({
     </div>
   );
 }
+
+/* -------------------------------------------------------------------------- */
+/* RejectReasonForm — textarea 입력 격리                                       */
+/*  부모 InlineReviewModal 의 state 를 건드리지 않도록 로컬 state.              */
+/*  submissionId 가 바뀌면 컴포넌트가 새로 마운트되어 자동 초기화.              */
+/* -------------------------------------------------------------------------- */
+
+const RejectReasonForm = memo(function RejectReasonForm({
+  submissionId,
+  isPending,
+  onCancel,
+  onConfirm,
+}: {
+  submissionId: string;
+  isPending: boolean;
+  onCancel: () => void;
+  onConfirm: (reason: string) => void;
+}) {
+  const [reason, setReason] = useState("");
+  const trimmed = reason.trim();
+
+  return (
+    <div className="rounded-xl border border-rose-200 bg-rose-50/60 p-3">
+      <label
+        htmlFor={`inline-reject-${submissionId}`}
+        className="block text-[11px] font-semibold text-rose-900"
+      >
+        반려 사유를 적어 주세요
+      </label>
+      <textarea
+        id={`inline-reject-${submissionId}`}
+        value={reason}
+        onChange={(e) => setReason(e.target.value)}
+        rows={3}
+        disabled={isPending}
+        autoFocus
+        placeholder="예: 사진이 흐려요 · 미션과 달라요 · 다시 시도해 주세요"
+        className="mt-2 w-full rounded-xl border border-rose-200 bg-white px-3 py-2 text-xs text-[#2C2C2C] focus:border-rose-500 focus:outline-none focus:ring-2 focus:ring-rose-500/30 disabled:opacity-50"
+      />
+      <div className="mt-2 flex justify-end gap-2">
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={isPending}
+          className="rounded-xl border border-[#D4E4BC] bg-white px-3 py-1.5 text-xs font-semibold text-[#2D5A3D] disabled:opacity-50"
+        >
+          취소
+        </button>
+        <button
+          type="button"
+          onClick={() => onConfirm(reason)}
+          disabled={isPending || !trimmed}
+          className="rounded-xl bg-rose-600 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {isPending ? "처리 중..." : "반려 확정"}
+        </button>
+      </div>
+    </div>
+  );
+});

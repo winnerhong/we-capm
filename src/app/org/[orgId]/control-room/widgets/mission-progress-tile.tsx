@@ -40,17 +40,16 @@ export function MissionProgressTile({ items, isTvMode }: Props) {
       </div>
 
       {sorted.length === 0 ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-2 py-10 text-center">
-          <div className="text-5xl" aria-hidden>
-            🌱
-          </div>
-          <div className="text-sm text-[#a8b8d0]">
-            활성 미션이 없어요
-          </div>
+        <div className="py-1 text-[12px] text-[#a8b8d0]">
+          🌱 활성 미션이 없어요
         </div>
       ) : (
-        <ul className="flex flex-col gap-2">
-          {sorted.slice(0, isTvMode ? 12 : 8).map((m) => {
+        <ul
+          className={`scroll-dark flex flex-col gap-2 overflow-y-auto pr-1 ${
+            isTvMode ? "max-h-none" : "max-h-[420px]"
+          }`}
+        >
+          {sorted.map((m) => {
             const kindLabel = KIND_LABEL[m.kind] ?? m.kind;
             const notStarted = Math.max(
               0,

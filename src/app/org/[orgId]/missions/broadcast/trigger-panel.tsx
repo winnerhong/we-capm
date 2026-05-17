@@ -6,9 +6,14 @@ import {
   triggerBroadcastAction,
   cancelBroadcastAction,
   createSampleBroadcastMissionAction,
+  deleteBroadcastMissionAction,
 } from "@/lib/missions/broadcast-actions";
 import type { BroadcastTargetScope } from "@/lib/missions/types";
 import { AcornIcon } from "@/components/acorn-icon";
+import {
+  MissionEditorModal,
+  type MissionEditorInitial,
+} from "./mission-editor-modal";
 
 type TargetScope = Exclude<BroadcastTargetScope, "ALL">; // ORG | EVENT
 
@@ -53,6 +58,11 @@ export function BroadcastTriggerPanel({ missions, activeEvents }: Props) {
     kind: "ok" | "error";
     text: string;
   } | null>(null);
+  // 생성/수정 모달 — null=닫힘, "new"=신규, MissionEditorInitial=수정 prefill
+  const [editor, setEditor] = useState<
+    "new" | MissionEditorInitial | null
+  >(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const openMission = missions.find((m) => m.id === openId) ?? null;
 
@@ -86,6 +96,33 @@ export function BroadcastTriggerPanel({ missions, activeEvents }: Props) {
               ? e.message
               : "발동에 실패했어요. 잠시 후 다시 시도해 주세요.",
         });
+      }
+    });
+  }
+
+  function onDelete(m: BroadcastMissionSummary) {
+    if (
+      !window.confirm(
+        `정말 "${m.title}" 돌발 미션을 삭제할까요?\n\n` +
+          `발동 기록이 있으면 삭제 대신 비활성(archive)으로 전환됩니다.`
+      )
+    ) {
+      return;
+    }
+    setMsg(null);
+    setDeletingId(m.id);
+    startTransition(async () => {
+      try {
+        await deleteBroadcastMissionAction(m.id);
+        setMsg({ kind: "ok", text: "삭제했어요." });
+        router.refresh();
+      } catch (e) {
+        setMsg({
+          kind: "error",
+          text: e instanceof Error ? e.message : "삭제 실패",
+        });
+      } finally {
+        setDeletingId(null);
       }
     });
   }
@@ -147,11 +184,28 @@ export function BroadcastTriggerPanel({ missions, activeEvents }: Props) {
             >
               ⚡ {isPending ? "만드는 중…" : "샘플 돌발 미션 만들기"}
             </button>
+            <button
+              type="button"
+              onClick={() => {
+                setMsg(null);
+                setEditor("new");
+              }}
+              disabled={isPending}
+              className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl border border-[#D4E4BC] bg-white px-4 py-2.5 text-sm font-bold text-[#2D5A3D] shadow-sm transition hover:bg-[#E8F0E4] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              ✨ 직접 새로 만들기
+            </button>
           </div>
           <p className="mt-2 text-[11px] text-[#8B7F75]">
             샘플은 언제든 카탈로그에서 내용 수정 가능해요.
           </p>
         </div>
+        {editor && (
+          <MissionEditorModal
+            initial={editor === "new" ? null : editor}
+            onClose={() => setEditor(null)}
+          />
+        )}
       </div>
     );
   }
@@ -170,6 +224,19 @@ export function BroadcastTriggerPanel({ missions, activeEvents }: Props) {
           {msg.text}
         </div>
       )}
+
+      <div className="flex items-center justify-end">
+        <button
+          type="button"
+          onClick={() => {
+            setMsg(null);
+            setEditor("new");
+          }}
+          className="inline-flex items-center gap-1 rounded-xl border border-[#D4E4BC] bg-white px-3 py-1.5 text-xs font-bold text-[#2D5A3D] shadow-sm transition hover:bg-[#E8F0E4]"
+        >
+          ✨ 새 돌발 미션
+        </button>
+      </div>
 
       <ul className="grid gap-3 md:grid-cols-2">
         {missions.map((m) => (
@@ -216,9 +283,47 @@ export function BroadcastTriggerPanel({ missions, activeEvents }: Props) {
             >
               🚨 발동
             </button>
+            {/* 수정/삭제 — 소형 secondary 액션 */}
+            <div className="mt-2 flex items-center justify-end gap-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setMsg(null);
+                  setEditor({
+                    id: m.id,
+                    title: m.title,
+                    icon: m.icon,
+                    description: m.description,
+                    acorns: m.acorns,
+                    prompt: m.prompt,
+                    duration_sec: m.duration_sec,
+                    submission_kind: m.submission_kind,
+                  });
+                }}
+                disabled={isPending || deletingId === m.id}
+                className="rounded-lg border border-[#D4E4BC] bg-white px-2 py-1 text-[11px] font-semibold text-[#2D5A3D] hover:bg-[#E8F0E4] disabled:opacity-40"
+              >
+                ✏️ 수정
+              </button>
+              <button
+                type="button"
+                onClick={() => onDelete(m)}
+                disabled={isPending || deletingId === m.id}
+                className="rounded-lg border border-rose-200 bg-white px-2 py-1 text-[11px] font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-40"
+              >
+                {deletingId === m.id ? "삭제 중…" : "🗑 삭제"}
+              </button>
+            </div>
           </li>
         ))}
       </ul>
+
+      {editor && (
+        <MissionEditorModal
+          initial={editor === "new" ? null : editor}
+          onClose={() => setEditor(null)}
+        />
+      )}
 
       {/* Confirm modal */}
       {openMission && (

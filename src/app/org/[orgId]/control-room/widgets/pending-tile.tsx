@@ -97,11 +97,7 @@ export function PendingTile({ snapshot, orgId, isTvMode }: Props) {
           </div>
 
           <ul
-            className="flex max-h-[520px] flex-col gap-2 overflow-y-auto pr-1
-              [&::-webkit-scrollbar]:w-1.5
-              [&::-webkit-scrollbar-track]:bg-transparent
-              [&::-webkit-scrollbar-thumb]:rounded-full
-              [&::-webkit-scrollbar-thumb]:bg-white/15"
+            className="scroll-dark flex max-h-[520px] flex-col gap-2 overflow-y-auto pr-1"
           >
             {list.map((it) => {
               const inner = (
