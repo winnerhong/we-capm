@@ -29,6 +29,19 @@ interface Props {
 const PULSE_MS = 2000;
 const HOT_THRESHOLD = 3;
 
+type SortMode = "popular" | "recent" | "oldest" | "boost";
+
+const SORT_OPTIONS: ReadonlyArray<{
+  key: SortMode;
+  label: string;
+  icon: string;
+}> = [
+  { key: "popular", label: "인기", icon: "🔥" },
+  { key: "recent", label: "최신", icon: "🆕" },
+  { key: "oldest", label: "오래된", icon: "⏳" },
+  { key: "boost", label: "경매", icon: "💎" },
+];
+
 function fmtAgo(iso: string, nowMs: number): string {
   const t = new Date(iso).getTime();
   if (Number.isNaN(t)) return "";
@@ -136,15 +149,46 @@ export function RequestModerationList({
     return map;
   }, [items]);
 
-  // 정렬 — 하트 많은 순 우선, 같은 하트면 최신 순. (DJ 가 인기 순으로 처리하기 쉽게)
+  // 정렬 모드 — DJ 가 화면에서만 바꾸는 UI state (DB 영향 없음).
+  //  - popular : song_normalized 그룹 카운트 desc, tiebreaker 최신 created_at desc
+  //  - recent  : created_at desc
+  //  - oldest  : created_at asc
+  //  - boost   : boost_amount desc, last_boost_at desc
+  const [sortMode, setSortMode] = useState<SortMode>("popular");
+
   const sortedItems = useMemo(() => {
-    return [...items].sort((a, b) => {
-      if (b.heart_count !== a.heart_count) return b.heart_count - a.heart_count;
-      return (
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      );
-    });
-  }, [items]);
+    const arr = [...items];
+    const toTime = (iso: string | null): number =>
+      iso ? new Date(iso).getTime() : 0;
+    if (sortMode === "recent") {
+      arr.sort((a, b) => toTime(b.created_at) - toTime(a.created_at));
+    } else if (sortMode === "oldest") {
+      arr.sort((a, b) => toTime(a.created_at) - toTime(b.created_at));
+    } else if (sortMode === "boost") {
+      arr.sort((a, b) => {
+        if (b.boost_amount !== a.boost_amount) {
+          return b.boost_amount - a.boost_amount;
+        }
+        return toTime(b.last_boost_at) - toTime(a.last_boost_at);
+      });
+    } else {
+      // popular — song_normalized 그룹 카운트 desc, tiebreaker 최신 desc
+      const groupCount = new Map<string, number>();
+      for (const r of arr) {
+        const k = r.song_normalized || normalize(r.song_title ?? "");
+        groupCount.set(k, (groupCount.get(k) ?? 0) + 1);
+      }
+      arr.sort((a, b) => {
+        const ak = a.song_normalized || normalize(a.song_title ?? "");
+        const bk = b.song_normalized || normalize(b.song_title ?? "");
+        const aC = groupCount.get(ak) ?? 0;
+        const bC = groupCount.get(bk) ?? 0;
+        if (bC !== aC) return bC - aC;
+        return toTime(b.created_at) - toTime(a.created_at);
+      });
+    }
+    return arr;
+  }, [items, sortMode]);
 
   const onAction = useCallback(
     (
@@ -201,6 +245,34 @@ export function RequestModerationList({
         </p>
       </header>
 
+      {/* 정렬 모드 셀렉터 — DJ 화면 전용 (DB 영향 없음) */}
+      <div
+        role="tablist"
+        aria-label="신청곡 정렬 모드"
+        className="mb-3 flex flex-wrap gap-1 rounded-xl border border-white/10 bg-white/[0.04] p-1"
+      >
+        {SORT_OPTIONS.map((opt) => {
+          const active = sortMode === opt.key;
+          return (
+            <button
+              key={opt.key}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => setSortMode(opt.key)}
+              className={`flex-1 rounded-lg px-2.5 py-1.5 text-[11px] font-bold transition ${
+                active
+                  ? "bg-rose-500/30 text-rose-50 ring-1 ring-rose-400/60 shadow-sm"
+                  : "text-rose-100/70 hover:bg-white/[0.06] hover:text-rose-100"
+              }`}
+            >
+              <span aria-hidden className="mr-1">{opt.icon}</span>
+              {opt.label}
+            </button>
+          );
+        })}
+      </div>
+
       {items.length === 0 ? (
         <p className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-center text-xs text-white/55 backdrop-blur-md">
           아직 접수된 신청곡이 없어요
@@ -247,6 +319,14 @@ export function RequestModerationList({
                       {isHot && (
                         <span className="rounded-full bg-rose-500 px-1.5 py-0.5 text-[10px] font-bold text-white shadow-md shadow-rose-500/40">
                           🔥 {count}명 신청
+                        </span>
+                      )}
+                      {r.boost_amount > 0 && (
+                        <span
+                          className="rounded-full bg-gradient-to-r from-violet-500 to-fuchsia-500 px-1.5 py-0.5 text-[10px] font-bold text-white shadow-md shadow-fuchsia-500/40"
+                          title={`경매가 +${r.boost_amount.toLocaleString("ko-KR")} 도토리`}
+                        >
+                          💎 +{r.boost_amount.toLocaleString("ko-KR")}
                         </span>
                       )}
                     </div>

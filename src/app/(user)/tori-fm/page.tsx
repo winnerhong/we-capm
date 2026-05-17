@@ -5,7 +5,10 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireAppUser } from "@/lib/user-auth-guard";
 import { userHasAnyLiveEvent } from "@/lib/org-events/queries";
-import { loadChildrenForUser } from "@/lib/app-user/queries";
+import {
+  getAcornBalance,
+  loadChildrenForUser,
+} from "@/lib/app-user/queries";
 import {
   loadLiveFmSessionForOrg,
   loadFmSessionsByOrg,
@@ -34,14 +37,21 @@ export default async function ToriFmPage() {
   const user = await requireAppUser();
   // 예정(DRAFT) 행사만 있는 참가자는 FM 차단.
   if (!(await userHasAnyLiveEvent(user.id))) redirect("/home");
-  const [liveSession, allSessions, radioMission, brandName, children] =
-    await Promise.all([
-      loadLiveFmSessionForOrg(user.orgId),
-      loadFmSessionsByOrg(user.orgId),
-      loadFirstActiveOrgMissionByKind(user.orgId, "RADIO"),
-      loadOrgFmBrandName(user.orgId),
-      loadChildrenForUser(user.id),
-    ]);
+  const [
+    liveSession,
+    allSessions,
+    radioMission,
+    brandName,
+    children,
+    acornBalance,
+  ] = await Promise.all([
+    loadLiveFmSessionForOrg(user.orgId),
+    loadFmSessionsByOrg(user.orgId),
+    loadFirstActiveOrgMissionByKind(user.orgId, "RADIO"),
+    loadOrgFmBrandName(user.orgId),
+    loadChildrenForUser(user.id),
+    getAcornBalance(user.id),
+  ]);
 
   // session 결정 — LIVE 우선, 없으면 가장 최근 만들어진 세션을 fallback 으로 사용.
   // OFF 상태에서도 신청곡·사연 다이얼로그가 동작하려면 sessionId 가 필요함.
@@ -179,6 +189,8 @@ export default async function ToriFmPage() {
             initialRequests={requests}
             heartedIds={userHearted}
             theme="dark"
+            showBoost
+            acornBalance={acornBalance}
           />
 
           {/* 오늘의 인기 신청곡 TOP — 하트 많은 순 (song_request 만, 최대 5) */}

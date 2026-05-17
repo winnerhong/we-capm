@@ -54,9 +54,69 @@ export async function loadChatMessages(
     .order("created_at", { ascending: false })
     .limit(limit)) as SbResp<FmChatMessageRow>;
 
-  const rows = resp.data ?? [];
+  const rows = (resp.data ?? []).slice().reverse();
   // 뒤집어서 ASC — 채팅 UI 는 오래된 게 위, 최신이 아래.
-  return rows.slice().reverse();
+
+  // sender_name 앞에 반(class) 이름 prefix 보강.
+  // 이전에 저장된 메시지(prefix 없이) 도 화면에는 "햇살반 유하준 가족" 형태로 보이도록
+  // user_id 기준 app_children.class_name 을 lookup 해서 prefix.
+  // 이미 prefix 가 박힌 메시지(새 insert) 는 멱등 처리 — startsWith 체크.
+  const userIds = Array.from(
+    new Set(
+      rows
+        .filter((r) => r.user_id)
+        .map((r) => r.user_id as string)
+    )
+  );
+  if (userIds.length === 0) return rows;
+
+  type ChildRow = {
+    user_id: string;
+    class_name: string | null;
+    is_enrolled: boolean;
+    created_at: string;
+  };
+  const childResp = (await (
+    supabase.from("app_children" as never) as unknown as {
+      select: (c: string) => {
+        in: (
+          k: string,
+          v: string[]
+        ) => {
+          order: (
+            c: string,
+            o: { ascending: boolean }
+          ) => Promise<SbResp<ChildRow>>;
+        };
+      };
+    }
+  )
+    .select("user_id, class_name, is_enrolled, created_at")
+    .in("user_id", userIds)
+    .order("created_at", { ascending: true })) as SbResp<ChildRow>;
+
+  // user_id → primary class_name (첫 enrolled child 중 class_name 있는 것 우선)
+  const classByUser = new Map<string, string>();
+  const enrolledFirst = (childResp.data ?? []).slice().sort((a, b) => {
+    const enrolledDiff = Number(b.is_enrolled) - Number(a.is_enrolled);
+    if (enrolledDiff !== 0) return enrolledDiff;
+    return a.created_at.localeCompare(b.created_at);
+  });
+  for (const c of enrolledFirst) {
+    const cn = (c.class_name ?? "").trim();
+    if (!cn) continue;
+    if (classByUser.has(c.user_id)) continue;
+    classByUser.set(c.user_id, cn);
+  }
+
+  return rows.map((r) => {
+    if (!r.user_id) return r;
+    const className = classByUser.get(r.user_id);
+    if (!className) return r;
+    const senderName = r.sender_name ?? "";
+    if (senderName.startsWith(`${className} `)) return r; // 멱등
+    return { ...r, sender_name: `${className} ${senderName}` };
+  });
 }
 
 /* -------------------------------------------------------------------------- */

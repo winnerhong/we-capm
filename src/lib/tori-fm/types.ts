@@ -68,6 +68,24 @@ export interface FmRequestRow {
   queue_position: number | null;
   kind: FmRequestKind;
   is_anonymous: boolean;
+  /** 누적 boost 도토리 (default 0). HIDDEN/REJECTED 시 환불 후 0 리셋. */
+  boost_amount: number;
+  /** 마지막 boost 시각 — 'boost' 정렬 tiebreaker. NULL 이면 boost 이력 없음. */
+  last_boost_at: string | null;
+  created_at: string;
+}
+
+/**
+ * boost 원장 한 줄.
+ *  - CHARGE : 청취자가 boost 지불 시 insert
+ *  - REFUND : HIDDEN/REJECTED 처리로 환불 시 insert (amount 는 양수, kind 로 구분)
+ */
+export interface FmRequestBoostRow {
+  id: string;
+  request_id: string;
+  user_id: string;
+  kind: "CHARGE" | "REFUND";
+  amount: number;
   created_at: string;
 }
 

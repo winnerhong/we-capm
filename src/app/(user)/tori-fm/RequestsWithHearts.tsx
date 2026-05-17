@@ -18,6 +18,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { toggleRequestHeartAction } from "@/lib/tori-fm/actions";
 import { anonLabelFromUserId, type FmRequestRow } from "@/lib/tori-fm/types";
+import { BoostModal } from "./BoostModal";
 
 type FilterKind = "song_request" | "story_only";
 type Theme = "light" | "dark";
@@ -32,6 +33,10 @@ type Props = {
   theme?: Theme;
   /** 외부에서 카드 제목 override (다크 모드용). */
   title?: string;
+  /** 청취자 화면에서 boost(끌어올리기) UI 노출. 호스트 콘솔은 false. */
+  showBoost?: boolean;
+  /** boost 모달용 현재 보유 도토리. SSR 시점 fresh value. */
+  acornBalance?: number;
 };
 
 /** created_at DESC (최신 우선). */
@@ -49,6 +54,8 @@ export function RequestsWithHearts({
   filterKind,
   theme = "light",
   title,
+  showBoost = false,
+  acornBalance,
 }: Props) {
   // 한 페이지에 여러 인스턴스(예: 호스트 콘솔의 song_request / story_only 두 카드)가
   // 마운트될 때 채널명 충돌 방지. useId 로 인스턴스별 고유 ID 부여.
@@ -63,6 +70,16 @@ export function RequestsWithHearts({
   // 호스트 다크 모드: 새 INSERT 발생 시 카드 외곽 글로우 1.5초 (key 토글로 재생).
   const [flashKey, setFlashKey] = useState(0);
   const [, startTransition] = useTransition();
+
+  // boost 모달 상태 — boostingId 가 set 되어 있으면 모달 노출.
+  const [boostingId, setBoostingId] = useState<string | null>(null);
+  // 잔액은 prop fresh 값으로 시작 → boost 성공 시 result.newBalance 로 갱신.
+  const [currentBalance, setCurrentBalance] = useState<number>(
+    acornBalance ?? 0
+  );
+  useEffect(() => {
+    if (typeof acornBalance === "number") setCurrentBalance(acornBalance);
+  }, [acornBalance]);
 
   useEffect(() => {
     if (!sessionId) return;
@@ -195,19 +212,58 @@ export function RequestsWithHearts({
   /* -------------------------------------------------------------------------- */
   /* 단일 섹션 렌더 (filterKind 지정 시)                                          */
   /* -------------------------------------------------------------------------- */
+  const boostRow = boostingId
+    ? requests.find((r) => r.id === boostingId) ?? null
+    : null;
+
+  const boostModalEl =
+    showBoost && boostRow ? (
+      <BoostModal
+        requestId={boostRow.id}
+        songLabel={
+          boostRow.song_title
+            ? `🎵 ${boostRow.song_title}${boostRow.artist ? ` — ${boostRow.artist}` : ""}`
+            : "💌 사연"
+        }
+        initialBalance={currentBalance}
+        onClose={() => setBoostingId(null)}
+        onSuccess={({ newBalance, spent }) => {
+          setCurrentBalance(newBalance);
+          // 낙관적: boost_amount 즉시 반영. Realtime UPDATE 가 들어오면 sync.
+          setRequests((prev) =>
+            prev.map((r) =>
+              r.id === boostRow.id
+                ? {
+                    ...r,
+                    boost_amount: (r.boost_amount ?? 0) + spent,
+                    last_boost_at: new Date().toISOString(),
+                  }
+                : r
+            )
+          );
+          setBoostingId(null);
+        }}
+      />
+    ) : null;
+
   if (filterKind === "song_request") {
     const rows = songRows;
     const headerTitle = title ?? `🎵 오늘 들어온 신청곡 (${rows.length})`;
     return (
-      <SongRequestSection
-        rows={rows}
-        title={headerTitle}
-        isDark={isDark}
-        hearted={hearted}
-        pendingIds={pendingIds}
-        handleHeart={handleHeart}
-        flashKey={flashKey}
-      />
+      <>
+        <SongRequestSection
+          rows={rows}
+          title={headerTitle}
+          isDark={isDark}
+          hearted={hearted}
+          pendingIds={pendingIds}
+          handleHeart={handleHeart}
+          flashKey={flashKey}
+          showBoost={showBoost}
+          onBoost={setBoostingId}
+        />
+        {boostModalEl}
+      </>
     );
   }
 
@@ -215,15 +271,20 @@ export function RequestsWithHearts({
     const rows = storyRows;
     const headerTitle = title ?? `💌 사연 (${rows.length})`;
     return (
-      <StorySection
-        rows={rows}
-        title={headerTitle}
-        isDark={isDark}
-        hearted={hearted}
-        pendingIds={pendingIds}
-        handleHeart={handleHeart}
-        flashKey={flashKey}
-      />
+      <>
+        <StorySection
+          rows={rows}
+          title={headerTitle}
+          isDark={isDark}
+          hearted={hearted}
+          pendingIds={pendingIds}
+          handleHeart={handleHeart}
+          flashKey={flashKey}
+          showBoost={showBoost}
+          onBoost={setBoostingId}
+        />
+        {boostModalEl}
+      </>
     );
   }
 
@@ -269,6 +330,8 @@ export function RequestsWithHearts({
           pendingIds={pendingIds}
           handleHeart={handleHeart}
           flashKey={flashKey}
+          showBoost={showBoost}
+          onBoost={setBoostingId}
         />
       )}
 
@@ -282,8 +345,11 @@ export function RequestsWithHearts({
           pendingIds={pendingIds}
           handleHeart={handleHeart}
           flashKey={flashKey}
+          showBoost={showBoost}
+          onBoost={setBoostingId}
         />
       )}
+      {boostModalEl}
     </div>
   );
 }
@@ -301,7 +367,66 @@ type SectionProps = {
   handleHeart: (id: string) => void;
   /** INSERT 글로우 키 — 0이면 글로우 없음, > 0 이면 1.5초 외곽 펄스 (key prop 으로 재시작). */
   flashKey?: number;
+  /** 청취자 화면에서만 boost UI 노출. */
+  showBoost?: boolean;
+  /** boost 모달 트리거 — request id 전달. */
+  onBoost?: (requestId: string) => void;
 };
+
+/**
+ * boost 뱃지 + "끌어올리기" 버튼.
+ *  - boost_amount > 0 일 때만 좌측 뱃지 노출
+ *  - showBoost=false 면 아무것도 렌더하지 않음 (호스트 콘솔)
+ */
+function BoostBar({
+  request,
+  isDark,
+  show,
+  onBoost,
+}: {
+  request: FmRequestRow;
+  isDark: boolean;
+  show: boolean;
+  onBoost?: (id: string) => void;
+}) {
+  if (!show) return null;
+  const hasBoost = request.boost_amount > 0;
+  // PLAYING/PLAYED/HIDDEN 은 boost 불가 — 액션에서도 거부하지만 UX 도 잠금.
+  const lockedStatus =
+    request.status === "PLAYING" ||
+    request.status === "PLAYED" ||
+    request.status === "HIDDEN";
+
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+      {hasBoost && (
+        <span
+          className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
+            isDark
+              ? "bg-fuchsia-500/25 text-fuchsia-100 ring-1 ring-fuchsia-300/40"
+              : "bg-fuchsia-100 text-fuchsia-700 ring-1 ring-fuchsia-300/60"
+          }`}
+          title={`경매가 +${request.boost_amount.toLocaleString("ko-KR")} 도토리`}
+        >
+          💎 +{request.boost_amount.toLocaleString("ko-KR")}
+        </span>
+      )}
+      {!lockedStatus && onBoost && (
+        <button
+          type="button"
+          onClick={() => onBoost(request.id)}
+          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold transition ${
+            isDark
+              ? "bg-white/[0.06] text-fuchsia-200 hover:bg-fuchsia-500/20 hover:text-fuchsia-100"
+              : "bg-white text-fuchsia-700 ring-1 ring-fuchsia-200 hover:bg-fuchsia-50"
+          }`}
+        >
+          💎 끌어올리기
+        </button>
+      )}
+    </div>
+  );
+}
 
 function SongRequestSection({
   rows,
@@ -311,6 +436,8 @@ function SongRequestSection({
   pendingIds,
   handleHeart,
   flashKey = 0,
+  showBoost = false,
+  onBoost,
 }: SectionProps) {
   if (isDark) {
     return (
@@ -398,6 +525,12 @@ function SongRequestSection({
                             ? `${r.child_name} 가족`
                             : ""}
                       </p>
+                      <BoostBar
+                        request={r}
+                        isDark={true}
+                        show={showBoost}
+                        onBoost={onBoost}
+                      />
                     </div>
 
                     <HeartButton
@@ -491,6 +624,12 @@ function SongRequestSection({
                           ? `${r.child_name} 가족`
                           : ""}
                     </p>
+                    <BoostBar
+                      request={r}
+                      isDark={false}
+                      show={showBoost}
+                      onBoost={onBoost}
+                    />
                   </div>
 
                   <HeartButton
@@ -518,6 +657,8 @@ function StorySection({
   pendingIds,
   handleHeart,
   flashKey = 0,
+  showBoost = false,
+  onBoost,
 }: SectionProps) {
   if (isDark) {
     return (
@@ -593,6 +734,12 @@ function StorySection({
                           ? anonLabelFromUserId(r.user_id)
                           : (r.child_name?.trim() || "보호자")}
                       </p>
+                      <BoostBar
+                        request={r}
+                        isDark={true}
+                        show={showBoost}
+                        onBoost={onBoost}
+                      />
                     </div>
 
                     <HeartButton
@@ -674,6 +821,12 @@ function StorySection({
                         ? anonLabelFromUserId(r.user_id)
                         : (r.child_name?.trim() || "보호자")}
                     </p>
+                    <BoostBar
+                      request={r}
+                      isDark={false}
+                      show={showBoost}
+                      onBoost={onBoost}
+                    />
                   </div>
 
                   <HeartButton

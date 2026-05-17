@@ -47,19 +47,26 @@ function clampString(
 /* ========================================================================== */
 
 /**
- * 보호자의 자녀 이름을 "{이름} 가족" 형태의 표시명으로 변환한다.
+ * 보호자의 자녀 이름을 "{반} {이름} 가족" 형태의 표시명으로 변환한다.
  *  - 원생(is_enrolled=true) 우선, 여러 명이면 "{첫이름} 외 {N-1}명 가족"
+ *  - 자녀 class_name 이 있으면 가장 앞에 prefix (예: "햇살반 유하준 가족")
  *  - 자녀 정보가 없으면 부모 이름 + 가족 → 최후 "익명 가족"
  */
 function deriveDisplayName(
-  children: { name: string; is_enrolled: boolean }[],
+  children: {
+    name: string;
+    is_enrolled: boolean;
+    class_name: string | null;
+  }[],
   parentName: string
 ): string {
   const enrolled = children.filter((c) => c.is_enrolled && c.name?.trim());
   const named = enrolled.length > 0 ? enrolled : children.filter((c) => c.name?.trim());
-  if (named.length === 1) return `${named[0].name.trim()} 가족`;
+  const className = named.find((c) => c.class_name?.trim())?.class_name?.trim();
+  const prefix = className ? `${className} ` : "";
+  if (named.length === 1) return `${prefix}${named[0].name.trim()} 가족`;
   if (named.length >= 2) {
-    return `${named[0].name.trim()} 외 ${named.length - 1}명 가족`;
+    return `${prefix}${named[0].name.trim()} 외 ${named.length - 1}명 가족`;
   }
   if (parentName?.trim()) return `${parentName.trim()} 가족`;
   return "익명 가족";
@@ -84,7 +91,11 @@ export async function sendChatMessageAction(
   // 자녀 이름을 표시명으로 사용 (없으면 부모 이름 fallback)
   const children = await loadChildrenForUser(user.id);
   const displayName = deriveDisplayName(
-    children.map((c) => ({ name: c.name, is_enrolled: c.is_enrolled })),
+    children.map((c) => ({
+      name: c.name,
+      is_enrolled: c.is_enrolled,
+      class_name: c.class_name,
+    })),
     user.parentName
   );
 
@@ -525,6 +536,7 @@ export async function deleteChatMessageAction(
 
 /**
  * 신청곡 상태 전환 공용 — DJ 전용.
+ *  - HIDDEN 으로 전이할 때는 boost 자동 환불 (PLAYED 는 정상 재생이라 환불 없음).
  */
 async function setRequestStatus(
   requestId: string,
@@ -553,6 +565,12 @@ async function setRequestStatus(
 
   if (!reqResp.data) throw new Error("신청곡을 찾을 수 없어요");
   await assertSessionOwnedByOrg(reqResp.data.session_id, org.orgId);
+
+  // HIDDEN 으로 가는 경우 boost 환불 — status update 보다 먼저 수행해서
+  // 환불 실패 시 상태도 안 바뀌도록.
+  if (status === "HIDDEN") {
+    await refundAllBoostsForRequest(supabase, requestId);
+  }
 
   const updResp = (await (
     supabase.from("tori_fm_requests" as never) as unknown as {
@@ -1110,4 +1128,344 @@ export async function dismissSpotlightAction(
     .is("dismissed_at", null);
 
   revalidateFm(sessionId, session.orgId);
+}
+
+/* ========================================================================== */
+/* BOOST — 신청곡 경매 (도토리 추가 지불로 상위 정렬)                            */
+/* ========================================================================== */
+
+// 1회 boost 한도: UX 안전망. 잔액 보유 한도에 추가로 클라이언트도 동일 검증.
+const BOOST_MIN = 1;
+const BOOST_MAX = 99_999;
+
+/**
+ * 결과 객체 — production throw 마스킹 회피.
+ */
+export type BoostRequestResult =
+  | {
+      ok: true;
+      /** boost 후 누적 boost_amount */
+      newBoostAmount: number;
+      /** boost 후 사용자 도토리 잔액 */
+      newBalance: number;
+    }
+  | { ok: false; error: string };
+
+/**
+ * 신청곡 boost — 청취자가 도토리를 지불해서 정렬 우선순위를 끌어올린다.
+ *  - 본인/타인 신청 모두 boost 가능
+ *  - 누적: 같은 신청에 여러 번 boost 시 boost_amount 누적
+ *  - HIDDEN 처리 시 환불은 setRequestStatus → refundAllBoostsForRequest
+ *  - 원자성: balance 차감을 `acorn_balance >= amount` 조건부 UPDATE 로 묶어
+ *    동시성 경쟁/오차 회피. 나머지 단계는 best-effort.
+ */
+export async function boostRequestAction(
+  requestId: string,
+  amount: number
+): Promise<BoostRequestResult> {
+  try {
+    const user = await requireAppUser();
+    if (!requestId) return { ok: false, error: "신청곡을 찾을 수 없어요" };
+    if (!Number.isInteger(amount)) {
+      return { ok: false, error: "금액이 올바르지 않아요" };
+    }
+    if (amount < BOOST_MIN) {
+      return { ok: false, error: `최소 ${BOOST_MIN} 도토리부터 가능해요` };
+    }
+    if (amount > BOOST_MAX) {
+      return {
+        ok: false,
+        error: `한 번에 ${BOOST_MAX.toLocaleString("ko-KR")} 도토리까지만 가능해요`,
+      };
+    }
+
+    const supabase = await createClient();
+
+    // 신청곡 존재 + 상태 검증 (PLAYING/PLAYED/HIDDEN 은 boost 거부)
+    const reqResp = (await (
+      supabase.from("tori_fm_requests" as never) as unknown as {
+        select: (c: string) => {
+          eq: (k: string, v: string) => {
+            maybeSingle: () => Promise<
+              SbRespOne<{
+                id: string;
+                session_id: string;
+                status: string;
+                boost_amount: number | null;
+              }>
+            >;
+          };
+        };
+      }
+    )
+      .select("id, session_id, status, boost_amount")
+      .eq("id", requestId)
+      .maybeSingle()) as SbRespOne<{
+      id: string;
+      session_id: string;
+      status: string;
+      boost_amount: number | null;
+    }>;
+
+    if (!reqResp.data) {
+      return { ok: false, error: "신청곡을 찾을 수 없어요" };
+    }
+    const reqRow = reqResp.data;
+    if (
+      reqRow.status === "PLAYING" ||
+      reqRow.status === "PLAYED" ||
+      reqRow.status === "HIDDEN"
+    ) {
+      return { ok: false, error: "이 신청곡은 더 이상 끌어올릴 수 없어요" };
+    }
+
+    // 1) 잔액 조회 → 차감 (read-modify-write).
+    //    동시성 보호는 차감 update 의 .gte("acorn_balance", amount) 조건으로 atomic 처리.
+    const balResp = (await (
+      supabase.from("app_users" as never) as unknown as {
+        select: (c: string) => {
+          eq: (k: string, v: string) => {
+            maybeSingle: () => Promise<
+              SbRespOne<{ acorn_balance: number | null }>
+            >;
+          };
+        };
+      }
+    )
+      .select("acorn_balance")
+      .eq("id", user.id)
+      .maybeSingle()) as SbRespOne<{ acorn_balance: number | null }>;
+
+    const currentBalance = balResp.data?.acorn_balance ?? 0;
+    if (currentBalance < amount) {
+      return {
+        ok: false,
+        error: `도토리가 부족해요 (보유 ${currentBalance.toLocaleString("ko-KR")})`,
+      };
+    }
+
+    // 차감 — 조건부 update (acorn_balance >= amount) returning new balance
+    const nextBalance = currentBalance - amount;
+    const deductResp = (await (
+      supabase.from("app_users" as never) as unknown as {
+        update: (p: Row) => {
+          eq: (k: string, v: string) => {
+            gte: (
+              k: string,
+              v: number
+            ) => {
+              select: (c: string) => Promise<{
+                data: Array<{ acorn_balance: number }> | null;
+                error: SbErr;
+              }>;
+            };
+          };
+        };
+      }
+    )
+      .update({ acorn_balance: nextBalance })
+      .eq("id", user.id)
+      .gte("acorn_balance", amount)
+      .select("acorn_balance")) as {
+      data: Array<{ acorn_balance: number }> | null;
+      error: SbErr;
+    };
+
+    if (deductResp.error || (deductResp.data ?? []).length === 0) {
+      return {
+        ok: false,
+        error: "도토리 차감에 실패했어요 (동시 결제 충돌 가능 — 다시 시도)",
+      };
+    }
+
+    // 2) ledger insert (best-effort; 실패해도 차감은 이미 됨 → 운영 reconcile)
+    const txInsert = (await (
+      supabase.from("user_acorn_transactions" as never) as unknown as {
+        insert: (r: Row) => Promise<{ error: SbErr }>;
+      }
+    ).insert({
+      user_id: user.id,
+      amount: -amount, // 차감 → 음수
+      reason: "FM_BOOST",
+      source_type: "fm_request",
+      source_id: requestId,
+      memo: `FM boost +${amount}`,
+    } satisfies Row)) as { error: SbErr };
+    if (txInsert.error) {
+      console.error("[fm/boost] tx insert failed (drift)", {
+        code: txInsert.error.code,
+      });
+    }
+
+    // 3) tori_fm_boosts ledger insert
+    const boostInsert = (await (
+      supabase.from("tori_fm_boosts" as never) as unknown as {
+        insert: (r: Row) => Promise<{ error: SbErr }>;
+      }
+    ).insert({
+      request_id: requestId,
+      user_id: user.id,
+      kind: "CHARGE",
+      amount,
+    } satisfies Row)) as { error: SbErr };
+    if (boostInsert.error) {
+      console.error("[fm/boost] boost ledger insert failed", {
+        code: boostInsert.error.code,
+      });
+    }
+
+    // 4) request.boost_amount 누적 + last_boost_at = now
+    const currentBoost = reqRow.boost_amount ?? 0;
+    const newBoostAmount = currentBoost + amount;
+    const nowIso = new Date().toISOString();
+    const reqUpd = (await (
+      supabase.from("tori_fm_requests" as never) as unknown as {
+        update: (p: Row) => {
+          eq: (k: string, v: string) => Promise<{ error: SbErr }>;
+        };
+      }
+    )
+      .update({
+        boost_amount: newBoostAmount,
+        last_boost_at: nowIso,
+      })
+      .eq("id", requestId)) as { error: SbErr };
+    if (reqUpd.error) {
+      console.error("[fm/boost] request update failed", {
+        code: reqUpd.error.code,
+      });
+    }
+
+    revalidateFm(reqRow.session_id);
+    return { ok: true, newBoostAmount, newBalance: nextBalance };
+  } catch (e) {
+    console.error("[fm/boost] unexpected throw", e);
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : "boost 실패",
+    };
+  }
+}
+
+/**
+ * 신청곡 환불 — HIDDEN/REJECTED 시 호출. 모든 CHARGE 합산에서
+ * 이전 REFUND 합산을 뺀 잔여를 사용자별로 복구.
+ *  - net = sum(CHARGE) - sum(REFUND)
+ *  - net > 0 인 user 에게만 환불 (이미 환불된 user 는 net=0)
+ *  - 각 user 에게: balance += net, ledger insert (FM_BOOST_REFUND), tori_fm_boosts insert (REFUND)
+ *  - 마지막에 tori_fm_requests.boost_amount=0, last_boost_at=null 리셋
+ */
+async function refundAllBoostsForRequest(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  requestId: string
+): Promise<void> {
+  type BoostLedgerRow = {
+    user_id: string;
+    kind: "CHARGE" | "REFUND";
+    amount: number;
+  };
+
+  const ledger = (await (
+    supabase.from("tori_fm_boosts" as never) as unknown as {
+      select: (c: string) => {
+        eq: (
+          k: string,
+          v: string
+        ) => Promise<{ data: BoostLedgerRow[] | null; error: SbErr }>;
+      };
+    }
+  )
+    .select("user_id, kind, amount")
+    .eq("request_id", requestId)) as {
+    data: BoostLedgerRow[] | null;
+    error: SbErr;
+  };
+
+  if (ledger.error) {
+    console.error("[fm/refund] ledger load failed", { code: ledger.error.code });
+    return; // 환불 실패해도 status 전이는 계속 — 운영 reconcile 대상
+  }
+
+  const netByUser = new Map<string, number>();
+  for (const l of ledger.data ?? []) {
+    const delta = l.kind === "CHARGE" ? l.amount : -l.amount;
+    netByUser.set(l.user_id, (netByUser.get(l.user_id) ?? 0) + delta);
+  }
+
+  for (const [userId, net] of netByUser) {
+    if (net <= 0) continue;
+
+    // balance 복구
+    const balResp = (await (
+      supabase.from("app_users" as never) as unknown as {
+        select: (c: string) => {
+          eq: (k: string, v: string) => {
+            maybeSingle: () => Promise<
+              SbRespOne<{ acorn_balance: number | null }>
+            >;
+          };
+        };
+      }
+    )
+      .select("acorn_balance")
+      .eq("id", userId)
+      .maybeSingle()) as SbRespOne<{ acorn_balance: number | null }>;
+
+    const before = balResp.data?.acorn_balance ?? 0;
+    const after = before + net;
+
+    const balUpd = (await (
+      supabase.from("app_users" as never) as unknown as {
+        update: (p: Row) => {
+          eq: (k: string, v: string) => Promise<{ error: SbErr }>;
+        };
+      }
+    )
+      .update({ acorn_balance: after })
+      .eq("id", userId)) as { error: SbErr };
+    if (balUpd.error) {
+      console.error("[fm/refund] balance update failed", {
+        userId,
+        code: balUpd.error.code,
+      });
+      continue; // 이 user 는 스킵 (ledger 도 안 넣어서 net 보존)
+    }
+
+    // user_acorn_transactions REFUND insert (양수)
+    await (
+      supabase.from("user_acorn_transactions" as never) as unknown as {
+        insert: (r: Row) => Promise<{ error: SbErr }>;
+      }
+    ).insert({
+      user_id: userId,
+      amount: net, // 양수 (환불)
+      reason: "FM_BOOST_REFUND",
+      source_type: "fm_request",
+      source_id: requestId,
+      memo: `FM boost refund +${net}`,
+    } satisfies Row);
+
+    // tori_fm_boosts REFUND row insert
+    await (
+      supabase.from("tori_fm_boosts" as never) as unknown as {
+        insert: (r: Row) => Promise<{ error: SbErr }>;
+      }
+    ).insert({
+      request_id: requestId,
+      user_id: userId,
+      kind: "REFUND",
+      amount: net,
+    } satisfies Row);
+  }
+
+  // 신청곡 boost_amount 리셋
+  await (
+    supabase.from("tori_fm_requests" as never) as unknown as {
+      update: (p: Row) => {
+        eq: (k: string, v: string) => Promise<{ error: SbErr }>;
+      };
+    }
+  )
+    .update({ boost_amount: 0, last_boost_at: null })
+    .eq("id", requestId);
 }
