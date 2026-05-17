@@ -2,7 +2,7 @@
 
 // RequestModerationList — 즉석 신청곡 모더레이션 큐 (DJ 관점)
 //  - Realtime: tori_fm_requests session_id=? 구독
-//  - PENDING 만 리스트에 표시 (승인/숨김/플레이는 즉시 제거)
+//  - PENDING 만 리스트에 표시 (큐 추가/삭제/플레이는 즉시 제거)
 //  - 같은 song_title 3회 이상 → 🔥 N명 신청 배지
 //  - 새 PENDING INSERT 시 펄스 애니메이션 (2초간)
 
@@ -15,7 +15,6 @@ import {
 } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
-  approveRequestAction,
   hideRequestAction,
   queueRequestAction,
 } from "@/lib/tori-fm/actions";
@@ -179,7 +178,7 @@ export function RequestModerationList({
   const onAction = useCallback(
     (
       id: string,
-      kind: "APPROVE" | "HIDE" | "QUEUE",
+      kind: "HIDE" | "QUEUE",
       needConfirm: boolean = false
     ) => {
       if (needConfirm) {
@@ -193,8 +192,7 @@ export function RequestModerationList({
       setPendingId(id);
       startTransition(async () => {
         try {
-          if (kind === "APPROVE") await approveRequestAction(id);
-          else if (kind === "HIDE") await hideRequestAction(id);
+          if (kind === "HIDE") await hideRequestAction(id);
           else await queueRequestAction(id);
           // Realtime UPDATE 가 리스트에서 제거 처리
           setItems((prev) => prev.filter((r) => r.id !== id));
@@ -227,7 +225,7 @@ export function RequestModerationList({
           </span>
         </h2>
         <p className="hidden text-[11px] text-rose-200/70 sm:block">
-          승인하면 대기 큐로, 삭제하면 사라져요
+          큐에 추가하면 방송 대기, 삭제하면 사라져요
         </p>
       </header>
 
@@ -371,19 +369,11 @@ export function RequestModerationList({
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   <button
                     type="button"
-                    onClick={() => onAction(r.id, "APPROVE")}
-                    disabled={isBusy}
-                    className="rounded-xl bg-emerald-500 px-3 py-1.5 text-xs font-bold text-white shadow-md shadow-emerald-500/30 transition hover:bg-emerald-400 disabled:opacity-50"
-                  >
-                    {isBusy ? "…" : "✅ 승인"}
-                  </button>
-                  <button
-                    type="button"
                     onClick={() => onAction(r.id, "QUEUE")}
                     disabled={isBusy}
                     className="rounded-xl bg-amber-400 px-3 py-1.5 text-xs font-bold text-[#0B1538] shadow-md shadow-amber-400/30 transition hover:bg-amber-300 disabled:opacity-50"
                   >
-                    📥 방송 큐에 추가
+                    {isBusy ? "…" : "📥 방송 큐에 추가"}
                   </button>
                   <button
                     type="button"

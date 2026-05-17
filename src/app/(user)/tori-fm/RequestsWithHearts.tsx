@@ -636,11 +636,6 @@ function SongRequestSection({
                     ✓ 방송된 곡입니다
                   </span>
                 )}
-                {r.status === "APPROVED" && (
-                  <span className="rounded-full bg-emerald-400/15 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-200">
-                    ✓ 승인
-                  </span>
-                )}
                 {r.status === "QUEUED" && (
                   <span className="rounded-full bg-amber-400/20 px-1.5 py-0.5 text-[10px] font-semibold text-amber-200">
                     📥 큐
@@ -790,11 +785,6 @@ function SongRequestSection({
                           ✓ 방송된 곡입니다
                         </span>
                       )}
-                      {r.status === "APPROVED" && (
-                        <span className="rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">
-                          ✓ 승인
-                        </span>
-                      )}
                       {r.status === "QUEUED" && (
                         <span className="rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">
                           📥 큐
@@ -922,11 +912,6 @@ function StorySection({
                             ✓ 방송된 곡입니다
                           </span>
                         )}
-                        {r.status === "APPROVED" && (
-                          <span className="rounded-full bg-emerald-400/15 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-200">
-                            ✓ 승인
-                          </span>
-                        )}
                         {r.status === "QUEUED" && (
                           <span className="rounded-full bg-amber-400/20 px-1.5 py-0.5 text-[10px] font-semibold text-amber-200">
                             📥 큐
@@ -1009,11 +994,6 @@ function StorySection({
                       {r.status === "PLAYED" && (
                         <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">
                           ✓ 방송된 곡입니다
-                        </span>
-                      )}
-                      {r.status === "APPROVED" && (
-                        <span className="rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">
-                          ✓ 승인
                         </span>
                       )}
                       {r.status === "QUEUED" && (

@@ -801,7 +801,7 @@ export async function deleteChatMessageAction(
  */
 async function setRequestStatus(
   requestId: string,
-  status: "APPROVED" | "HIDDEN" | "PLAYED"
+  status: "PENDING" | "HIDDEN" | "PLAYED"
 ): Promise<void> {
   const org = await requireOrg();
   if (!requestId) throw new Error("신청곡을 찾을 수 없어요");
@@ -852,10 +852,6 @@ async function setRequestStatus(
   }
 
   revalidateFm(reqResp.data.session_id, org.orgId);
-}
-
-export async function approveRequestAction(requestId: string): Promise<void> {
-  return setRequestStatus(requestId, "APPROVED");
 }
 
 export async function hideRequestAction(requestId: string): Promise<void> {
@@ -954,7 +950,7 @@ export async function queueRequestAction(requestId: string): Promise<void> {
 }
 
 /**
- * 큐에서 빼기 — APPROVED 로 되돌림. queue_position NULL.
+ * 큐에서 빼기 — PENDING 으로 되돌림(모더레이션 큐에 다시 노출). queue_position NULL.
  */
 export async function unqueueRequestAction(requestId: string): Promise<void> {
   const org = await requireOrg();
@@ -986,7 +982,7 @@ export async function unqueueRequestAction(requestId: string): Promise<void> {
       };
     }
   )
-    .update({ status: "APPROVED", queue_position: null })
+    .update({ status: "PENDING", queue_position: null })
     .eq("id", requestId);
 
   revalidateFm(reqResp.data.session_id, org.orgId);

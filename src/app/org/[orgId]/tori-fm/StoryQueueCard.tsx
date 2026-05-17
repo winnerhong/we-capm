@@ -193,11 +193,6 @@ export function StoryQueueCard({ sessionId, initialItems }: Props) {
                           대기
                         </span>
                       )}
-                      {r.status === "APPROVED" && (
-                        <span className="rounded-full bg-emerald-400/20 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-200">
-                          ✓ 승인
-                        </span>
-                      )}
                       {r.status === "QUEUED" && (
                         <span className="rounded-full bg-violet-400/30 px-1.5 py-0.5 text-[10px] font-semibold text-violet-100">
                           📥 큐
@@ -227,7 +222,7 @@ export function StoryQueueCard({ sessionId, initialItems }: Props) {
                     </div>
                   </div>
 
-                  {/* 액션 — PENDING/APPROVED → [큐 추가] / QUEUED → [▲][▼] */}
+                  {/* 액션 — PENDING → [큐 추가] / QUEUED → [▲][▼] */}
                   <div className="flex flex-col items-stretch gap-1">
                     {!isQueued ? (
                       <button

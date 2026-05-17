@@ -7,7 +7,8 @@ export type ChatSenderType = "USER" | "DJ" | "SYSTEM";
 /**
  * 신청곡 상태 머신.
  *  - PENDING  : 청취자 신청 직후 (호스트 모더레이션 대기)
- *  - APPROVED : 호스트가 승인했지만 큐엔 안 올림 (인정만)
+ *  - APPROVED : (legacy) 과거 "승인" 액션 결과. 신규 흐름에서는 사용 안 함.
+ *               기존 row 와의 호환을 위해 union 에 유지.
  *  - QUEUED   : 방송 대기 큐에 올림 (queue_position 순서로 재생 대기)
  *  - PLAYING  : 현재 NOW PLAYING (세션당 1개)
  *  - PLAYED   : 재생 완료
