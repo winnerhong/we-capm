@@ -285,7 +285,11 @@ export default async function UserHomePage({
   return (
     <div className="space-y-4">
       {/* 도토리 TOP 5 가족 — 최상단 노출, 본인 행 강조 */}
-      <AcornTopBoard families={topFamilies} myUserId={user.id} />
+      <AcornTopBoard
+        families={topFamilies}
+        myUserId={user.id}
+        orgName={freshOrgName}
+      />
 
       {/* 온보딩 위저드 — 최상단 노출(미완 시 배너). 첫 입장 시 자동 오픈, 미완 시 상단 배너 유지. */}
       <OnboardingWizard
@@ -403,20 +407,22 @@ export default async function UserHomePage({
 function AcornTopBoard({
   families,
   myUserId,
+  orgName,
 }: {
   families: TopAcornFamily[];
   myUserId: string;
+  orgName: string;
 }) {
   if (families.length === 0) return null;
   return (
     <section className="overflow-hidden rounded-3xl border border-[#E5D3B8] bg-gradient-to-br from-[#FFFDF8] to-[#FFF6E5] p-4 shadow-sm">
-      <header className="mb-2 flex items-center justify-between">
-        <h2 className="flex items-center gap-1.5 text-sm font-bold text-[#6B4423]">
+      <header className="mb-2 flex items-center justify-between gap-2">
+        <h2 className="flex min-w-0 items-center gap-1.5 text-sm font-bold text-[#6B4423]">
           <span aria-hidden>🏆</span>
-          <span>도토리 TOP 5</span>
+          <span className="truncate">{orgName} TOP 5</span>
         </h2>
-        <span className="text-[10px] font-semibold text-[#8B6F47]">
-          실시간 잔액 기준
+        <span className="shrink-0 text-[10px] font-semibold text-[#8B6F47]">
+          실시간 기준
         </span>
       </header>
       <ol className="space-y-1.5">
