@@ -215,8 +215,13 @@ export function RequestsWithHearts({
     [hearted, pendingIds]
   );
 
-  // 정렬 모드 — 인기순(popularity) 디폴트 또는 최신순(created_at).
-  const [sortMode, setSortMode] = useState<"popular" | "recent">("popular");
+  // 정렬/필터 모드:
+  //  - popular : popularity(heart+boost) DESC, 최신 tiebreak
+  //  - recent  : created_at DESC
+  //  - zero    : popularity 0 + 진행 가능 상태만 필터 (응원 못 받은 곡 모아보기)
+  const [sortMode, setSortMode] = useState<"popular" | "recent" | "zero">(
+    "popular"
+  );
 
   // kind 별로 분리 + HIDDEN 제외. PLAYED 는 항상 뒤로, 그 안에서 sortMode 적용.
   const { songRows, storyRows } = useMemo(() => {
@@ -225,6 +230,21 @@ export function RequestsWithHearts({
     const stories = visible.filter((r) => r.kind === "story_only");
     const popularityOf = (r: FmRequestRow) =>
       (r.heart_count ?? 0) + (r.boost_amount ?? 0);
+    // "응원 0" 모드 — popularity 0 + 아직 끝나지 않은 곡만 (PLAYED/PLAYING 제외).
+    if (sortMode === "zero") {
+      const isOpen = (r: FmRequestRow) =>
+        r.status !== "PLAYED" && r.status !== "PLAYING";
+      const recentDesc = (a: FmRequestRow, b: FmRequestRow) =>
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      return {
+        songRows: songs
+          .filter((r) => popularityOf(r) === 0 && isOpen(r))
+          .sort(recentDesc),
+        storyRows: stories
+          .filter((r) => popularityOf(r) === 0 && isOpen(r))
+          .sort(recentDesc),
+      };
+    }
     const innerSort =
       sortMode === "popular"
         ? (a: FmRequestRow, b: FmRequestRow) => {
@@ -428,6 +448,8 @@ export function RequestsWithHearts({
 /* Section 컴포넌트                                                            */
 /* -------------------------------------------------------------------------- */
 
+type SortMode = "popular" | "recent" | "zero";
+
 type SectionProps = {
   rows: FmRequestRow[];
   title: string;
@@ -442,9 +464,9 @@ type SectionProps = {
   /** boost 모달 트리거 — request id 전달. */
   onBoost?: (requestId: string) => void;
   /** 인기순 정렬 시 메달/순위 prefix 노출. */
-  sortMode?: "popular" | "recent";
+  sortMode?: SortMode;
   /** 정렬 토글 핸들러 — 헤더 옆 토글 버튼. 없으면 토글 미노출. */
-  onSortChange?: (mode: "popular" | "recent") => void;
+  onSortChange?: (mode: SortMode) => void;
   /** user_id → 반 이름. 작성자 라벨 prefix. */
   classByUser?: Record<string, string>;
 };
@@ -467,8 +489,8 @@ function SortToggle({
   onChange,
   isDark,
 }: {
-  mode: "popular" | "recent";
-  onChange: (m: "popular" | "recent") => void;
+  mode: SortMode;
+  onChange: (m: SortMode) => void;
   isDark: boolean;
 }) {
   const baseBtn = isDark
@@ -495,6 +517,14 @@ function SortToggle({
         className={`${baseBtn} ${mode === "recent" ? activeCls : inactiveCls}`}
       >
         🆕 최신
+      </button>
+      <button
+        type="button"
+        onClick={() => onChange("zero")}
+        className={`${baseBtn} ${mode === "zero" ? activeCls : inactiveCls}`}
+        title="아직 응원 받지 못한 곡만 모아보기"
+      >
+        🌱 응원 0
       </button>
     </div>
   );
@@ -590,7 +620,9 @@ function SongRequestSection({
 
         {rows.length === 0 ? (
           <p className="mt-4 rounded-xl bg-white/5 p-4 text-center text-xs text-white/60">
-            아직 신청곡이 없어요
+            {sortMode === "zero"
+              ? "모든 신청곡이 응원을 받았어요 🎉"
+              : "아직 신청곡이 없어요"}
           </p>
         ) : (
           <ul
