@@ -29,11 +29,18 @@ export function PhotoWallTile({ items, isTvMode }: Props) {
   // 미션별 필터 — null = 전체. 디폴트는 null (모든 사진).
   const [filterMissionId, setFilterMissionId] = useState<string | null>(null);
 
-  // 미션 칩 — 사진이 있는 미션만, count desc 로 정렬.
+  // 미션 칩 — 사진이 있는 미션만, 스템프북 순서(display_order) ASC 로 정렬.
+  //  → 좌측부터 스템프 순서가 빠른 미션이 먼저 노출됨.
   const missionChips = useMemo(() => {
     const map = new Map<
       string,
-      { id: string; title: string; icon: string | null; count: number }
+      {
+        id: string;
+        title: string;
+        icon: string | null;
+        count: number;
+        displayOrder: number;
+      }
     >();
     for (const p of items) {
       const cur = map.get(p.missionId);
@@ -44,10 +51,17 @@ export function PhotoWallTile({ items, isTvMode }: Props) {
           title: p.missionTitle,
           icon: p.missionIcon,
           count: 1,
+          displayOrder: p.missionDisplayOrder,
         });
       }
     }
-    return Array.from(map.values()).sort((a, b) => b.count - a.count);
+    return Array.from(map.values()).sort((a, b) => {
+      if (a.displayOrder !== b.displayOrder) {
+        return a.displayOrder - b.displayOrder;
+      }
+      // tiebreaker: id 안정 정렬
+      return a.id.localeCompare(b.id);
+    });
   }, [items]);
 
   // 필터링: 미션 선택 시 그 미션 사진만, 아니면 전체.

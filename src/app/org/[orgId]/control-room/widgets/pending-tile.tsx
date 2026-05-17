@@ -1,6 +1,10 @@
+"use client";
+
+import { useState } from "react";
 import Link from "next/link";
 import type { ControlRoomSnapshot } from "@/lib/control-room/types";
 import styles from "../control-room.module.css";
+import { InlineReviewModal } from "./inline-review-modal";
 
 type Props = {
   snapshot: ControlRoomSnapshot;
@@ -30,6 +34,9 @@ export function PendingTile({ snapshot, orgId, isTvMode }: Props) {
   const now = new Date(snapshot.serverNowIso).getTime();
   const oldestHex = oldestColor(oldestWaitingMinutes);
   const reviewHref = `/org/${orgId}/missions/review`;
+
+  // 일반 모드에서 행 클릭 시 인라인 검수 모달 오픈 (TV 모드는 기존 동작 유지)
+  const [reviewingId, setReviewingId] = useState<string | null>(null);
 
   return (
     <div className={`${styles.surface} flex flex-col p-4`}>
@@ -112,18 +119,27 @@ export function PendingTile({ snapshot, orgId, isTvMode }: Props) {
                       {inner}
                     </div>
                   ) : (
-                    <Link
-                      href={reviewHref}
-                      className="flex items-start justify-between gap-3 rounded-lg border border-[#1a2a52] bg-[#0a1839] px-3 py-2 transition hover:border-[#FFC83D]/50 hover:bg-[#0e1f4d]"
+                    <button
+                      type="button"
+                      onClick={() => setReviewingId(it.id)}
+                      className="flex w-full items-start justify-between gap-3 rounded-lg border border-[#1a2a52] bg-[#0a1839] px-3 py-2 text-left transition hover:border-[#FFC83D]/50 hover:bg-[#0e1f4d]"
+                      title="여기서 바로 검수"
                     >
                       {inner}
-                    </Link>
+                    </button>
                   )}
                 </li>
               );
             })}
           </ul>
         </>
+      )}
+
+      {reviewingId && (
+        <InlineReviewModal
+          initialSubmissionId={reviewingId}
+          onClose={() => setReviewingId(null)}
+        />
       )}
     </div>
   );

@@ -2001,13 +2001,14 @@ async function loadPhotoWall(
                 title: string;
                 icon: string | null;
                 kind: string;
+                display_order: number | null;
               }>
             >;
           };
         };
       }
     )
-      .select("id, title, icon, kind")
+      .select("id, title, icon, kind, display_order")
       .eq("org_id", orgId)
       .in("kind", [
         "PHOTO",
@@ -2019,6 +2020,7 @@ async function loadPhotoWall(
       title: string;
       icon: string | null;
       kind: string;
+      display_order: number | null;
     }>;
 
     if (missionResp.error) {
@@ -2178,6 +2180,7 @@ async function loadPhotoWall(
         submissionId: s.id,
         missionId: s.org_mission_id,
         missionKind: mission.kind,
+        missionDisplayOrder: mission.display_order ?? 0,
         url: firstUrl,
         missionTitle: mission.title,
         missionIcon: mission.icon ?? null,

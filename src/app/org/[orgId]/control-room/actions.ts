@@ -10,8 +10,33 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireOrg } from "@/lib/org-auth-guard";
+import {
+  loadPendingReviews,
+  type ReviewSubmissionItem,
+} from "@/lib/missions/review-queries";
 
 type SbErr = { message: string } | null;
+
+/**
+ * 관제실 인라인 검수 모달용 — pending 큐 전체를 한 번에 로드.
+ * 모달 마운트 시 호출하고 결과 큐를 client state 로 들고 있다가
+ * 승인/반려 처리하면 큐에서 제거.
+ */
+export async function loadPendingReviewsForControlRoomAction(): Promise<
+  { ok: true; items: ReviewSubmissionItem[] } | { ok: false; error: string }
+> {
+  try {
+    const session = await requireOrg();
+    const items = await loadPendingReviews(session.orgId);
+    return { ok: true, items };
+  } catch (e) {
+    console.error("[control-room/loadPendingReviews] threw", e);
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : "큐를 불러오지 못했어요",
+    };
+  }
+}
 
 export async function deletePhotoFromWallAction(
   submissionId: string

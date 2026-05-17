@@ -95,6 +95,8 @@ export interface ControlRoomPhotoItem {
   missionId: string;
   /** 미션 종류 — PHOTO/PHOTO_APPROVAL/COOP/BROADCAST */
   missionKind: string;
+  /** 스템프북 순서 — 미션 칩 정렬 키. 같으면 missionId tiebreaker. */
+  missionDisplayOrder: number;
   url: string;
   missionTitle: string;
   missionIcon: string | null;
