@@ -599,7 +599,101 @@ function SongRequestSection({
   onSortChange,
   classByUser = {},
 }: SectionProps) {
+  // 방송된 곡 접기 — 디폴트 접힘. 아직 방송 안 된 곡들에 관심이 쏠리도록.
+  const [playedExpanded, setPlayedExpanded] = useState(false);
+  const liveRows = rows.filter((r) => r.status !== "PLAYED");
+  const playedRows = rows.filter((r) => r.status === "PLAYED");
+
   if (isDark) {
+    const renderRow = (r: FmRequestRow, idx: number, showRank: boolean) => {
+      const isHearted = !!hearted[r.id];
+      const isPending = !!pendingIds[r.id];
+      const rank =
+        showRank && sortMode === "popular"
+          ? rankPrefix(idx)
+          : { kind: null, label: "" };
+      return (
+        <li
+          key={r.id}
+          className="rounded-2xl border border-l-4 border-l-amber-300/50 border-y-white/10 border-r-white/10 bg-[#1B2552] p-3"
+        >
+          <div className="flex items-start gap-3">
+            {rank.kind === "medal" && (
+              <span aria-label={`${idx + 1}위`} className="flex h-7 w-7 flex-shrink-0 items-center justify-center text-base">
+                {rank.label}
+              </span>
+            )}
+            {rank.kind === "num" && (
+              <span aria-label={`${idx + 1}위`} className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-amber-400/20 text-[11px] font-bold text-amber-200">
+                {rank.label}
+              </span>
+            )}
+            <div className="min-w-0 flex-1">
+              {/* 상태 뱃지 */}
+              <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
+                {r.status === "PLAYED" && (
+                  <span className="rounded-full bg-emerald-500/30 px-2 py-0.5 text-[10px] font-bold text-emerald-100 ring-1 ring-emerald-400/50">
+                    ✓ 방송된 곡입니다
+                  </span>
+                )}
+                {r.status === "APPROVED" && (
+                  <span className="rounded-full bg-emerald-400/15 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-200">
+                    ✓ 승인
+                  </span>
+                )}
+                {r.status === "QUEUED" && (
+                  <span className="rounded-full bg-amber-400/20 px-1.5 py-0.5 text-[10px] font-semibold text-amber-200">
+                    📥 큐
+                    {r.queue_position != null
+                      ? ` #${r.queue_position}`
+                      : ""}
+                  </span>
+                )}
+                {r.status === "PLAYING" && (
+                  <span className="rounded-full bg-rose-400/30 px-1.5 py-0.5 text-[10px] font-semibold text-rose-100">
+                    ▶ 재생 중
+                  </span>
+                )}
+              </div>
+
+              <p className="truncate text-sm font-bold text-white/95">
+                {r.song_title ?? "(사연만)"}
+                {r.artist && (
+                  <span className="ml-1 text-xs font-normal text-white/60">
+                    — {r.artist}
+                  </span>
+                )}
+              </p>
+              {r.story && (
+                <p className="mt-1 line-clamp-2 text-[12px] leading-snug text-white/80">
+                  “{r.story}”
+                </p>
+              )}
+              <p className="mt-1 text-[10px] text-amber-200/80">
+                {r.is_anonymous
+                  ? anonLabelFromUserId(r.user_id)
+                  : authorWithClass(r.child_name, r.user_id, classByUser)}
+              </p>
+              <BoostBar
+                request={r}
+                isDark={true}
+                show={showBoost}
+                onBoost={onBoost}
+              />
+            </div>
+
+            <HeartButton
+              isHearted={isHearted}
+              isPending={isPending}
+              count={(r.heart_count ?? 0) + (r.boost_amount ?? 0)}
+              tone="dark"
+              onClick={() => handleHeart(r.id)}
+            />
+          </div>
+        </li>
+      );
+    };
+
     return (
       <section
         className={`relative isolate rounded-2xl border-l-[5px] border-l-amber-300/70 border-y border-y-white/10 border-r border-r-white/10 bg-[#101935] p-4 text-white shadow-md shadow-amber-500/10 ${
@@ -618,101 +712,44 @@ function SongRequestSection({
           )}
         </header>
 
-        {rows.length === 0 ? (
+        {liveRows.length === 0 && playedRows.length === 0 ? (
           <p className="mt-4 rounded-xl bg-white/5 p-4 text-center text-xs text-white/60">
             {sortMode === "zero"
               ? "모든 신청곡이 응원을 받았어요 🎉"
               : "아직 신청곡이 없어요"}
           </p>
         ) : (
-          <ul
-            className="scroll-dark mt-3 max-h-[420px] space-y-2 overflow-y-auto pr-1"
-          >
-            {rows.map((r, idx) => {
-              const isHearted = !!hearted[r.id];
-              const isPending = !!pendingIds[r.id];
-              const rank = sortMode === "popular" ? rankPrefix(idx) : { kind: null, label: "" };
-              return (
-                <li
-                  key={r.id}
-                  className="rounded-2xl border border-l-4 border-l-amber-300/50 border-y-white/10 border-r-white/10 bg-[#1B2552] p-3"
+          <ul className="scroll-dark mt-3 max-h-[420px] space-y-2 overflow-y-auto pr-1">
+            {liveRows.length === 0 && (
+              <li className="rounded-xl bg-white/5 p-3 text-center text-xs text-white/60">
+                방송 대기 중인 신청곡이 없어요
+              </li>
+            )}
+            {liveRows.map((r, idx) => renderRow(r, idx, true))}
+
+            {/* 방송된 곡 — 디폴트 접힘, 아래 토글로 펼치기 */}
+            {playedRows.length > 0 && (
+              <li className="pt-1">
+                <button
+                  type="button"
+                  onClick={() => setPlayedExpanded((v) => !v)}
+                  className="flex w-full items-center justify-between rounded-xl bg-white/[0.06] px-3 py-2 text-[11px] font-semibold text-emerald-200/80 transition hover:bg-white/[0.1]"
+                  aria-expanded={playedExpanded}
                 >
-                  <div className="flex items-start gap-3">
-                    {rank.kind === "medal" && (
-                      <span aria-label={`${idx + 1}위`} className="flex h-7 w-7 flex-shrink-0 items-center justify-center text-base">
-                        {rank.label}
-                      </span>
+                  <span>
+                    ✓ 방송된 곡 {playedRows.length}개
+                    {!playedExpanded && (
+                      <span className="ml-1 text-white/40">— 펼쳐서 보기</span>
                     )}
-                    {rank.kind === "num" && (
-                      <span aria-label={`${idx + 1}위`} className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-amber-400/20 text-[11px] font-bold text-amber-200">
-                        {rank.label}
-                      </span>
-                    )}
-                    <div className="min-w-0 flex-1">
-                      {/* 상태 뱃지 */}
-                      <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
-                        {r.status === "PLAYED" && (
-                          <span className="rounded-full bg-emerald-500/30 px-2 py-0.5 text-[10px] font-bold text-emerald-100 ring-1 ring-emerald-400/50">
-                            ✓ 방송된 곡입니다
-                          </span>
-                        )}
-                        {r.status === "APPROVED" && (
-                          <span className="rounded-full bg-emerald-400/15 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-200">
-                            ✓ 승인
-                          </span>
-                        )}
-                        {r.status === "QUEUED" && (
-                          <span className="rounded-full bg-amber-400/20 px-1.5 py-0.5 text-[10px] font-semibold text-amber-200">
-                            📥 큐
-                            {r.queue_position != null
-                              ? ` #${r.queue_position}`
-                              : ""}
-                          </span>
-                        )}
-                        {r.status === "PLAYING" && (
-                          <span className="rounded-full bg-rose-400/30 px-1.5 py-0.5 text-[10px] font-semibold text-rose-100">
-                            ▶ 재생 중
-                          </span>
-                        )}
-                      </div>
-
-                      <p className="truncate text-sm font-bold text-white/95">
-                        {r.song_title ?? "(사연만)"}
-                        {r.artist && (
-                          <span className="ml-1 text-xs font-normal text-white/60">
-                            — {r.artist}
-                          </span>
-                        )}
-                      </p>
-                      {r.story && (
-                        <p className="mt-1 line-clamp-2 text-[12px] leading-snug text-white/80">
-                          “{r.story}”
-                        </p>
-                      )}
-                      <p className="mt-1 text-[10px] text-amber-200/80">
-                        {r.is_anonymous
-                          ? anonLabelFromUserId(r.user_id)
-                          : authorWithClass(r.child_name, r.user_id, classByUser)}
-                      </p>
-                      <BoostBar
-                        request={r}
-                        isDark={true}
-                        show={showBoost}
-                        onBoost={onBoost}
-                      />
-                    </div>
-
-                    <HeartButton
-                      isHearted={isHearted}
-                      isPending={isPending}
-                      count={(r.heart_count ?? 0) + (r.boost_amount ?? 0)}
-                      tone="dark"
-                      onClick={() => handleHeart(r.id)}
-                    />
-                  </div>
-                </li>
-              );
-            })}
+                  </span>
+                  <span aria-hidden className="text-[10px]">
+                    {playedExpanded ? "▲" : "▼"}
+                  </span>
+                </button>
+              </li>
+            )}
+            {playedExpanded &&
+              playedRows.map((r, idx) => renderRow(r, idx, false))}
           </ul>
         )}
       </section>
