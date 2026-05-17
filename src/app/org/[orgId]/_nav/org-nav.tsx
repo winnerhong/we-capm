@@ -189,7 +189,7 @@ function buildGroups(
           icon: "🎁",
         },
         {
-          label: "선물 수령(매장)",
+          label: "선물 수령 QR카메라",
           href: `${base}/gifts/redeem`,
           icon: "🏪",
         },
