@@ -373,8 +373,8 @@ export function RequestsWithHearts({
   /* 두 섹션 분리 렌더 (기존 청취자 페이지 동작)                                   */
   /* -------------------------------------------------------------------------- */
 
-  // 둘 다 비어있으면 한 줄 안내
-  if (songRows.length === 0 && storyRows.length === 0) {
+  // 참가자 페이지(filterKind 미지정)는 신청곡 섹션만 노출 — story_only 카드는 호스트 콘솔 전용.
+  if (songRows.length === 0) {
     if (isDark) {
       return (
         <section className="relative isolate rounded-2xl border-l-[5px] border-l-amber-300/50 border-y border-y-white/10 border-r border-r-white/10 bg-[#101935] p-4 text-white shadow-xl">
@@ -419,23 +419,6 @@ export function RequestsWithHearts({
         />
       )}
 
-      {/* 💌 사연 */}
-      {storyRows.length > 0 && (
-        <StorySection
-          rows={storyRows}
-          title={`💌 사연 (${storyRows.length})`}
-          isDark={isDark}
-          hearted={hearted}
-          pendingIds={pendingIds}
-          handleHeart={handleHeart}
-          flashKey={flashKey}
-          showBoost={showBoost}
-          onBoost={setBoostingId}
-          sortMode={sortMode}
-          onSortChange={setSortMode}
-          classByUser={classByUser}
-        />
-      )}
       {boostModalEl}
     </div>
   );
