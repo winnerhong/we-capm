@@ -32,6 +32,23 @@ export interface UserGiftRow {
   created_at: string;
 }
 
+/**
+ * org_gift_templates row — 기관별 미리 등록한 선물 쿠폰 템플릿.
+ * 발급 시 폼을 즉시 채우기 위한 프리셋.
+ */
+export interface OrgGiftTemplateRow {
+  id: string;
+  org_id: string;
+  label: string;
+  message: string | null;
+  gift_url: string | null;
+  default_expires_days: number;
+  is_archived: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
 /* -------------------------------------------------------------------------- */
 /* 라벨                                                                       */
 /* -------------------------------------------------------------------------- */

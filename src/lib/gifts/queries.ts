@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import type {
   GiftSourceType,
   GiftStatus,
+  OrgGiftTemplateRow,
   UserGiftRow,
 } from "@/lib/gifts/types";
 
@@ -155,4 +156,59 @@ export async function loadOrgGifts(
 
   const resp = (await (q as unknown as Promise<SbResp<UserGiftRow>>));
   return resp.data ?? [];
+}
+
+/* -------------------------------------------------------------------------- */
+/* 쿠폰 템플릿 (org)                                                            */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * 기관별 쿠폰 템플릿 — 발급 폼에서 셀렉터에 뜨는 프리셋.
+ *  - includeArchived=false (디폴트): 보관 처리(is_archived=true)한 것 제외
+ *  - 정렬: sort_order ASC, created_at DESC
+ */
+export async function loadOrgGiftTemplates(
+  orgId: string,
+  opts?: { includeArchived?: boolean }
+): Promise<OrgGiftTemplateRow[]> {
+  if (!orgId) return [];
+  const includeArchived = opts?.includeArchived ?? false;
+  const supabase = await createClient();
+
+  type Q = {
+    select: (c: string) => Q;
+    eq: (k: string, v: string | boolean) => Q;
+    order: (c: string, o: { ascending: boolean }) => Q;
+  };
+  let q = (supabase.from("org_gift_templates" as never) as unknown as Q).select(
+    "*"
+  );
+  q = q.eq("org_id", orgId);
+  if (!includeArchived) q = q.eq("is_archived", false);
+  q = q.order("sort_order", { ascending: true });
+  q = q.order("created_at", { ascending: false });
+
+  const resp = (await (q as unknown as Promise<SbResp<OrgGiftTemplateRow>>));
+  return resp.data ?? [];
+}
+
+/** 단건 조회 — 발급 시 다시 한 번 검증할 때 사용. */
+export async function loadOrgGiftTemplateById(
+  id: string
+): Promise<OrgGiftTemplateRow | null> {
+  if (!id) return null;
+  const supabase = await createClient();
+  const resp = (await (
+    supabase.from("org_gift_templates" as never) as unknown as {
+      select: (c: string) => {
+        eq: (k: string, v: string) => {
+          maybeSingle: () => Promise<SbRespOne<OrgGiftTemplateRow>>;
+        };
+      };
+    }
+  )
+    .select("*")
+    .eq("id", id)
+    .maybeSingle()) as SbRespOne<OrgGiftTemplateRow>;
+  return resp.data ?? null;
 }

@@ -189,6 +189,11 @@ function buildGroups(
           icon: "🎁",
         },
         {
+          label: "쿠폰 만들기",
+          href: `${base}/gifts/templates`,
+          icon: "🎟️",
+        },
+        {
           label: "선물 수령 QR카메라",
           href: `${base}/gifts/redeem`,
           icon: "🏪",

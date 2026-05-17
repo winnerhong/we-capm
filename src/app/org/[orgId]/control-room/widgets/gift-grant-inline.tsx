@@ -8,15 +8,29 @@
 import { useState, useTransition } from "react";
 import { bulkManualGrantAction } from "@/lib/gifts/actions";
 
+export type GiftTemplateOption = {
+  id: string;
+  label: string;
+  message: string | null;
+  giftUrl: string | null;
+  defaultExpiresDays: number;
+};
+
 interface Props {
   userId: string;
   /** 표시용 — 받는 사람 이름. UX 안내에만 사용 (실제 발급 표시명은 서버가 결정). */
   displayName: string;
+  /** 미리 저장한 쿠폰 템플릿 — 셀렉터에서 골라 폼 자동 채움. */
+  templates?: GiftTemplateOption[];
 }
 
 const DEFAULT_EXPIRES_DAYS = 30;
 
-export function GiftGrantInline({ userId, displayName }: Props) {
+export function GiftGrantInline({
+  userId,
+  displayName,
+  templates = [],
+}: Props) {
   const [open, setOpen] = useState(false);
   const [giftLabel, setGiftLabel] = useState("");
   const [message, setMessage] = useState("");
@@ -115,6 +129,36 @@ export function GiftGrantInline({ userId, displayName }: Props) {
           ✕
         </button>
       </div>
+
+      {templates.length > 0 && (
+        <label className="block">
+          <span className="block text-[10px] font-semibold text-amber-200/80">
+            🎟️ 저장된 쿠폰 불러오기
+          </span>
+          <select
+            onChange={(e) => {
+              const id = e.target.value;
+              if (!id) return;
+              const t = templates.find((x) => x.id === id);
+              if (!t) return;
+              setGiftLabel(t.label);
+              if (t.message) setMessage(t.message);
+              setDays(t.defaultExpiresDays || DEFAULT_EXPIRES_DAYS);
+              e.target.value = "";
+            }}
+            defaultValue=""
+            disabled={pending}
+            className="mt-0.5 w-full rounded border border-amber-400/40 bg-[#0d1530] px-2 py-1 text-[11px] text-white outline-none focus:border-amber-400"
+          >
+            <option value="">— 골라서 폼 자동 채우기 —</option>
+            {templates.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
 
       <label className="block">
         <span className="block text-[10px] font-semibold text-[#a8b8d0]">

@@ -21,13 +21,28 @@ type EventLite = {
 
 type Mode = "all" | "event" | "manual";
 
+export type GiftTemplateLite = {
+  id: string;
+  label: string;
+  message: string | null;
+  giftUrl: string | null;
+  defaultExpiresDays: number;
+};
+
 type Props = {
   orgId: string;
   recipients: RecipientRow[];
   events: EventLite[];
+  /** 미리 저장된 쿠폰 템플릿 — 셀렉터에서 골라 폼 자동 채움. */
+  templates: GiftTemplateLite[];
 };
 
-export function GrantForm({ orgId, recipients, events }: Props) {
+export function GrantForm({
+  orgId,
+  recipients,
+  events,
+  templates,
+}: Props) {
   const router = useRouter();
   const [mode, setMode] = useState<Mode>("all");
   const [selectedEventId, setSelectedEventId] = useState<string>(
@@ -265,6 +280,43 @@ export function GrantForm({ orgId, recipients, events }: Props) {
         <h2 className="text-sm font-bold text-[#2D5A3D]">
           2️⃣ 어떤 선물인가요?
         </h2>
+
+        {/* 미리 저장된 쿠폰 템플릿 셀렉터 — 선택 시 폼 자동 채움 */}
+        {templates.length > 0 && (
+          <div className="mt-3 rounded-xl border border-[#E5D3B8] bg-[#FFF8F0] p-3">
+            <label className="block">
+              <span className="text-[11px] font-bold text-[#8B6F47]">
+                🎟️ 저장된 쿠폰 불러오기
+              </span>
+              <select
+                onChange={(e) => {
+                  const id = e.target.value;
+                  if (!id) return;
+                  const t = templates.find((x) => x.id === id);
+                  if (!t) return;
+                  setGiftLabel(t.label);
+                  if (t.message) setMessage(t.message);
+                  setDays(t.defaultExpiresDays || 30);
+                  // 셀렉트 값은 비워서 다시 같은 항목도 재적용 가능하도록.
+                  e.target.value = "";
+                }}
+                defaultValue=""
+                className="mt-1 w-full rounded-lg border border-[#E5D3B8] bg-white px-3 py-2 text-sm text-[#2D5A3D]"
+              >
+                <option value="">— 골라서 폼 자동 채우기 —</option>
+                {templates.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.label}
+                    {t.defaultExpiresDays
+                      ? ` (만료 ${t.defaultExpiresDays}일)`
+                      : " (만료 없음)"}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        )}
+
         <div className="mt-3 space-y-3">
           <label className="flex flex-col gap-1 text-xs font-semibold text-[#6B6560]">
             선물명 <span className="text-rose-600">*</span>

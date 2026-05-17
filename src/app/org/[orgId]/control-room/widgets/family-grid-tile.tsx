@@ -14,6 +14,14 @@ import { AcornIcon } from "@/components/acorn-icon";
 import { GiftGrantInline } from "./gift-grant-inline";
 import styles from "../control-room.module.css";
 
+export type FamilyGridGiftTemplate = {
+  id: string;
+  label: string;
+  message: string | null;
+  giftUrl: string | null;
+  defaultExpiresDays: number;
+};
+
 type Props = {
   grid: ControlRoomFamilyGrid;
   /** 가족 클릭 시 그 가족의 사진을 모아 보여주기 위해 photoWall 도 함께 받음 */
@@ -21,6 +29,8 @@ type Props = {
   /** 평시 우측 사이드(아무 가족도 hover 안 됨)에 컴팩트 미션 진행률을 표시. */
   missionProgress: ControlRoomMissionProgressRow[];
   isTvMode: boolean;
+  /** 🎁 인라인 발급 시 셀렉터로 노출할 미리 저장 쿠폰 템플릿. */
+  giftTemplates?: FamilyGridGiftTemplate[];
 };
 
 const STATE_META: Record<
@@ -54,6 +64,7 @@ export function FamilyGridTile({
   photos,
   missionProgress,
   isTvMode,
+  giftTemplates = [],
 }: Props) {
   // 클릭으로 "고정" 한 가족. ✕ 누를 때까지 유지.
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
@@ -532,6 +543,7 @@ export function FamilyGridTile({
               <GiftGrantInline
                 userId={previewRow.userId}
                 displayName={previewRow.displayName}
+                templates={giftTemplates}
               />
 
               {/* 미션별 상태 리스트 */}

@@ -249,6 +249,12 @@ export default async function OrgGiftsPage({
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Link
+              href={`/org/${orgId}/gifts/templates`}
+              className="inline-flex items-center gap-1 rounded-xl border border-[#E5D3B8] bg-[#FFF8F0] px-3 py-2 text-xs font-bold text-[#8B6F47] hover:bg-[#FAE7D0]"
+            >
+              🎟️ 쿠폰 만들기
+            </Link>
+            <Link
               href={`/org/${orgId}/gifts/grant`}
               className="inline-flex items-center gap-1 rounded-xl bg-gradient-to-r from-[#2D5A3D] to-[#3A7A52] px-3 py-2 text-xs font-bold text-white shadow-sm hover:from-[#234a30]"
             >

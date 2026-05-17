@@ -1,4 +1,5 @@
 import type { ControlRoomSnapshot } from "@/lib/control-room/types";
+import { loadOrgGiftTemplates } from "@/lib/gifts/queries";
 import styles from "./control-room.module.css";
 import { HeaderBar } from "./widgets/header-bar";
 import { ParticipantsTile } from "./widgets/participants-tile";
@@ -24,8 +25,18 @@ type Props = {
 };
 
 // ControlRoomGrid 는 async — FmStudioEmbed (server component) 가 LIVE 세션
-// 데이터를 직접 로드한다.
+// 데이터를 직접 로드한다. 가족 미리보기 패널의 🎁 선물 증정 인라인 폼에서 쓸
+// 쿠폰 템플릿도 여기서 같이 로드해 prop drilling.
 export async function ControlRoomGrid({ snapshot, orgId, isTvMode }: Props) {
+  const giftTemplates = await loadOrgGiftTemplates(orgId);
+  const giftTemplatesLite = giftTemplates.map((t) => ({
+    id: t.id,
+    label: t.label,
+    message: t.message,
+    giftUrl: t.gift_url,
+    defaultExpiresDays: t.default_expires_days,
+  }));
+
   return (
     <div
       className={`${styles.bg} ${isTvMode ? styles.tvScale : ""}`}
@@ -64,6 +75,7 @@ export async function ControlRoomGrid({ snapshot, orgId, isTvMode }: Props) {
             photos={snapshot.photoWall}
             missionProgress={snapshot.missionProgress}
             isTvMode={isTvMode}
+            giftTemplates={giftTemplatesLite}
           />
         </div>
 

@@ -598,3 +598,254 @@ export async function bulkManualGrantAction(input: {
   return { granted, failed };
 }
 
+
+/* ========================================================================== */
+/* org_gift_templates — 기관별 쿠폰 템플릿 CRUD                                */
+/* ========================================================================== */
+
+/**
+ * 새 템플릿 생성.
+ *  - label 은 필수, 나머지는 옵션.
+ *  - sort_order 미지정 시 현재 같은 org 의 최대 sort_order + 10 으로 자동 부여
+ *    (수동 재정렬 여지 확보).
+ */
+export async function createGiftTemplateAction(input: {
+  label: string;
+  message?: string | null;
+  giftUrl?: string | null;
+  defaultExpiresDays?: number;
+}): Promise<{ id: string }> {
+  const org = await requireOrg();
+  const label = (input.label ?? "").trim();
+  if (!label) throw new Error("쿠폰 이름을 입력해 주세요");
+
+  const message = (input.message ?? "").trim() || null;
+  const giftUrl = (input.giftUrl ?? "").trim() || null;
+  const days =
+    typeof input.defaultExpiresDays === "number"
+      ? Math.max(0, Math.min(365, Math.floor(input.defaultExpiresDays)))
+      : DEFAULT_EXPIRES_IN_DAYS;
+
+  const supabase = await createClient();
+
+  // 다음 sort_order 자동 부여 — 현재 최댓값 + 10.
+  const maxResp = (await (
+    supabase.from("org_gift_templates" as never) as unknown as {
+      select: (c: string) => {
+        eq: (k: string, v: string) => {
+          order: (
+            c: string,
+            o: { ascending: boolean }
+          ) => {
+            limit: (n: number) => Promise<SbResp<{ sort_order: number }>>;
+          };
+        };
+      };
+    }
+  )
+    .select("sort_order")
+    .eq("org_id", org.orgId)
+    .order("sort_order", { ascending: false })
+    .limit(1)) as SbResp<{ sort_order: number }>;
+  const nextOrder = ((maxResp.data ?? [])[0]?.sort_order ?? 0) + 10;
+
+  const insResp = (await (
+    supabase.from("org_gift_templates" as never) as unknown as {
+      insert: (r: Row) => {
+        select: (c: string) => {
+          maybeSingle: () => Promise<SbRespOne<{ id: string }>>;
+        };
+      };
+    }
+  )
+    .insert({
+      org_id: org.orgId,
+      label,
+      message,
+      gift_url: giftUrl,
+      default_expires_days: days,
+      sort_order: nextOrder,
+    } satisfies Row)
+    .select("id")
+    .maybeSingle()) as SbRespOne<{ id: string }>;
+
+  if (!insResp.data?.id) {
+    console.error("[gifts/createTemplate] insert failed", insResp.error);
+    throw new Error("쿠폰 템플릿 생성에 실패했어요");
+  }
+
+  revalidatePath(`/org/${org.orgId}/gifts/templates`);
+  revalidatePath(`/org/${org.orgId}/gifts/grant`);
+  return { id: insResp.data.id };
+}
+
+/**
+ * 템플릿 수정 — 같은 org 소유만 가능.
+ *  - 부분 업데이트(전달된 키만 UPDATE).
+ */
+export async function updateGiftTemplateAction(input: {
+  id: string;
+  label?: string;
+  message?: string | null;
+  giftUrl?: string | null;
+  defaultExpiresDays?: number;
+  sortOrder?: number;
+}): Promise<void> {
+  const org = await requireOrg();
+  const id = (input.id ?? "").trim();
+  if (!id) throw new Error("템플릿을 찾을 수 없어요");
+
+  const supabase = await createClient();
+
+  // 소유권 검증
+  const ownResp = (await (
+    supabase.from("org_gift_templates" as never) as unknown as {
+      select: (c: string) => {
+        eq: (k: string, v: string) => {
+          maybeSingle: () => Promise<SbRespOne<{ org_id: string }>>;
+        };
+      };
+    }
+  )
+    .select("org_id")
+    .eq("id", id)
+    .maybeSingle()) as SbRespOne<{ org_id: string }>;
+  if (!ownResp.data) throw new Error("템플릿을 찾을 수 없어요");
+  if (ownResp.data.org_id !== org.orgId) {
+    throw new Error("다른 기관의 템플릿이에요");
+  }
+
+  const patch: Row = {};
+  if (typeof input.label === "string") {
+    const v = input.label.trim();
+    if (!v) throw new Error("쿠폰 이름을 입력해 주세요");
+    patch.label = v;
+  }
+  if (input.message !== undefined) {
+    patch.message = (input.message ?? "").trim() || null;
+  }
+  if (input.giftUrl !== undefined) {
+    patch.gift_url = (input.giftUrl ?? "").trim() || null;
+  }
+  if (typeof input.defaultExpiresDays === "number") {
+    patch.default_expires_days = Math.max(
+      0,
+      Math.min(365, Math.floor(input.defaultExpiresDays))
+    );
+  }
+  if (typeof input.sortOrder === "number") {
+    patch.sort_order = Math.floor(input.sortOrder);
+  }
+  if (Object.keys(patch).length === 0) return;
+  patch.updated_at = new Date().toISOString();
+
+  const upd = (await (
+    supabase.from("org_gift_templates" as never) as unknown as {
+      update: (p: Row) => {
+        eq: (k: string, v: string) => Promise<{ error: SbErr }>;
+      };
+    }
+  )
+    .update(patch)
+    .eq("id", id)) as { error: SbErr };
+  if (upd.error) {
+    console.error("[gifts/updateTemplate] error", upd.error);
+    throw new Error("쿠폰 템플릿 수정에 실패했어요");
+  }
+
+  revalidatePath(`/org/${org.orgId}/gifts/templates`);
+  revalidatePath(`/org/${org.orgId}/gifts/grant`);
+}
+
+/**
+ * 템플릿 보관(soft delete) — is_archived=true 로 토글.
+ * (실 row 는 남겨두어 과거 발급 이력과의 라벨 추적은 분리되어 있어도 안전.)
+ */
+export async function archiveGiftTemplateAction(
+  id: string,
+  archive: boolean = true
+): Promise<void> {
+  const org = await requireOrg();
+  if (!id) throw new Error("템플릿을 찾을 수 없어요");
+  const supabase = await createClient();
+
+  const ownResp = (await (
+    supabase.from("org_gift_templates" as never) as unknown as {
+      select: (c: string) => {
+        eq: (k: string, v: string) => {
+          maybeSingle: () => Promise<SbRespOne<{ org_id: string }>>;
+        };
+      };
+    }
+  )
+    .select("org_id")
+    .eq("id", id)
+    .maybeSingle()) as SbRespOne<{ org_id: string }>;
+  if (!ownResp.data) throw new Error("템플릿을 찾을 수 없어요");
+  if (ownResp.data.org_id !== org.orgId) {
+    throw new Error("다른 기관의 템플릿이에요");
+  }
+
+  const upd = (await (
+    supabase.from("org_gift_templates" as never) as unknown as {
+      update: (p: Row) => {
+        eq: (k: string, v: string) => Promise<{ error: SbErr }>;
+      };
+    }
+  )
+    .update({
+      is_archived: archive,
+      updated_at: new Date().toISOString(),
+    } satisfies Row)
+    .eq("id", id)) as { error: SbErr };
+  if (upd.error) {
+    console.error("[gifts/archiveTemplate] error", upd.error);
+    throw new Error("쿠폰 템플릿 보관 처리에 실패했어요");
+  }
+
+  revalidatePath(`/org/${org.orgId}/gifts/templates`);
+  revalidatePath(`/org/${org.orgId}/gifts/grant`);
+}
+
+/**
+ * 영구 삭제 — 보관 처리로 충분한 경우가 많지만, UI 에서 명시적으로 비우고 싶을 때.
+ */
+export async function deleteGiftTemplateAction(id: string): Promise<void> {
+  const org = await requireOrg();
+  if (!id) throw new Error("템플릿을 찾을 수 없어요");
+  const supabase = await createClient();
+
+  const ownResp = (await (
+    supabase.from("org_gift_templates" as never) as unknown as {
+      select: (c: string) => {
+        eq: (k: string, v: string) => {
+          maybeSingle: () => Promise<SbRespOne<{ org_id: string }>>;
+        };
+      };
+    }
+  )
+    .select("org_id")
+    .eq("id", id)
+    .maybeSingle()) as SbRespOne<{ org_id: string }>;
+  if (!ownResp.data) throw new Error("템플릿을 찾을 수 없어요");
+  if (ownResp.data.org_id !== org.orgId) {
+    throw new Error("다른 기관의 템플릿이에요");
+  }
+
+  const del = (await (
+    supabase.from("org_gift_templates" as never) as unknown as {
+      delete: () => {
+        eq: (k: string, v: string) => Promise<{ error: SbErr }>;
+      };
+    }
+  )
+    .delete()
+    .eq("id", id)) as { error: SbErr };
+  if (del.error) {
+    console.error("[gifts/deleteTemplate] error", del.error);
+    throw new Error("쿠폰 템플릿 삭제에 실패했어요");
+  }
+
+  revalidatePath(`/org/${org.orgId}/gifts/templates`);
+  revalidatePath(`/org/${org.orgId}/gifts/grant`);
+}

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { requireOrg } from "@/lib/org-auth-guard";
 import { createClient } from "@/lib/supabase/server";
 import { loadOrgEvents } from "@/lib/org-events/queries";
+import { loadOrgGiftTemplates } from "@/lib/gifts/queries";
 import { GrantForm, type RecipientRow } from "./grant-form";
 
 export const dynamic = "force-dynamic";
@@ -137,10 +138,11 @@ export default async function OrgGiftGrantPage({
   const { orgId } = await params;
   await requireOrg();
 
-  const [recipients, events, participantMap] = await Promise.all([
+  const [recipients, events, participantMap, templates] = await Promise.all([
     loadOrgUsers(orgId),
     loadOrgEvents(orgId),
     loadEventParticipantMap(orgId),
+    loadOrgGiftTemplates(orgId),
   ]);
 
   const visibleEvents = events
@@ -190,6 +192,13 @@ export default async function OrgGiftGrantPage({
         orgId={orgId}
         recipients={recipients}
         events={visibleEvents}
+        templates={templates.map((t) => ({
+          id: t.id,
+          label: t.label,
+          message: t.message,
+          giftUrl: t.gift_url,
+          defaultExpiresDays: t.default_expires_days,
+        }))}
       />
     </div>
   );
