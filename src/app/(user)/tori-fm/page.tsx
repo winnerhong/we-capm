@@ -38,7 +38,6 @@ import { LiveFmRefresher } from "./LiveFmRefresher";
 import { MiniStage, type MiniStageNowPlaying } from "./MiniStage";
 import { RequestsWithHearts } from "./RequestsWithHearts";
 import { SubmitRequestDialog } from "./SubmitRequestDialog";
-import { TodayRankingSummary } from "./TodayRankingSummary";
 import { BroadcastQueueViewer } from "./BroadcastQueueViewer";
 
 export const dynamic = "force-dynamic";
@@ -257,10 +256,6 @@ export default async function ToriFmPage() {
             classByUser={classByUserObj}
           />
 
-          {/* 오늘의 인기 신청곡/사연 TOP 별도 카드 제거됨 —
-              RequestsWithHearts 가 인기순 정렬 + 메달 prefix 로 흡수. */}
-
-          <TodayRankingSummary sessionId={session.id} />
         </>
       )}
     </div>
