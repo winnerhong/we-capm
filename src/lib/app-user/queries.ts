@@ -227,6 +227,8 @@ export interface TopAcornFamily {
   userId: string;
   rank: number;
   familyLabel: string;
+  /** 등록 자녀의 대표 반 이름 — 없으면 null. */
+  className: string | null;
   acorns: number;
 }
 
@@ -279,7 +281,10 @@ export async function loadTopAcornFamilies(
   if (users.length === 0) return [];
 
   const ids = users.map((u) => u.id);
-  const childMap = await loadChildNamesByUserIds(ids);
+  const [childMap, classMap] = await Promise.all([
+    loadChildNamesByUserIds(ids),
+    loadPrimaryClassByUserIds(ids),
+  ]);
 
   return users.map((u, idx) => {
     const childNames = childMap.get(u.id) ?? [];
@@ -291,6 +296,7 @@ export async function loadTopAcornFamilies(
       userId: u.id,
       rank: idx + 1,
       familyLabel,
+      className: classMap.get(u.id) ?? null,
       acorns: u.acorn_balance ?? 0,
     };
   });

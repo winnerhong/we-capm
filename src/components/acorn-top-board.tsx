@@ -48,10 +48,15 @@ export function AcornTopBoard({ families, myUserId, orgName }: Props) {
                 {medal ?? f.rank}
               </span>
               <span
-                className={`min-w-0 flex-1 truncate text-sm ${
+                className={`min-w-0 flex-1 truncate text-[12px] ${
                   isMe ? "font-bold text-[#6B4423]" : "font-semibold text-[#2D5A3D]"
                 }`}
               >
+                {f.className && (
+                  <span className="mr-1 text-[10px] font-bold text-[#8B6F47]">
+                    {f.className}
+                  </span>
+                )}
                 {f.familyLabel}
                 {isMe && (
                   <span className="ml-1 text-[10px] text-[#8B6F47]">(나)</span>
