@@ -385,73 +385,94 @@ function fmtRelative(iso: string): string {
   });
 }
 
-/** 비주얼라이저 — CSS 기반, 참가자 화면 스피릿(그린/앰버/핑크 막대) */
+/**
+ * 비주얼라이저 — CSS 기반, 참가자 화면 스피릿(그린/앰버/핑크 막대).
+ *
+ * 성능 고려:
+ *  - 28 막대(14 × L/R) 가 각각 RAF 를 돌리면 layout/paint 가 매 프레임 28회 발생해
+ *    페이지 전체 스크롤이 무거워진다. → 단일 RAF 로 모든 막대를 한 번에 갱신.
+ *  - height 변경은 layout 을 트리거 → transform: scaleY 로 바꿔 compositor-only.
+ *  - IntersectionObserver 로 컨테이너가 화면 밖이면 RAF 자체를 중단.
+ *  - backdrop-blur 는 스크롤 시 매 프레임 재합성 비용이 커서 제거.
+ */
 function Visualizer({ playing }: { playing: boolean }) {
   const bars = 14;
-  return (
-    <div className="flex items-end gap-2 rounded-2xl border border-white/10 bg-white/[0.04] p-3 backdrop-blur-md">
-      {[0, 1].map((ch) => (
-        <div key={ch} className="flex flex-col items-center gap-1">
-          <span className="font-mono text-[9px] font-bold tracking-widest text-white/45">
-            {ch === 0 ? "L" : "R"}
-          </span>
-          <div className="flex h-24 items-end gap-[2px]">
-            {Array.from({ length: bars }).map((_, i) => (
-              <VisualizerBar key={i} index={i} total={bars} playing={playing} />
-            ))}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function VisualizerBar({
-  index,
-  total,
-  playing,
-}: {
-  index: number;
-  total: number;
-  playing: boolean;
-}) {
-  const ref = useRef<HTMLSpanElement>(null);
+  const total = bars * 2; // L + R
+  const containerRef = useRef<HTMLDivElement>(null);
+  const barRefs = useRef<Array<HTMLSpanElement | null>>([]);
+  const [visible, setVisible] = useState(true);
 
   useEffect(() => {
+    const el = containerRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver(
+      (entries) => setVisible(entries[0]?.isIntersecting ?? false),
+      { rootMargin: "200px" }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!visible) return;
     let raf = 0;
     let last = 0;
     const step = (t: number) => {
-      if (t - last > 120 + index * 7) {
+      if (t - last > 110) {
         last = t;
-        const el = ref.current;
-        if (el) {
+        for (let i = 0; i < total; i++) {
+          const el = barRefs.current[i];
+          if (!el) continue;
+          const idx = i % bars;
           const base = playing
-            ? 0.3 + ((total - index) / total) * 0.4
-            : 0.05 + ((total - index) / total) * 0.1;
+            ? 0.3 + ((bars - idx) / bars) * 0.4
+            : 0.05 + ((bars - idx) / bars) * 0.1;
           const jitter = playing ? Math.random() * 0.4 : Math.random() * 0.08;
           const h = Math.max(0.04, Math.min(1, base + jitter));
-          el.style.height = `${h * 100}%`;
+          el.style.transform = `scaleY(${h.toFixed(3)})`;
         }
       }
       raf = requestAnimationFrame(step);
     };
     raf = requestAnimationFrame(step);
     return () => cancelAnimationFrame(raf);
-  }, [index, total, playing]);
+  }, [visible, playing, total, bars]);
 
-  const color =
-    index < total * 0.5
-      ? "bg-emerald-400"
-      : index < total * 0.8
-        ? "bg-amber-400"
-        : "bg-rose-400";
-
+  let assignIdx = 0;
   return (
-    <span
-      ref={ref}
-      aria-hidden
-      className={`block w-1.5 rounded-sm ${color} transition-[height] duration-100 ease-out`}
-      style={{ height: "10%" }}
-    />
+    <div
+      ref={containerRef}
+      className="flex items-end gap-2 rounded-2xl border border-white/10 bg-white/[0.04] p-3"
+    >
+      {[0, 1].map((ch) => (
+        <div key={ch} className="flex flex-col items-center gap-1">
+          <span className="font-mono text-[9px] font-bold tracking-widest text-white/45">
+            {ch === 0 ? "L" : "R"}
+          </span>
+          <div className="flex h-24 items-end gap-[2px]">
+            {Array.from({ length: bars }).map((_, i) => {
+              const color =
+                i < bars * 0.5
+                  ? "bg-emerald-400"
+                  : i < bars * 0.8
+                    ? "bg-amber-400"
+                    : "bg-rose-400";
+              const myIdx = assignIdx++;
+              return (
+                <span
+                  key={i}
+                  ref={(el) => {
+                    barRefs.current[myIdx] = el;
+                  }}
+                  aria-hidden
+                  className={`block h-full w-1.5 origin-bottom rounded-sm ${color} will-change-transform`}
+                  style={{ transform: "scaleY(0.1)" }}
+                />
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }
