@@ -171,8 +171,8 @@ export function LiveChatStream({
 
   if (visible.length === 0) {
     return (
-      <div className="pointer-events-none rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-3 backdrop-blur-md">
-        <p className="text-center text-[11px] text-white/55">
+      <div className="pointer-events-none rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-6 backdrop-blur-md">
+        <p className="text-center text-[13px] text-white/55">
           💬 첫 인사를 남겨 보세요
         </p>
       </div>
@@ -182,8 +182,8 @@ export function LiveChatStream({
   return (
     <div
       ref={listRef}
-      className={`scroll-dark pointer-events-auto overflow-y-auto rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2 ${
-        fillHeight ? "h-full" : "max-h-56 sm:max-h-72"
+      className={`scroll-dark pointer-events-auto overflow-y-auto rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4 ${
+        fillHeight ? "h-full" : "max-h-[28rem] sm:max-h-[36rem]"
       }`}
       role="log"
       aria-live="polite"
@@ -274,7 +274,7 @@ export function LiveChatStream({
             return (
               <li
                 key={m.id}
-                className="flex flex-wrap items-baseline justify-end gap-1.5 break-words text-right text-[13px] leading-relaxed"
+                className="flex flex-wrap items-baseline justify-end gap-1.5 break-words text-right text-[15px] leading-relaxed"
               >
                 <span className={`font-bold ${ownColor}`}>{m.message}</span>
                 <span
@@ -318,7 +318,7 @@ export function LiveChatStream({
           return (
             <li
               key={m.id}
-              className="flex flex-wrap items-baseline gap-1.5 break-words text-[13px] leading-relaxed"
+              className="flex flex-wrap items-baseline gap-1.5 break-words text-[15px] leading-relaxed"
             >
               <span className={`font-bold ${senderColor}`}>
                 {senderPrefix}
