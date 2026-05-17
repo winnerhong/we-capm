@@ -10,6 +10,9 @@ import {
   sumAcornsForPack,
 } from "@/lib/missions/queries";
 import { StampbookDetail } from "@/components/stampbook-detail";
+import { AcornTopBoard } from "@/components/acorn-top-board";
+import { loadTopAcornFamilies } from "@/lib/app-user/queries";
+import { loadOrgNameById } from "@/lib/org-partner";
 
 export const dynamic = "force-dynamic";
 
@@ -27,14 +30,29 @@ export default async function StampbookDetailPage({
   if (!pack) notFound();
   if (pack.org_id !== user.orgId) redirect("/home");
 
-  const [missions, submissions, userAcornsInPack] = await Promise.all([
+  const [
+    missions,
+    submissions,
+    userAcornsInPack,
+    topFamilies,
+    freshOrgName,
+  ] = await Promise.all([
     loadOrgMissionsByQuestPack(packId),
     loadUserSubmissions(user.id, { packId }),
     sumAcornsForPack(user.id, packId),
+    loadTopAcornFamilies(user.orgId, 5),
+    loadOrgNameById(user.orgId, user.orgName || "소속 기관"),
   ]);
 
   return (
     <div className="space-y-5">
+      {/* 도토리 TOP 5 가족 — 최상단 노출 */}
+      <AcornTopBoard
+        families={topFamilies}
+        myUserId={user.id}
+        orgName={freshOrgName}
+      />
+
       {/* 상단 뒤로가기 */}
       <nav className="text-[11px] text-[#6B6560]">
         <Link href="/stampbook" className="hover:underline">

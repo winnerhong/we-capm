@@ -13,6 +13,9 @@ import { computePackProgress, type PackProgress } from "@/lib/missions/progress"
 import type { OrgQuestPackRow } from "@/lib/missions/types";
 import { QUEST_PACK_STATUS_META } from "@/lib/missions/types";
 import { AcornIcon } from "@/components/acorn-icon";
+import { AcornTopBoard } from "@/components/acorn-top-board";
+import { loadTopAcornFamilies } from "@/lib/app-user/queries";
+import { loadOrgNameById } from "@/lib/org-partner";
 import { fmtDateRangeKst } from "@/lib/datetime/kst";
 
 export const dynamic = "force-dynamic";
@@ -79,7 +82,11 @@ export default async function StampbookListPage({
       ? rawFilter
       : "active";
 
-  const allPacks = await loadOrgQuestPacks(user.orgId);
+  const [allPacks, topFamilies, freshOrgName] = await Promise.all([
+    loadOrgQuestPacks(user.orgId),
+    loadTopAcornFamilies(user.orgId, 5),
+    loadOrgNameById(user.orgId, user.orgName || "소속 기관"),
+  ]);
 
   const enriched: EnrichedPack[] = await Promise.all(
     allPacks.map(async (pack) => {
@@ -122,6 +129,13 @@ export default async function StampbookListPage({
 
   return (
     <div className="space-y-4">
+      {/* 도토리 TOP 5 가족 — 최상단 노출, 본인 행 강조 */}
+      <AcornTopBoard
+        families={topFamilies}
+        myUserId={user.id}
+        orgName={freshOrgName}
+      />
+
       <header>
         <h1 className="text-xl font-bold text-[#2D5A3D]">📚 스탬프북</h1>
         <p className="mt-1 text-xs text-[#6B6560]">

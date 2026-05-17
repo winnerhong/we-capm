@@ -9,7 +9,10 @@ import {
   getAcornBalance,
   loadChildrenForUser,
   loadPrimaryClassByUserIds,
+  loadTopAcornFamilies,
 } from "@/lib/app-user/queries";
+import { AcornTopBoard } from "@/components/acorn-top-board";
+import { loadOrgNameById } from "@/lib/org-partner";
 import {
   loadLiveFmSessionForOrg,
   loadFmSessionsByOrg,
@@ -53,6 +56,8 @@ export default async function ToriFmPage() {
     brandName,
     children,
     acornBalance,
+    topFamilies,
+    freshOrgName,
   ] = await Promise.all([
     loadLiveFmSessionForOrg(user.orgId),
     loadFmSessionsByOrg(user.orgId),
@@ -60,6 +65,8 @@ export default async function ToriFmPage() {
     loadOrgFmBrandName(user.orgId),
     loadChildrenForUser(user.id),
     getAcornBalance(user.id),
+    loadTopAcornFamilies(user.orgId, 5),
+    loadOrgNameById(user.orgId, user.orgName || "소속 기관"),
   ]);
 
   // session 결정 — LIVE 우선, 없으면 가장 최근 만들어진 세션을 fallback 으로 사용.
@@ -175,6 +182,13 @@ export default async function ToriFmPage() {
 
   return (
     <div className="space-y-4">
+      {/* 도토리 TOP 5 가족 — 최상단 노출 */}
+      <AcornTopBoard
+        families={topFamilies}
+        myUserId={user.id}
+        orgName={freshOrgName}
+      />
+
       {/* Realtime 구독 — 라이브 상태/곡 변화 자동 반영 */}
       <LiveFmRefresher orgId={user.orgId} />
 
