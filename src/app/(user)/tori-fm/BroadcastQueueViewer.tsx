@@ -19,6 +19,8 @@ interface Props {
   initialQueued: FmRequestRow[];
   /** 강조용 — 본인 user_id 면 카드에 "내 신청" 배지. */
   myUserId?: string;
+  /** user_id → 반 이름. "햇살반 OOO 가족" prefix 표시용. */
+  classByUser?: Record<string, string>;
 }
 
 function sortByQueuePos(arr: FmRequestRow[]): FmRequestRow[] {
@@ -30,17 +32,22 @@ function sortByQueuePos(arr: FmRequestRow[]): FmRequestRow[] {
   });
 }
 
-function authorLabel(r: FmRequestRow): string {
+function authorLabel(
+  r: FmRequestRow,
+  classByUser: Record<string, string>
+): string {
   if (r.is_anonymous) return anonLabelFromUserId(r.user_id);
   const fam = withFamilySuffix(r.child_name);
-  if (fam) return fam;
-  return "익명의 청취자";
+  if (!fam) return "익명의 청취자";
+  const cn = (classByUser[r.user_id] ?? "").trim();
+  return cn ? `${cn} ${fam}` : fam;
 }
 
 export function BroadcastQueueViewer({
   sessionId,
   initialQueued,
   myUserId,
+  classByUser = {},
 }: Props) {
   const [queue, setQueue] = useState<FmRequestRow[]>(() =>
     sortByQueuePos(initialQueued)
@@ -170,7 +177,7 @@ export function BroadcastQueueViewer({
                   </p>
                 )}
                 <p className="mt-0.5 text-[10px] text-white/55">
-                  {authorLabel(r)}
+                  {authorLabel(r, classByUser)}
                 </p>
               </div>
             </li>

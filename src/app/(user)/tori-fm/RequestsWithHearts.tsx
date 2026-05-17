@@ -41,7 +41,21 @@ type Props = {
   showBoost?: boolean;
   /** boost 모달용 현재 보유 도토리. SSR 시점 fresh value. */
   acornBalance?: number;
+  /** user_id → 반 이름. 작성자 라벨 prefix("햇살반 OOO 가족") 표시용. */
+  classByUser?: Record<string, string>;
 };
+
+/** "반 이름 + child_name 가족" — 반 없으면 가족 라벨만. */
+function authorWithClass(
+  childName: string | null | undefined,
+  userId: string,
+  classByUser: Record<string, string>
+): string {
+  const fam = withFamilySuffix(childName);
+  if (!fam) return "";
+  const cn = (classByUser[userId] ?? "").trim();
+  return cn ? `${cn} ${fam}` : fam;
+}
 
 /** created_at DESC (최신 우선). */
 function sortByCreatedDesc(arr: FmRequestRow[]): FmRequestRow[] {
@@ -60,6 +74,7 @@ export function RequestsWithHearts({
   title,
   showBoost = false,
   acornBalance,
+  classByUser = {},
 }: Props) {
   // 한 페이지에 여러 인스턴스(예: 호스트 콘솔의 song_request / story_only 두 카드)가
   // 마운트될 때 채널명 충돌 방지. useId 로 인스턴스별 고유 ID 부여.
@@ -323,6 +338,7 @@ export function RequestsWithHearts({
           onBoost={setBoostingId}
           sortMode={sortMode}
           onSortChange={setSortMode}
+          classByUser={classByUser}
         />
         {boostModalEl}
       </>
@@ -346,6 +362,7 @@ export function RequestsWithHearts({
           onBoost={setBoostingId}
           sortMode={sortMode}
           onSortChange={setSortMode}
+          classByUser={classByUser}
         />
         {boostModalEl}
       </>
@@ -398,6 +415,7 @@ export function RequestsWithHearts({
           onBoost={setBoostingId}
           sortMode={sortMode}
           onSortChange={setSortMode}
+          classByUser={classByUser}
         />
       )}
 
@@ -415,6 +433,7 @@ export function RequestsWithHearts({
           onBoost={setBoostingId}
           sortMode={sortMode}
           onSortChange={setSortMode}
+          classByUser={classByUser}
         />
       )}
       {boostModalEl}
@@ -443,6 +462,8 @@ type SectionProps = {
   sortMode?: "popular" | "recent";
   /** 정렬 토글 핸들러 — 헤더 옆 토글 버튼. 없으면 토글 미노출. */
   onSortChange?: (mode: "popular" | "recent") => void;
+  /** user_id → 반 이름. 작성자 라벨 prefix. */
+  classByUser?: Record<string, string>;
 };
 
 /**
@@ -563,6 +584,7 @@ function SongRequestSection({
   onBoost,
   sortMode = "popular",
   onSortChange,
+  classByUser = {},
 }: SectionProps) {
   if (isDark) {
     return (
@@ -655,7 +677,7 @@ function SongRequestSection({
                       <p className="mt-1 text-[10px] text-amber-200/80">
                         {r.is_anonymous
                           ? anonLabelFromUserId(r.user_id)
-                          : withFamilySuffix(r.child_name)}
+                          : authorWithClass(r.child_name, r.user_id, classByUser)}
                       </p>
                       <BoostBar
                         request={r}
@@ -752,7 +774,7 @@ function SongRequestSection({
                     <p className="mt-1 text-[10px] text-[#6B6560]">
                       {r.is_anonymous
                         ? anonLabelFromUserId(r.user_id)
-                        : withFamilySuffix(r.child_name)}
+                        : authorWithClass(r.child_name, r.user_id, classByUser)}
                     </p>
                     <BoostBar
                       request={r}
@@ -791,6 +813,7 @@ function StorySection({
   onBoost,
   sortMode = "popular",
   onSortChange,
+  classByUser = {},
 }: SectionProps) {
   if (isDark) {
     return (

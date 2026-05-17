@@ -142,6 +142,55 @@ export async function loadChildNamesByUserIds(
 }
 
 /**
+ * 여러 보호자의 대표 반 이름을 user_id → class_name 으로 반환.
+ *  - enrolled 자녀의 class_name 우선 (created_at 오래된 순)
+ *  - enrolled 가 없으면 미등록 자녀 중 첫 class_name fallback
+ *  - class_name 비어있으면 해당 user 는 map 에서 제외 (없음 == 표시 안 함)
+ */
+export async function loadPrimaryClassByUserIds(
+  userIds: string[]
+): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  if (userIds.length === 0) return out;
+  const supabase = await createClient();
+  const resp = (await (
+    supabase.from("app_children" as never) as unknown as {
+      select: (c: string) => {
+        in: (
+          k: string,
+          v: string[]
+        ) => {
+          order: (
+            c: string,
+            o: { ascending: boolean }
+          ) => Promise<SbResp<AppChildRow>>;
+        };
+      };
+    }
+  )
+    .select("user_id, class_name, is_enrolled, created_at")
+    .in("user_id", userIds)
+    .order("created_at", { ascending: true })) as SbResp<AppChildRow>;
+
+  const enrolled = new Map<string, string>();
+  const fallback = new Map<string, string>();
+  for (const c of resp.data ?? []) {
+    const cn = (c.class_name ?? "").trim();
+    if (!cn) continue;
+    if (c.is_enrolled) {
+      if (!enrolled.has(c.user_id)) enrolled.set(c.user_id, cn);
+    } else {
+      if (!fallback.has(c.user_id)) fallback.set(c.user_id, cn);
+    }
+  }
+  for (const uid of userIds) {
+    const v = enrolled.get(uid) ?? fallback.get(uid);
+    if (v) out.set(uid, v);
+  }
+  return out;
+}
+
+/**
  * 보호자의 아이 목록 (오래된 순)
  */
 export async function loadChildrenForUser(

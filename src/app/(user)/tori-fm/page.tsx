@@ -8,6 +8,7 @@ import { userHasAnyLiveEvent } from "@/lib/org-events/queries";
 import {
   getAcornBalance,
   loadChildrenForUser,
+  loadPrimaryClassByUserIds,
 } from "@/lib/app-user/queries";
 import {
   loadLiveFmSessionForOrg,
@@ -101,6 +102,19 @@ export default async function ToriFmPage() {
     session ? loadQueuedRequests(session.id) : Promise.resolve([]),
   ]);
 
+  // 작성자(반) prefix 표시용 — 등장한 모든 user_id 에 대해 한 번에 반 이름 조회.
+  // 신청곡 + 큐 + PLAYING 묶음 + 채팅 메시지 사용자까지 합쳐 1회만 조회.
+  const authorUserIds = Array.from(
+    new Set([
+      ...requests.map((r) => r.user_id),
+      ...queuedRequests.map((r) => r.user_id),
+      ...playingGroup.map((r) => r.user_id),
+    ])
+  );
+  const classByUser = await loadPrimaryClassByUserIds(authorUserIds);
+  const classByUserObj: Record<string, string> = {};
+  for (const [k, v] of classByUser) classByUserObj[k] = v;
+
   // PLAYING 곡이 있으면 — 본인 곡이면 받은 응원, 그 외엔 본인이 보낸 응원 카운트 prefetch.
   // MiniStage 의 초기 cheerCount 로 사용되어 깜빡임 방지.
   const playingHeadForCheer = playingGroup[0] ?? null;
@@ -187,6 +201,7 @@ export default async function ToriFmPage() {
               sessionId={session.id}
               initialQueued={queuedRequests}
               myUserId={user.id}
+              classByUser={classByUserObj}
             />
           ) : null
         }
@@ -239,6 +254,7 @@ export default async function ToriFmPage() {
             theme="dark"
             showBoost
             acornBalance={acornBalance}
+            classByUser={classByUserObj}
           />
 
           {/* 오늘의 인기 신청곡/사연 TOP 별도 카드 제거됨 —
