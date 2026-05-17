@@ -90,6 +90,17 @@ export interface FmRequestBoostRow {
 }
 
 /**
+ * "{이름} 가족" 라벨 안전 부착 — 이미 "가족" 으로 끝나면 그대로 반환.
+ * child_name 에 이미 가족 라벨이 저장된 경우 (예: "최시윤 가족")
+ * "최시윤 가족 가족" 중복 출력 방지.
+ */
+export function withFamilySuffix(name: string | null | undefined): string {
+  const v = (name ?? "").trim();
+  if (!v) return "";
+  return /가족\s*$/.test(v) ? v : `${v} 가족`;
+}
+
+/**
  * 익명 표시 라벨 — user_id 해시 4글자로 같은 사람의 여러 사연을 묶음.
  * "익명의 청취자 #A1B2" 형태.
  */

@@ -20,7 +20,11 @@ import {
   stopPlayingAction,
   unqueueRequestAction,
 } from "@/lib/tori-fm/actions";
-import { anonLabelFromUserId, type FmRequestRow } from "@/lib/tori-fm/types";
+import {
+  anonLabelFromUserId,
+  withFamilySuffix,
+  type FmRequestRow,
+} from "@/lib/tori-fm/types";
 
 interface Props {
   sessionId: string;
@@ -44,8 +48,7 @@ function songTitleOrFallback(r: FmRequestRow): string {
 
 function authorLabel(r: FmRequestRow): string {
   if (r.is_anonymous) return anonLabelFromUserId(r.user_id);
-  if (r.child_name?.trim()) return `${r.child_name.trim()} 가족`;
-  return "";
+  return withFamilySuffix(r.child_name);
 }
 
 /** "5분 전" / "방금 전" — created_at 기준 한국어 상대 시간. */

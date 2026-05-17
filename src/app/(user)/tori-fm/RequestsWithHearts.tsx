@@ -17,7 +17,11 @@ import {
 } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { toggleRequestHeartAction } from "@/lib/tori-fm/actions";
-import { anonLabelFromUserId, type FmRequestRow } from "@/lib/tori-fm/types";
+import {
+  anonLabelFromUserId,
+  withFamilySuffix,
+  type FmRequestRow,
+} from "@/lib/tori-fm/types";
 import { BoostModal } from "./BoostModal";
 
 type FilterKind = "song_request" | "story_only";
@@ -651,9 +655,7 @@ function SongRequestSection({
                       <p className="mt-1 text-[10px] text-amber-200/80">
                         {r.is_anonymous
                           ? anonLabelFromUserId(r.user_id)
-                          : r.child_name
-                            ? `${r.child_name} 가족`
-                            : ""}
+                          : withFamilySuffix(r.child_name)}
                       </p>
                       <BoostBar
                         request={r}
@@ -750,9 +752,7 @@ function SongRequestSection({
                     <p className="mt-1 text-[10px] text-[#6B6560]">
                       {r.is_anonymous
                         ? anonLabelFromUserId(r.user_id)
-                        : r.child_name
-                          ? `${r.child_name} 가족`
-                          : ""}
+                        : withFamilySuffix(r.child_name)}
                     </p>
                     <BoostBar
                       request={r}

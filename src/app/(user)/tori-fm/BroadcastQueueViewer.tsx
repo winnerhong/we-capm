@@ -8,7 +8,11 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { anonLabelFromUserId, type FmRequestRow } from "@/lib/tori-fm/types";
+import {
+  anonLabelFromUserId,
+  withFamilySuffix,
+  type FmRequestRow,
+} from "@/lib/tori-fm/types";
 
 interface Props {
   sessionId: string;
@@ -28,7 +32,8 @@ function sortByQueuePos(arr: FmRequestRow[]): FmRequestRow[] {
 
 function authorLabel(r: FmRequestRow): string {
   if (r.is_anonymous) return anonLabelFromUserId(r.user_id);
-  if (r.child_name?.trim()) return `${r.child_name.trim()} 가족`;
+  const fam = withFamilySuffix(r.child_name);
+  if (fam) return fam;
   return "익명의 청취자";
 }
 
