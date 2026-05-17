@@ -70,7 +70,7 @@ export function LiveChatComposer({ sessionId, isLive }: Props) {
           ⚠ {error}
         </p>
       )}
-      <div className="flex items-center gap-3 rounded-full border border-white/10 bg-white/[0.06] p-2 pl-5 shadow-lg backdrop-blur-md">
+      <div className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.06] p-1 pl-3.5 shadow-lg backdrop-blur-md">
         <input
           ref={inputRef}
           type="text"
@@ -96,14 +96,14 @@ export function LiveChatComposer({ sessionId, isLive }: Props) {
             WebkitTextFillColor: "rgb(255, 255, 255)",
             caretColor: "rgb(252, 211, 77)",
           }}
-          className="min-w-0 flex-1 border-0 text-base py-1.5 outline-none placeholder:text-white/45 disabled:opacity-50"
+          className="min-w-0 flex-1 border-0 text-sm outline-none placeholder:text-white/45 disabled:opacity-50"
         />
         <button
           type="button"
           onClick={handleSend}
           disabled={!isLive || pending || !input.trim()}
           aria-label="전송"
-          className="shrink-0 rounded-full bg-amber-400 px-5 py-2.5 text-sm font-bold text-[#1B2B3A] shadow-md transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-40"
+          className="shrink-0 rounded-full bg-amber-400 px-2.5 py-1 text-[11px] font-bold text-[#1B2B3A] shadow-md transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-40"
         >
           {pending ? "..." : "전송"}
         </button>
@@ -112,7 +112,7 @@ export function LiveChatComposer({ sessionId, isLive }: Props) {
           onClick={handleHeart}
           disabled={!isLive}
           aria-label="좋아요 보내기"
-          className="shrink-0 rounded-full bg-rose-500 px-4 py-2.5 text-lg font-bold text-white shadow-md transition hover:scale-110 hover:bg-rose-400 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
+          className="shrink-0 rounded-full bg-rose-500 px-2 py-1 text-sm font-bold text-white shadow-md transition hover:scale-110 hover:bg-rose-400 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
         >
           ♥
         </button>

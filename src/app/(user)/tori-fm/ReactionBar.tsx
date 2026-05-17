@@ -85,7 +85,7 @@ export function ReactionBar({
     ? "hidden"
     : "px-1 text-[11px] font-semibold text-[#2D5A3D]";
   const buttonCls = isEmbedded
-    ? "group relative flex h-16 items-center justify-center rounded-full bg-white/5 text-3xl ring-1 ring-white/10 transition hover:bg-white/15 hover:ring-amber-300/40 focus:outline-none focus:ring-2 focus:ring-amber-300/60 active:scale-90 disabled:cursor-not-allowed disabled:opacity-40 sm:h-[72px] sm:text-[34px]"
+    ? "group relative flex h-8 items-center justify-center rounded-full bg-white/5 text-base ring-1 ring-white/10 transition hover:bg-white/15 hover:ring-amber-300/40 focus:outline-none focus:ring-2 focus:ring-amber-300/60 active:scale-90 disabled:cursor-not-allowed disabled:opacity-40 sm:h-9 sm:text-lg"
     : "group relative flex min-h-14 items-center justify-center rounded-2xl border border-transparent bg-white text-2xl transition hover:border-[#2D5A3D]/30 hover:bg-[#D4E4BC]/40 focus:outline-none focus:ring-2 focus:ring-[#2D5A3D]/50 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40";
   const offlineCls = isEmbedded
     ? "mt-1 text-center text-[10px] text-white/50"
