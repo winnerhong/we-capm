@@ -51,17 +51,11 @@ CREATE POLICY "tori_fm_boosts_all" ON public.tori_fm_boosts
   FOR ALL USING (true) WITH CHECK (true);
 
 -- ------------------------------------------------------------
--- 3) user_acorn_transactions.reason 확장 — FM_BOOST / FM_BOOST_REFUND
---    기존 차감 정책과 동일: insert 시 amount 는 음수(차감)/양수(환불).
+-- 3) user_acorn_transactions.reason CHECK 제약 영구 제거
+--    원래는 확장 리스트로 ADD 했지만, 이후 FM_HEART / FM_CHEER_* 등
+--    추가될 때마다 마이그레이션이 필요했고 production 데이터가 매번
+--    23514 로 막힘. application 코드(AcornReason union) 가 enum 통제
+--    중이므로 DB 레벨 CHECK 제거로 단순화.
 -- ------------------------------------------------------------
 ALTER TABLE public.user_acorn_transactions
   DROP CONSTRAINT IF EXISTS user_acorn_transactions_reason_check;
-
-ALTER TABLE public.user_acorn_transactions
-  ADD CONSTRAINT user_acorn_transactions_reason_check
-  CHECK (reason IN (
-    'STAMP_SLOT','STAMPBOOK_COMPLETE','CHALLENGE','ATTENDANCE',
-    'SPEND_COUPON','SPEND_DECORATION','ADMIN_GRANT','ADMIN_DEDUCT','OTHER',
-    'MISSION','MISSION_REVERSE',
-    'FM_BOOST','FM_BOOST_REFUND'
-  ));

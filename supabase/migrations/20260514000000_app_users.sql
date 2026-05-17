@@ -59,14 +59,14 @@ CREATE POLICY "app_children_all" ON app_children
 
 
 -- 3) user_acorn_transactions (도토리 원장)
+--    reason 은 application enum(AcornReason union + FM_* / MISSION_*) 으로
+--    통제. DB CHECK 는 이후 FM_HEART / FM_CHEER_* 등 추가될 때마다
+--    production 데이터를 막아 23514 가 자주 발생하므로 처음부터 미지정.
 CREATE TABLE IF NOT EXISTS user_acorn_transactions (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
   amount int NOT NULL,
-  reason text NOT NULL CHECK (reason IN (
-    'STAMP_SLOT','STAMPBOOK_COMPLETE','CHALLENGE','ATTENDANCE',
-    'SPEND_COUPON','SPEND_DECORATION','ADMIN_GRANT','ADMIN_DEDUCT','OTHER'
-  )),
+  reason text NOT NULL,
   source_id uuid,
   source_type text,
   memo text,
