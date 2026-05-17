@@ -811,7 +811,7 @@ export function MiniStage({
       )}
 
       {/* ⑤ 하단 액션 — 채팅 스트림(머무름) + 리액션 + 입력바 (항상 노출) */}
-      <div className="relative z-20 mt-auto flex flex-col gap-2 p-3 sm:p-4">
+      <div className="relative z-20 mt-auto flex flex-col gap-2.5 p-3 pb-3.5 sm:p-4 sm:pb-4">
         {sessionId && (
           <LiveChatStream
             sessionId={sessionId}
