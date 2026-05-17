@@ -9,6 +9,8 @@ export type RecipientRow = {
   parentName: string;
   phone: string;
   childNames: string[];
+  /** enrolled 자녀의 대표 반 이름. 없으면 null. */
+  className: string | null;
 };
 
 type EventLite = {
@@ -47,7 +49,7 @@ export function GrantForm({ orgId, recipients, events }: Props) {
     const q = search.trim().toLowerCase();
     if (!q) return recipients;
     return recipients.filter((r) => {
-      const hay = `${r.parentName} ${r.phone} ${r.childNames.join(" ")}`.toLowerCase();
+      const hay = `${r.parentName} ${r.phone} ${r.childNames.join(" ")} ${r.className ?? ""}`.toLowerCase();
       return hay.includes(q);
     });
   }, [recipients, search]);
@@ -214,15 +216,25 @@ export function GrantForm({ orgId, recipients, events }: Props) {
                           />
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-sm font-bold text-[#2D5A3D]">
-                              {r.parentName ||
-                                (phoneTail
-                                  ? `010-…-${phoneTail}`
-                                  : "참가자")}
-                              {r.childNames.length > 0 && (
-                                <span className="ml-2 text-[11px] font-semibold text-[#6B6560]">
-                                  · {r.childNames.join("·")}
+                              {r.className && (
+                                <span className="mr-1 text-[11px] font-semibold text-[#8B6F47]">
+                                  {r.className}
                                 </span>
                               )}
+                              {(() => {
+                                if (r.childNames.length > 0) {
+                                  return `${r.childNames.join("·")} 가족`;
+                                }
+                                const isAutoName = /^학부모_\d+$/.test(
+                                  r.parentName ?? ""
+                                );
+                                if (r.parentName && !isAutoName) {
+                                  return `${r.parentName} 가족`;
+                                }
+                                return phoneTail
+                                  ? `010-…-${phoneTail} 가족`
+                                  : "참가자";
+                              })()}
                             </p>
                             {phoneTail && (
                               <p className="text-[11px] text-[#8B7F75]">

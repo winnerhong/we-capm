@@ -35,31 +35,45 @@ async function loadOrgUsers(orgId: string): Promise<RecipientRow[]> {
 
   const rows = resp.data ?? [];
 
-  // 자녀 이름 묶음 (원생 표시용)
+  // 자녀 이름 + 대표 반 (원생 표시용 — created_at ASC 로 첫 enrolled 반 사용)
   const ids = rows.map((r) => r.id);
   const childMap = new Map<string, string[]>();
+  const classMap = new Map<string, string>();
   if (ids.length > 0) {
+    type ChildRow = {
+      user_id: string;
+      name: string;
+      is_enrolled: boolean;
+      class_name: string | null;
+      created_at: string;
+    };
     const cResp = (await (
       supabase.from("app_children" as never) as unknown as {
         select: (c: string) => {
           in: (
             k: string,
             v: string[]
-          ) => Promise<{
-            data: Array<{ user_id: string; name: string; is_enrolled: boolean }> | null;
-          }>;
+          ) => {
+            order: (
+              c: string,
+              o: { ascending: boolean }
+            ) => Promise<{ data: ChildRow[] | null }>;
+          };
         };
       }
     )
-      .select("user_id, name, is_enrolled")
-      .in("user_id", ids)) as {
-      data: Array<{ user_id: string; name: string; is_enrolled: boolean }> | null;
+      .select("user_id, name, is_enrolled, class_name, created_at")
+      .in("user_id", ids)
+      .order("created_at", { ascending: true })) as {
+      data: ChildRow[] | null;
     };
     for (const c of cResp.data ?? []) {
       if (!c.is_enrolled) continue;
       const arr = childMap.get(c.user_id) ?? [];
       arr.push(c.name);
       childMap.set(c.user_id, arr);
+      const cn = (c.class_name ?? "").trim();
+      if (cn && !classMap.has(c.user_id)) classMap.set(c.user_id, cn);
     }
   }
 
@@ -70,6 +84,7 @@ async function loadOrgUsers(orgId: string): Promise<RecipientRow[]> {
       parentName: r.parent_name ?? "",
       phone: r.phone ?? "",
       childNames: childMap.get(r.id) ?? [],
+      className: classMap.get(r.id) ?? null,
     }));
 }
 
