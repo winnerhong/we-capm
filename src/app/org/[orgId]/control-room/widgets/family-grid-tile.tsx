@@ -11,6 +11,7 @@ import type {
 import { fmtClockKstAlways } from "@/lib/datetime/kst";
 import { useLightbox, type LightboxItem } from "@/components/photo-lightbox";
 import { AcornIcon } from "@/components/acorn-icon";
+import { GiftGrantInline } from "./gift-grant-inline";
 import styles from "../control-room.module.css";
 
 type Props = {
@@ -526,6 +527,12 @@ export function FamilyGridTile({
                   <AcornIcon size={11} /> {previewRow.totalAcorns}
                 </span>
               </p>
+
+              {/* 🎁 선물 증정 — 클릭 시 폼 펼침, 발급되면 그 가족 /gifts 에 즉시 노출 */}
+              <GiftGrantInline
+                userId={previewRow.userId}
+                displayName={previewRow.displayName}
+              />
 
               {/* 미션별 상태 리스트 */}
               <ul className="mt-3 space-y-1">
