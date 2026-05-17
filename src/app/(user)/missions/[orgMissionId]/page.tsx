@@ -220,7 +220,22 @@ export default async function MissionRunnerPage({
                 <AcornIcon size={18} /> +{existing.awarded_acorns} 도토리 획득
               </p>
             )}
-          {existing.reject_reason && (
+          {existing.status === "REJECTED" && (
+            <div className="mt-3 rounded-2xl border-2 border-amber-300 bg-amber-50/90 p-3 text-left">
+              <p className="text-sm font-bold text-amber-900">
+                🔄 다시 한번 시도해 주세요
+              </p>
+              {existing.reject_reason && (
+                <p className="mt-1.5 text-xs leading-relaxed text-amber-900/90">
+                  💬 {existing.reject_reason}
+                </p>
+              )}
+              <p className="mt-2 text-[11px] text-amber-800/80">
+                미션 페이지로 돌아가 새로운 사진/내용으로 다시 제출할 수 있어요.
+              </p>
+            </div>
+          )}
+          {existing.status !== "REJECTED" && existing.reject_reason && (
             <p className="mt-3 rounded-2xl bg-white/60 px-3 py-2 text-xs">
               💬 {existing.reject_reason}
             </p>

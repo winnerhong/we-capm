@@ -206,18 +206,79 @@ async function rejectSubmissionActionInner(
     revalidatePath(`/org/${org.orgId}/missions/review`);
     return { ok: true }; // idempotent
   }
-  if (
-    submission.status !== "SUBMITTED" &&
-    submission.status !== "PENDING_REVIEW"
-  ) {
-    throw new Error("이미 처리된 제출이에요");
+  if (submission.status === "REVOKED") {
+    throw new Error("취소된 제출은 반려할 수 없어요");
+  }
+  // SUBMITTED / PENDING_REVIEW / APPROVED / AUTO_APPROVED 모두 허용.
+  //  - APPROVED/AUTO_APPROVED 인 경우: 운영자가 잘못 승인 → 되돌리기. 도토리 자동 회수.
+
+  // 1) 이미 도토리 지급된 케이스라면 회수 (APPROVED/AUTO_APPROVED 분기)
+  const wasApproved =
+    submission.status === "APPROVED" ||
+    submission.status === "AUTO_APPROVED";
+  const awardedAmount = submission.awarded_acorns ?? 0;
+
+  if (wasApproved && awardedAmount > 0) {
+    // user_acorn_transactions: 음수 amount + reason='MISSION_REVERSE'
+    const txResp = (await (
+      supabase.from("user_acorn_transactions" as never) as unknown as {
+        insert: (r: Row) => Promise<{ error: SbErr }>;
+      }
+    ).insert({
+      user_id: submission.user_id,
+      amount: -awardedAmount,
+      reason: "MISSION_REVERSE",
+      source_type: "mission_submission_reverse",
+      source_id: submission.id,
+      memo: `반려 회수: ${trimmed.slice(0, 50)}`,
+    } satisfies Row)) as { error: SbErr };
+    if (txResp.error) {
+      console.error("[review/reject] ledger reverse failed", {
+        code: txResp.error.code,
+      });
+      // 도토리 회수 실패해도 status 는 바뀜 — 운영 reconcile 대상
+    }
+
+    // app_users.acorn_balance -= awardedAmount (음수 방지 가드)
+    const balResp = (await (
+      supabase.from("app_users" as never) as unknown as {
+        select: (c: string) => {
+          eq: (k: string, v: string) => {
+            maybeSingle: () => Promise<{
+              data: { acorn_balance: number | null } | null;
+              error: SbErr;
+            }>;
+          };
+        };
+      }
+    )
+      .select("acorn_balance")
+      .eq("id", submission.user_id)
+      .maybeSingle()) as {
+      data: { acorn_balance: number | null } | null;
+      error: SbErr;
+    };
+    const current = balResp.data?.acorn_balance ?? 0;
+    const next = Math.max(0, current - awardedAmount);
+    await (
+      supabase.from("app_users" as never) as unknown as {
+        update: (p: Row) => {
+          eq: (k: string, v: string) => Promise<{ error: SbErr }>;
+        };
+      }
+    )
+      .update({ acorn_balance: next })
+      .eq("id", submission.user_id);
   }
 
+  // 2) submission 상태 전환
   const updErr = await updateSubmissionStatus(supabase, submissionId, {
     status: "REJECTED",
     reject_reason: trimmed,
     reviewed_at: new Date().toISOString(),
     reviewed_by: org.managerId,
+    // 회수 후 0 으로 리셋해서 다시 승인 시 mission award 가 정상 동작.
+    ...(wasApproved ? { awarded_acorns: 0 } : {}),
   });
   if (updErr) throw new Error(`반려 실패: ${updErr.message}`);
 

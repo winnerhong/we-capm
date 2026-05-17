@@ -859,7 +859,9 @@ async function loadPending(
 
     const subs = subResp.data ?? [];
     const total = subs.length;
-    const topItems = subs.slice(0, 10);
+    // 위젯이 내부 스크롤로 전부 노출하므로 cap 을 넉넉히 (이전 10 → 100).
+    // total 은 별도로 정확함, items 는 표시용.
+    const topItems = subs.slice(0, 100);
 
     // 3단계: 제출자 이름 + 팩 이름 맵 일괄 조회
     const userIds = Array.from(new Set(topItems.map((s) => s.user_id)));
@@ -2070,7 +2072,7 @@ async function loadPhotoWall(
       .in("org_mission_id", missionIds)
       .neq("status", "REVOKED")
       .order("submitted_at", { ascending: false })
-      .limit(60)) as SbResp<SubRow>;
+      .limit(200)) as SbResp<SubRow>;
 
     if (subResp.error) {
       console.error("[control-room/loadPhotoWall] sub err", subResp.error);
@@ -2192,7 +2194,7 @@ async function loadPhotoWall(
         submittedAt: s.submitted_at,
         status: s.status,
       });
-      if (out.length >= 30) break;
+      if (out.length >= 120) break; // 위젯 안에서 스크롤로 다 노출됨
     }
 
     // 5) 사설 버킷 signed URL 은 24시간 후 만료 → admin client 로 재서명.

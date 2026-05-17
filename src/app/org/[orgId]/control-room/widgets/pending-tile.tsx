@@ -30,7 +30,9 @@ function oldestColor(min: number | null): string {
 
 export function PendingTile({ snapshot, orgId, isTvMode }: Props) {
   const { total, oldestWaitingMinutes, items } = snapshot.pending;
-  const list = items.slice(0, 5);
+  // 전부 노출 — 5개 cap 제거. 위젯이 너무 길어지지 않도록 ul 컨테이너에
+  // max-h + overflow-y-auto 적용 (아래 ul className 참고).
+  const list = items;
   const now = new Date(snapshot.serverNowIso).getTime();
   const oldestHex = oldestColor(oldestWaitingMinutes);
   const reviewHref = `/org/${orgId}/missions/review`;
@@ -94,7 +96,13 @@ export function PendingTile({ snapshot, orgId, isTvMode }: Props) {
             )}
           </div>
 
-          <ul className="flex flex-col gap-2 overflow-hidden">
+          <ul
+            className="flex max-h-[520px] flex-col gap-2 overflow-y-auto pr-1
+              [&::-webkit-scrollbar]:w-1.5
+              [&::-webkit-scrollbar-track]:bg-transparent
+              [&::-webkit-scrollbar-thumb]:rounded-full
+              [&::-webkit-scrollbar-thumb]:bg-white/15"
+          >
             {list.map((it) => {
               const inner = (
                 <>
