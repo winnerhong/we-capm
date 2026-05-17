@@ -4,6 +4,8 @@ import {
   getAcornBalance,
   loadAppUserById,
   loadChildrenForUser,
+  loadTopAcornFamilies,
+  type TopAcornFamily,
 } from "@/lib/app-user/queries";
 import { OnboardingWizard } from "./onboarding-wizard";
 import {
@@ -107,14 +109,21 @@ export default async function UserHomePage({
   const sp = await searchParams;
   const urlEventId = sp.event_id;
 
-  const [acornBalance, children, activeEvents, userDetail, freshOrgName] =
-    await Promise.all([
-      getAcornBalance(user.id),
-      loadChildrenForUser(user.id),
-      loadActiveAndUpcomingEventsForUser(user.id),
-      loadAppUserById(user.id),
-      loadOrgNameById(user.orgId, user.orgName || "소속 기관"),
-    ]);
+  const [
+    acornBalance,
+    children,
+    activeEvents,
+    userDetail,
+    freshOrgName,
+    topFamilies,
+  ] = await Promise.all([
+    getAcornBalance(user.id),
+    loadChildrenForUser(user.id),
+    loadActiveAndUpcomingEventsForUser(user.id),
+    loadAppUserById(user.id),
+    loadOrgNameById(user.orgId, user.orgName || "소속 기관"),
+    loadTopAcornFamilies(user.orgId, 5),
+  ]);
 
   // 선택 규칙:
   //   - URL ?event_id= 가 activeEvents 에 있으면 그걸 사용
@@ -275,6 +284,9 @@ export default async function UserHomePage({
 
   return (
     <div className="space-y-4">
+      {/* 도토리 TOP 5 가족 — 최상단 노출, 본인 행 강조 */}
+      <AcornTopBoard families={topFamilies} myUserId={user.id} />
+
       {/* 온보딩 위저드 — 최상단 노출(미완 시 배너). 첫 입장 시 자동 오픈, 미완 시 상단 배너 유지. */}
       <OnboardingWizard
         userId={user.id}
@@ -385,6 +397,71 @@ export default async function UserHomePage({
       )}
 
     </div>
+  );
+}
+
+function AcornTopBoard({
+  families,
+  myUserId,
+}: {
+  families: TopAcornFamily[];
+  myUserId: string;
+}) {
+  if (families.length === 0) return null;
+  return (
+    <section className="overflow-hidden rounded-3xl border border-[#E5D3B8] bg-gradient-to-br from-[#FFFDF8] to-[#FFF6E5] p-4 shadow-sm">
+      <header className="mb-2 flex items-center justify-between">
+        <h2 className="flex items-center gap-1.5 text-sm font-bold text-[#6B4423]">
+          <span aria-hidden>🏆</span>
+          <span>도토리 TOP 5</span>
+        </h2>
+        <span className="text-[10px] font-semibold text-[#8B6F47]">
+          실시간 잔액 기준
+        </span>
+      </header>
+      <ol className="space-y-1.5">
+        {families.map((f) => {
+          const isMe = f.userId === myUserId;
+          const medal =
+            f.rank === 1 ? "🥇" : f.rank === 2 ? "🥈" : f.rank === 3 ? "🥉" : null;
+          return (
+            <li
+              key={f.userId}
+              className={`flex items-center gap-2 rounded-xl px-3 py-2 ${
+                isMe
+                  ? "bg-gradient-to-r from-[#FFE9B3] to-[#FFD98A] ring-1 ring-[#E5B86A]"
+                  : "bg-white/70"
+              }`}
+            >
+              <span
+                className={`inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${
+                  medal
+                    ? "bg-transparent text-base"
+                    : "bg-[#E5D3B8] text-[#6B4423]"
+                }`}
+                aria-label={`${f.rank}위`}
+              >
+                {medal ?? f.rank}
+              </span>
+              <span
+                className={`min-w-0 flex-1 truncate text-sm ${
+                  isMe ? "font-bold text-[#6B4423]" : "font-semibold text-[#2D5A3D]"
+                }`}
+              >
+                {f.familyLabel}
+                {isMe && (
+                  <span className="ml-1 text-[10px] text-[#8B6F47]">(나)</span>
+                )}
+              </span>
+              <span className="flex shrink-0 items-center gap-1 text-sm font-bold tabular-nums text-[#6B4423]">
+                <AcornIcon size={14} />
+                {f.acorns}
+              </span>
+            </li>
+          );
+        })}
+      </ol>
+    </section>
   );
 }
 

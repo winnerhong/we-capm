@@ -168,6 +168,86 @@ export async function loadChildrenForUser(
 }
 
 /**
+ * org 내 도토리 잔액 TOP N 가족 — 참가자 홈 상단 리더보드용.
+ *
+ * 표시명 규칙: enrolled 자녀 있으면 "{이름들} 가족", 없고 자녀만 있으면
+ * "{자녀이름들} 가족", 둘 다 없으면 "{보호자명} 가족".
+ * acorn_balance > 0 만, 동점은 created_at ASC (먼저 가입 우선).
+ */
+export interface TopAcornFamily {
+  userId: string;
+  rank: number;
+  familyLabel: string;
+  acorns: number;
+}
+
+export async function loadTopAcornFamilies(
+  orgId: string,
+  limit: number
+): Promise<TopAcornFamily[]> {
+  if (!orgId) return [];
+  const n = Math.max(1, Math.min(20, Math.floor(limit) || 5));
+  const supabase = await createClient();
+
+  type Row = {
+    id: string;
+    parent_name: string | null;
+    acorn_balance: number | null;
+    created_at: string;
+  };
+  const usersResp = (await (
+    supabase.from("app_users" as never) as unknown as {
+      select: (c: string) => {
+        eq: (k: string, v: string) => {
+          eq: (k: string, v: string) => {
+            gt: (k: string, v: number) => {
+              order: (
+                c: string,
+                o: { ascending: boolean }
+              ) => {
+                order: (
+                  c: string,
+                  o: { ascending: boolean }
+                ) => {
+                  limit: (n: number) => Promise<SbResp<Row>>;
+                };
+              };
+            };
+          };
+        };
+      };
+    }
+  )
+    .select("id, parent_name, acorn_balance, created_at")
+    .eq("org_id", orgId)
+    .eq("status", "ACTIVE")
+    .gt("acorn_balance", 0)
+    .order("acorn_balance", { ascending: false })
+    .order("created_at", { ascending: true })
+    .limit(n)) as SbResp<Row>;
+
+  const users = usersResp.data ?? [];
+  if (users.length === 0) return [];
+
+  const ids = users.map((u) => u.id);
+  const childMap = await loadChildNamesByUserIds(ids);
+
+  return users.map((u, idx) => {
+    const childNames = childMap.get(u.id) ?? [];
+    const familyLabel =
+      childNames.length > 0
+        ? `${childNames.join("·")} 가족`
+        : `${(u.parent_name ?? "").trim() || "보호자"} 가족`;
+    return {
+      userId: u.id,
+      rank: idx + 1,
+      familyLabel,
+      acorns: u.acorn_balance ?? 0,
+    };
+  });
+}
+
+/**
  * 현재 도토리 잔액. 유저가 없으면 0 반환.
  */
 export async function getAcornBalance(userId: string): Promise<number> {
