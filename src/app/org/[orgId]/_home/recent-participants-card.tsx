@@ -92,6 +92,12 @@ export function RecentParticipantsCard({
             통계 보기
           </Link>
         </div>
+        <Link
+          href={`/org/${orgId}/members`}
+          className="mt-2 inline-flex w-full items-center justify-center gap-1 rounded-xl border border-[#D4E4BC] bg-[#F5F1E8] px-3 py-2 text-center text-xs font-bold text-[#2D5A3D] transition hover:bg-[#E8F0E4]"
+        >
+          👨‍👩‍👧 가족 명단 (자녀·반·연락처·CSV)
+        </Link>
       </div>
     </section>
   );

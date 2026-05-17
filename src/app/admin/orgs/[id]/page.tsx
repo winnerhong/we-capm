@@ -242,6 +242,22 @@ export default async function AdminOrgDetailPage({ params }: PageProps) {
         </div>
       </header>
 
+      {/* 가족 명단 진입 카드 */}
+      <Link
+        href={`/admin/orgs/${id}/members`}
+        className="flex items-center justify-between gap-3 rounded-2xl border border-[#D4E4BC] bg-white p-4 shadow-sm transition hover:border-[#2D5A3D] hover:bg-[#F5F1E8]/50"
+      >
+        <div className="min-w-0">
+          <p className="text-sm font-bold text-[#2D5A3D]">
+            👨‍👩‍👧 가족 명단 보기
+          </p>
+          <p className="mt-0.5 text-xs text-[#6B6560]">
+            가입한 보호자·자녀 리스트, 반·연락처 검색, CSV 내보내기
+          </p>
+        </div>
+        <span className="shrink-0 text-[#8B7F75]">›</span>
+      </Link>
+
       {/* 완성도 카드 */}
       <CompletenessCard result={completeness} missingAnchor="#missing" />
 

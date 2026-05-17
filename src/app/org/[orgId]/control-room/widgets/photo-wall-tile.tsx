@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation";
 import type { ControlRoomSnapshot } from "@/lib/control-room/types";
 import { fmtClockKstAlways } from "@/lib/datetime/kst";
 import { useLightbox, type LightboxItem } from "@/components/photo-lightbox";
+import { approveSubmissionAction } from "@/lib/missions/review-actions";
 import { deletePhotoFromWallAction } from "../actions";
+import { InlineReviewModal } from "./inline-review-modal";
 import styles from "../control-room.module.css";
 
 type Props = {
@@ -24,6 +26,14 @@ export function PhotoWallTile({ items, isTvMode }: Props) {
   const router = useRouter();
   const limit = isTvMode ? 18 : 12;
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [approvingId, setApprovingId] = useState<string | null>(null);
+  // 빠른 승인 후 "✅ 승인됨" 토스트 한 번 표시할 사진 id.
+  // router.refresh 가 끝나기 전에 사용자에게 피드백 주기 위해.
+  const [justApprovedId, setJustApprovedId] = useState<string | null>(null);
+  // ❌ 반려 클릭 시 InlineReviewModal 을 그 사진의 submissionId 로 오픈.
+  const [reviewingSubmissionId, setReviewingSubmissionId] = useState<
+    string | null
+  >(null);
   const [, startTransition] = useTransition();
 
   // 미션별 필터 — null = 전체. 디폴트는 null (모든 사진).
@@ -85,6 +95,28 @@ export function PhotoWallTile({ items, isTvMode }: Props) {
     [list]
   );
   const { openAt, lightbox } = useLightbox(lightboxItems);
+
+  function handleApprove(p: (typeof list)[number]) {
+    if (approvingId) return;
+    setApprovingId(p.submissionId);
+    startTransition(async () => {
+      const result = await approveSubmissionAction(p.submissionId);
+      setApprovingId(null);
+      if (!result.ok) {
+        window.alert(`승인 실패: ${result.error}`);
+        return;
+      }
+      // 사용자에게 즉시 피드백 — 다음 fetch 까지 "승인됨" 토스트 유지.
+      setJustApprovedId(p.submissionId);
+      router.refresh();
+      // 3초 후 토스트 제거 (refresh 후 status 가 APPROVED 로 바뀌어도 안전망)
+      setTimeout(() => {
+        setJustApprovedId((curr) =>
+          curr === p.submissionId ? null : curr
+        );
+      }, 3000);
+    });
+  }
 
   function handleDelete(p: (typeof list)[number]) {
     if (
@@ -220,16 +252,63 @@ export function PhotoWallTile({ items, isTvMode }: Props) {
                   {fmtClockKstAlways(p.submittedAt)}
                 </div>
               </div>
-              {p.status === "PENDING_REVIEW" && (
+              {/* 상태 뱃지 — 검수/반려/방금 승인됨 */}
+              {justApprovedId === p.submissionId ? (
+                <span className="pointer-events-none absolute right-1 top-1 rounded-full bg-emerald-500/95 px-1.5 py-0.5 text-[8px] font-bold text-white shadow-md">
+                  ✅ 승인됨
+                </span>
+              ) : p.status === "PENDING_REVIEW" || p.status === "SUBMITTED" ? (
                 <span className="pointer-events-none absolute right-1 top-1 rounded-full bg-amber-500/90 px-1.5 py-0.5 text-[8px] font-bold text-white">
                   검수
                 </span>
-              )}
-              {p.status === "REJECTED" && (
+              ) : p.status === "REJECTED" ? (
                 <span className="pointer-events-none absolute right-1 top-1 rounded-full bg-rose-500/90 px-1.5 py-0.5 text-[8px] font-bold text-white">
                   반려
                 </span>
-              )}
+              ) : null}
+
+              {/* 검수 액션 — 검수 대기 상태이고 일반 모드일 때만, 호버/탭 시 노출.
+                  ✅ : 1클릭 즉시 승인 (confirm 없음 — 실수해도 검수 페이지에서 다시 처리 가능)
+                  ❌ : InlineReviewModal 오픈 (사유 입력) */}
+              {!isTvMode &&
+                (p.status === "PENDING_REVIEW" || p.status === "SUBMITTED") &&
+                justApprovedId !== p.submissionId && (
+                  <div className="absolute inset-x-1 top-7 flex justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setReviewingSubmissionId(p.submissionId);
+                      }}
+                      disabled={
+                        approvingId === p.submissionId ||
+                        deletingId === p.submissionId
+                      }
+                      aria-label="반려 (사유 입력)"
+                      title="반려 (사유 입력)"
+                      className="flex h-6 w-6 items-center justify-center rounded-full bg-rose-600/95 text-xs font-bold text-white shadow-md transition hover:bg-rose-500 disabled:opacity-50"
+                    >
+                      ❌
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleApprove(p);
+                      }}
+                      disabled={
+                        approvingId === p.submissionId ||
+                        deletingId === p.submissionId
+                      }
+                      aria-label="바로 승인"
+                      title="바로 승인"
+                      className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-600/95 text-xs font-bold text-white shadow-md transition hover:bg-emerald-500 disabled:opacity-50"
+                    >
+                      {approvingId === p.submissionId ? "⏳" : "✅"}
+                    </button>
+                  </div>
+                )}
+
               {/* 운영자 삭제 버튼 — TV 모드에서는 숨김 */}
               {!isTvMode && (
                 <button
@@ -251,6 +330,17 @@ export function PhotoWallTile({ items, isTvMode }: Props) {
         </ul>
       )}
       {lightbox}
+
+      {/* 반려 시 InlineReviewModal — 사유 입력 + 처리 후 자동 다음 건 */}
+      {reviewingSubmissionId && (
+        <InlineReviewModal
+          initialSubmissionId={reviewingSubmissionId}
+          onClose={() => {
+            setReviewingSubmissionId(null);
+            router.refresh();
+          }}
+        />
+      )}
     </div>
   );
 }
