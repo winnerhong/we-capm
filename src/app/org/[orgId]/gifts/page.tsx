@@ -258,7 +258,7 @@ export default async function OrgGiftsPage({
               href={`/org/${orgId}/gifts/redeem`}
               className="inline-flex items-center gap-1 rounded-xl border border-[#D4E4BC] bg-white px-3 py-2 text-xs font-bold text-[#2D5A3D] hover:bg-[#F5F1E8]"
             >
-              🏪 매장 수령 처리
+              🏪 선물 수령 QR카메라
             </Link>
             <ExpireOverdueButton overdueCount={overdueCount} />
           </div>
