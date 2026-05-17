@@ -91,6 +91,10 @@ export interface ControlRoomHeatmap {
  */
 export interface ControlRoomPhotoItem {
   submissionId: string;
+  /** 어떤 미션에서 올라온 사진인지 — 미션별 필터링에 사용. */
+  missionId: string;
+  /** 미션 종류 — PHOTO/PHOTO_APPROVAL/COOP/BROADCAST */
+  missionKind: string;
   url: string;
   missionTitle: string;
   missionIcon: string | null;

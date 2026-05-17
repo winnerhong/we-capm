@@ -1973,9 +1973,13 @@ async function loadHeatmap(
 /* -------------------------------------------------------------------------- */
 
 /**
- * 최근 PHOTO/PHOTO_APPROVAL 미션 제출의 사진 URL 모음.
+ * 최근 사진 미션 제출의 사진 URL 모음 — PHOTO/PHOTO_APPROVAL/COOP/BROADCAST 통합.
  * - status 가 REJECTED 인 것도 표시 (운영진은 검수에 도움됨)
  * - 한 제출에 여러 사진이면 첫 사진만 사용
+ * - kind별 payload 키:
+ *     PHOTO/PHOTO_APPROVAL : payload_json.photo_urls[0]
+ *     COOP                 : payload_json.shared_photo_url
+ *     BROADCAST            : payload_json.content (content_type='PHOTO' 일 때)
  * - 최대 30장
  */
 async function loadPhotoWall(
@@ -1983,7 +1987,7 @@ async function loadPhotoWall(
   orgId: string
 ): Promise<ControlRoomPhotoItem[]> {
   try {
-    // 1) org 의 PHOTO/PHOTO_APPROVAL 미션 id + meta
+    // 1) org 의 사진 종류 미션 id + meta — PHOTO/PHOTO_APPROVAL/COOP/BROADCAST 모두 포함
     const missionResp = (await (
       supabase.from("org_missions" as never) as unknown as {
         select: (c: string) => {
@@ -2005,7 +2009,12 @@ async function loadPhotoWall(
     )
       .select("id, title, icon, kind")
       .eq("org_id", orgId)
-      .in("kind", ["PHOTO", "PHOTO_APPROVAL"])) as SbResp<{
+      .in("kind", [
+        "PHOTO",
+        "PHOTO_APPROVAL",
+        "COOP",
+        "BROADCAST",
+      ])) as SbResp<{
       id: string;
       title: string;
       icon: string | null;
@@ -2022,14 +2031,21 @@ async function loadPhotoWall(
     const missionMap = new Map(missions.map((m) => [m.id, m]));
     const missionIds = missions.map((m) => m.id);
 
-    // 2) submissions — payload_json 포함
+    // 2) submissions — payload_json 포함. kind 별 사진 키가 다르므로 유니온.
     type SubRow = {
       id: string;
       org_mission_id: string;
       user_id: string;
       status: string;
       submitted_at: string;
-      payload_json: { photo_urls?: string[] } | null;
+      payload_json:
+        | {
+            photo_urls?: string[];
+            shared_photo_url?: string;
+            content?: string;
+            content_type?: string;
+          }
+        | null;
     };
     // 관제실에서 운영자가 부적절한 사진을 'REVOKED' 로 마킹하면 사진 월에서 제외.
     const subResp = (await (
@@ -2127,19 +2143,44 @@ async function loadPhotoWall(
       ]);
     }
 
-    // 4) 사진 URL 추출 + 30장 cap
+    // 4) 사진 URL 추출 + 30장 cap — kind 별 payload 키 분기
     const out: ControlRoomPhotoItem[] = [];
     for (const s of subs) {
-      const urls = s.payload_json?.photo_urls ?? [];
-      const firstUrl = urls.find((u) => typeof u === "string" && u.length > 0);
-      if (!firstUrl) continue;
       const mission = missionMap.get(s.org_mission_id);
+      if (!mission) continue;
+      const p = s.payload_json ?? {};
+
+      let firstUrl: string | null = null;
+      if (mission.kind === "PHOTO" || mission.kind === "PHOTO_APPROVAL") {
+        const arr = p.photo_urls ?? [];
+        firstUrl =
+          arr.find((u) => typeof u === "string" && u.length > 0) ?? null;
+      } else if (mission.kind === "COOP") {
+        // COOP shared_photo_url — 같은 세션의 A/B 두 submission 모두 같은 url 을 가짐.
+        // 일단 그대로 두 장 표시 (가족 둘이 한 사진 같이 올린 것처럼 자연스러움).
+        if (typeof p.shared_photo_url === "string" && p.shared_photo_url) {
+          firstUrl = p.shared_photo_url;
+        }
+      } else if (mission.kind === "BROADCAST") {
+        // BROADCAST: content_type='PHOTO' 일 때만 content 가 사진 URL
+        if (
+          p.content_type === "PHOTO" &&
+          typeof p.content === "string" &&
+          p.content
+        ) {
+          firstUrl = p.content;
+        }
+      }
+      if (!firstUrl) continue;
+
       const parentName = nameMap.get(s.user_id) || "보호자";
       out.push({
         submissionId: s.id,
+        missionId: s.org_mission_id,
+        missionKind: mission.kind,
         url: firstUrl,
-        missionTitle: mission?.title ?? "(미션)",
-        missionIcon: mission?.icon ?? null,
+        missionTitle: mission.title,
+        missionIcon: mission.icon ?? null,
         userDisplayName: formatFamilyDisplayName(
           parentName,
           enrolledMap.get(s.user_id) ?? [],

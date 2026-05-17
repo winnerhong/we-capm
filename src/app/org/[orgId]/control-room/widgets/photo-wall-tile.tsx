@@ -23,9 +23,43 @@ type Props = {
 export function PhotoWallTile({ items, isTvMode }: Props) {
   const router = useRouter();
   const limit = isTvMode ? 18 : 12;
-  const list = items.slice(0, limit);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [, startTransition] = useTransition();
+
+  // 미션별 필터 — null = 전체. 디폴트는 null (모든 사진).
+  const [filterMissionId, setFilterMissionId] = useState<string | null>(null);
+
+  // 미션 칩 — 사진이 있는 미션만, count desc 로 정렬.
+  const missionChips = useMemo(() => {
+    const map = new Map<
+      string,
+      { id: string; title: string; icon: string | null; count: number }
+    >();
+    for (const p of items) {
+      const cur = map.get(p.missionId);
+      if (cur) cur.count += 1;
+      else {
+        map.set(p.missionId, {
+          id: p.missionId,
+          title: p.missionTitle,
+          icon: p.missionIcon,
+          count: 1,
+        });
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => b.count - a.count);
+  }, [items]);
+
+  // 필터링: 미션 선택 시 그 미션 사진만, 아니면 전체.
+  // 미션이 deselect 됐는데 filterMissionId 가 사진월에 더이상 없으면 자동 리셋.
+  const filteredItems = useMemo(() => {
+    if (!filterMissionId) return items;
+    const exists = items.some((p) => p.missionId === filterMissionId);
+    if (!exists) return items;
+    return items.filter((p) => p.missionId === filterMissionId);
+  }, [items, filterMissionId]);
+
+  const list = filteredItems.slice(0, limit);
 
   const lightboxItems: LightboxItem[] = useMemo(
     () =>
@@ -70,9 +104,60 @@ export function PhotoWallTile({ items, isTvMode }: Props) {
           사진 월
         </h2>
         <span className="ml-auto font-mono text-xs text-[#a8b8d0]">
-          {items.length}
+          {filterMissionId
+            ? `${filteredItems.length} / ${items.length}`
+            : items.length}
         </span>
       </div>
+
+      {/* 미션별 필터 칩 — 사진이 있는 미션만, 활성 칩이 강조. 미션 1개 이하면 숨김. */}
+      {missionChips.length > 1 && (
+        <div
+          role="tablist"
+          aria-label="미션별 사진 필터"
+          className="mb-3 flex flex-wrap gap-1.5"
+        >
+          <button
+            type="button"
+            role="tab"
+            aria-selected={filterMissionId === null}
+            onClick={() => setFilterMissionId(null)}
+            className={`rounded-full px-2.5 py-1 text-[10px] font-bold transition ${
+              filterMissionId === null
+                ? "bg-emerald-400 text-[#0B1538] shadow-md shadow-emerald-500/30"
+                : "border border-[#1a2a52] bg-[#0a1839] text-[#a8b8d0] hover:bg-[#0e1f4d] hover:text-[#f4ecd8]"
+            }`}
+          >
+            전체 {items.length}
+          </button>
+          {missionChips.map((m) => {
+            const active = filterMissionId === m.id;
+            return (
+              <button
+                key={m.id}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                onClick={() => setFilterMissionId(active ? null : m.id)}
+                className={`rounded-full px-2.5 py-1 text-[10px] font-bold transition ${
+                  active
+                    ? "bg-amber-400 text-[#0B1538] shadow-md shadow-amber-500/30"
+                    : "border border-[#1a2a52] bg-[#0a1839] text-[#a8b8d0] hover:bg-[#0e1f4d] hover:text-[#f4ecd8]"
+                }`}
+                title={`${m.title} — ${m.count}장`}
+              >
+                <span aria-hidden className="mr-1">{m.icon ?? "📷"}</span>
+                <span className="max-w-[120px] truncate align-middle">
+                  {m.title}
+                </span>
+                <span className={`ml-1 font-mono ${active ? "" : "text-[#7a89a8]"}`}>
+                  {m.count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {list.length === 0 ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-2 py-10 text-center">
