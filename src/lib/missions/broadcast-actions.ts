@@ -474,7 +474,7 @@ export async function loadBroadcastSetupAction(): Promise<{
     }
   );
 
-  const events = await loadOrgEvents(orgId, "live");
+  const events = await loadOrgEvents(orgId, "LIVE");
   const activeEvents = events.map((e) => ({ id: e.id, name: e.name }));
 
   return { missions, activeEvents };

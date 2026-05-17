@@ -297,7 +297,6 @@ export function PhotoWallTile({ items, isTvMode }: Props) {
             onClick={() => {
               setFilterMissionId(null);
               setStatusFilter("all");
-              setCurrentPage(1);
             }}
             className={`rounded-full px-2.5 py-1 text-[10px] font-bold transition ${
               filterMissionId === null
