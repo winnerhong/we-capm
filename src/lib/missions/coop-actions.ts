@@ -320,11 +320,17 @@ export async function createCoopSessionAction(
 /* 2) joinCoopSessionAction                                                   */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * B(partner) 가 A(initiator) 의 코드를 입력 → WAITING_RECIPROCAL 로 전이.
+ *  - B 측 코드(partner_pair_code) 를 자동 발급해서 row 에 저장.
+ *  - A 가 그 코드를 확인(confirmPartnerCodeAction) 해야 PAIRED 로 진입.
+ *  - partner_pair_code 충돌 시 최대 10회 재시도 (활성 세션 안에서 UNIQUE).
+ */
 export async function joinCoopSessionAction(
   orgMissionId: string,
   pairCode: string,
   childId?: string
-): Promise<{ sessionId: string }> {
+): Promise<{ sessionId: string; myPartnerCode: string }> {
   const user = await requireAppUser();
   if (!orgMissionId) throw new Error("미션을 찾을 수 없어요");
 
@@ -356,7 +362,105 @@ export async function joinCoopSessionAction(
   const supabase = await createClient();
   const nowIso = new Date().toISOString();
 
-  // race-safe update: state='WAITING' 조건부 UPDATE, 영향 행 수로 경쟁 판정
+  // partner_pair_code 자동 발급 — 활성 세션 안에서 UNIQUE.
+  // 23505 충돌 시 새 코드 재시도. A 의 pair_code 와 같을 수 있어도 unique 인덱스가 모든 활성을 검사.
+  let myPartnerCode = "";
+  let lastErr: SbErr = null;
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const candidate = genPairCode();
+    if (candidate === session.pair_code) continue; // A 코드와 같으면 즉시 재시도
+
+    const resp = (await (
+      supabase.from("mission_coop_sessions" as never) as unknown as {
+        update: (p: Row) => {
+          eq: (k: string, v: string) => {
+            eq: (k: string, v: string) => {
+              select: (c: string) => Promise<SbResp<{ id: string }>>;
+            };
+          };
+        };
+      }
+    )
+      .update({
+        partner_user_id: user.id,
+        partner_child_id: childId ?? null,
+        partner_pair_code: candidate,
+        state: "WAITING_RECIPROCAL",
+      } satisfies Row)
+      .eq("id", session.id)
+      .eq("state", "WAITING")
+      .select("id")) as SbResp<{ id: string }> & { error?: SbErr };
+
+    if (resp.error) {
+      lastErr = resp.error;
+      // 23505 (partner_pair_code unique 충돌) 만 재시도, 그 외는 즉시 중단
+      if (resp.error.code !== "23505") break;
+      continue;
+    }
+    const updated = resp.data ?? [];
+    if (updated.length === 0) {
+      throw new Error("이미 다른 짝꿍이 합류했어요");
+    }
+    myPartnerCode = candidate;
+    break;
+  }
+
+  if (!myPartnerCode) {
+    console.error("[coop/join] partner code gen failed", lastErr);
+    throw new Error("짝꿍 코드 발급에 실패했어요. 다시 시도해 주세요");
+  }
+
+  // race condition fallback: paired_at 은 PAIRED 전이 시점이라 여기선 아직 설정 안 함.
+  void nowIso;
+
+  revalidateAll(orgMissionId);
+  return { sessionId: session.id, myPartnerCode };
+}
+
+/* -------------------------------------------------------------------------- */
+/* 2.5) confirmPartnerCodeAction — A 가 B 의 코드 입력 → PAIRED                 */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * A(initiator) 가 B(partner) 가 발급한 코드를 입력해서 양방향 교환을 완료.
+ *  - 세션은 sessionId 로 지목 (코드만으로 찾지 않음 — A 가 이미 세션을 알고 있음)
+ *  - state='WAITING_RECIPROCAL' 일 때만 가능
+ *  - partner_pair_code 와 정확히 일치해야 함
+ *  - 성공 시 state='PAIRED', paired_at = now, initiator_confirmed_partner_at = now
+ */
+export async function confirmPartnerCodeAction(
+  sessionId: string,
+  enteredCode: string
+): Promise<{ ok: true }> {
+  const user = await requireAppUser();
+  if (!sessionId) throw new Error("세션을 찾을 수 없어요");
+
+  const code = normalizePairCode(enteredCode);
+  if (!code || code.length !== 4) {
+    throw new Error("짝꿍 코드 4자리 숫자를 입력해 주세요");
+  }
+
+  const session = await loadCoopSessionById(sessionId);
+  if (!session) throw new Error("세션을 찾을 수 없어요");
+  if (session.initiator_user_id !== user.id) {
+    throw new Error("이 세션의 발급자만 짝꿍 코드를 확인할 수 있어요");
+  }
+  if (session.state !== "WAITING_RECIPROCAL") {
+    throw new Error("지금은 코드 확인 단계가 아니에요");
+  }
+  if (new Date(session.expires_at).getTime() <= Date.now()) {
+    throw new Error("페어 코드 유효 시간이 지났어요");
+  }
+  if (!session.partner_pair_code) {
+    throw new Error("짝꿍 코드가 아직 발급되지 않았어요");
+  }
+  if (session.partner_pair_code !== code) {
+    throw new Error("짝꿍 코드가 일치하지 않아요");
+  }
+
+  const supabase = await createClient();
+  const nowIso = new Date().toISOString();
+
   const resp = (await (
     supabase.from("mission_coop_sessions" as never) as unknown as {
       update: (p: Row) => {
@@ -369,22 +473,20 @@ export async function joinCoopSessionAction(
     }
   )
     .update({
-      partner_user_id: user.id,
-      partner_child_id: childId ?? null,
       state: "PAIRED",
       paired_at: nowIso,
-    })
+      initiator_confirmed_partner_at: nowIso,
+    } satisfies Row)
     .eq("id", session.id)
-    .eq("state", "WAITING")
+    .eq("state", "WAITING_RECIPROCAL")
     .select("id")) as SbResp<{ id: string }>;
 
-  const updated = resp.data ?? [];
-  if (updated.length === 0) {
-    throw new Error("이미 다른 짝꿍이 합류했어요");
+  if ((resp.data ?? []).length === 0) {
+    throw new Error("세션 상태가 바뀌었어요. 다시 시도해 주세요");
   }
 
-  revalidateAll(orgMissionId);
-  return { sessionId: session.id };
+  revalidateAll(session.org_mission_id);
+  return { ok: true };
 }
 
 /* -------------------------------------------------------------------------- */
@@ -414,6 +516,9 @@ async function performConfirmCoopSide(
   activeStateOrThrow(session.state);
   if (session.state === "WAITING") {
     throw new Error("짝꿍이 아직 합류하지 않았어요");
+  }
+  if (session.state === "WAITING_RECIPROCAL") {
+    throw new Error("아직 양측 코드 교환이 끝나지 않았어요");
   }
   if (new Date(session.expires_at).getTime() <= Date.now()) {
     throw new Error("세션 유효 시간이 지났어요");
@@ -590,6 +695,9 @@ export async function uploadCoopSharedPhotoAction(
   if (session.state === "WAITING") {
     throw new Error("짝꿍이 아직 합류하지 않았어요");
   }
+  if (session.state === "WAITING_RECIPROCAL") {
+    throw new Error("아직 양측 코드 교환이 끝나지 않았어요");
+  }
 
   const supabase = await createClient();
 
@@ -643,7 +751,11 @@ export async function cancelCoopSessionAction(
     revalidateAll(session.org_mission_id);
     return; // idempotent
   }
-  if (session.state !== "WAITING" && session.state !== "PAIRED") {
+  if (
+    session.state !== "WAITING" &&
+    session.state !== "WAITING_RECIPROCAL" &&
+    session.state !== "PAIRED"
+  ) {
     throw new Error("이미 진행된 세션은 취소할 수 없어요");
   }
 

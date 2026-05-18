@@ -546,13 +546,14 @@ export const RADIO_MODERATION_META: Record<
 /* -------------------------------------------------------------------------- */
 
 export type CoopSessionState =
-  | "WAITING"     // 혼자 기다리는 중 (pair_code 생성됨, partner 없음)
-  | "PAIRED"      // 짝꿍 합류 (둘 다 아직 제출 안 함)
-  | "A_DONE"      // initiator 제출 완료 (partner 대기)
-  | "B_DONE"      // partner 제출 완료 (initiator 대기)
-  | "COMPLETED"   // 둘 다 제출 완료
-  | "EXPIRED"     // 시간 초과
-  | "CANCELLED";  // 수동 취소
+  | "WAITING"             // 혼자 기다리는 중 (pair_code 생성됨, partner 없음)
+  | "WAITING_RECIPROCAL"  // B 합류 후 B 코드 자동 발급, A 가 B 코드 확인 대기 (양방향 교환 중간)
+  | "PAIRED"              // 양측 코드 교환 완료 (둘 다 아직 제출 안 함)
+  | "A_DONE"              // initiator 제출 완료 (partner 대기)
+  | "B_DONE"              // partner 제출 완료 (initiator 대기)
+  | "COMPLETED"           // 둘 다 제출 완료
+  | "EXPIRED"             // 시간 초과
+  | "CANCELLED";          // 수동 취소
 
 export type BroadcastTargetScope = "ORG" | "EVENT" | "ALL";
 
@@ -568,6 +569,10 @@ export interface MissionCoopSessionRow {
   shared_photo_url: string | null;
   initiator_submission_id: string | null;
   partner_submission_id: string | null;
+  /** B(partner) 가 합류 시점에 자동 발급받는 4자리 코드. A 가 입력해야 PAIRED 전이. */
+  partner_pair_code: string | null;
+  /** A 가 B 코드 입력 완료 시각. NULL 이면 양방향 교환 미완료. */
+  initiator_confirmed_partner_at: string | null;
   expires_at: string;
   paired_at: string | null;
   completed_at: string | null;
@@ -597,6 +602,11 @@ export const COOP_STATE_META: Record<
     label: "짝꿍 기다리는 중",
     icon: "⌛",
     color: "bg-amber-50 text-amber-800 border-amber-200",
+  },
+  WAITING_RECIPROCAL: {
+    label: "코드 주고받는 중",
+    icon: "🔁",
+    color: "bg-sky-50 text-sky-800 border-sky-200",
   },
   PAIRED: {
     label: "짝꿍 합류!",

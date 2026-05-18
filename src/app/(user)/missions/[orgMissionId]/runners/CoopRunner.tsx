@@ -12,6 +12,7 @@ import { COOP_STATE_META } from "@/lib/missions/types";
 import {
   cancelCoopSessionAction,
   confirmCoopSideAction,
+  confirmPartnerCodeAction,
   createCoopSessionAction,
   joinCoopSessionAction,
   uploadCoopSharedPhotoAction,
@@ -44,6 +45,8 @@ export function CoopRunner({
 }: Props) {
   const router = useRouter();
   const [pairCodeInput, setPairCodeInput] = useState("");
+  // A 가 WAITING_RECIPROCAL 단계에서 B 가 발급한 코드를 입력하는 칸.
+  const [partnerCodeInput, setPartnerCodeInput] = useState("");
   const [selectedChildId, setSelectedChildId] = useState<string>(
     kids[0]?.id ?? ""
   );
@@ -123,6 +126,26 @@ export function CoopRunner({
     startTransition(async () => {
       try {
         await cancelCoopSessionAction(session.id);
+        router.refresh();
+      } catch (e) {
+        setErrorMsg(e instanceof Error ? e.message : String(e));
+      }
+    });
+  };
+
+  // A 가 B 의 코드를 입력해 짝꿍 성립을 확정.
+  const handleConfirmPartnerCode = () => {
+    if (!session) return;
+    const code = partnerCodeInput.replace(/\D/g, "").slice(0, 4);
+    if (code.length !== 4) {
+      setErrorMsg("짝꿍 코드 4자리 숫자를 입력해 주세요");
+      return;
+    }
+    setErrorMsg(null);
+    startTransition(async () => {
+      try {
+        await confirmPartnerCodeAction(session.id, code);
+        setPartnerCodeInput("");
         router.refresh();
       } catch (e) {
         setErrorMsg(e instanceof Error ? e.message : String(e));
@@ -375,6 +398,126 @@ export function CoopRunner({
           className="min-h-[48px] w-full rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700 transition hover:bg-rose-100 disabled:opacity-50"
         >
           ❌ 짝꿍 코드 취소
+        </button>
+      </div>
+    );
+  }
+
+  // WAITING_RECIPROCAL — 양방향 코드 교환 중간 단계.
+  //   A(initiator): 짝꿍이 합류했다는 알림 + B 가 발급한 코드를 입력하는 칸
+  //   B(partner)  : 본인이 발급받은 코드 노출 + "짝꿍이 입력하면 자동 짝꿍 성립" 안내
+  if (session.state === "WAITING_RECIPROCAL") {
+    return (
+      <div className="space-y-4">
+        <section
+          className={`rounded-3xl border p-5 shadow-sm ${stateMeta.color}`}
+        >
+          <div className="flex items-center justify-between gap-2">
+            <p className="inline-flex items-center gap-2 text-sm font-bold">
+              <span aria-hidden>{stateMeta.icon}</span>
+              <span>{stateMeta.label}</span>
+            </p>
+            <Countdown expiresAt={session.expires_at} urgentSec={60} />
+          </div>
+
+          {myRole === "A" ? (
+            // A 화면 — 짝꿍 코드 입력칸
+            <>
+              <p className="mt-3 rounded-2xl bg-white/70 px-3 py-2 text-[13px] font-semibold leading-relaxed text-current">
+                ✓ 짝꿍이 합류했어요! 짝꿍이 발급받은 4자리 코드를 입력하면
+                짝꿍 성립이 끝나요.
+              </p>
+              <label
+                htmlFor="partner-code"
+                className="mt-4 block text-[11px] font-bold uppercase tracking-widest opacity-80"
+              >
+                짝꿍이 보내준 코드
+              </label>
+              <input
+                id="partner-code"
+                type="text"
+                value={partnerCodeInput}
+                placeholder="예: 5678"
+                inputMode="numeric"
+                pattern="[0-9]{4}"
+                maxLength={4}
+                autoComplete="off"
+                onChange={(e) =>
+                  setPartnerCodeInput(
+                    e.target.value.replace(/\D/g, "").slice(0, 4)
+                  )
+                }
+                className="mt-2 w-full rounded-2xl border-2 border-current/30 bg-white px-4 py-3 text-center text-3xl font-mono font-bold tracking-[0.3em] outline-none focus:border-current"
+              />
+              <button
+                type="button"
+                onClick={handleConfirmPartnerCode}
+                disabled={isPending || partnerCodeInput.length !== 4}
+                className="mt-3 min-h-[48px] w-full rounded-2xl bg-[#2D5A3D] px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-[#3A7A52] disabled:opacity-50"
+              >
+                {isPending ? "확인 중..." : "🤝 짝꿍 성립하기"}
+              </button>
+            </>
+          ) : (
+            // B 화면 — 본인 코드 노출 + 안내
+            <>
+              <p className="mt-3 text-center text-[11px] font-semibold uppercase tracking-widest opacity-80">
+                내 코드
+              </p>
+              <p className="mt-1 text-center text-4xl font-mono font-bold tracking-[0.3em]">
+                {session.partner_pair_code ?? "----"}
+              </p>
+              {session.partner_pair_code && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(
+                        session.partner_pair_code!
+                      );
+                      setCopyToast(true);
+                      setTimeout(() => setCopyToast(false), 1500);
+                    } catch {
+                      setErrorMsg("클립보드 복사 실패");
+                    }
+                  }}
+                  className="mt-3 min-h-[44px] w-full rounded-2xl border border-current/20 bg-white/60 px-4 py-2 text-sm font-bold backdrop-blur-sm transition hover:bg-white/80"
+                >
+                  📋 코드 복사
+                </button>
+              )}
+              {copyToast && (
+                <p
+                  role="status"
+                  className="mt-2 text-center text-[12px] font-semibold"
+                >
+                  ✅ 복사 완료!
+                </p>
+              )}
+              <p className="mt-4 rounded-2xl bg-white/70 px-3 py-2 text-[13px] font-semibold leading-relaxed text-current">
+                짝꿍에게 위 코드를 알려주세요. 짝꿍이 입력하면 자동으로 짝꿍
+                성립이 끝나요.
+              </p>
+            </>
+          )}
+        </section>
+
+        {errorMsg && (
+          <div
+            role="alert"
+            className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-800"
+          >
+            ⚠️ {errorMsg}
+          </div>
+        )}
+
+        <button
+          type="button"
+          onClick={handleCancel}
+          disabled={isPending}
+          className="min-h-[48px] w-full rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700 transition hover:bg-rose-100 disabled:opacity-50"
+        >
+          ❌ 세션 취소
         </button>
       </div>
     );
