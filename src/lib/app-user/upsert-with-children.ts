@@ -124,11 +124,19 @@ export async function upsertParticipantWithChildren(
     merged = true;
     userId = existing.id;
   } else {
-    const account = await createAppUserAccountFromPhone(
-      phoneDigits,
-      orgId,
-      parentName
-    );
+    let account;
+    try {
+      account = await createAppUserAccountFromPhone(
+        phoneDigits,
+        orgId,
+        parentName
+      );
+    } catch (e) {
+      console.error("[upsertParticipant] account create error", e);
+      throw new Error(
+        `계정 해시 생성 실패: ${e instanceof Error ? e.message : String(e)}`
+      );
+    }
 
     const insResp = (await (
       supabase.from("app_users" as never) as unknown as {
@@ -150,6 +158,12 @@ export async function upsertParticipantWithChildren(
       .single()) as SbOne<{ id: string }>;
 
     if (insResp.error || !insResp.data) {
+      console.error("[upsertParticipant] app_users insert error", {
+        phoneDigits,
+        orgId,
+        parentName,
+        error: insResp.error,
+      });
       throw new Error(
         `보호자 등록 실패: ${insResp.error?.message ?? "알 수 없는 오류"}`
       );

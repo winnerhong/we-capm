@@ -23,31 +23,58 @@ async function assertEventOwned(eventId: string, orgId: string) {
  * 행사 페이지에서 한 명 추가 — 보호자+자녀 upsert + event 연결 + redirect.
  *
  * partial-applied 형태로 form action 에 전달: action.bind(null, orgId, eventId)
+ *
+ * 에러 처리:
+ *   - Next.js production 은 server action 에서 raw error 를 클라이언트로 직접
+ *     넘기지 않고 generic "An error occurred in the Server Components render"
+ *     메시지로 치환할 수 있음.
+ *   - 진짜 원인을 잃지 않도록 본 함수에서 catch → console.error 로 풀 스택을
+ *     찍고, message 를 그대로 보존해서 다시 throw. NEXT_REDIRECT 만 통과.
  */
 export async function createSingleEventParticipantAction(
   orgId: string,
   eventId: string,
   formData: FormData
 ): Promise<void> {
-  const session = await requireOrg();
-  if (!orgId || orgId !== session.orgId) {
-    throw new Error("이 기관의 참가자를 등록할 권한이 없습니다");
+  try {
+    const session = await requireOrg();
+    if (!orgId || orgId !== session.orgId) {
+      throw new Error("이 기관의 참가자를 등록할 권한이 없습니다");
+    }
+    await assertEventOwned(eventId, orgId);
+
+    const { userId, merged } = await upsertParticipantWithChildren(
+      orgId,
+      formData
+    );
+
+    await linkUsersToEvent(eventId, [userId]);
+
+    revalidatePath(`/org/${orgId}/events/${eventId}`);
+    redirect(
+      `/org/${orgId}/events/${eventId}?tab=participants&imported=1${
+        merged ? "&merged=1" : ""
+      }`
+    );
+  } catch (err) {
+    // NEXT_REDIRECT 는 정상 흐름 — 통과시켜야 redirect 가 동작.
+    if (
+      err instanceof Error &&
+      (err.message === "NEXT_REDIRECT" ||
+        err.message.startsWith("NEXT_REDIRECT"))
+    ) {
+      throw err;
+    }
+    // production digest 로 가려지지 않도록 풀 컨텍스트 로깅.
+    console.error("[events/users/createSingleEventParticipant] error", {
+      orgId,
+      eventId,
+      err,
+      stack: err instanceof Error ? err.stack : undefined,
+    });
+    const msg = err instanceof Error ? err.message : String(err);
+    throw new Error(`참가자 등록 실패: ${msg}`);
   }
-  await assertEventOwned(eventId, orgId);
-
-  const { userId, merged } = await upsertParticipantWithChildren(
-    orgId,
-    formData
-  );
-
-  await linkUsersToEvent(eventId, [userId]);
-
-  revalidatePath(`/org/${orgId}/events/${eventId}`);
-  redirect(
-    `/org/${orgId}/events/${eventId}?tab=participants&imported=1${
-      merged ? "&merged=1" : ""
-    }`
-  );
 }
 
 // 일괄 등록은 기존 bulkImportAppUsersAction 이 eventId 옵션을 받도록 확장됨.
