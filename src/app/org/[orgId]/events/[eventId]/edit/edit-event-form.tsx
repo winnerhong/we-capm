@@ -133,13 +133,23 @@ function formatDateTimeKo(iso: string): string {
   return fmtDateTimeKst(iso);
 }
 
+export type InvitationTemplateLite = {
+  id: string;
+  label: string;
+  message: string | null;
+  body: string | null;
+};
+
 export function EditEventForm({
   orgId,
   eventId,
+  invitationTemplates = [],
   initial,
 }: {
   orgId: string;
   eventId: string;
+  /** 초대장 인사말/내용 템플릿 — 셀렉터에서 골라 폼 자동 채움. */
+  invitationTemplates?: InvitationTemplateLite[];
   initial: {
     name: string;
     description: string;
@@ -548,13 +558,59 @@ export function EditEventForm({
 
           {/* 📨 초대장 */}
           <div className="rounded-2xl border-2 border-emerald-200 bg-gradient-to-br from-emerald-50/40 via-white to-[#FAE7D0]/30 p-4">
-            <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-[#2D5A3D]">
-              <span aria-hidden>📨</span>
-              <span>초대장</span>
-              <span className="text-[10px] font-normal text-[#8B7F75]">
-                (선택 — 비워도 기본 초대장이 만들어져요)
+            <h3 className="mb-3 flex items-center justify-between gap-2 text-sm font-bold text-[#2D5A3D]">
+              <span className="flex items-center gap-2">
+                <span aria-hidden>📨</span>
+                <span>초대장</span>
+                <span className="text-[10px] font-normal text-[#8B7F75]">
+                  (선택 — 비워도 기본 초대장이 만들어져요)
+                </span>
               </span>
+              <a
+                href={`/org/${orgId}/invitations/templates`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded-full border border-emerald-300 bg-white px-2 py-0.5 text-[10px] font-bold text-emerald-700 hover:bg-emerald-50"
+              >
+                템플릿 관리 →
+              </a>
             </h3>
+
+            {/* 미리 저장된 인사말/초대장 템플릿 셀렉터 */}
+            {invitationTemplates.length > 0 && (
+              <div className="mb-3 rounded-xl border border-emerald-200 bg-emerald-50/60 p-3">
+                <label className="block">
+                  <span className="text-[11px] font-bold text-emerald-800">
+                    📚 저장된 템플릿 불러오기
+                  </span>
+                  <select
+                    onChange={(e) => {
+                      const id = e.target.value;
+                      if (!id) return;
+                      const t = invitationTemplates.find((x) => x.id === id);
+                      if (!t) return;
+                      // 비어있는 값은 덮어쓰지 않음 — 사용자 기존 입력 보존 의도.
+                      // (전체 교체를 원하면 셀렉터 우측 [전체 덮어쓰기] 옵션 별도 검토 가능)
+                      if (t.message) setInvMessage(t.message);
+                      if (t.body) setInvBody(t.body);
+                      e.target.value = "";
+                    }}
+                    defaultValue=""
+                    className="mt-1 w-full rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm text-[#2D5A3D]"
+                  >
+                    <option value="">— 골라서 인사말·내용 자동 채우기 —</option>
+                    {invitationTemplates.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <p className="mt-1 text-[10px] text-emerald-700/80">
+                  선택 시 빈 칸만 채워져요. 이미 입력한 값은 보존됩니다.
+                </p>
+              </div>
+            )}
 
             <div className="space-y-3">
               <div>

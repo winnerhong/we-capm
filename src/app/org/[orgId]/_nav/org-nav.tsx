@@ -103,6 +103,11 @@ function buildGroups(
           icon: "📅",
           badge: draftBadge,
         },
+        {
+          label: "초대장 템플릿",
+          href: `${base}/invitations/templates`,
+          icon: "📨",
+        },
       ],
     },
     // ───── 3단계 ─────

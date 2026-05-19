@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireOrg } from "@/lib/org-auth-guard";
 import { loadOrgEventById } from "@/lib/org-events/queries";
+import { loadOrgInvitationTemplates } from "@/lib/invitation-templates/queries";
 import { EditEventForm } from "./edit-event-form";
 
 export const dynamic = "force-dynamic";
@@ -18,6 +19,14 @@ export default async function EditOrgEventPage({
   if (!event || event.org_id !== orgId) {
     notFound();
   }
+
+  const invitationTemplates = await loadOrgInvitationTemplates(orgId);
+  const invitationTemplatesLite = invitationTemplates.map((t) => ({
+    id: t.id,
+    label: t.label,
+    message: t.message,
+    body: t.body,
+  }));
 
   return (
     <div className="mx-auto max-w-2xl space-y-6 px-4 py-6">
@@ -64,6 +73,7 @@ export default async function EditOrgEventPage({
       <EditEventForm
         orgId={orgId}
         eventId={eventId}
+        invitationTemplates={invitationTemplatesLite}
         initial={{
           name: event.name ?? "",
           description: event.description ?? "",
