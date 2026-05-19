@@ -218,100 +218,159 @@ function parseExtended(formData: FormData) {
 }
 
 export async function createProgramAction(formData: FormData) {
-  const supabase = await createClient();
-  const partner_id = await resolvePartnerId();
-  const base = parseForm(formData);
-  const ext = parseExtended(formData);
+  try {
+    const supabase = await createClient();
+    const partner_id = await resolvePartnerId();
+    const base = parseForm(formData);
+    const ext = parseExtended(formData);
 
-  const visibility: ProgramVisibility = ext.visibility ?? "DRAFT";
+    const visibility: ProgramVisibility = ext.visibility ?? "DRAFT";
 
-  // 주차장 / 집결장소 — 하단 hidden input(JSON) 에서 파싱·검증.
-  const parking_lots = parseParkingLots(formData.get("parking_lots"));
-  const meeting_point = parseMeetingPoint(formData.get("meeting_point"));
+    // 주차장 / 집결장소 — 하단 hidden input(JSON) 에서 파싱·검증.
+    const parking_lots = parseParkingLots(formData.get("parking_lots"));
+    const meeting_point = parseMeetingPoint(formData.get("meeting_point"));
 
-  const payload: Record<string, unknown> = {
-    ...base,
-    partner_id,
-    long_description: ext.long_description,
-    safety_notes: ext.safety_notes,
-    target_audience: ext.target_audience,
-    schedule_items: ext.schedule_items,
-    faq: ext.faq,
-    required_items: ext.required_items,
-    images: ext.images,
-    linked_trail_id: ext.linked_trail_id,
-    visibility,
-    parking_lots,
-    meeting_point,
-  };
+    const payload: Record<string, unknown> = {
+      ...base,
+      partner_id,
+      long_description: ext.long_description,
+      safety_notes: ext.safety_notes,
+      target_audience: ext.target_audience,
+      schedule_items: ext.schedule_items,
+      faq: ext.faq,
+      required_items: ext.required_items,
+      images: ext.images,
+      linked_trail_id: ext.linked_trail_id,
+      visibility,
+      parking_lots,
+      meeting_point,
+    };
 
-  const { error } = await (
-    supabase.from("partner_programs") as unknown as {
-      insert: (row: unknown) => Promise<{ error: { message: string } | null }>;
+    const { error } = await (
+      supabase.from("partner_programs") as unknown as {
+        insert: (
+          row: unknown
+        ) => Promise<{ error: { message: string; code?: string } | null }>;
+      }
+    ).insert(payload as never);
+
+    if (error) {
+      console.error("[partner/programs/createProgram] insert error", {
+        code: error.code,
+        message: error.message,
+        partner_id,
+        title: base.title,
+        category: base.category,
+      });
+      throw new Error(`프로그램 저장 실패: ${error.message}`);
     }
-  ).insert(payload as never);
 
-  if (error) throw new Error(`프로그램 저장 실패: ${error.message}`);
-
-  revalidatePath("/partner/programs");
-  redirect("/partner/programs");
+    revalidatePath("/partner/programs");
+    redirect("/partner/programs");
+  } catch (err) {
+    if (
+      err instanceof Error &&
+      (err.message === "NEXT_REDIRECT" ||
+        err.message.startsWith("NEXT_REDIRECT"))
+    ) {
+      throw err;
+    }
+    console.error("[partner/programs/createProgram] uncaught", {
+      err,
+      stack: err instanceof Error ? err.stack : undefined,
+    });
+    const msg = err instanceof Error ? err.message : String(err);
+    throw new Error(`프로그램 저장 실패: ${msg}`);
+  }
 }
 
 export async function updateProgramAction(id: string, formData: FormData) {
-  const supabase = await createClient();
-  const base = parseForm(formData);
-  const ext = parseExtended(formData);
+  try {
+    const supabase = await createClient();
+    const base = parseForm(formData);
+    const ext = parseExtended(formData);
 
-  // 주차장 / 집결장소 — 하단 hidden input(JSON) 에서 파싱·검증.
-  const parking_lots = parseParkingLots(formData.get("parking_lots"));
-  const meeting_point = parseMeetingPoint(formData.get("meeting_point"));
+    // 주차장 / 집결장소 — 하단 hidden input(JSON) 에서 파싱·검증.
+    const parking_lots = parseParkingLots(formData.get("parking_lots"));
+    const meeting_point = parseMeetingPoint(formData.get("meeting_point"));
 
-  // visibility 저장 포함 — 값 있을 때만 반영 (폼에서 항상 hidden으로 넣도록 UI 처리)
-  const payload: Record<string, unknown> = {
-    ...base,
-    long_description: ext.long_description,
-    safety_notes: ext.safety_notes,
-    target_audience: ext.target_audience,
-    schedule_items: ext.schedule_items,
-    faq: ext.faq,
-    required_items: ext.required_items,
-    images: ext.images,
-    linked_trail_id: ext.linked_trail_id,
-    parking_lots,
-    meeting_point,
-  };
-  if (ext.visibility) {
-    payload.visibility = ext.visibility;
-    // is_published는 deprecated — 새 코드는 visibility만 씀 (읽기 쪽에서 호환 매핑)
-  }
-
-  const { error } = await (
-    supabase.from("partner_programs") as unknown as {
-      update: (p: unknown) => {
-        eq: (k: string, v: string) => Promise<{ error: { message: string } | null }>;
-      };
+    // visibility 저장 포함 — 값 있을 때만 반영 (폼에서 항상 hidden으로 넣도록 UI 처리)
+    const payload: Record<string, unknown> = {
+      ...base,
+      long_description: ext.long_description,
+      safety_notes: ext.safety_notes,
+      target_audience: ext.target_audience,
+      schedule_items: ext.schedule_items,
+      faq: ext.faq,
+      required_items: ext.required_items,
+      images: ext.images,
+      linked_trail_id: ext.linked_trail_id,
+      parking_lots,
+      meeting_point,
+    };
+    if (ext.visibility) {
+      payload.visibility = ext.visibility;
+      // is_published는 deprecated — 새 코드는 visibility만 씀 (읽기 쪽에서 호환 매핑)
     }
-  )
-    .update(payload as never)
-    .eq("id", id);
 
-  if (error) throw new Error(`프로그램 수정 실패: ${error.message}`);
+    const { error } = await (
+      supabase.from("partner_programs") as unknown as {
+        update: (p: unknown) => {
+          eq: (
+            k: string,
+            v: string
+          ) => Promise<{ error: { message: string; code?: string } | null }>;
+        };
+      }
+    )
+      .update(payload as never)
+      .eq("id", id);
 
-  // SELECTED visibility일 때 assignments 동기화 (assigned_org_ids hidden input)
-  if (ext.visibility === "SELECTED") {
-    const rawOrgIds = String(formData.get("assigned_org_ids") ?? "").trim();
-    const orgIds = rawOrgIds
-      ? rawOrgIds.split(",").map((s) => s.trim()).filter(Boolean)
-      : [];
-    await syncAssignments(id, orgIds);
-  } else if (ext.visibility === "ALL" || ext.visibility === "DRAFT" || ext.visibility === "ARCHIVED") {
-    // SELECTED가 아니면 할당 제거 (ALL은 모든 기관 자동 노출이므로 junction 불필요)
-    await syncAssignments(id, []);
+    if (error) {
+      console.error("[partner/programs/updateProgram] update error", {
+        code: error.code,
+        message: error.message,
+        id,
+        title: base.title,
+      });
+      throw new Error(`프로그램 수정 실패: ${error.message}`);
+    }
+
+    // SELECTED visibility일 때 assignments 동기화 (assigned_org_ids hidden input)
+    if (ext.visibility === "SELECTED") {
+      const rawOrgIds = String(formData.get("assigned_org_ids") ?? "").trim();
+      const orgIds = rawOrgIds
+        ? rawOrgIds.split(",").map((s) => s.trim()).filter(Boolean)
+        : [];
+      await syncAssignments(id, orgIds);
+    } else if (
+      ext.visibility === "ALL" ||
+      ext.visibility === "DRAFT" ||
+      ext.visibility === "ARCHIVED"
+    ) {
+      // SELECTED가 아니면 할당 제거 (ALL은 모든 기관 자동 노출이므로 junction 불필요)
+      await syncAssignments(id, []);
+    }
+
+    revalidatePath("/partner/programs");
+    revalidatePath(`/partner/programs/${id}/edit`);
+    redirect("/partner/programs");
+  } catch (err) {
+    if (
+      err instanceof Error &&
+      (err.message === "NEXT_REDIRECT" ||
+        err.message.startsWith("NEXT_REDIRECT"))
+    ) {
+      throw err;
+    }
+    console.error("[partner/programs/updateProgram] uncaught", {
+      id,
+      err,
+      stack: err instanceof Error ? err.stack : undefined,
+    });
+    const msg = err instanceof Error ? err.message : String(err);
+    throw new Error(`프로그램 수정 실패: ${msg}`);
   }
-
-  revalidatePath("/partner/programs");
-  revalidatePath(`/partner/programs/${id}/edit`);
-  redirect("/partner/programs");
 }
 
 async function syncAssignments(programId: string, orgIds: string[]) {
