@@ -181,10 +181,9 @@ export default async function EventInvitationPage({
     return <PendingState eventName={event.name} />;
   }
 
-  // 같은 기관 소속이 아니면 접근 차단
-  if (user && user.org_id !== event.org_id) {
-    return <NoAccessState />;
-  }
+  // 초대장 링크는 UUID 비공개라 자체로 접근 토큰 — 다른 기관 소속 사용자도
+  // 받은 링크로 열어볼 수 있게 허용. (이전엔 user.org_id !== event.org_id 차단)
+  // 실제 행사 참여(가족 등록·미션 등) 시점에는 별도 흐름에서 org 일치 검증.
 
   const orgName = await loadPartnerDisplayNameForOrg(event.org_id).catch(
     () => null
