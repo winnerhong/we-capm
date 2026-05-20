@@ -2,7 +2,10 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { getAppUser } from "@/lib/user-auth-guard";
-import { loadAllLiveEvents } from "@/lib/org-events/queries";
+import {
+  loadAllLiveEvents,
+  loadLiveEventsForSameOrgAs,
+} from "@/lib/org-events/queries";
 import { fmtFullDateKst, fmtAmPmClockKst } from "@/lib/datetime/kst";
 import { LoginForm } from "./login-form";
 import { AcornIcon } from "@/components/acorn-icon";
@@ -49,7 +52,17 @@ export default async function UserLoginPage({
   const initialError =
     typeof sp.error === "string" && sp.error.trim() ? sp.error : null;
 
-  const liveEvents = await loadAllLiveEvents();
+  // 초대장 링크로 들어왔다면 그 행사가 속한 기관의 LIVE 행사만 노출 — 다른 기관 행사
+  // 섞여 보이지 않도록. 그 외 직접 방문 케이스는 전체 LIVE 목록 유지.
+  //   /invitation/{eventId} 또는 /invitation/{eventId}?... 형태에서 eventId 추출.
+  const invitationMatch = returnTo
+    ? returnTo.match(/^\/invitation\/([0-9a-fA-F-]{8,})/)
+    : null;
+  const invitationEventId = invitationMatch?.[1] ?? null;
+
+  const liveEvents = invitationEventId
+    ? await loadLiveEventsForSameOrgAs(invitationEventId)
+    : await loadAllLiveEvents();
 
   return (
     <main className="flex min-h-dvh items-center justify-center bg-gradient-to-b from-[#FFF8F0] via-[#F5F1E8] to-[#E8F0E4] px-4 py-10">

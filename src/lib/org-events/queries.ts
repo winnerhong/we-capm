@@ -239,17 +239,104 @@ export async function loadOrgEventForJoin(eventId: string): Promise<{
  * - starts_at ASC (먼저 시작한 행사가 위)
  * - 실패 시 빈 배열 (silent fail)
  */
-export async function loadAllLiveEvents(): Promise<
-  Array<{
-    id: string;
-    name: string;
-    org_id: string;
-    org_name: string;
-    starts_at: string | null;
-    ends_at: string | null;
-    cover_image_url: string | null;
-  }>
-> {
+export type LiveEventLite = {
+  id: string;
+  name: string;
+  org_id: string;
+  org_name: string;
+  starts_at: string | null;
+  ends_at: string | null;
+  cover_image_url: string | null;
+};
+
+/**
+ * 특정 행사가 속한 기관의 LIVE 행사만 로드.
+ *  - 초대장 링크로 들어온 사용자에게 다른 기관 행사가 섞여 보이지 않도록 분리.
+ *  - eventId 가 존재하지 않거나 LIVE 가 아니면 빈 배열.
+ */
+export async function loadLiveEventsForSameOrgAs(
+  eventId: string
+): Promise<LiveEventLite[]> {
+  if (!eventId) return [];
+  try {
+    const supabase = await createClient();
+    const evResp = (await (
+      supabase.from("org_events" as never) as unknown as {
+        select: (c: string) => {
+          eq: (k: string, v: string) => {
+            maybeSingle: () => Promise<SbRespOne<{ org_id: string }>>;
+          };
+        };
+      }
+    )
+      .select("org_id")
+      .eq("id", eventId)
+      .maybeSingle()) as SbRespOne<{ org_id: string }>;
+
+    const orgId = evResp.data?.org_id ?? null;
+    if (!orgId) return [];
+
+    type EvtRow = {
+      id: string;
+      name: string;
+      starts_at: string | null;
+      ends_at: string | null;
+      cover_image_url: string | null;
+    };
+    const evtResp = (await (
+      supabase.from("org_events" as never) as unknown as {
+        select: (c: string) => {
+          eq: (k: string, v: string) => {
+            eq: (k: string, v: string) => {
+              order: (
+                c: string,
+                o: { ascending: boolean }
+              ) => Promise<SbResp<EvtRow>>;
+            };
+          };
+        };
+      }
+    )
+      .select("id, name, starts_at, ends_at, cover_image_url")
+      .eq("org_id", orgId)
+      .eq("status", "LIVE")
+      .order("starts_at", { ascending: true })) as SbResp<EvtRow>;
+
+    const events = evtResp.data ?? [];
+    if (events.length === 0) return [];
+
+    const orgResp = (await (
+      supabase.from("partner_orgs" as never) as unknown as {
+        select: (c: string) => {
+          eq: (k: string, v: string) => {
+            maybeSingle: () => Promise<
+              SbRespOne<{ org_name: string | null }>
+            >;
+          };
+        };
+      }
+    )
+      .select("org_name")
+      .eq("id", orgId)
+      .maybeSingle()) as SbRespOne<{ org_name: string | null }>;
+    const orgName = orgResp.data?.org_name ?? "";
+
+    return events.map((e) => ({
+      id: e.id,
+      name: e.name,
+      org_id: orgId,
+      org_name: orgName,
+      starts_at: e.starts_at,
+      ends_at: e.ends_at,
+      cover_image_url: e.cover_image_url,
+    }));
+  } catch (e) {
+    console.error("[org-events/loadLiveEventsForSameOrgAs] throw", e);
+    return [];
+  }
+}
+
+export async function loadAllLiveEvents(): Promise<LiveEventLite[]> {
   try {
     const supabase = await createClient();
 
