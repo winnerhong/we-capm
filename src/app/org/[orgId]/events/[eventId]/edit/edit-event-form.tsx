@@ -140,16 +140,27 @@ export type InvitationTemplateLite = {
   body: string | null;
 };
 
+export type VenueLite = {
+  id: string;
+  name: string;
+  address: string | null;
+  imageUrl: string | null;
+  parkings: ParkingItem[];
+};
+
 export function EditEventForm({
   orgId,
   eventId,
   invitationTemplates = [],
+  venues = [],
   initial,
 }: {
   orgId: string;
   eventId: string;
   /** 초대장 인사말/내용 템플릿 — 셀렉터에서 골라 폼 자동 채움. */
   invitationTemplates?: InvitationTemplateLite[];
+  /** 지사 행사장 카탈로그 — 셀렉터에서 골라 장소/주차장 자동 채움. */
+  venues?: VenueLite[];
   initial: {
     name: string;
     description: string;
@@ -669,6 +680,48 @@ export function EditEventForm({
                   💡 줄바꿈 그대로 보입니다. 인사말 아래 안내문 카드에 표시돼요.
                 </p>
               </div>
+
+              {/* 행사장 카탈로그 셀렉터 — 지사가 등록한 venue 에서 골라 장소·주소·이미지·주차장 한 번에 채움. */}
+              {venues.length > 0 && (
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-3">
+                  <label className="block">
+                    <span className="text-[11px] font-bold text-emerald-800">
+                      📍 저장된 행사장 불러오기
+                    </span>
+                    <select
+                      onChange={(e) => {
+                        const id = e.target.value;
+                        if (!id) return;
+                        const v = venues.find((x) => x.id === id);
+                        if (!v) return;
+                        setInvLocation(v.name);
+                        if (v.address) setInvAddress(v.address);
+                        if (v.imageUrl) setInvLocationImage(v.imageUrl);
+                        // 주차장은 venue 의 것 + 기존 사용자 입력을 합쳐도 되지만,
+                        // 동일 행사장 재선택 시 중복 누적 방지 위해 venue 의 것으로 교체.
+                        setInvParkings(
+                          v.parkings.slice(0, MAX_PARKING_ITEMS)
+                        );
+                        e.target.value = "";
+                      }}
+                      defaultValue=""
+                      className="mt-1 w-full rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm text-[#2D5A3D]"
+                    >
+                      <option value="">— 골라서 장소·주소·주차장 자동 채우기 —</option>
+                      {venues.map((v) => (
+                        <option key={v.id} value={v.id}>
+                          {v.name}
+                          {v.address ? ` (${v.address})` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <p className="mt-1 text-[10px] text-emerald-700/80">
+                    선택 시 장소 이름·주소·이미지·주차장이 한 번에 채워져요.
+                    아래 항목을 직접 수정해도 됩니다.
+                  </p>
+                </div>
+              )}
 
               <div>
                 <label

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { requireOrg } from "@/lib/org-auth-guard";
 import { loadOrgEventById } from "@/lib/org-events/queries";
 import { loadOrgInvitationTemplates } from "@/lib/invitation-templates/queries";
+import { loadVenuesForOrg } from "@/lib/partner-venues/queries";
 import { EditEventForm } from "./edit-event-form";
 
 export const dynamic = "force-dynamic";
@@ -20,12 +21,27 @@ export default async function EditOrgEventPage({
     notFound();
   }
 
-  const invitationTemplates = await loadOrgInvitationTemplates(orgId);
+  const [invitationTemplates, venues] = await Promise.all([
+    loadOrgInvitationTemplates(orgId),
+    loadVenuesForOrg(orgId),
+  ]);
   const invitationTemplatesLite = invitationTemplates.map((t) => ({
     id: t.id,
     label: t.label,
     message: t.message,
     body: t.body,
+  }));
+  const venuesLite = venues.map((v) => ({
+    id: v.id,
+    name: v.name,
+    address: v.address,
+    imageUrl: v.image_url,
+    // 행사로 옮길 때는 ParkingItem 포맷(name/address/image_url) 만 사용.
+    parkings: v.parking_lots.map((p) => ({
+      name: p.name,
+      address: p.address,
+      image_url: p.image_url ?? undefined,
+    })),
   }));
 
   return (
@@ -74,6 +90,7 @@ export default async function EditOrgEventPage({
         orgId={orgId}
         eventId={eventId}
         invitationTemplates={invitationTemplatesLite}
+        venues={venuesLite}
         initial={{
           name: event.name ?? "",
           description: event.description ?? "",

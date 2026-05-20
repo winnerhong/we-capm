@@ -9,7 +9,6 @@ import {
 } from "../actions";
 import { CategoryPicker } from "@/components/category-picker";
 import { ImageUploader } from "@/components/image-uploader";
-import { ProgramExtrasSection } from "@/components/program-extras-section";
 import { CollapsibleSection } from "@/components/collapsible-section";
 
 type ProgramRow = {
@@ -230,8 +229,11 @@ export default async function NewProgramPage({
           </div>
         </CollapsibleSection>
 
-        {/* Section 1.5: 주차장 + 집결장소 (선택) */}
-        <ProgramExtrasSection />
+        {/* 주차장·집결장소 섹션 제거 — "내 행사장소" 카탈로그로 이관.
+            기존 프로그램에 저장된 parking_lots/meeting_point 는 DB 그대로 유지하되
+            새 폼에서는 입력 받지 않음 (update 시 hidden 으로 빈 값 보내면 덮어쓰므로,
+            actions 가 미전달 케이스를 빈 배열로 처리하지 않도록 주의 필요 — 현재 기본동작은
+            전달된 값으로 교체이므로 새 폼은 parking_lots 항목 자체를 보내지 않음). */}
 
         {/* Section 2: 운영 정보 */}
         <CollapsibleSection icon="⚙️" title="운영 정보" defaultOpen>
