@@ -32,6 +32,7 @@ const NAV_GROUPS: NavGroup[] = [
     match: [
       "/partner/programs",
       "/partner/venues",
+      "/partner/timetable-templates",
       "/partner/trails",
       "/partner/missions",
       "/partner/stampbook-presets",
@@ -56,6 +57,12 @@ const NAV_GROUPS: NavGroup[] = [
         label: "내 행사장소",
         href: "/partner/venues",
         icon: "📍",
+        allowedRoles: ALL_ROLES,
+      },
+      {
+        label: "타임테이블 템플릿",
+        href: "/partner/timetable-templates",
+        icon: "📋",
         allowedRoles: ALL_ROLES,
       },
       {

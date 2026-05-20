@@ -667,6 +667,7 @@ export async function startFmBroadcastAction(
   }
 
   revalidatePath(`/org/${org.orgId}/tori-fm`);
+  revalidatePath(`/org/${org.orgId}/control-room`);
   revalidatePath(`/screen/tori-fm/${org.orgId}`);
   revalidatePath("/tori-fm");
 }
@@ -710,6 +711,7 @@ export async function stopFmBroadcastAction(
   }
 
   revalidatePath(`/org/${org.orgId}/tori-fm`);
+  revalidatePath(`/org/${org.orgId}/control-room`);
   revalidatePath(`/screen/tori-fm/${org.orgId}`);
   revalidatePath("/tori-fm");
 }
@@ -892,6 +894,43 @@ export async function updateFmSessionAction(
 
   revalidatePath(`/org/${org.orgId}/tori-fm`);
   revalidatePath(`/org/${org.orgId}/tori-fm/${sessionId}`);
+  revalidatePath(`/org/${org.orgId}/control-room`);
+}
+
+/* -------------------------------------------------------------------------- */
+/* 10-2) deleteFmSessionAction — 예약된(비-LIVE) 세션 취소·삭제                */
+/* -------------------------------------------------------------------------- */
+
+export async function deleteFmSessionAction(
+  sessionId: string
+): Promise<void> {
+  const org = await requireOrg();
+  if (!sessionId) throw new Error("sessionId가 비어 있어요");
+
+  const session = await loadFmSessionById(sessionId);
+  if (!session) return; // 이미 없음 — idempotent
+  if (session.org_id !== org.orgId) {
+    throw new Error("다른 기관의 세션이에요");
+  }
+  if (session.is_live) {
+    throw new Error("진행 중인 방송은 삭제할 수 없어요. 먼저 종료해 주세요.");
+  }
+
+  const supabase = await createClient();
+  const resp = (await (
+    supabase.from("tori_fm_sessions" as never) as unknown as {
+      delete: () => {
+        eq: (k: string, v: string) => Promise<{ error: SbErr }>;
+      };
+    }
+  )
+    .delete()
+    .eq("id", sessionId)) as { error: SbErr };
+
+  if (resp.error) throw new Error(`세션 삭제 실패: ${resp.error.message}`);
+
+  revalidatePath(`/org/${org.orgId}/tori-fm`);
+  revalidatePath(`/org/${org.orgId}/control-room`);
 }
 
 /* -------------------------------------------------------------------------- */

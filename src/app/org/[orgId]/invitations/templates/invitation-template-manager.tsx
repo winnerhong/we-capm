@@ -248,9 +248,9 @@ export function InvitationTemplateManager({
             return (
               <li
                 key={t.id}
-                className={`rounded-2xl border bg-white p-3 shadow-sm ${
+                className={`rounded-2xl border bg-white p-4 shadow-sm ${
                   t.is_archived
-                    ? "border-[#E5D3B8] opacity-60"
+                    ? "border-[#E5D3B8] opacity-70"
                     : "border-[#D4E4BC]"
                 }`}
               >
@@ -283,35 +283,50 @@ export function InvitationTemplateManager({
                     </div>
                   </div>
                 ) : (
-                  <div className="flex items-start gap-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <h4 className="text-sm font-bold text-[#2D5A3D]">
-                          {t.label}
-                        </h4>
-                        {t.is_archived && (
-                          <span className="rounded-full bg-[#F5F1E8] px-1.5 py-0.5 text-[10px] font-bold text-[#8B7F75]">
-                            보관됨
-                          </span>
-                        )}
-                      </div>
-                      {t.message && (
-                        <p className="mt-1 text-[12px] font-semibold text-[#2D5A3D]">
-                          💬 {t.message}
-                        </p>
-                      )}
-                      {t.body && (
-                        <p className="mt-0.5 line-clamp-3 whitespace-pre-line text-[11px] text-[#6B6560]">
-                          {t.body}
-                        </p>
+                  <div className="space-y-3">
+                    {/* 제목 */}
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <h4 className="text-[15px] font-bold text-[#2D5A3D]">
+                        {t.label}
+                      </h4>
+                      {t.is_archived && (
+                        <span className="rounded-full bg-[#F5F1E8] px-1.5 py-0.5 text-[10px] font-bold text-[#8B7F75]">
+                          보관됨
+                        </span>
                       )}
                     </div>
-                    <div className="flex shrink-0 flex-col gap-1">
+
+                    {/* 인사말 */}
+                    {t.message && (
+                      <p className="rounded-xl bg-[#FFF8F0] px-3 py-2 text-[12.5px] font-semibold leading-relaxed text-[#2D5A3D]">
+                        <span aria-hidden className="mr-1">
+                          💬
+                        </span>
+                        {t.message}
+                      </p>
+                    )}
+
+                    {/* 초대장 내용 */}
+                    {t.body && (
+                      <p className="line-clamp-4 whitespace-pre-line rounded-xl border border-[#F0EBE3] bg-white px-3 py-2 text-[12px] leading-relaxed text-[#6B6560]">
+                        {t.body}
+                      </p>
+                    )}
+
+                    {!t.message && !t.body && (
+                      <p className="text-[11px] italic text-[#B0A89C]">
+                        내용이 비어 있어요 — 수정에서 인사말·초대장 내용을 채워
+                        보세요
+                      </p>
+                    )}
+
+                    {/* 액션 — 푸터 */}
+                    <div className="flex justify-end gap-1.5 border-t border-[#F0EBE3] pt-2.5">
                       <button
                         type="button"
                         onClick={() => beginEdit(t)}
                         disabled={pending}
-                        className="rounded-md border border-[#D4E4BC] bg-white px-2 py-1 text-[10px] font-bold text-[#2D5A3D] hover:bg-[#F5F1E8] disabled:opacity-40"
+                        className="rounded-lg border border-[#D4E4BC] bg-white px-2.5 py-1.5 text-[11px] font-bold text-[#2D5A3D] hover:bg-[#F5F1E8] disabled:opacity-40"
                       >
                         ✏ 수정
                       </button>
@@ -319,7 +334,7 @@ export function InvitationTemplateManager({
                         type="button"
                         onClick={() => toggleArchive(t.id, !t.is_archived)}
                         disabled={pending}
-                        className="rounded-md border border-[#E5D3B8] bg-white px-2 py-1 text-[10px] font-bold text-[#8B6F47] hover:bg-[#FFF8F0] disabled:opacity-40"
+                        className="rounded-lg border border-[#E5D3B8] bg-white px-2.5 py-1.5 text-[11px] font-bold text-[#8B6F47] hover:bg-[#FFF8F0] disabled:opacity-40"
                       >
                         {t.is_archived ? "↺ 복원" : "📦 보관"}
                       </button>
@@ -327,7 +342,7 @@ export function InvitationTemplateManager({
                         type="button"
                         onClick={() => handleDelete(t.id, t.label)}
                         disabled={pending}
-                        className="rounded-md border border-rose-200 bg-white px-2 py-1 text-[10px] font-bold text-rose-700 hover:bg-rose-50 disabled:opacity-40"
+                        className="rounded-lg border border-rose-200 bg-white px-2.5 py-1.5 text-[11px] font-bold text-rose-700 hover:bg-rose-50 disabled:opacity-40"
                       >
                         🗑 삭제
                       </button>

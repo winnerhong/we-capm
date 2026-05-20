@@ -4,6 +4,7 @@
 import { notFound } from "next/navigation";
 import { loadOrgEventById } from "@/lib/org-events/queries";
 import { loadTimelineSlots } from "@/lib/event-timeline/queries";
+import { loadTimetableTemplatesForOrg } from "@/lib/timetable-templates/queries";
 import { TimelineEditor } from "./timeline-editor";
 
 interface Props {
@@ -12,9 +13,10 @@ interface Props {
 }
 
 export async function TimelineTabPanel({ orgId, eventId }: Props) {
-  const [event, slots] = await Promise.all([
+  const [event, slots, templates] = await Promise.all([
     loadOrgEventById(eventId),
     loadTimelineSlots(eventId),
+    loadTimetableTemplatesForOrg(orgId),
   ]);
 
   if (!event || event.org_id !== orgId) {
@@ -46,6 +48,7 @@ export async function TimelineTabPanel({ orgId, eventId }: Props) {
         eventStartsAt={event.starts_at}
         initialSlots={slots}
         orgId={orgId}
+        templates={templates}
       />
     </div>
   );

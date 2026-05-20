@@ -3,8 +3,8 @@
 //
 // LIVE 세션이 없으면 안내 카드만 노출.
 
-import Link from "next/link";
 import {
+  loadFmSessionsByOrg,
   loadLiveFmSessionForOrg,
   loadRadioQueueItemWithSubmission,
 } from "@/lib/missions/queries";
@@ -19,32 +19,23 @@ import { anonLabelFromUserId } from "@/lib/tori-fm/types";
 import { loadActiveRpsRoomForFmSession } from "@/lib/rps/queries";
 import { FmSessionControls } from "../../tori-fm/FmSessionControls";
 import { LiveStudioConsole } from "../../tori-fm/LiveStudioConsole";
+import { FmTogglePanel } from "./fm-toggle-panel";
 
 export async function FmStudioEmbed({ orgId }: { orgId: string }) {
   const liveSession = await loadLiveFmSessionForOrg(orgId);
 
   if (!liveSession) {
+    // LIVE 없음 → 켜기/예약 토글 패널. 예약(비-LIVE, 미종료) 세션을 시작 시각 순으로.
+    const allSessions = await loadFmSessionsByOrg(orgId);
+    const scheduledSessions = allSessions
+      .filter((s) => !s.is_live && !s.ended_at)
+      .sort(
+        (a, b) =>
+          new Date(a.scheduled_start).getTime() -
+          new Date(b.scheduled_start).getTime()
+      );
     return (
-      <section
-        aria-label="토리FM"
-        className="rounded-2xl border border-amber-500/15 bg-[rgba(11,21,56,0.5)] p-6 text-center text-amber-50/95"
-      >
-        <p className="text-3xl" aria-hidden>
-          📻
-        </p>
-        <p className="mt-2 text-sm font-bold text-amber-100">
-          진행 중인 토리FM 방송이 없어요
-        </p>
-        <p className="mt-1 text-[11px] text-amber-50/60">
-          /tori-fm 에서 방송을 시작하면 여기에 라이브 스튜디오가 이어집니다.
-        </p>
-        <Link
-          href={`/org/${orgId}/tori-fm`}
-          className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-amber-400 px-3 py-2 text-xs font-bold text-[#1B2B3A] shadow-md hover:bg-amber-300"
-        >
-          🎙 토리FM 스튜디오로 이동 →
-        </Link>
-      </section>
+      <FmTogglePanel orgId={orgId} scheduledSessions={scheduledSessions} />
     );
   }
 
