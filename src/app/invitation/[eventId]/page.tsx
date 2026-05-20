@@ -181,9 +181,14 @@ export default async function EventInvitationPage({
     return <PendingState eventName={event.name} />;
   }
 
-  // 초대장 링크는 UUID 비공개라 자체로 접근 토큰 — 다른 기관 소속 사용자도
-  // 받은 링크로 열어볼 수 있게 허용. (이전엔 user.org_id !== event.org_id 차단)
-  // 실제 행사 참여(가족 등록·미션 등) 시점에는 별도 흐름에서 org 일치 검증.
+  // 기관 완전 분리 — 다른 기관 계정으로 로그인한 상태면 차단.
+  //  - 비로그인: 초대장 링크(UUID)가 credential → 열람 허용 (참여 시 로그인 유도)
+  //  - 같은 기관 로그인: 허용
+  //  - 다른 기관 로그인: 차단 (로그아웃 후 재시도 안내)
+  // 이 페이지는 (user) 레이아웃 밖이라 다른 기관 헤더 chrome 이 새지 않음.
+  if (user && user.org_id !== event.org_id) {
+    return <NoAccessState eventId={eventId} />;
+  }
 
   const orgName = await loadPartnerDisplayNameForOrg(event.org_id).catch(
     () => null
@@ -676,24 +681,41 @@ function PendingState({ eventName }: { eventName: string }) {
   );
 }
 
-function NoAccessState() {
+function NoAccessState({ eventId }: { eventId: string }) {
+  // 로그아웃 후 다시 이 초대장으로 — 비로그인 상태가 되면 열람 가능,
+  // 또는 해당 기관 계정으로 다시 로그인하면 정상 진입.
+  const logoutHref = `/api/auth/user-logout?redirect=${encodeURIComponent(
+    `/invitation/${eventId}`
+  )}`;
   return (
     <div className="flex min-h-dvh flex-col items-center justify-center bg-[#FFFDF8] px-6 py-12 text-center">
       <p className="text-6xl" aria-hidden>
         🚫
       </p>
       <h1 className="mt-6 text-xl font-bold text-rose-700">
-        접근 권한이 없어요
+        다른 기관 계정으로 로그인되어 있어요
       </h1>
       <p className="mt-2 max-w-sm text-sm text-[#6B6560]">
-        이 초대장은 다른 기관의 행사예요. 등록된 기관의 초대장만 볼 수 있어요.
+        이 초대장은 다른 기관의 행사예요. 지금 로그인된 계정은 이 초대장을 볼 수
+        없어요. 로그아웃하면 초대장을 열람하거나, 해당 기관 계정으로 다시
+        로그인할 수 있어요.
       </p>
+      {/* 로그아웃은 쿠키 삭제라 POST — form 으로 처리 */}
+      <form action={logoutHref} method="post" className="mt-6">
+        <button
+          type="submit"
+          className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-[#2D5A3D] to-[#3A7A52] px-5 py-2.5 text-sm font-bold text-white shadow-md hover:from-[#234a30]"
+        >
+          <span aria-hidden>🔓</span>
+          <span>로그아웃하고 이 초대장 보기</span>
+        </button>
+      </form>
       <Link
         href="/home"
-        className="mt-6 inline-flex items-center gap-1.5 rounded-xl border border-[#D4E4BC] bg-white px-4 py-2.5 text-sm font-semibold text-[#2D5A3D] hover:bg-[#F5F1E8]"
+        className="mt-3 inline-flex items-center gap-1.5 rounded-xl border border-[#D4E4BC] bg-white px-4 py-2 text-xs font-semibold text-[#2D5A3D] hover:bg-[#F5F1E8]"
       >
         <span aria-hidden>🏠</span>
-        <span>홈으로 돌아가기</span>
+        <span>내 기관 홈으로</span>
       </Link>
     </div>
   );
