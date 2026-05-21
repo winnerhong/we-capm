@@ -6,7 +6,7 @@
     "dev": "rimraf .next C:/Temp/we-camp-next && next dev -p 1000",
     "dev:fast": "next dev -p 1000",
     "clean": "rimraf .next C:/Temp/we-camp-next",
-    "build": "next build --webpack",
+    "build": "next build",
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
