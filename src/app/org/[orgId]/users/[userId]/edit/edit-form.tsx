@@ -72,6 +72,12 @@ export function EditUserForm({
   const router = useRouter();
   const [parentName, setParentName] = useState(initialParentName);
   const [status, setStatus] = useState<UserStatus>(initialStatus);
+
+  // 보호자 이름 자동 제안 — 대표 자녀(원생 우선) 이름 + " 학부모".
+  //   "학부모_3477" 같은 자동 생성 이름을 자녀 기준으로 손쉽게 바꾸도록.
+  const repChild = children.find((c) => c.is_enrolled) ?? children[0] ?? null;
+  const repChildName = (repChild?.name ?? "").trim();
+  const suggestedParentName = repChildName ? `${repChildName} 학부모` : null;
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -234,6 +240,16 @@ export function EditUserForm({
                 required
                 className={INPUT_CLS}
               />
+              {suggestedParentName &&
+                suggestedParentName !== parentName.trim() && (
+                  <button
+                    type="button"
+                    onClick={() => setParentName(suggestedParentName)}
+                    className="mt-1.5 inline-flex items-center gap-1 rounded-lg border border-[#D4E4BC] bg-[#F5F1E8] px-2.5 py-1 text-[11px] font-semibold text-[#2D5A3D] transition hover:bg-[#E8F0E4]"
+                  >
+                    🧒 &ldquo;{suggestedParentName}&rdquo; 로 채우기
+                  </button>
+                )}
             </div>
 
             <div>

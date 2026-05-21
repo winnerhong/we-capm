@@ -517,6 +517,8 @@ export interface ParticipantOptionRow {
   children_count: number;
   /** 원생(is_enrolled=true) 이름 — 행 헤더 표시용 */
   enrolled_child_names: string[];
+  /** 대표 반명 — 원생 자녀의 첫 번째 class_name. 없으면 null. */
+  class_name: string | null;
   acorn_balance: number;
   last_login_at: string | null;
   attendance_status: "PRESENT" | "LATE" | "ABSENT" | null;
@@ -565,8 +567,12 @@ export async function loadParticipantOptionsForOrg(
   const users = usersResp.data ?? [];
   if (users.length === 0) return [];
 
-  // 2) 자녀(원생만) — user_id 별 이름 수집
-  type ChildRow = { user_id: string; name: string };
+  // 2) 자녀(원생만) — user_id 별 이름·반명 수집
+  type ChildRow = {
+    user_id: string;
+    name: string;
+    class_name: string | null;
+  };
   const childResp = (await (
     supabase.from("app_children" as never) as unknown as {
       select: (c: string) => {
@@ -581,7 +587,7 @@ export async function loadParticipantOptionsForOrg(
       };
     }
   )
-    .select("user_id, name")
+    .select("user_id, name, class_name")
     .in(
       "user_id",
       users.map((u) => u.id)
@@ -590,12 +596,16 @@ export async function loadParticipantOptionsForOrg(
     .order("created_at", { ascending: true })) as SbResp<ChildRow>;
 
   const namesMap = new Map<string, string[]>();
+  const classMap = new Map<string, string>();
   for (const c of childResp.data ?? []) {
     const list = namesMap.get(c.user_id);
     const name = (c.name ?? "").trim();
     if (!name) continue;
     if (list) list.push(name);
     else namesMap.set(c.user_id, [name]);
+    // 대표 반명 — created_at 순 첫 자녀의 class_name
+    const cn = (c.class_name ?? "").trim();
+    if (cn && !classMap.has(c.user_id)) classMap.set(c.user_id, cn);
   }
 
   return users.map((u) => {
@@ -607,6 +617,7 @@ export async function loadParticipantOptionsForOrg(
       status: u.status,
       children_count: names.length,
       enrolled_child_names: names,
+      class_name: classMap.get(u.id) ?? null,
       acorn_balance: u.acorn_balance ?? 0,
       last_login_at: u.last_login_at,
       attendance_status: u.attendance_status,

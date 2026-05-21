@@ -35,6 +35,7 @@ export type ParticipantOption = {
   status: UserStatus;
   children_count: number;
   enrolled_child_names: string[];
+  class_name: string | null;
   acorn_balance: number;
   last_login_at: string | null;
   attendance_status: AttendanceStatus | null;
@@ -128,7 +129,7 @@ export function ParticipantsTab({
     const q = query.trim().toLowerCase();
     if (!q) return inEvent;
     return inEvent.filter((r) => {
-      const hay = `${r.enrolled_child_names.join(" ")} ${r.parent_name} ${r.phone}`.toLowerCase();
+      const hay = `${r.enrolled_child_names.join(" ")} ${r.parent_name} ${r.phone} ${r.class_name ?? ""}`.toLowerCase();
       return hay.includes(q);
     });
   }, [inEvent, query]);
@@ -158,7 +159,7 @@ export function ParticipantsTab({
     return notInEvent.filter((r) => {
       if (bulkActiveOnly && r.status !== "ACTIVE") return false;
       if (!q) return true;
-      const hay = `${r.enrolled_child_names.join(" ")} ${r.parent_name} ${r.phone}`.toLowerCase();
+      const hay = `${r.enrolled_child_names.join(" ")} ${r.parent_name} ${r.phone} ${r.class_name ?? ""}`.toLowerCase();
       return hay.includes(q);
     });
   }, [notInEvent, bulkQuery, bulkActiveOnly]);
@@ -281,6 +282,9 @@ export function ParticipantsTab({
                     <th className="px-2 py-2 text-left text-[10px] font-bold">
                       🎒 원생명
                     </th>
+                    <th className="px-2 py-2 text-center text-[10px] font-bold">
+                      🏫 반명
+                    </th>
                     <th className="px-2 py-2 text-left text-[10px] font-bold">
                       📞 연락처
                     </th>
@@ -334,6 +338,15 @@ export function ParticipantsTab({
                             <span className="ml-1 text-[10px] text-[#8B7F75]">
                               (미지정)
                             </span>
+                          )}
+                        </td>
+                        <td className="px-2 py-2 text-center">
+                          {r.class_name ? (
+                            <span className="inline-flex items-center rounded-full bg-[#E8F0E4] px-2 py-0.5 text-[10px] font-bold text-[#2D5A3D]">
+                              {r.class_name}
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-[#B0A89C]">-</span>
                           )}
                         </td>
                         <td className="px-2 py-2">
@@ -425,6 +438,13 @@ export function ParticipantsTab({
                       >
                         🎒 {name}
                       </Link>
+                      {r.class_name && (
+                        <div className="mt-0.5">
+                          <span className="inline-flex items-center rounded-full bg-[#E8F0E4] px-2 py-0.5 text-[10px] font-bold text-[#2D5A3D]">
+                            🏫 {r.class_name}
+                          </span>
+                        </div>
+                      )}
                       <a
                         href={`tel:${phoneDigits}`}
                         className="mt-0.5 inline-flex items-center gap-1 font-mono text-xs text-[#2D5A3D] underline-offset-2 hover:underline"
