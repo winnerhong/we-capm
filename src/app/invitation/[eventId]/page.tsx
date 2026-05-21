@@ -2,7 +2,10 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { getAppUser } from "@/lib/user-auth-guard";
-import { loadOrgEventById } from "@/lib/org-events/queries";
+import {
+  loadOrgEventById,
+  isEventParticipant,
+} from "@/lib/org-events/queries";
 import { loadAppUserById } from "@/lib/app-user/queries";
 import { loadPartnerDisplayNameForOrg } from "@/lib/org-partner";
 import { loadTimelineSlots } from "@/lib/event-timeline/queries";
@@ -195,13 +198,16 @@ export default async function EventInvitationPage({
     return <PendingState eventName={event.name} />;
   }
 
-  // 기관 완전 분리 — 다른 기관 계정으로 로그인한 상태면 차단.
+  // 기관 분리 — 다른 기관 계정으로 로그인한 상태면 차단.
   //  - 비로그인: 초대장 링크(UUID)가 credential → 열람 허용 (참여 시 로그인 유도)
   //  - 같은 기관 로그인: 허용
-  //  - 다른 기관 로그인: 차단 (로그아웃 후 재시도 안내)
-  // 이 페이지는 (user) 레이아웃 밖이라 다른 기관 헤더 chrome 이 새지 않음.
+  //  - 다른 기관 로그인이지만 이 행사에 참가자로 연결된 경우: 허용 (cross-org 참여)
+  //  - 그 외 다른 기관 로그인: 차단 (로그아웃 후 재시도 안내)
   if (user && user.org_id !== event.org_id) {
-    return <NoAccessState eventId={eventId} />;
+    const linked = await isEventParticipant(eventId, user.id);
+    if (!linked) {
+      return <NoAccessState eventId={eventId} />;
+    }
   }
 
   const orgName = await loadPartnerDisplayNameForOrg(event.org_id).catch(

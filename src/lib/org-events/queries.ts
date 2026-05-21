@@ -523,6 +523,8 @@ export interface ParticipantOptionRow {
   last_login_at: string | null;
   attendance_status: "PRESENT" | "LATE" | "ABSENT" | null;
   attendance_date: string | null;
+  /** 이 행사를 운영하는 기관과 소속이 다를 때 그 사람의 홈 기관명. 같으면 null. */
+  home_org_name: string | null;
 }
 
 export async function loadParticipantOptionsForOrg(
@@ -622,8 +624,154 @@ export async function loadParticipantOptionsForOrg(
       last_login_at: u.last_login_at,
       attendance_status: u.attendance_status,
       attendance_date: u.attendance_date,
+      home_org_name: null, // 같은 기관 소속
     };
   });
+}
+
+/**
+ * 임의의 app_user id 목록으로 ParticipantOptionRow 빌드 — 기관 무관.
+ *  - 행사에 연결됐지만 다른 기관 소속인 cross-org 참가자를 행사 참가자 탭에
+ *    표시하기 위함. currentOrgId 와 다른 기관이면 home_org_name 채움.
+ */
+export async function loadParticipantOptionsByIds(
+  userIds: string[],
+  currentOrgId: string
+): Promise<ParticipantOptionRow[]> {
+  if (userIds.length === 0) return [];
+  const supabase = await createClient();
+
+  type AppUserLite = {
+    id: string;
+    parent_name: string;
+    phone: string;
+    org_id: string;
+    status: "ACTIVE" | "SUSPENDED" | "CLOSED";
+    acorn_balance: number | null;
+    last_login_at: string | null;
+    attendance_status: "PRESENT" | "LATE" | "ABSENT" | null;
+    attendance_date: string | null;
+  };
+  const usersResp = (await (
+    supabase.from("app_users" as never) as unknown as {
+      select: (c: string) => {
+        in: (k: string, v: string[]) => Promise<SbResp<AppUserLite>>;
+      };
+    }
+  )
+    .select(
+      "id, parent_name, phone, org_id, status, acorn_balance, last_login_at, attendance_status, attendance_date"
+    )
+    .in("id", userIds)) as SbResp<AppUserLite>;
+
+  const users = usersResp.data ?? [];
+  if (users.length === 0) return [];
+
+  // 자녀(원생) 이름·반명
+  type ChildRow = { user_id: string; name: string; class_name: string | null };
+  const childResp = (await (
+    supabase.from("app_children" as never) as unknown as {
+      select: (c: string) => {
+        in: (k: string, v: string[]) => {
+          eq: (k: string, v: boolean) => {
+            order: (
+              c: string,
+              o: { ascending: boolean }
+            ) => Promise<SbResp<ChildRow>>;
+          };
+        };
+      };
+    }
+  )
+    .select("user_id, name, class_name")
+    .in(
+      "user_id",
+      users.map((u) => u.id)
+    )
+    .eq("is_enrolled", true)
+    .order("created_at", { ascending: true })) as SbResp<ChildRow>;
+
+  const namesMap = new Map<string, string[]>();
+  const classMap = new Map<string, string>();
+  for (const c of childResp.data ?? []) {
+    const name = (c.name ?? "").trim();
+    if (!name) continue;
+    const list = namesMap.get(c.user_id);
+    if (list) list.push(name);
+    else namesMap.set(c.user_id, [name]);
+    const cn = (c.class_name ?? "").trim();
+    if (cn && !classMap.has(c.user_id)) classMap.set(c.user_id, cn);
+  }
+
+  // 다른 기관 소속이면 그 기관명 조회
+  const otherOrgIds = Array.from(
+    new Set(users.map((u) => u.org_id).filter((id) => id !== currentOrgId))
+  );
+  const orgNameMap = new Map<string, string>();
+  if (otherOrgIds.length > 0) {
+    const orgResp = (await (
+      supabase.from("partner_orgs" as never) as unknown as {
+        select: (c: string) => {
+          in: (
+            k: string,
+            v: string[]
+          ) => Promise<SbResp<{ id: string; org_name: string }>>;
+        };
+      }
+    )
+      .select("id, org_name")
+      .in("id", otherOrgIds)) as SbResp<{ id: string; org_name: string }>;
+    for (const o of orgResp.data ?? []) {
+      orgNameMap.set(o.id, o.org_name);
+    }
+  }
+
+  return users.map((u) => {
+    const names = namesMap.get(u.id) ?? [];
+    return {
+      id: u.id,
+      parent_name: u.parent_name ?? "",
+      phone: u.phone ?? "",
+      status: u.status,
+      children_count: names.length,
+      enrolled_child_names: names,
+      class_name: classMap.get(u.id) ?? null,
+      acorn_balance: u.acorn_balance ?? 0,
+      last_login_at: u.last_login_at,
+      attendance_status: u.attendance_status,
+      attendance_date: u.attendance_date,
+      home_org_name:
+        u.org_id === currentOrgId ? null : (orgNameMap.get(u.org_id) ?? "타 기관"),
+    };
+  });
+}
+
+/** 특정 사용자가 해당 행사의 참가자로 연결돼 있는지. */
+export async function isEventParticipant(
+  eventId: string,
+  userId: string
+): Promise<boolean> {
+  if (!eventId || !userId) return false;
+  const supabase = await createClient();
+  const resp = (await (
+    supabase.from("org_event_participants" as never) as unknown as {
+      select: (c: string) => {
+        eq: (k: string, v: string) => {
+          eq: (k: string, v: string) => {
+            maybeSingle: () => Promise<{
+              data: { user_id: string } | null;
+              error: unknown;
+            }>;
+          };
+        };
+      };
+    }
+  )
+    .select("user_id")
+    .eq("event_id", eventId)
+    .eq("user_id", userId)
+    .maybeSingle()) as { data: { user_id: string } | null; error: unknown };
+  return !!resp.data;
 }
 
 /**

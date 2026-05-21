@@ -113,9 +113,8 @@ export async function upsertParticipantWithChildren(
 
   const existing = existingResp.data;
 
-  if (existing && existing.org_id !== orgId) {
-    throw new Error("이미 다른 기관에 등록된 핸드폰 번호예요");
-  }
+  // 같은 사람(전화번호)이면 다른 기관 소속이라도 재사용 — 한 사람이 여러 기관
+  // 행사에 참여 가능. org_id(홈 기관)는 그대로 두고 행사 연결만 추가.
 
   let userId: string;
   let merged = false;

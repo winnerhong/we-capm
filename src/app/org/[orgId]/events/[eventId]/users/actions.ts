@@ -8,6 +8,7 @@ import { redirect } from "next/navigation";
 import { requireOrg } from "@/lib/org-auth-guard";
 import { createClient } from "@/lib/supabase/server";
 import { loadOrgEventById } from "@/lib/org-events/queries";
+import { normalizeUserPhone } from "@/lib/app-user/account";
 import {
   upsertParticipantWithChildren,
   linkUsersToEvent,
@@ -102,6 +103,148 @@ export async function linkUsersToEventAction(
   await linkUsersToEvent(eventId, ids);
   revalidatePath(`/org/${orgId}/events/${eventId}`);
   revalidatePath(`/org/${orgId}/users`);
+  return { ok: true, linked: ids.length };
+}
+
+/* -------------------------------------------------------------------------- */
+/* 연락처 중복 조회 — 빠른 원생 추가에서 이미 등록된 사람인지 사전 확인.       */
+/* -------------------------------------------------------------------------- */
+
+export type ParticipantLookupResult =
+  | { found: false }
+  | {
+      found: true;
+      userId: string;
+      parentName: string;
+      /** 그 사람의 홈 기관(처음 등록한 기관) id. */
+      homeOrgId: string;
+      /** 홈 기관명. 현재 기관과 같으면 isSameOrg=true. */
+      homeOrgName: string;
+      isSameOrg: boolean;
+      /** 원생(is_enrolled=true) 자녀 이름들. */
+      childNames: string[];
+    };
+
+/**
+ * 전화번호로 기존 참가자(app_user) 조회.
+ *  - 같은 기관이든 다른 기관이든 찾으면 found:true.
+ *  - 빠른 원생 추가 폼이 제출 전에 호출해 "이미 등록된 분" 패널을 띄움.
+ */
+export async function lookupParticipantByPhoneAction(
+  orgId: string,
+  phoneRaw: string
+): Promise<ParticipantLookupResult> {
+  const session = await requireOrg();
+  if (!orgId || orgId !== session.orgId) {
+    return { found: false };
+  }
+  const phone = normalizeUserPhone(phoneRaw ?? "");
+  if (phone.length < 10 || phone.length > 11) return { found: false };
+
+  const supabase = await createClient();
+  type UserRow = {
+    id: string;
+    parent_name: string;
+    org_id: string;
+  };
+  const userResp = (await (
+    supabase.from("app_users" as never) as unknown as {
+      select: (c: string) => {
+        eq: (k: string, v: string) => {
+          maybeSingle: () => Promise<{
+            data: UserRow | null;
+            error: unknown;
+          }>;
+        };
+      };
+    }
+  )
+    .select("id, parent_name, org_id")
+    .eq("phone", phone)
+    .maybeSingle()) as { data: UserRow | null; error: unknown };
+
+  const user = userResp.data;
+  if (!user) return { found: false };
+
+  // 홈 기관명
+  const orgResp = (await (
+    supabase.from("partner_orgs" as never) as unknown as {
+      select: (c: string) => {
+        eq: (k: string, v: string) => {
+          maybeSingle: () => Promise<{
+            data: { org_name: string } | null;
+            error: unknown;
+          }>;
+        };
+      };
+    }
+  )
+    .select("org_name")
+    .eq("id", user.org_id)
+    .maybeSingle()) as {
+    data: { org_name: string } | null;
+    error: unknown;
+  };
+
+  // 원생 자녀 이름
+  const childResp = (await (
+    supabase.from("app_children" as never) as unknown as {
+      select: (c: string) => {
+        eq: (k: string, v: string) => {
+          eq: (k: string, v: boolean) => Promise<{
+            data: Array<{ name: string }> | null;
+            error: unknown;
+          }>;
+        };
+      };
+    }
+  )
+    .select("name")
+    .eq("user_id", user.id)
+    .eq("is_enrolled", true)) as {
+    data: Array<{ name: string }> | null;
+    error: unknown;
+  };
+
+  return {
+    found: true,
+    userId: user.id,
+    parentName: user.parent_name ?? "",
+    homeOrgId: user.org_id,
+    homeOrgName: orgResp.data?.org_name ?? "타 기관",
+    isSameOrg: user.org_id === orgId,
+    childNames: (childResp.data ?? [])
+      .map((c) => (c.name ?? "").trim())
+      .filter((n) => n.length > 0),
+  };
+}
+
+/**
+ * 이미 등록된 참가자를 여러 행사에 한 번에 연결 — 멱등.
+ *  - 다른 기관 소속 참가자도 이 기관 행사에 연결 가능 (cross-org 참여).
+ */
+export async function linkParticipantToEventsAction(
+  orgId: string,
+  userId: string,
+  eventIds: string[]
+): Promise<{ ok: true; linked: number } | { ok: false; message: string }> {
+  const session = await requireOrg();
+  if (!orgId || orgId !== session.orgId) {
+    return { ok: false, message: "이 기관에 등록할 권한이 없습니다" };
+  }
+  if (!userId) return { ok: false, message: "참가자가 없어요" };
+  const ids = Array.from(new Set(eventIds.filter((s) => !!s)));
+  if (ids.length === 0) {
+    return { ok: false, message: "연결할 행사를 선택해 주세요" };
+  }
+  // 모든 행사가 이 기관 소유인지 검증
+  for (const eid of ids) {
+    await assertEventOwned(eid, orgId);
+  }
+  for (const eid of ids) {
+    await linkUsersToEvent(eid, [userId]);
+    revalidatePath(`/org/${orgId}/events/${eid}`);
+  }
   return { ok: true, linked: ids.length };
 }
 

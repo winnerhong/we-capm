@@ -6,6 +6,19 @@ import { createSingleAppUserAction } from "./new/actions";
 
 type Sibling = { id: string; name: string; className: string };
 
+/** 전화번호 조회 결과 — events/[eventId]/users/actions 의 ParticipantLookupResult 와 호환. */
+type LookupFound = {
+  found: true;
+  userId: string;
+  parentName: string;
+  homeOrgName: string;
+  isSameOrg: boolean;
+  childNames: string[];
+};
+type LookupResult = { found: false } | LookupFound;
+
+type EventOption = { id: string; name: string; status: string };
+
 function newSiblingId(): string {
   return Math.random().toString(36).slice(2, 8);
 }
@@ -26,12 +39,27 @@ export function QuickAddUser({
   action,
   successHint,
   classSuggestions = [],
+  lookupAction,
+  linkAction,
+  events = [],
+  currentEventId,
 }: {
   orgId: string;
   action?: (formData: FormData) => Promise<void>;
   successHint?: string;
   /** 자동완성 후보 — 이미 사용된 반명 목록 */
   classSuggestions?: string[];
+  /** 연락처로 기존 참가자 조회 — 전달 시 제출 전 중복 감지 패널 동작. */
+  lookupAction?: (phone: string) => Promise<LookupResult>;
+  /** 기존 참가자를 선택한 행사들에 연결. */
+  linkAction?: (
+    userId: string,
+    eventIds: string[]
+  ) => Promise<{ ok: boolean; linked?: number; message?: string }>;
+  /** 중복 패널에서 선택할 수 있는 행사 목록 (행사 페이지에서만 전달). */
+  events?: EventOption[];
+  /** 현재 보고 있는 행사 — 중복 패널에서 기본 선택. */
+  currentEventId?: string;
 }) {
   const router = useRouter();
   const [enrolledName, setEnrolledName] = useState("");
@@ -43,11 +71,61 @@ export function QuickAddUser({
   );
   const [isPending, startTransition] = useTransition();
 
+  // 중복 감지 — 이미 등록된 참가자면 폼 대신 "행사 연결" 패널 노출.
+  const [duplicate, setDuplicate] = useState<LookupFound | null>(null);
+  const [selectedEventIds, setSelectedEventIds] = useState<Set<string>>(
+    new Set()
+  );
+
   function reset() {
     setEnrolledName("");
     setPhone("");
     setClassName("");
     setSiblings([]);
+  }
+
+  function toggleEvent(id: string) {
+    setSelectedEventIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function onConfirmLink() {
+    if (!linkAction || !duplicate) return;
+    if (selectedEventIds.size === 0) {
+      setMsg({ kind: "error", text: "연결할 행사를 선택해 주세요" });
+      return;
+    }
+    setMsg(null);
+    startTransition(async () => {
+      try {
+        const res = await linkAction(
+          duplicate.userId,
+          Array.from(selectedEventIds)
+        );
+        if (res.ok) {
+          setMsg({
+            kind: "ok",
+            text: `✅ ${duplicate.parentName}님을 행사 ${
+              res.linked ?? selectedEventIds.size
+            }개에 연결했어요`,
+          });
+          setDuplicate(null);
+          reset();
+          router.refresh();
+        } else {
+          setMsg({ kind: "error", text: res.message ?? "연결에 실패했어요" });
+        }
+      } catch (e) {
+        setMsg({
+          kind: "error",
+          text: e instanceof Error ? e.message : "연결에 실패했어요",
+        });
+      }
+    });
   }
 
   function addSibling() {
@@ -112,6 +190,17 @@ export function QuickAddUser({
 
     startTransition(async () => {
       try {
+        // 행사 컨텍스트 — 제출 전 연락처 중복 확인. 이미 있으면 패널로 전환.
+        if (lookupAction) {
+          const result = await lookupAction(phoneDigits);
+          if (result.found) {
+            setDuplicate(result);
+            const init = new Set<string>();
+            if (currentEventId) init.add(currentEventId);
+            setSelectedEventIds(init);
+            return;
+          }
+        }
         if (action) {
           await action(fd);
         } else {
@@ -165,7 +254,86 @@ export function QuickAddUser({
         </div>
       )}
 
-      <form onSubmit={onSubmit} className="space-y-2">
+      {duplicate ? (
+        <div className="space-y-3 rounded-xl border border-amber-300 bg-amber-50/60 p-3">
+          <div>
+            <p className="text-sm font-bold text-[#2D5A3D]">
+              🔎 이미 등록된 참가자예요
+            </p>
+            <p className="mt-1 text-[12px] leading-relaxed text-[#6B6560]">
+              이 연락처는{" "}
+              <b className="text-[#2D5A3D]">{duplicate.parentName}</b>님으로
+              이미 등록돼 있어요.
+              {!duplicate.isSameOrg && (
+                <span className="ml-1 inline-flex items-center rounded-full bg-white px-1.5 py-0.5 text-[10px] font-bold text-[#8B6F47] ring-1 ring-[#E5D3B8]">
+                  🏫 {duplicate.homeOrgName}
+                </span>
+              )}
+            </p>
+            {duplicate.childNames.length > 0 && (
+              <p className="mt-0.5 text-[11px] text-[#8B7F75]">
+                자녀: {duplicate.childNames.join(", ")}
+              </p>
+            )}
+            <p className="mt-1 text-[11px] text-[#6B6560]">
+              새 계정을 만들지 않고, 이 분을 선택한 행사에 그대로 연결할게요.
+            </p>
+          </div>
+
+          {events.length > 0 ? (
+            <div className="space-y-1.5">
+              <p className="text-[11px] font-bold text-[#2D5A3D]">
+                연결할 행사 선택
+              </p>
+              <ul className="space-y-1">
+                {events.map((ev) => (
+                  <li key={ev.id}>
+                    <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-[#E5D3B8] bg-white px-2.5 py-1.5">
+                      <input
+                        type="checkbox"
+                        checked={selectedEventIds.has(ev.id)}
+                        onChange={() => toggleEvent(ev.id)}
+                        disabled={isPending}
+                        className="h-4 w-4 rounded border-[#D4E4BC] text-emerald-600 focus:ring-emerald-500"
+                      />
+                      <span className="flex-1 truncate text-xs font-semibold text-[#2D5A3D]">
+                        {ev.name || "(이름 없음)"}
+                        {ev.id === currentEventId && (
+                          <span className="ml-1 text-[10px] font-bold text-emerald-700">
+                            (현재 행사)
+                          </span>
+                        )}
+                      </span>
+                    </label>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : (
+            <p className="text-[11px] text-[#8B7F75]">연결할 행사가 없어요.</p>
+          )}
+
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setDuplicate(null)}
+              disabled={isPending}
+              className="rounded-lg border border-[#D4E4BC] bg-white px-3 py-1.5 text-xs font-bold text-[#6B6560] hover:bg-[#F5F1E8] disabled:opacity-50"
+            >
+              취소
+            </button>
+            <button
+              type="button"
+              onClick={onConfirmLink}
+              disabled={isPending || selectedEventIds.size === 0}
+              className="rounded-lg bg-gradient-to-r from-[#2D5A3D] to-[#3A7A52] px-4 py-1.5 text-xs font-bold text-white shadow-sm transition hover:from-[#234a30] disabled:opacity-50"
+            >
+              {isPending ? "연결 중..." : "선택한 행사에 연결"}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <form onSubmit={onSubmit} className="space-y-2">
         <div className="grid grid-cols-1 gap-2 md:grid-cols-[1fr_1.2fr_1.2fr_auto]">
           <div>
             <label htmlFor="qa-class" className="sr-only">
@@ -293,7 +461,8 @@ export function QuickAddUser({
             <span>+ 형제/자매 추가</span>
           </button>
         )}
-      </form>
+        </form>
+      )}
 
       <p className="mt-2 text-[10px] leading-relaxed text-[#8B7F75]">
         🔑 로그인 아이디 = 부모님 연락처. 비밀번호는 없어요. 생년월일·성별은

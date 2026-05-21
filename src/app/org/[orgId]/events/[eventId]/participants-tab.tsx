@@ -16,7 +16,11 @@ import {
   type ChangeEvent,
 } from "react";
 import { setEventParticipantsAction } from "@/lib/org-events/actions";
-import { createSingleEventParticipantAction } from "./users/actions";
+import {
+  createSingleEventParticipantAction,
+  lookupParticipantByPhoneAction,
+  linkParticipantToEventsAction,
+} from "./users/actions";
 import { QuickAddUser } from "@/app/org/[orgId]/users/quick-add-user";
 import { AttendanceToggle } from "@/app/org/[orgId]/users/attendance-toggle";
 import { AcornAdjuster } from "@/app/org/[orgId]/users/acorn-adjuster";
@@ -40,13 +44,19 @@ export type ParticipantOption = {
   last_login_at: string | null;
   attendance_status: AttendanceStatus | null;
   attendance_date: string | null;
+  /** 다른 기관 소속이면 그 기관명. 같은 기관이면 null. */
+  home_org_name: string | null;
 };
+
+export type EventLite = { id: string; name: string; status: string };
 
 type Props = {
   eventId: string;
   orgId: string;
   allParticipants: ParticipantOption[];
   initialSelectedIds: string[];
+  /** 중복 감지 패널에서 선택할 수 있는 이 기관의 행사 목록. */
+  events: EventLite[];
 };
 
 const STATUS_META: Record<UserStatus, { label: string; chip: string }> = {
@@ -103,6 +113,7 @@ export function ParticipantsTab({
   orgId,
   allParticipants,
   initialSelectedIds,
+  events,
 }: Props) {
   const router = useRouter();
   const todayIso = todayIsoDate();
@@ -138,6 +149,15 @@ export function ParticipantsTab({
   const quickAddAction = useMemo(
     () => createSingleEventParticipantAction.bind(null, orgId, eventId),
     [orgId, eventId]
+  );
+  // 중복 감지 — 연락처 조회 / 기존 참가자 다중행사 연결
+  const lookupAction = useMemo(
+    () => lookupParticipantByPhoneAction.bind(null, orgId),
+    [orgId]
+  );
+  const linkAction = useMemo(
+    () => linkParticipantToEventsAction.bind(null, orgId),
+    [orgId]
   );
 
   // 하단 접이식: 기관 다른 참가자 추가 (체크박스 UX)
@@ -214,6 +234,10 @@ export function ParticipantsTab({
         orgId={orgId}
         action={quickAddAction}
         successHint="이 행사 참가자 명단에 자동 연결됐어요."
+        lookupAction={lookupAction}
+        linkAction={linkAction}
+        events={events}
+        currentEventId={eventId}
       />
 
       {/* ───────────────── 검색 ───────────────── */}
@@ -339,6 +363,13 @@ export function ParticipantsTab({
                               (미지정)
                             </span>
                           )}
+                          {r.home_org_name && (
+                            <div className="mt-0.5">
+                              <span className="inline-flex items-center rounded-full bg-amber-50 px-1.5 py-0.5 text-[9px] font-bold text-amber-700 ring-1 ring-amber-200">
+                                🏫 타기관 · {r.home_org_name}
+                              </span>
+                            </div>
+                          )}
                         </td>
                         <td className="px-2 py-2 text-center">
                           {r.class_name ? (
@@ -438,13 +469,18 @@ export function ParticipantsTab({
                       >
                         🎒 {name}
                       </Link>
-                      {r.class_name && (
-                        <div className="mt-0.5">
+                      <div className="mt-0.5 flex flex-wrap gap-1">
+                        {r.class_name && (
                           <span className="inline-flex items-center rounded-full bg-[#E8F0E4] px-2 py-0.5 text-[10px] font-bold text-[#2D5A3D]">
                             🏫 {r.class_name}
                           </span>
-                        </div>
-                      )}
+                        )}
+                        {r.home_org_name && (
+                          <span className="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700 ring-1 ring-amber-200">
+                            타기관 · {r.home_org_name}
+                          </span>
+                        )}
+                      </div>
                       <a
                         href={`tel:${phoneDigits}`}
                         className="mt-0.5 inline-flex items-center gap-1 font-mono text-xs text-[#2D5A3D] underline-offset-2 hover:underline"

@@ -5,12 +5,14 @@ import { createClient } from "@/lib/supabase/server";
 import { fmtClockKst, fmtFullDateKst } from "@/lib/datetime/kst";
 import {
   loadOrgEventById,
+  loadOrgEvents,
   loadOrgEventSummaryById,
   loadEventQuestPackIds,
   loadEventParticipantIds,
   loadEventProgramIds,
   loadEventTrailIds,
   loadParticipantOptionsForOrg,
+  loadParticipantOptionsByIds,
 } from "@/lib/org-events/queries";
 import {
   ORG_EVENT_STATUS_META,
@@ -933,16 +935,30 @@ async function ParticipantsTabPanel({
   orgId: string;
   eventId: string;
 }) {
-  const [allParticipants, selectedIds] = await Promise.all([
+  const [orgPool, selectedIds, orgEvents] = await Promise.all([
     loadParticipantOptionsForOrg(orgId),
     loadEventParticipantIds(eventId),
+    loadOrgEvents(orgId),
   ]);
+  // 이 행사에 연결됐지만 기관 풀에 없는 = 다른 기관 소속(cross-org) 참가자.
+  const poolIds = new Set(orgPool.map((p) => p.id));
+  const crossIds = selectedIds.filter((id) => !poolIds.has(id));
+  const crossParticipants =
+    crossIds.length > 0
+      ? await loadParticipantOptionsByIds(crossIds, orgId)
+      : [];
+  const allParticipants = [...orgPool, ...crossParticipants];
+  // 중복 감지 패널에서 선택할 행사 — 진행중/예정만.
+  const events = orgEvents
+    .filter((e) => e.status === "LIVE" || e.status === "DRAFT")
+    .map((e) => ({ id: e.id, name: e.name, status: e.status }));
   return (
     <ParticipantsTab
       orgId={orgId}
       eventId={eventId}
       allParticipants={allParticipants}
       initialSelectedIds={selectedIds}
+      events={events}
     />
   );
 }
