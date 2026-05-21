@@ -46,7 +46,10 @@ export function OrgRowActions({
       try {
         await deleteOrgAction(orgId);
       } catch (e) {
-        alert(e instanceof Error ? e.message : "삭제 실패");
+        // redirect() 가 던지는 NEXT_REDIRECT 는 정상 동작 — alert 하지 않음.
+        const msg = e instanceof Error ? e.message : "삭제 실패";
+        if (msg.includes("NEXT_REDIRECT")) return;
+        alert(msg);
       }
     });
   };
