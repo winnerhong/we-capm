@@ -41,6 +41,10 @@ export async function POST(request: Request) {
   cookieStore.delete("campnic_participant");
   cookieStore.delete("campnic_org");
   cookieStore.delete("campnic_user");
+  // 다중 기관 로그인 — 임퍼소네이트했던 모든 기관 쿠키도 정리.
+  for (const c of cookieStore.getAll()) {
+    if (c.name.startsWith("campnic_org_")) cookieStore.delete(c.name);
+  }
 
   try {
     const supabase = await createClient();

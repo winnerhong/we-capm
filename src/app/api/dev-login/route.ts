@@ -88,7 +88,7 @@ export async function GET(request: NextRequest) {
       .maybeSingle();
 
     if (org) {
-      cookieStore.set("campnic_org", JSON.stringify({
+      cookieStore.set(`campnic_org_${org.id}`, JSON.stringify({
         orgId: org.id,
         orgName: org.org_name,
         managerId: org.auto_username ?? "dev-org",

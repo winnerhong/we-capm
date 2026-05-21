@@ -108,10 +108,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    cookieStore.delete("campnic_org");
+    // 다중 기관 동시 로그인 — 기관별 쿠키.
     cookieStore.delete("campnic_manager");
     cookieStore.set(
-      "campnic_org",
+      `campnic_org_${org.id}`,
       JSON.stringify({
         orgId: org.id,
         orgName: org.org_name,

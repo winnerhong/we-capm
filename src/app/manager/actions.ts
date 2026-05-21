@@ -163,7 +163,8 @@ async function setManagerCookie(eventId: string, eventName: string, managerId: s
 
 async function setOrgCookie(orgId: string, orgName: string, managerId: string) {
   const cookieStore = await cookies();
-  cookieStore.set("campnic_org", JSON.stringify({
+  // 다중 기관 동시 로그인 — 기관별 쿠키 (campnic_org_<orgId>).
+  cookieStore.set(`campnic_org_${orgId}`, JSON.stringify({
     orgId, orgName, managerId, loginAt: new Date().toISOString(),
   }), {
     httpOnly: true, secure: process.env.NODE_ENV === "production",
