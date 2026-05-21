@@ -56,6 +56,82 @@ async function loadOrgs(partnerId: string): Promise<OrgRow[]> {
   }
 }
 
+/**
+ * 기관별 실제 등록된 원생(app_children, is_enrolled=true) 수.
+ *  - partner_orgs.children_count 컬럼은 기관 생성 시 입력한 계획값이라
+ *    실제 등록 참가자와 어긋남 → 실데이터로 집계해 표시.
+ */
+async function loadChildrenCountByOrg(
+  orgIds: string[]
+): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  if (orgIds.length === 0) return out;
+  const supabase = await createClient();
+
+  // 1) 이 기관들에 속한 app_users
+  const usersResp = (await (
+    supabase.from("app_users" as never) as unknown as {
+      select: (c: string) => {
+        in: (
+          k: string,
+          v: string[]
+        ) => Promise<{
+          data: Array<{ id: string; org_id: string | null }> | null;
+          error: unknown;
+        }>;
+      };
+    }
+  )
+    .select("id, org_id")
+    .in("org_id", orgIds)) as {
+    data: Array<{ id: string; org_id: string | null }> | null;
+    error: unknown;
+  };
+  const users = usersResp.data ?? [];
+  if (users.length === 0) return out;
+
+  const userOrg = new Map<string, string>();
+  for (const u of users) {
+    if (u.org_id) userOrg.set(u.id, u.org_id);
+  }
+
+  // 2) 그 보호자들의 원생(is_enrolled=true) 자녀
+  const childResp = (await (
+    supabase.from("app_children" as never) as unknown as {
+      select: (c: string) => {
+        in: (
+          k: string,
+          v: string[]
+        ) => {
+          eq: (
+            k: string,
+            v: boolean
+          ) => Promise<{
+            data: Array<{ user_id: string }> | null;
+            error: unknown;
+          }>;
+        };
+      };
+    }
+  )
+    .select("user_id")
+    .in(
+      "user_id",
+      users.map((u) => u.id)
+    )
+    .eq("is_enrolled", true)) as {
+    data: Array<{ user_id: string }> | null;
+    error: unknown;
+  };
+
+  for (const c of childResp.data ?? []) {
+    const orgId = userOrg.get(c.user_id);
+    if (!orgId) continue;
+    out.set(orgId, (out.get(orgId) ?? 0) + 1);
+  }
+  return out;
+}
+
 type SearchParams = {
   q?: string;
   type?: string;
@@ -75,6 +151,8 @@ export default async function OrgListPage({
   const partner = await requirePartner();
   const sp = await searchParams;
   const all = await loadOrgs(partner.id);
+  // 실제 등록된 원생 수 — children_count 저장 컬럼 대신 실데이터 집계.
+  const childCountByOrg = await loadChildrenCountByOrg(all.map((o) => o.id));
 
   // Filter in memory (simple approach, partner has limited orgs)
   const q = (sp.q ?? "").trim().toLowerCase();
@@ -416,7 +494,10 @@ export default async function OrgListPage({
                       <div className="rounded-lg bg-[#FFF8F0] px-2 py-1.5 text-center">
                         <div className="text-[10px] text-[#8B7F75]">아동</div>
                         <div className="font-bold text-[#2D5A3D]">
-                          {o.children_count.toLocaleString("ko-KR")}명
+                          {(childCountByOrg.get(o.id) ?? 0).toLocaleString(
+                            "ko-KR"
+                          )}
+                          명
                         </div>
                       </div>
                       <div className="rounded-lg bg-[#FFF8F0] px-2 py-1.5 text-center">
@@ -520,7 +601,9 @@ export default async function OrgListPage({
                           {formatPhone(o.representative_phone)}
                         </td>
                         <td className="px-4 py-3 text-right font-semibold text-[#2D5A3D]">
-                          {o.children_count.toLocaleString("ko-KR")}
+                          {(childCountByOrg.get(o.id) ?? 0).toLocaleString(
+                            "ko-KR"
+                          )}
                           <span className="ml-0.5 text-[10px] text-[#8B7F75]">
                             명
                           </span>

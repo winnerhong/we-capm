@@ -143,13 +143,27 @@ export async function generateMetadata({
     };
   }
   const date = fmtFullDate(event.starts_at);
+  // 공유 미리보기 설명 — 날짜 + 시간 범위(오후 5:00 ~ 8:00 (3시간)).
+  //   시간 정보가 없을 때만 초대 인사말로 대체.
+  const startClock = event.starts_at ? fmtClock(event.starts_at) : "";
+  const endClock = event.ends_at ? fmtClock(event.ends_at) : "";
+  const dur = fmtDuration(event.starts_at, event.ends_at);
+  const timeLine =
+    startClock && endClock
+      ? `⏰ ${startClock} ~ ${endClock}${dur ? ` (${dur})` : ""}`
+      : startClock
+        ? `⏰ ${startClock}`
+        : "";
   const message = event.invitation_message || "함께 즐거운 시간을 만들어요";
+  const description = timeLine
+    ? `📅 ${date}\n${timeLine}`
+    : `📅 ${date} · ${message}`;
   return {
     title: `${event.name} — 초대장`,
-    description: `📅 ${date} · ${message}`,
+    description,
     openGraph: {
       title: `${event.name} — 초대장`,
-      description: `📅 ${date} · ${message}`,
+      description,
       images: event.cover_image_url ? [event.cover_image_url] : [],
       type: "website",
     },
