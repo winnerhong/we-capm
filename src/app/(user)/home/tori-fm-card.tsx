@@ -55,12 +55,14 @@ function findUpcoming(
 }
 
 export async function ToriFmCard({ orgId, eventId }: Props) {
-  const [session, brandName] = await Promise.all([
-    eventId
-      ? loadLiveFmSessionForEvent(eventId)
-      : loadLiveFmSessionForOrg(orgId),
+  // 1) 행사 컨텍스트가 있으면 그 행사 LIVE 세션 우선.
+  // 2) 행사 매칭 실패 → 기관 전체 LIVE 세션으로 폴백 (운영자가 quickStart
+  //    로 켰을 때 session.event_id=null 인 케이스 포함).
+  const [eventSession, brandName] = await Promise.all([
+    eventId ? loadLiveFmSessionForEvent(eventId) : Promise.resolve(null),
     loadOrgFmBrandName(orgId),
   ]);
+  const session = eventSession ?? (await loadLiveFmSessionForOrg(orgId));
 
   /* -------------------------------------------------------------- */
   /* OFF — 라이브 아님                                                */
