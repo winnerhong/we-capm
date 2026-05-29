@@ -108,6 +108,34 @@ export async function createOrgAction(formData: FormData) {
   const supabase = await createClient();
   const data = parseForm(formData);
 
+  // 중복 검사 — 같은 지사 안에 같은 이름의 기관이 이미 있으면 차단.
+  const trimmedName = data.org_name.trim();
+  const dupSb = supabase as unknown as {
+    from: (t: string) => {
+      select: (c: string) => {
+        eq: (k: string, v: string) => {
+          eq: (k: string, v: string) => {
+            maybeSingle: () => Promise<{
+              data: { id: string } | null;
+              error: { message: string } | null;
+            }>;
+          };
+        };
+      };
+    };
+  };
+  const { data: dup } = await dupSb
+    .from("partner_orgs")
+    .select("id")
+    .eq("partner_id", partner.id)
+    .eq("org_name", trimmedName)
+    .maybeSingle();
+  if (dup) {
+    throw new Error(
+      `이미 같은 이름의 기관이 등록돼 있어요: "${trimmedName}". 다른 이름을 쓰거나 기존 기관을 수정해 주세요.`
+    );
+  }
+
   // 지사 입력값 — 비우면 자동 생성 규칙으로 폴백.
   const usernameOverride = toStr(formData.get("auto_username"));
   const passwordOverride = toStr(formData.get("auto_password"));
@@ -175,9 +203,40 @@ export async function createOrgAction(formData: FormData) {
 }
 
 export async function updateOrgAction(id: string, formData: FormData) {
-  await requirePartner();
+  const partner = await requirePartner();
   const supabase = await createClient();
   const data = parseForm(formData);
+
+  // 중복 검사 — 같은 지사 안의 다른 기관과 이름이 겹치면 차단.
+  const trimmedName = data.org_name.trim();
+  const dupSb = supabase as unknown as {
+    from: (t: string) => {
+      select: (c: string) => {
+        eq: (k: string, v: string) => {
+          eq: (k: string, v: string) => {
+            neq: (k: string, v: string) => {
+              maybeSingle: () => Promise<{
+                data: { id: string } | null;
+                error: { message: string } | null;
+              }>;
+            };
+          };
+        };
+      };
+    };
+  };
+  const { data: dup } = await dupSb
+    .from("partner_orgs")
+    .select("id")
+    .eq("partner_id", partner.id)
+    .eq("org_name", trimmedName)
+    .neq("id", id)
+    .maybeSingle();
+  if (dup) {
+    throw new Error(
+      `이미 같은 이름의 기관이 있어요: "${trimmedName}". 다른 이름을 써 주세요.`
+    );
+  }
 
   const sb = supabase as unknown as {
     from: (t: string) => {
@@ -198,27 +257,75 @@ export async function updateOrgAction(id: string, formData: FormData) {
   redirect(`/partner/customers/org/${id}`);
 }
 
+/**
+ * 기관 삭제 — 2단계.
+ *  - 상태 != CLOSED → soft delete (status=CLOSED, 해지)
+ *  - 상태 == CLOSED → 영구 삭제 (DB DELETE, CASCADE 로 행사·참가자 등 정리)
+ *
+ * 첫 클릭은 해지, 이미 해지된 row 에서 다시 클릭하면 실제 삭제. 호출자가
+ * confirm 메시지로 단계 구분.
+ */
 export async function deleteOrgAction(id: string) {
-  await requirePartner();
+  const partner = await requirePartner();
   const supabase = await createClient();
 
-  // soft delete: status = CLOSED
-  const sb = supabase as unknown as {
+  // 소유권 + 현재 상태 조회
+  const sbSelect = supabase as unknown as {
     from: (t: string) => {
-      update: (p: unknown) => {
-        eq: (k: string, v: string) => Promise<{
-          error: { message: string } | null;
-        }>;
+      select: (c: string) => {
+        eq: (k: string, v: string) => {
+          maybeSingle: () => Promise<{
+            data: { partner_id: string; status: string } | null;
+            error: { message: string } | null;
+          }>;
+        };
       };
     };
   };
-
-  const { error } = await sb
+  const { data: org } = await sbSelect
     .from("partner_orgs")
-    .update({ status: "CLOSED" })
-    .eq("id", id);
+    .select("partner_id, status")
+    .eq("id", id)
+    .maybeSingle();
 
-  if (error) throw new Error(`해지 실패: ${error.message}`);
+  if (!org) {
+    revalidatePath("/partner/customers/org");
+    redirect("/partner/customers/org");
+  }
+  if (org.partner_id !== partner.id) {
+    throw new Error("다른 지사의 기관이에요");
+  }
+
+  if (org.status === "CLOSED") {
+    // 영구 삭제 — CASCADE 로 관련 데이터 모두 제거.
+    const sbDel = supabase as unknown as {
+      from: (t: string) => {
+        delete: () => {
+          eq: (k: string, v: string) => Promise<{
+            error: { message: string } | null;
+          }>;
+        };
+      };
+    };
+    const { error } = await sbDel.from("partner_orgs").delete().eq("id", id);
+    if (error) throw new Error(`영구 삭제 실패: ${error.message}`);
+  } else {
+    // soft delete — status=CLOSED (해지)
+    const sbUpd = supabase as unknown as {
+      from: (t: string) => {
+        update: (p: unknown) => {
+          eq: (k: string, v: string) => Promise<{
+            error: { message: string } | null;
+          }>;
+        };
+      };
+    };
+    const { error } = await sbUpd
+      .from("partner_orgs")
+      .update({ status: "CLOSED" })
+      .eq("id", id);
+    if (error) throw new Error(`해지 실패: ${error.message}`);
+  }
 
   revalidatePath("/partner/customers/org");
   redirect("/partner/customers/org");

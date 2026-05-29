@@ -36,12 +36,11 @@ export function OrgRowActions({
   };
 
   const onDelete = () => {
-    if (
-      !confirm(
-        `정말로 "${orgName}" 기관을 삭제(해지)할까요? 되돌리려면 상태를 다시 활성으로 바꿔야 해요.`
-      )
-    )
-      return;
+    const isClosed = status === "CLOSED";
+    const message = isClosed
+      ? `⚠ "${orgName}" 기관을 영구 삭제할까요?\n\n이 기관의 모든 행사·참가자·프로그램·도토리·토리톡 데이터가 함께 삭제되며 되돌릴 수 없어요.`
+      : `정말로 "${orgName}" 기관을 삭제(해지)할까요? 되돌리려면 상태를 다시 활성으로 바꿔야 해요.`;
+    if (!confirm(message)) return;
     start(async () => {
       try {
         await deleteOrgAction(orgId);
