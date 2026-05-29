@@ -38,13 +38,26 @@ export async function POST(request: Request) {
   const raw = cookieStore.get("campnic_user")?.value;
   let userId: string | undefined;
   let phoneTail: string | undefined;
+  let userOrgId: string | undefined;
   if (raw) {
     try {
-      const parsed = JSON.parse(raw) as { id?: string; phone?: string };
+      const parsed = JSON.parse(raw) as {
+        id?: string;
+        phone?: string;
+        orgId?: string;
+      };
       userId = parsed?.id;
       if (parsed?.phone) {
         const digits = String(parsed.phone).replace(/\D/g, "");
         if (digits) phoneTail = digits.slice(-4);
+      }
+      // 홈 기관 id 보존 → 로그아웃 후에도 그 기관 LIVE 행사만 노출 (타 기관 행사
+      // 정보가 새지 않도록).
+      if (
+        typeof parsed?.orgId === "string" &&
+        /^[0-9a-fA-F-]{8,}$/.test(parsed.orgId)
+      ) {
+        userOrgId = parsed.orgId;
       }
     } catch {
       // ignore
@@ -74,7 +87,10 @@ export async function POST(request: Request) {
     // best-effort
   }
 
-  const safeRedirect = resolveSafeRedirect(request, "/user-login");
+  const fallback = userOrgId
+    ? `/user-login?org=${userOrgId}`
+    : "/user-login";
+  const safeRedirect = resolveSafeRedirect(request, fallback);
   return NextResponse.redirect(
     new URL(
       safeRedirect,

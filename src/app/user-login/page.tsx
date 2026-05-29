@@ -2,11 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { getAppUser } from "@/lib/user-auth-guard";
-import {
-  loadAllLiveEvents,
-  loadLiveEventsForOrg,
-  loadLiveEventsForSameOrgAs,
-} from "@/lib/org-events/queries";
+import { loadLiveEventsForSameOrgAs } from "@/lib/org-events/queries";
 import { fmtFullDateKst, fmtAmPmClockKst } from "@/lib/datetime/kst";
 import { LoginForm } from "./login-form";
 import { AcornIcon } from "@/components/acorn-icon";
@@ -44,9 +40,9 @@ export default async function UserLoginPage({
   // 초대장 등에서 ?return= 으로 보내준 경로가 있으면 우선 처리.
   const returnTo = safeReturnPath(sp.return);
 
-  // 행사 노출 스코핑 — 우선순위: 초대장 링크 → ?org= 파라미터(기관 참가자 링크) → 전체.
-  //   초대장: /invitation/{eventId} → 그 행사가 속한 기관의 LIVE 만.
-  //   ?org=  : 기관 관리자 페이지의 "참가자 링크" 가 붙임 → 그 기관의 LIVE 만.
+  // 행사 노출 정책 — "초대장 링크로 들어왔을 때만" 그 기관의 LIVE 행사 노출.
+  //   ?org=  : 참가자 로그인 공유 / 로그아웃 폴백 — 행사 목록 노출하지 않음.
+  //   직접 진입 / 로그아웃 : 행사 목록 노출하지 않음. 핸드폰만 입력해 바로 입장.
   const invitationMatch = returnTo
     ? returnTo.match(/^\/invitation\/([0-9a-fA-F-]{8,})/)
     : null;
@@ -68,11 +64,11 @@ export default async function UserLoginPage({
   const initialError =
     typeof sp.error === "string" && sp.error.trim() ? sp.error : null;
 
+  // 초대장 링크 진입에서만 행사 노출. 그 외(직접 방문 / 로그아웃 / 기관 참가자
+  // 링크 ?org=)에서는 행사 목록 숨기고 로그인 폼만 보여줌.
   const liveEvents = invitationEventId
     ? await loadLiveEventsForSameOrgAs(invitationEventId)
-    : orgIdParam
-      ? await loadLiveEventsForOrg(orgIdParam)
-      : await loadAllLiveEvents();
+    : [];
 
   return (
     <main className="flex min-h-dvh items-center justify-center bg-gradient-to-b from-[#FFF8F0] via-[#F5F1E8] to-[#E8F0E4] px-4 py-10">
