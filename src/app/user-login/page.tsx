@@ -165,9 +165,16 @@ export default async function UserLoginPage({
           <Suspense fallback={<div className="h-40" aria-hidden />}>
             <LoginForm
               initialError={initialError}
-              // 라이브 이벤트가 정확히 1개일 때만 자동 안내. 여러 개면 사용자가
-              // home 에서 직접 선택하도록 둠.
-              liveEventId={liveEvents.length === 1 ? liveEvents[0].id : null}
+              // 라이브 이벤트가 정확히 1개일 때만 자동 안내(초대장으로 직행).
+              // 단, 기관 참가자 로그인 공유 링크(?org=)로 들어왔다면 — 운영자
+              // 의도가 "웹앱으로 바로 입장" — 이므로 무조건 /home 으로 보냄.
+              liveEventId={
+                orgIdParam
+                  ? null
+                  : liveEvents.length === 1
+                    ? liveEvents[0].id
+                    : null
+              }
             />
           </Suspense>
         </section>

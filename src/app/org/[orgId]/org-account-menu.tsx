@@ -18,7 +18,6 @@ export function OrgAccountMenu({
   hasUnreadNotification = false,
 }: Props) {
   const [open, setOpen] = useState(false);
-  const [copied, setCopied] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
 
   const initial = (orgName ?? "").trim().charAt(0) || "🌿";
@@ -36,57 +35,11 @@ export function OrgAccountMenu({
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  async function onCopyParticipantLink() {
-    if (typeof window === "undefined") return;
-    // 기관 컨텍스트 — 받는 사람이 어느 기관 행사인지 헷갈리지 않도록 orgId 동봉.
-    const url = `${window.location.origin}/user-login?org=${orgId}`;
-    try {
-      await navigator.clipboard.writeText(url);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // 구형 브라우저 폴백
-      const ta = document.createElement("textarea");
-      ta.value = url;
-      ta.style.position = "fixed";
-      ta.style.opacity = "0";
-      document.body.appendChild(ta);
-      ta.select();
-      try {
-        document.execCommand("copy");
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-      } catch {
-        window.prompt("참가자 링크를 복사하세요", url);
-      } finally {
-        document.body.removeChild(ta);
-      }
-    }
-  }
-
   return (
     <div
       ref={wrapRef}
       className="relative flex shrink-0 items-center gap-1.5"
     >
-      {/* 참가자 링크 복사 */}
-      <button
-        type="button"
-        onClick={onCopyParticipantLink}
-        aria-label="참가자 링크 복사"
-        title="참가자 앱 링크를 클립보드에 복사"
-        className={`relative inline-flex h-9 shrink-0 items-center gap-1 whitespace-nowrap rounded-full border px-3 text-xs font-semibold transition ${
-          copied
-            ? "border-emerald-300 bg-emerald-50 text-emerald-800"
-            : "border-[#D4E4BC] bg-white text-[#2D5A3D] hover:bg-[#F5F1E8]"
-        }`}
-      >
-        <span aria-hidden>{copied ? "✅" : "🔗"}</span>
-        <span className="hidden sm:inline">
-          {copied ? "복사됨!" : "참가자 링크"}
-        </span>
-      </button>
-
       {/* Notification bell */}
       <button
         type="button"
