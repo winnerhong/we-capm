@@ -3,6 +3,7 @@ import { requireOrg } from "@/lib/org-auth-guard";
 import { loadOrgEvents } from "@/lib/org-events/queries";
 import { fmtFullDateKst } from "@/lib/datetime/kst";
 import { InvitationCardShare } from "./invitation-card-share";
+import { ParticipantLoginShare } from "./participant-login-share";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +25,7 @@ export default async function OrgInvitationsPage({
   params: Promise<{ orgId: string }>;
 }) {
   const { orgId } = await params;
-  await requireOrg();
+  const session = await requireOrg();
   const events = await loadOrgEvents(orgId);
   const visible = events.filter((e) => e.status !== "ARCHIVED");
 
@@ -103,11 +104,16 @@ export default async function OrgInvitationsPage({
                     </p>
                   )}
                 </header>
-                <div className="p-5">
+                <div className="space-y-4 p-5">
                   <InvitationCardShare
                     eventId={e.id}
                     eventName={e.name}
                     publishedAt={e.invitation_published_at ?? null}
+                  />
+                  {/* 참가자 로그인 공유 — 이 기관 행사만 노출됨 (?org=<orgId>) */}
+                  <ParticipantLoginShare
+                    orgId={orgId}
+                    orgName={session.orgName}
                   />
                 </div>
               </section>

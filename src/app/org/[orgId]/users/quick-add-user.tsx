@@ -196,7 +196,10 @@ export function QuickAddUser({
           if (result.found) {
             setDuplicate(result);
             const init = new Set<string>();
-            if (currentEventId) init.add(currentEventId);
+            // 같은 기관일 때만 현재 행사 미리 체크. 다른 기관(cross-org)
+            // 이면 비워두고 운영자가 명시적으로 선택하도록 — "무심코 연결"
+            // 방지.
+            if (currentEventId && result.isSameOrg) init.add(currentEventId);
             setSelectedEventIds(init);
             return;
           }
@@ -278,6 +281,13 @@ export function QuickAddUser({
             <p className="mt-1 text-[11px] text-[#6B6560]">
               새 계정을 만들지 않고, 이 분을 선택한 행사에 그대로 연결할게요.
             </p>
+            {!duplicate.isSameOrg && (
+              <p className="mt-2 rounded-lg border border-rose-300 bg-rose-50 px-2.5 py-1.5 text-[11px] font-semibold leading-snug text-rose-800">
+                ⚠ 이 분은 <b>{duplicate.homeOrgName}</b> 소속이에요. 정말로
+                우리 기관 행사에 연결할 거면 아래에서 행사를 직접 체크해
+                주세요. (기본 체크 안 됨 — 무심코 연결 방지)
+              </p>
+            )}
           </div>
 
           {events.length > 0 ? (

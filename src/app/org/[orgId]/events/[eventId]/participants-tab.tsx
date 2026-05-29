@@ -240,6 +240,29 @@ export function ParticipantsTab({
         currentEventId={eventId}
       />
 
+      {/* ───────────────── 엑셀 일괄등록 진입 ───────────────── */}
+      <Link
+        href={`/org/${orgId}/users/bulk-import?event=${eventId}`}
+        className="flex items-center justify-between gap-3 rounded-2xl border border-dashed border-[#6B4423]/40 bg-[#FFFDF8] px-4 py-3 shadow-sm transition hover:border-[#6B4423] hover:bg-[#FFF8F0]"
+      >
+        <div className="flex items-center gap-3">
+          <span className="text-xl" aria-hidden>
+            📥
+          </span>
+          <div>
+            <p className="text-sm font-bold text-[#6B4423]">
+              엑셀로 한 번에 등록
+            </p>
+            <p className="text-[11px] text-[#8B7F75]">
+              엑셀/CSV 업로드 → 이 행사 참가자 명단에 자동 연결
+            </p>
+          </div>
+        </div>
+        <span aria-hidden className="text-[#8B6F47]">
+          ›
+        </span>
+      </Link>
+
       {/* ───────────────── 검색 ───────────────── */}
       <div className="rounded-2xl border border-[#D4E4BC] bg-white p-4 shadow-sm">
         <div className="flex flex-wrap items-end gap-3">
