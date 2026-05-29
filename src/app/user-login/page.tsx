@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { getAppUser } from "@/lib/user-auth-guard";
 import {
   loadAllLiveEvents,
+  loadLiveEventsForOrg,
   loadLiveEventsForSameOrgAs,
 } from "@/lib/org-events/queries";
 import { fmtFullDateKst, fmtAmPmClockKst } from "@/lib/datetime/kst";
@@ -37,7 +38,7 @@ function safeReturnPath(raw: unknown): string | null {
 export default async function UserLoginPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ error?: string; return?: string }>;
+  searchParams?: Promise<{ error?: string; return?: string; org?: string }>;
 }) {
   const sp = (await searchParams) ?? {};
   // 초대장 등에서 ?return= 으로 보내준 경로가 있으면 우선 처리.
@@ -52,17 +53,23 @@ export default async function UserLoginPage({
   const initialError =
     typeof sp.error === "string" && sp.error.trim() ? sp.error : null;
 
-  // 초대장 링크로 들어왔다면 그 행사가 속한 기관의 LIVE 행사만 노출 — 다른 기관 행사
-  // 섞여 보이지 않도록. 그 외 직접 방문 케이스는 전체 LIVE 목록 유지.
-  //   /invitation/{eventId} 또는 /invitation/{eventId}?... 형태에서 eventId 추출.
+  // 행사 노출 스코핑 — 우선순위: 초대장 링크 → ?org= 파라미터(기관 참가자 링크) → 전체.
+  //   초대장: /invitation/{eventId} → 그 행사가 속한 기관의 LIVE 만.
+  //   ?org=  : 기관 관리자 페이지의 "참가자 링크" 가 붙임 → 그 기관의 LIVE 만.
   const invitationMatch = returnTo
     ? returnTo.match(/^\/invitation\/([0-9a-fA-F-]{8,})/)
     : null;
   const invitationEventId = invitationMatch?.[1] ?? null;
+  const orgIdParam =
+    typeof sp.org === "string" && /^[0-9a-fA-F-]{8,}$/.test(sp.org)
+      ? sp.org
+      : null;
 
   const liveEvents = invitationEventId
     ? await loadLiveEventsForSameOrgAs(invitationEventId)
-    : await loadAllLiveEvents();
+    : orgIdParam
+      ? await loadLiveEventsForOrg(orgIdParam)
+      : await loadAllLiveEvents();
 
   return (
     <main className="flex min-h-dvh items-center justify-center bg-gradient-to-b from-[#FFF8F0] via-[#F5F1E8] to-[#E8F0E4] px-4 py-10">

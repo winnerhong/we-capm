@@ -38,7 +38,8 @@ export function OrgAccountMenu({
 
   async function onCopyParticipantLink() {
     if (typeof window === "undefined") return;
-    const url = `${window.location.origin}/home`;
+    // 기관 컨텍스트 — 받는 사람이 어느 기관 행사인지 헷갈리지 않도록 orgId 동봉.
+    const url = `${window.location.origin}/user-login?org=${orgId}`;
     try {
       await navigator.clipboard.writeText(url);
       setCopied(true);

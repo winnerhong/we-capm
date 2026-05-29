@@ -336,6 +336,77 @@ export async function loadLiveEventsForSameOrgAs(
   }
 }
 
+/**
+ * 특정 기관(orgId)의 LIVE 행사 목록 — 참가자 링크 / 로그인 페이지에서
+ * 기관 단위 스코핑에 사용. loadLiveEventsForSameOrgAs 의 내부 로직과 동일하되
+ * eventId 가 아닌 orgId 를 바로 받음.
+ */
+export async function loadLiveEventsForOrg(
+  orgId: string
+): Promise<LiveEventLite[]> {
+  if (!orgId) return [];
+  try {
+    const supabase = await createClient();
+    type EvtRow = {
+      id: string;
+      name: string;
+      starts_at: string | null;
+      ends_at: string | null;
+      cover_image_url: string | null;
+    };
+    const evtResp = (await (
+      supabase.from("org_events" as never) as unknown as {
+        select: (c: string) => {
+          eq: (k: string, v: string) => {
+            eq: (k: string, v: string) => {
+              order: (
+                c: string,
+                o: { ascending: boolean }
+              ) => Promise<SbResp<EvtRow>>;
+            };
+          };
+        };
+      }
+    )
+      .select("id, name, starts_at, ends_at, cover_image_url")
+      .eq("org_id", orgId)
+      .eq("status", "LIVE")
+      .order("starts_at", { ascending: true })) as SbResp<EvtRow>;
+
+    const events = evtResp.data ?? [];
+    if (events.length === 0) return [];
+
+    const orgResp = (await (
+      supabase.from("partner_orgs" as never) as unknown as {
+        select: (c: string) => {
+          eq: (k: string, v: string) => {
+            maybeSingle: () => Promise<
+              SbRespOne<{ org_name: string | null }>
+            >;
+          };
+        };
+      }
+    )
+      .select("org_name")
+      .eq("id", orgId)
+      .maybeSingle()) as SbRespOne<{ org_name: string | null }>;
+    const orgName = orgResp.data?.org_name ?? "";
+
+    return events.map((e) => ({
+      id: e.id,
+      name: e.name,
+      org_id: orgId,
+      org_name: orgName,
+      starts_at: e.starts_at,
+      ends_at: e.ends_at,
+      cover_image_url: e.cover_image_url,
+    }));
+  } catch (e) {
+    console.error("[org-events/loadLiveEventsForOrg] throw", e);
+    return [];
+  }
+}
+
 export async function loadAllLiveEvents(): Promise<LiveEventLite[]> {
   try {
     const supabase = await createClient();
