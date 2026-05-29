@@ -9,6 +9,7 @@ import {
 } from "@/lib/missions/types";
 import { loadPartnerDisplayNameForOrg } from "@/lib/org-partner";
 import { DeletePackButton } from "./delete-pack-button";
+import { PublishPackButton } from "./publish-pack-button";
 
 export const dynamic = "force-dynamic";
 
@@ -282,7 +283,10 @@ function PackCard({
             {pack.description}
           </p>
         )}
-        <div className="mt-1 flex gap-2 pt-2">
+        <div className="mt-1 flex flex-wrap gap-2 pt-2">
+          {pack.status === "DRAFT" && (
+            <PublishPackButton packId={pack.id} packName={pack.name} />
+          )}
           <Link
             href={`/org/${orgId}/quest-packs/${pack.id}/edit`}
             className="inline-flex flex-1 items-center justify-center gap-1 rounded-xl bg-[#2D5A3D] px-3 py-2 text-xs font-bold text-white transition hover:bg-[#234a30]"

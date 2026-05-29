@@ -44,15 +44,6 @@ export default async function UserLoginPage({
   // 초대장 등에서 ?return= 으로 보내준 경로가 있으면 우선 처리.
   const returnTo = safeReturnPath(sp.return);
 
-  const existing = await getAppUser();
-  if (existing) {
-    // 이미 로그인 → 초대장 같은 원래 가려던 곳이 있으면 거기로, 아니면 home
-    redirect(returnTo ?? "/home");
-  }
-
-  const initialError =
-    typeof sp.error === "string" && sp.error.trim() ? sp.error : null;
-
   // 행사 노출 스코핑 — 우선순위: 초대장 링크 → ?org= 파라미터(기관 참가자 링크) → 전체.
   //   초대장: /invitation/{eventId} → 그 행사가 속한 기관의 LIVE 만.
   //   ?org=  : 기관 관리자 페이지의 "참가자 링크" 가 붙임 → 그 기관의 LIVE 만.
@@ -64,6 +55,18 @@ export default async function UserLoginPage({
     typeof sp.org === "string" && /^[0-9a-fA-F-]{8,}$/.test(sp.org)
       ? sp.org
       : null;
+
+  const existing = await getAppUser();
+  if (existing && !orgIdParam) {
+    // 이미 로그인 + 일반 진입 → 초대장 같은 원래 가려던 곳 또는 home 으로.
+    //   ?org=<orgId> 로 들어온 경우(기관 참가자 링크)는 의도적으로 자동
+    //   리다이렉트하지 않고 로그인 폼을 다시 보여줌 — 운영자가 공유한 링크는
+    //   "이 기관 계정으로 새로 입장" 의미이므로 매번 연락처를 재입력.
+    redirect(returnTo ?? "/home");
+  }
+
+  const initialError =
+    typeof sp.error === "string" && sp.error.trim() ? sp.error : null;
 
   const liveEvents = invitationEventId
     ? await loadLiveEventsForSameOrgAs(invitationEventId)

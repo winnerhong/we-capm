@@ -399,7 +399,32 @@ async function loadParticipantUserIds(
     for (const r of partResp.data ?? []) {
       if (r.user_id) set.add(r.user_id);
     }
-    return Array.from(set);
+    const ids = Array.from(set);
+    if (ids.length === 0) return [];
+
+    // 홈 기관(app_users.org_id) 이 이 기관과 일치하는 사용자만 — 다른 기관
+    // 소속이지만 행사에 연결된 cross-org 참가자는 관제실에서 제외.
+    const usrResp = (await (
+      supabase.from("app_users" as never) as unknown as {
+        select: (c: string) => {
+          in: (k: string, v: string[]) => {
+            eq: (k: string, v: string) => Promise<SbResp<{ id: string }>>;
+          };
+        };
+      }
+    )
+      .select("id")
+      .in("id", ids)
+      .eq("org_id", orgId)) as SbResp<{ id: string }>;
+
+    if (usrResp.error) {
+      console.error(
+        "[control-room/loadParticipantUserIds] org filter error",
+        usrResp.error
+      );
+      return ids; // best-effort fallback
+    }
+    return (usrResp.data ?? []).map((r) => r.id);
   } catch (e) {
     console.error("[control-room/loadParticipantUserIds] throw", e);
     return [];
@@ -2210,7 +2235,27 @@ async function loadFamilyGrid(
       return { missions: [], rows: [] };
     }
 
-    // 1) org active missions (컬럼) — 스템프북 표시 순서 (display_order ASC)
+    // 0) LIVE 스탬프북 ids — 관제실은 "지금 진행중" 화면이므로 LIVE 팩
+    //    소속 미션만 노출. 종료/보관/초안 팩 미션, 어느 팩에도 안 속한
+    //    고아 미션은 가족 그리드에서 제외.
+    const packResp = (await (
+      supabase.from("org_quest_packs" as never) as unknown as {
+        select: (c: string) => {
+          eq: (k: string, v: string) => {
+            eq: (k: string, v: string) => Promise<SbResp<{ id: string }>>;
+          };
+        };
+      }
+    )
+      .select("id")
+      .eq("org_id", orgId)
+      .eq("status", "LIVE")) as SbResp<{ id: string }>;
+    const livePackIds = (packResp.data ?? []).map((r) => r.id);
+    if (livePackIds.length === 0) {
+      return { missions: [], rows: [] };
+    }
+
+    // 1) org active missions (컬럼) — LIVE 팩 소속, display_order ASC
     type MissionRow = {
       id: string;
       title: string;
@@ -2223,10 +2268,15 @@ async function loadFamilyGrid(
         select: (c: string) => {
           eq: (k: string, v: string) => {
             eq: (k: string, v: boolean) => {
-              order: (
-                c: string,
-                o: { ascending: boolean }
-              ) => Promise<SbResp<MissionRow>>;
+              in: (
+                k: string,
+                v: string[]
+              ) => {
+                order: (
+                  c: string,
+                  o: { ascending: boolean }
+                ) => Promise<SbResp<MissionRow>>;
+              };
             };
           };
         };
@@ -2235,6 +2285,7 @@ async function loadFamilyGrid(
       .select("id, title, icon, display_order, created_at")
       .eq("org_id", orgId)
       .eq("is_active", true)
+      .in("quest_pack_id", livePackIds)
       .order("display_order", { ascending: true })) as SbResp<MissionRow>;
 
     if (mResp.error || !mResp.data) {
