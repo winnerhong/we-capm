@@ -24,6 +24,7 @@ type Supa = Awaited<ReturnType<typeof createClient>>;
 export type SelfRegisterInput = {
   phone: string;
   parentName: string; // 빈 문자열 가능 — 검증은 내부에서.
+  childName: string; // 빈 문자열 가능 — 보호자 이름과 함께 필수.
   eventId: string;
 };
 
@@ -35,6 +36,7 @@ export type SelfRegisterResult =
       orgName: string;
       parentName: string;
     }
+  /** 보호자 이름 또는 원아 이름이 없거나 길이 위반. UI 가 두 입력칸을 모두 노출해야 함. */
   | { kind: "NEEDS_NAME" }
   | { kind: "NOT_ALLOWED" };
 
@@ -51,6 +53,7 @@ export async function trySelfRegister(
 ): Promise<SelfRegisterResult> {
   const { phone, eventId } = input;
   const parentName = (input.parentName ?? "").trim();
+  const childName = (input.childName ?? "").trim();
 
   // ---- 1) 행사 로드 + 자가가입 허용 여부 ----
   const evtResp = (await (
@@ -87,8 +90,11 @@ export async function trySelfRegister(
   if (!evt.allow_self_register) return { kind: "NOT_ALLOWED" };
   if (evt.status !== "LIVE") return { kind: "NOT_ALLOWED" };
 
-  // ---- 2) 이름 검증 (길이) ----
+  // ---- 2) 이름 검증 (보호자 + 원아 모두 필수) ----
   if (!parentName || parentName.length < 1 || parentName.length > 50) {
+    return { kind: "NEEDS_NAME" };
+  }
+  if (!childName || childName.length < 1 || childName.length > 50) {
     return { kind: "NEEDS_NAME" };
   }
 
@@ -158,7 +164,39 @@ export async function trySelfRegister(
     return { kind: "NOT_ALLOWED" };
   }
 
-  // ---- 4) org_event_participants 멱등 upsert ----
+  // ---- 4) 원아 등록 — 같은 이름 자녀가 이미 있으면 skip (재제출 멱등성).
+  //   app_children 에는 (user_id, name) UNIQUE 제약이 없으므로 직접 조회 후 분기.
+  const existingChildResp = (await (
+    supabase.from("app_children" as never) as unknown as {
+      select: (c: string) => {
+        eq: (k: string, v: string) => {
+          eq: (k: string, v: string) => {
+            maybeSingle: () => Promise<{
+              data: { id: string } | null;
+            }>;
+          };
+        };
+      };
+    }
+  )
+    .select("id")
+    .eq("user_id", finalUserId)
+    .eq("name", childName)
+    .maybeSingle()) as { data: { id: string } | null };
+
+  if (!existingChildResp.data) {
+    await (
+      supabase.from("app_children" as never) as unknown as {
+        insert: (r: unknown) => Promise<{ error: unknown }>;
+      }
+    ).insert({
+      user_id: finalUserId,
+      name: childName,
+      is_enrolled: true,
+    });
+  }
+
+  // ---- 5) org_event_participants 멱등 upsert ----
   await (
     supabase.from("org_event_participants" as never) as unknown as {
       upsert: (
@@ -175,7 +213,7 @@ export async function trySelfRegister(
     { onConflict: "event_id,user_id" }
   );
 
-  // ---- 5) 쿠키용 org_name 조회 ----
+  // ---- 6) 쿠키용 org_name 조회 ----
   const orgResp = (await (
     supabase.from("partner_orgs" as never) as unknown as {
       select: (c: string) => {

@@ -78,6 +78,7 @@ async function readBody(request: Request): Promise<{
   phone: string;
   eventId: string;
   parentName: string;
+  childName: string;
   isForm: boolean;
 }> {
   const ct = request.headers.get("content-type") ?? "";
@@ -87,15 +88,23 @@ async function readBody(request: Request): Promise<{
         phone?: unknown;
         event_id?: unknown;
         parent_name?: unknown;
+        child_name?: unknown;
       };
       return {
         phone: String(body?.phone ?? ""),
         eventId: String(body?.event_id ?? ""),
         parentName: String(body?.parent_name ?? ""),
+        childName: String(body?.child_name ?? ""),
         isForm: false,
       };
     } catch {
-      return { phone: "", eventId: "", parentName: "", isForm: false };
+      return {
+        phone: "",
+        eventId: "",
+        parentName: "",
+        childName: "",
+        isForm: false,
+      };
     }
   }
   // form-urlencoded / multipart
@@ -105,10 +114,17 @@ async function readBody(request: Request): Promise<{
       phone: String(form.get("phone") ?? ""),
       eventId: String(form.get("event_id") ?? ""),
       parentName: String(form.get("parent_name") ?? ""),
+      childName: String(form.get("child_name") ?? ""),
       isForm: true,
     };
   } catch {
-    return { phone: "", eventId: "", parentName: "", isForm: true };
+    return {
+      phone: "",
+      eventId: "",
+      parentName: "",
+      childName: "",
+      isForm: true,
+    };
   }
 }
 
@@ -123,7 +139,7 @@ export async function POST(request: Request) {
   maybeGcBuckets();
   if (!rl.allowed) return tooManyRequests(rl);
 
-  const { phone: rawPhone, eventId, parentName, isForm } =
+  const { phone: rawPhone, eventId, parentName, childName, isForm } =
     await readBody(request);
   const phone = normalizeUserPhone(rawPhone);
 
@@ -206,7 +222,12 @@ export async function POST(request: Request) {
     if (eventId) {
       const selfRegisterResult = await trySelfRegister(
         supabase,
-        { phone, parentName: parentName.trim(), eventId },
+        {
+          phone,
+          parentName: parentName.trim(),
+          childName: childName.trim(),
+          eventId,
+        },
         meta
       );
 

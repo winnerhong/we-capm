@@ -41,6 +41,7 @@ export function JoinEventForm({
   const router = useRouter();
   const [phone, setPhone] = useState("");
   const [parentName, setParentName] = useState("");
+  const [childName, setChildName] = useState("");
   const [needsSignup, setNeedsSignup] = useState(initialNeedsSignup);
   const [error, setError] = useState<string | null>(initialError);
   const [pending, startTransition] = useTransition();
@@ -63,14 +64,23 @@ export function JoinEventForm({
       setError("연락처 10~11자리를 숫자로 입력해 주세요");
       return;
     }
-    // needsSignup 모드에서는 이름 검증.
-    const trimmedName = parentName.trim();
-    if (needsSignup && trimmedName.length < 1) {
+    // needsSignup 모드에서는 보호자 + 원아 이름 모두 검증.
+    const trimmedParent = parentName.trim();
+    const trimmedChild = childName.trim();
+    if (needsSignup && trimmedParent.length < 1) {
       setError("보호자 이름을 입력해 주세요");
       return;
     }
-    if (needsSignup && trimmedName.length > 50) {
-      setError("이름은 50자 이내로 입력해 주세요");
+    if (needsSignup && trimmedParent.length > 50) {
+      setError("보호자 이름은 50자 이내로 입력해 주세요");
+      return;
+    }
+    if (needsSignup && trimmedChild.length < 1) {
+      setError("원아 이름을 입력해 주세요");
+      return;
+    }
+    if (needsSignup && trimmedChild.length > 50) {
+      setError("원아 이름은 50자 이내로 입력해 주세요");
       return;
     }
 
@@ -85,7 +95,8 @@ export function JoinEventForm({
           body: JSON.stringify({
             phone: phoneDigits,
             event_id: eventId,
-            parent_name: needsSignup ? trimmedName : undefined,
+            parent_name: needsSignup ? trimmedParent : undefined,
+            child_name: needsSignup ? trimmedChild : undefined,
           }),
         });
         if (res.ok) {
@@ -182,31 +193,54 @@ export function JoinEventForm({
         </div>
 
         {needsSignup && (
-          <div className="space-y-1.5">
-            <label
-              htmlFor="join-name"
-              className="block text-sm font-semibold text-[#2D5A3D]"
-            >
-              👋 보호자 이름
-            </label>
-            <input
-              id="join-name"
-              name="parent_name"
-              type="text"
-              autoComplete="name"
-              required
-              maxLength={50}
-              value={parentName}
-              onChange={(e) => setParentName(e.target.value)}
-              placeholder="홍길동"
-              disabled={pending}
-              aria-describedby="join-name-hint"
-              className="w-full rounded-2xl border border-[#D4E4BC] bg-[#FFF8F0] px-4 py-3.5 text-base text-[#2D5A3D] shadow-sm outline-none placeholder:text-[#8B7F75] focus:border-[#3A7A52] focus:ring-2 focus:ring-[#3A7A52]/30 disabled:opacity-50"
-            />
-            <p id="join-name-hint" className="text-[11px] text-[#6B6560]">
-              🌱 처음이시군요! 이름을 알려주시면 바로 참여하실 수 있어요.
-            </p>
-          </div>
+          <>
+            <div className="space-y-1.5">
+              <label
+                htmlFor="join-name"
+                className="block text-sm font-semibold text-[#2D5A3D]"
+              >
+                👋 보호자 이름
+              </label>
+              <input
+                id="join-name"
+                name="parent_name"
+                type="text"
+                autoComplete="name"
+                required
+                maxLength={50}
+                value={parentName}
+                onChange={(e) => setParentName(e.target.value)}
+                placeholder="홍길동"
+                disabled={pending}
+                className="w-full rounded-2xl border border-[#D4E4BC] bg-[#FFF8F0] px-4 py-3.5 text-base text-[#2D5A3D] shadow-sm outline-none placeholder:text-[#8B7F75] focus:border-[#3A7A52] focus:ring-2 focus:ring-[#3A7A52]/30 disabled:opacity-50"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label
+                htmlFor="join-child-name"
+                className="block text-sm font-semibold text-[#2D5A3D]"
+              >
+                👶 원아 이름
+              </label>
+              <input
+                id="join-child-name"
+                name="child_name"
+                type="text"
+                required
+                maxLength={50}
+                value={childName}
+                onChange={(e) => setChildName(e.target.value)}
+                placeholder="홍유빈"
+                disabled={pending}
+                aria-describedby="join-child-hint"
+                className="w-full rounded-2xl border border-[#D4E4BC] bg-[#FFF8F0] px-4 py-3.5 text-base text-[#2D5A3D] shadow-sm outline-none placeholder:text-[#8B7F75] focus:border-[#3A7A52] focus:ring-2 focus:ring-[#3A7A52]/30 disabled:opacity-50"
+              />
+              <p id="join-child-hint" className="text-[11px] text-[#6B6560]">
+                🌱 형제·자매는 입장 후 마이페이지에서 추가할 수 있어요.
+              </p>
+            </div>
+          </>
         )}
 
         <button
