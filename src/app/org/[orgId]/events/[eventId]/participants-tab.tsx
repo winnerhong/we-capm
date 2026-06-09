@@ -27,7 +27,9 @@ import { AcornAdjuster } from "@/app/org/[orgId]/users/acorn-adjuster";
 import { UserRowActions } from "@/app/org/[orgId]/users/user-row-actions";
 import { AcornIcon } from "@/components/acorn-icon";
 import { RemoveFromEventButton } from "./users/remove-from-event-button";
+import { SelfRegisterToggle } from "./self-register-toggle";
 import { fmtFullDateKst } from "@/lib/datetime/kst";
+import type { OrgEventStatus } from "@/lib/org-events/types";
 
 type UserStatus = "ACTIVE" | "SUSPENDED" | "CLOSED";
 type AttendanceStatus = "PRESENT" | "LATE" | "ABSENT";
@@ -46,6 +48,8 @@ export type ParticipantOption = {
   attendance_date: string | null;
   /** 다른 기관 소속이면 그 기관명. 같은 기관이면 null. */
   home_org_name: string | null;
+  /** 가입 경로 — 'self_register' 이면 🆕 배지 노출. */
+  created_via: "manual" | "csv" | "self_register" | "cross_org" | null;
 };
 
 export type EventLite = { id: string; name: string; status: string };
@@ -57,6 +61,10 @@ type Props = {
   initialSelectedIds: string[];
   /** 중복 감지 패널에서 선택할 수 있는 이 기관의 행사 목록. */
   events: EventLite[];
+  /** 셀프 등록 허용 여부 — 토글 카드 초기값. */
+  allowSelfRegister: boolean;
+  /** 현재 행사 상태 — LIVE 가 아니면 셀프 등록이 실제 동작하지 않음을 표시. */
+  eventStatus: OrgEventStatus;
 };
 
 const STATUS_META: Record<UserStatus, { label: string; chip: string }> = {
@@ -114,6 +122,8 @@ export function ParticipantsTab({
   allParticipants,
   initialSelectedIds,
   events,
+  allowSelfRegister,
+  eventStatus,
 }: Props) {
   const router = useRouter();
   const todayIso = todayIsoDate();
@@ -229,6 +239,13 @@ export function ParticipantsTab({
 
   return (
     <div className="space-y-6">
+      {/* ───────────────── 셀프 등록 허용 토글 ───────────────── */}
+      <SelfRegisterToggle
+        eventId={eventId}
+        initialEnabled={allowSelfRegister}
+        eventStatus={eventStatus}
+      />
+
       {/* ───────────────── 빠른 원생 추가 (행사 자동 연결) ───────────────── */}
       <QuickAddUser
         orgId={orgId}
@@ -386,11 +403,22 @@ export function ParticipantsTab({
                               (미지정)
                             </span>
                           )}
-                          {r.home_org_name && (
-                            <div className="mt-0.5">
-                              <span className="inline-flex items-center rounded-full bg-amber-50 px-1.5 py-0.5 text-[9px] font-bold text-amber-700 ring-1 ring-amber-200">
-                                🏫 타기관 · {r.home_org_name}
-                              </span>
+                          {(r.home_org_name ||
+                            r.created_via === "self_register") && (
+                            <div className="mt-0.5 flex flex-wrap gap-1">
+                              {r.home_org_name && (
+                                <span className="inline-flex items-center rounded-full bg-amber-50 px-1.5 py-0.5 text-[9px] font-bold text-amber-700 ring-1 ring-amber-200">
+                                  🏫 타기관 · {r.home_org_name}
+                                </span>
+                              )}
+                              {r.created_via === "self_register" && (
+                                <span
+                                  className="inline-flex items-center rounded-full bg-violet-50 px-1.5 py-0.5 text-[9px] font-bold text-violet-700 ring-1 ring-violet-200"
+                                  title="초대장 링크에서 본인이 직접 등록한 참가자예요"
+                                >
+                                  🆕 셀프
+                                </span>
+                              )}
                             </div>
                           )}
                         </td>
@@ -501,6 +529,14 @@ export function ParticipantsTab({
                         {r.home_org_name && (
                           <span className="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700 ring-1 ring-amber-200">
                             타기관 · {r.home_org_name}
+                          </span>
+                        )}
+                        {r.created_via === "self_register" && (
+                          <span
+                            className="inline-flex items-center rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-bold text-violet-700 ring-1 ring-violet-200"
+                            title="초대장 링크에서 본인이 직접 등록한 참가자예요"
+                          >
+                            🆕 셀프 등록
                           </span>
                         )}
                       </div>

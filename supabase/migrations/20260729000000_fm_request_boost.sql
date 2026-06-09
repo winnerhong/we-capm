@@ -33,7 +33,7 @@ CREATE INDEX IF NOT EXISTS idx_fm_requests_session_boost
 CREATE TABLE IF NOT EXISTS public.tori_fm_boosts (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   request_id uuid NOT NULL REFERENCES public.tori_fm_requests(id) ON DELETE CASCADE,
-  user_id uuid NOT NULL REFERENCES public.app_users(id),
+  user_id uuid NOT NULL REFERENCES public.app_users(id) ON DELETE CASCADE,
   kind text NOT NULL DEFAULT 'CHARGE' CHECK (kind IN ('CHARGE', 'REFUND')),
   amount integer NOT NULL CHECK (amount > 0),
   created_at timestamptz NOT NULL DEFAULT now()

@@ -392,7 +392,12 @@ export default async function OrgEventDetailPage({
         ) : tab === "timeline" ? (
           <TimelineTabPanel orgId={orgId} eventId={eventId} />
         ) : tab === "participants" ? (
-          <ParticipantsTabPanel orgId={orgId} eventId={eventId} />
+          <ParticipantsTabPanel
+            orgId={orgId}
+            eventId={eventId}
+            allowSelfRegister={event.allow_self_register ?? false}
+            eventStatus={event.status}
+          />
         ) : tab === "questpacks" ? (
           <QuestPacksTabPanel orgId={orgId} eventId={eventId} />
         ) : tab === "programs" ? (
@@ -931,9 +936,13 @@ async function QuestPacksTabPanel({
 async function ParticipantsTabPanel({
   orgId,
   eventId,
+  allowSelfRegister,
+  eventStatus,
 }: {
   orgId: string;
   eventId: string;
+  allowSelfRegister: boolean;
+  eventStatus: OrgEventStatus;
 }) {
   const [orgPool, selectedIds, orgEvents] = await Promise.all([
     loadParticipantOptionsForOrg(orgId),
@@ -959,6 +968,8 @@ async function ParticipantsTabPanel({
       allParticipants={allParticipants}
       initialSelectedIds={selectedIds}
       events={events}
+      allowSelfRegister={allowSelfRegister}
+      eventStatus={eventStatus}
     />
   );
 }

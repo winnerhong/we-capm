@@ -118,6 +118,7 @@ export async function trySelfRegister(
       status: "ACTIVE",
       notification_consent: true,
       acorn_balance: 0,
+      created_via: "self_register",
     })
     .select("id")
     .single()) as {

@@ -427,6 +427,15 @@ export async function updateOrgEventStatusAction(
 
   await assertEventOwned(eventId, org.orgId);
 
+  // LIVE 가 아닌 상태로 전환되면 allow_self_register 도 자동 OFF.
+  //   ENDED/ARCHIVED 행사가 셀프 등록을 계속 받으면 명단에 유령 가입자가
+  //   생길 수 있어서 안전장치로 같이 꺼버림. 다시 LIVE 로 돌리면 운영자가
+  //   참가자 탭에서 명시적으로 다시 켜야 함.
+  const patch: Row =
+    next === "LIVE"
+      ? ({ status: next } satisfies Row)
+      : ({ status: next, allow_self_register: false } satisfies Row);
+
   const supabase = await createClient();
   const resp = (await (
     supabase.from("org_events" as never) as unknown as {
@@ -435,7 +444,7 @@ export async function updateOrgEventStatusAction(
       };
     }
   )
-    .update({ status: next } satisfies Row)
+    .update(patch)
     .eq("id", eventId)) as { error: SbErr };
 
   if (resp.error) {

@@ -596,6 +596,8 @@ export interface ParticipantOptionRow {
   attendance_date: string | null;
   /** 이 행사를 운영하는 기관과 소속이 다를 때 그 사람의 홈 기관명. 같으면 null. */
   home_org_name: string | null;
+  /** 가입 경로 — 'self_register' 일 때 명단에서 🆕 배지로 구분. */
+  created_via: "manual" | "csv" | "self_register" | "cross_org" | null;
 }
 
 export async function loadParticipantOptionsForOrg(
@@ -614,6 +616,7 @@ export async function loadParticipantOptionsForOrg(
     last_login_at: string | null;
     attendance_status: "PRESENT" | "LATE" | "ABSENT" | null;
     attendance_date: string | null;
+    created_via: string | null;
   };
   const usersResp = (await (
     supabase.from("app_users" as never) as unknown as {
@@ -628,7 +631,7 @@ export async function loadParticipantOptionsForOrg(
     }
   )
     .select(
-      "id, parent_name, phone, status, acorn_balance, last_login_at, attendance_status, attendance_date"
+      "id, parent_name, phone, status, acorn_balance, last_login_at, attendance_status, attendance_date, created_via"
     )
     .eq("org_id", orgId)
     .order("parent_name", { ascending: true })) as SbResp<AppUserLite>;
@@ -696,6 +699,8 @@ export async function loadParticipantOptionsForOrg(
       attendance_status: u.attendance_status,
       attendance_date: u.attendance_date,
       home_org_name: null, // 같은 기관 소속
+      created_via:
+        (u.created_via as ParticipantOptionRow["created_via"]) ?? null,
     };
   });
 }
@@ -722,6 +727,7 @@ export async function loadParticipantOptionsByIds(
     last_login_at: string | null;
     attendance_status: "PRESENT" | "LATE" | "ABSENT" | null;
     attendance_date: string | null;
+    created_via: string | null;
   };
   const usersResp = (await (
     supabase.from("app_users" as never) as unknown as {
@@ -731,7 +737,7 @@ export async function loadParticipantOptionsByIds(
     }
   )
     .select(
-      "id, parent_name, phone, org_id, status, acorn_balance, last_login_at, attendance_status, attendance_date"
+      "id, parent_name, phone, org_id, status, acorn_balance, last_login_at, attendance_status, attendance_date, created_via"
     )
     .in("id", userIds)) as SbResp<AppUserLite>;
 
@@ -813,6 +819,8 @@ export async function loadParticipantOptionsByIds(
       attendance_date: u.attendance_date,
       home_org_name:
         u.org_id === currentOrgId ? null : (orgNameMap.get(u.org_id) ?? "타 기관"),
+      created_via:
+        (u.created_via as ParticipantOptionRow["created_via"]) ?? null,
     };
   });
 }

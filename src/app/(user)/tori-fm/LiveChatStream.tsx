@@ -10,6 +10,7 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
+  deleteChatMessageAction,
   deleteOwnChatMessageAction,
   editOwnChatMessageAction,
 } from "@/lib/tori-fm/actions";
@@ -167,6 +168,26 @@ export function LiveChatStream({
     });
   };
 
+  // DJ(관리자) 가 다른 사용자 메시지 숨기기 — is_deleted=true.
+  const handleAdminDelete = (id: string) => {
+    if (!window.confirm("이 메시지를 숨길까요? 청취자 화면에서 사라져요.")) {
+      return;
+    }
+    setBusyId(id);
+    startTransition(async () => {
+      try {
+        await deleteChatMessageAction(id);
+        setMessages((prev) =>
+          prev.map((m) => (m.id === id ? { ...m, is_deleted: true } : m))
+        );
+      } catch (e) {
+        alert(e instanceof Error ? e.message : "숨기기에 실패했어요");
+      } finally {
+        setBusyId(null);
+      }
+    });
+  };
+
   const visible = messages.filter((m) => !m.is_deleted);
 
   if (visible.length === 0) {
@@ -314,6 +335,8 @@ export function LiveChatStream({
           // 다른 사람 메시지 — 좌측 정렬, [이름][메시지][시간]
           const senderColor = isDj ? "text-rose-300" : "text-amber-200";
           const senderPrefix = isDj ? "🎙 " : "";
+          // DJ(관리자) 콘솔에서는 다른 사용자 메시지에 숨김 버튼 노출.
+          const canAdminDelete = viewerRole === "DJ" && !isDj;
 
           return (
             <li
@@ -331,6 +354,18 @@ export function LiveChatStream({
               >
                 {time}
               </span>
+              {canAdminDelete && (
+                <button
+                  type="button"
+                  onClick={() => handleAdminDelete(m.id)}
+                  disabled={isBusy}
+                  aria-label="관리자: 메시지 숨기기"
+                  title="관리자: 이 메시지를 숨김"
+                  className="rounded p-0.5 text-[11px] text-white/40 transition hover:bg-rose-500/15 hover:text-rose-300 disabled:opacity-40"
+                >
+                  🗑
+                </button>
+              )}
             </li>
           );
         })}

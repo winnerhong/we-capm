@@ -616,6 +616,23 @@ export default async function EventInvitationPage({
         </section>
       )}
 
+      {/* ─── 앱 입장 CTA — 초대장은 (user) 레이아웃 밖이라 앱 진입 버튼을 직접 제공 ─── */}
+      <section className="mx-auto max-w-md px-6 pb-14 pt-2">
+        <Link
+          href="/home"
+          className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#2D5A3D] to-[#3A7A52] px-6 py-4 text-base font-bold text-white shadow-lg transition hover:from-[#234a30] hover:to-[#2D5A3D]"
+        >
+          <span aria-hidden>{event.status === "LIVE" ? "🎪" : "🏠"}</span>
+          <span>
+            {event.status === "LIVE" ? "행사 입장하기" : "토리로 앱 홈으로"}
+          </span>
+          <span aria-hidden>→</span>
+        </Link>
+        <p className="mt-2 text-center text-[11px] text-[#8B7F75]">
+          미션·스탬프북·토리FM 라이브를 앱에서 즐겨보세요
+        </p>
+      </section>
+
     </div>
   );
 }
