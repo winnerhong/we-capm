@@ -304,7 +304,7 @@ export default async function OrgUserDetailPage({
         <div className="flex flex-wrap gap-2">
           {user.status === "ACTIVE" && (
             <a
-              href={`/api/org/impersonate-user?id=${user.id}`}
+              href={`/api/org/impersonate-user?id=${user.id}&org=${orgId}`}
               target="_blank"
               rel="noopener"
               className="inline-flex items-center gap-1.5 rounded-xl border border-violet-300 bg-violet-50 px-4 py-2.5 text-sm font-semibold text-violet-800 hover:bg-violet-100"

@@ -117,7 +117,8 @@ export function UserRowActions({
     );
   })();
 
-  const loginHref = `/api/org/impersonate-user?id=${userId}`;
+  // ?org=<orgId> 는 미들웨어가 다중 기관 쿠키 중 어느 것을 주입할지 결정하는 데 사용.
+  const loginHref = `/api/org/impersonate-user?id=${userId}&org=${orgId}`;
 
   if (variant === "card") {
     return (

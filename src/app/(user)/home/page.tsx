@@ -30,6 +30,7 @@ import { ToriFmCard } from "./tori-fm-card";
 import { BroadcastCard } from "./broadcast-card";
 import { EventSelector } from "./event-selector";
 import { NextUpCard } from "./next-up-card";
+import { BingoCard } from "./bingo-card";
 import { loadTimelineSlots } from "@/lib/event-timeline/queries";
 import { loadOrgNameById } from "@/lib/org-partner";
 import { StampbookDetail } from "@/components/stampbook-detail";
@@ -378,6 +379,9 @@ export default async function UserHomePage({
 
       {/* 돌발 미션 — 시간 임계이므로 FM 보다 위 */}
       <BroadcastCard orgId={user.orgId} />
+
+      {/* 🎯 토리 빙고 — LIVE 보드 있을 때만 자동 노출. 사진 등록 진입 카드 역할. */}
+      <BingoCard orgId={user.orgId} userId={user.id} />
 
       {/* 토리FM 라이브 (선택된 행사의 LIVE 세션만, 행사 없으면 org fallback) */}
       <ToriFmCard

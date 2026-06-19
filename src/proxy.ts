@@ -11,9 +11,19 @@ import { updateSession } from "@/lib/supabase/proxy";
  *   → request 쿠키만 수정하므로 브라우저의 실제 쿠키는 바뀌지 않는다 (탭별 독립).
  */
 function injectOrgSession(request: NextRequest) {
-  const m = request.nextUrl.pathname.match(/^\/org\/([^/]+)/);
-  if (!m) return;
-  const orgId = m[1];
+  // 1) URL path 가 /org/<orgId>/... → 그 기관 쿠키 사용.
+  // 2) 그 외 경로 (예: /api/org/impersonate-user) 는 ?org=<orgId> 쿼리로
+  //    어느 기관에서 호출됐는지 지정 — 그 기관 쿠키를 주입.
+  //    /org/[orgId] 페이지의 새 탭/팝업에서 운영자 API 를 호출할 때 필요.
+  let orgId: string | null = null;
+  const pathMatch = request.nextUrl.pathname.match(/^\/org\/([^/]+)/);
+  if (pathMatch) {
+    orgId = pathMatch[1];
+  } else {
+    const q = request.nextUrl.searchParams.get("org");
+    if (q && /^[0-9a-fA-F-]{8,}$/.test(q)) orgId = q;
+  }
+  if (!orgId) return;
 
   const perOrg = request.cookies.get(`campnic_org_${orgId}`)?.value;
   if (perOrg) {

@@ -135,6 +135,7 @@ function buildGroups(
         `${base}/trails`,
         `${base}/missions/catalog`,
         `${base}/templates`,
+        `${base}/bingo`,
       ],
       badge: unpubBadge,
       items: [
@@ -151,6 +152,7 @@ function buildGroups(
           href: `${base}/missions/catalog`,
           icon: "🎯",
         },
+        { label: "토리 빙고", href: `${base}/bingo`, icon: "🎯" },
         { label: templateLabel, href: `${base}/templates`, icon: "🪜" },
       ],
     },

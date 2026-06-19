@@ -17,6 +17,7 @@ import { LiveAttemptsTile } from "./widgets/live-attempts-tile";
 import { CoopSessionsTile } from "./widgets/coop-sessions-tile";
 import { PhotoCoopRow } from "./widgets/photo-coop-row";
 import { FmStudioEmbed } from "./widgets/fm-studio-embed";
+import { BingoTile } from "./widgets/bingo-tile";
 
 type Props = {
   snapshot: ControlRoomSnapshot;
@@ -97,6 +98,11 @@ export async function ControlRoomGrid({ snapshot, orgId, isTvMode }: Props) {
 
         {/* row 3 제거됨 — 순위는 가족 매트릭스 각 행 prefix 의 🥇🥈🥉/숫자 배지로 흡수.
             미션별 진행률은 가족 매트릭스 우측 평시 사이드/미션 헤더 hover 로 노출. */}
+
+        {/* row 5.5: 🎯 토리 빙고 — LIVE 보드 있을 때만 자동 노출. 위젯이 null 반환. */}
+        <div className="grid grid-cols-1">
+          <BingoTile orgId={orgId} isTvMode={isTvMode} />
+        </div>
 
         {/* row 6: Heatmap(12, fullwidth) — 24h 시간대별 활동량
             (돌발 미션 BroadcastTile 은 헤더 우측 작은 버튼으로 이동) */}
