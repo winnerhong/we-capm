@@ -26,11 +26,17 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: "행사",
     icon: "🌲",
-    match: ["/admin/events", "/admin/challenges", "/admin/esg"],
+    match: [
+      "/admin/events",
+      "/admin/challenges",
+      "/admin/esg",
+      "/admin/bingo-templates",
+    ],
     items: [
       { label: "행사 목록", href: "/admin/events", icon: "📋" },
       { label: "새 행사", href: "/admin/events/new", icon: "➕" },
       { label: "챌린지 관리", href: "/admin/challenges", icon: "🎯" },
+      { label: "빙고 템플릿", href: "/admin/bingo-templates", icon: "🟦" },
       { label: "ESG 리포트", href: "/admin/esg", icon: "🌱" },
     ],
   },

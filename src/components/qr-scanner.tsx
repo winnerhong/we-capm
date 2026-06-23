@@ -11,6 +11,8 @@ interface Props {
   expectPrefix?: string;
   buttonLabel?: string;
   className?: string;
+  /** true 면 마운트 즉시 카메라를 켠다 (시작 버튼 생략). */
+  autoStart?: boolean;
 }
 
 type ScannerState = "idle" | "requesting" | "scanning" | "error";
@@ -21,6 +23,7 @@ export function QrScanner({
   expectPrefix,
   buttonLabel = "📷 QR 스캔 시작",
   className,
+  autoStart = false,
 }: Props) {
   const elementId = useId().replace(/:/g, "_") + "_qr";
   const [state, setState] = useState<ScannerState>("idle");
@@ -30,6 +33,8 @@ export function QrScanner({
 
   useEffect(() => {
     mountedRef.current = true;
+    // autoStart 면 마운트 즉시 카메라 켜기 (시작 버튼 생략).
+    if (autoStart) startScanner();
     return () => {
       mountedRef.current = false;
       // 언마운트 시 카메라 확실히 해제
@@ -39,6 +44,7 @@ export function QrScanner({
       }
       scannerRef.current = null;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function stopScanner() {

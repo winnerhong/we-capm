@@ -6,6 +6,7 @@ import {
   loadEntriesForBoard,
   loadLeaderboard,
 } from "@/lib/bingo/queries";
+import { loadTemplatesForOrg } from "@/lib/bingo/template-queries";
 import {
   setBingoStatusAction,
   updateBingoBoardAction,
@@ -13,6 +14,8 @@ import {
 } from "@/lib/bingo/actions";
 import { BINGO_STATUS_META } from "@/lib/bingo/types";
 import { BoardForm } from "../new/board-form";
+import { BingoTimerControl } from "./timer-control";
+import { OrgTilesEditor } from "./org-tiles-editor";
 
 export const dynamic = "force-dynamic";
 
@@ -26,9 +29,10 @@ export default async function OrgBingoDetailPage({
   const board = await loadBoardById(boardId);
   if (!board || board.org_id !== orgId) notFound();
 
-  const [entries, leaderboard] = await Promise.all([
+  const [entries, leaderboard, templates] = await Promise.all([
     loadEntriesForBoard(boardId),
     loadLeaderboard(boardId, 10),
+    loadTemplatesForOrg(orgId),
   ]);
   const meta = BINGO_STATUS_META[board.status];
 
@@ -108,6 +112,22 @@ export default async function OrgBingoDetailPage({
         </div>
       </section>
 
+      {/* 배열 타이머 — LIVE 상태에서만 의미 있음 */}
+      {board.status === "LIVE" && (
+        <BingoTimerControl
+          boardId={boardId}
+          arrangeEndsAt={board.arrange_ends_at}
+        />
+      )}
+
+      {/* 기관 문구 타일 */}
+      <OrgTilesEditor
+        boardId={boardId}
+        size={board.size}
+        tiles={entries.filter((e) => e.is_org)}
+        templates={templates}
+      />
+
       {/* 편집 */}
       <details className="rounded-2xl border border-[#D4E4BC] bg-white shadow-sm" open={board.status === "DRAFT"}>
         <summary className="cursor-pointer rounded-2xl bg-[#FFF8F0] p-4 text-sm font-bold text-[#2D5A3D]">
@@ -144,7 +164,9 @@ export default async function OrgBingoDetailPage({
                   {l.child_name ? `${l.child_name} 가족` : l.parent_name || "(이름 없음)"}
                 </span>
                 <span className="text-xs text-[#6B6560]">
-                  채움 {l.cells_filled} · 줄 {l.lines_completed}
+                  {l.lines_completed}줄 ·{" "}
+                  <span className="font-bold text-rose-500">⭕{l.cells_checked}</span> ·
+                  채움 {l.cells_filled}
                 </span>
                 {l.finished_at && (
                   <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 ring-1 ring-emerald-200">

@@ -8,9 +8,11 @@ import {
   loadGridForUser,
   loadLeaderboard,
 } from "@/lib/bingo/queries";
+import { loadSignedEntryIds } from "@/lib/bingo/grid-stats";
 import { BINGO_STATUS_META } from "@/lib/bingo/types";
 import { EntryForm } from "./entry-form";
 import { PlayBoard } from "./play-board";
+import { BingoCountdown } from "./countdown";
 import { LiveAutoRefresh } from "@/app/org/[orgId]/bingo/[boardId]/live/auto-refresh";
 
 export const dynamic = "force-dynamic";
@@ -40,6 +42,22 @@ export default async function BingoPlayPage({
 
   const meta = BINGO_STATUS_META[board.status];
   const isLive = board.status === "LIVE";
+
+  // 체크 = 자동 ⭕(CIRCLE 호명) ∪ 내가 QR 인증한 entry ∪ 내 QR 사진(주인 자동).
+  const circleCalledIds = allEntries
+    .filter((e) => e.called_at && e.call_mode === "CIRCLE")
+    .map((e) => e.id);
+  const signedIds = await loadSignedEntryIds(boardId, user.id);
+  const checkedSet = new Set([...circleCalledIds, ...signedIds]);
+  // 내 사진이 QR로 호명됐으면 주인인 나는 자동 ⭕.
+  if (myEntry?.called_at && myEntry.call_mode === "QR") {
+    checkedSet.add(myEntry.id);
+  }
+  const checkedEntryIds = Array.from(checkedSet);
+  // QR 방식으로 호명된 그림 = 참가자 인증 미션.
+  const qrReleasedIds = allEntries
+    .filter((e) => e.called_at && e.call_mode === "QR")
+    .map((e) => e.id);
 
   return (
     <div className="mx-auto max-w-md space-y-4 px-4 py-4">
@@ -80,6 +98,11 @@ export default async function BingoPlayPage({
         </div>
       )}
 
+      {/* 배열 타이머 카운트다운 (타이머 세팅됐을 때만 노출) */}
+      {isLive && board.arrange_ends_at && (
+        <BingoCountdown arrangeEndsAt={board.arrange_ends_at} />
+      )}
+
       {/* 1단계: 우리 가족 등록 */}
       {isLive && (
         <EntryForm
@@ -89,19 +112,29 @@ export default async function BingoPlayPage({
         />
       )}
 
-      {/* 2단계: 내 빙고판 + 피드 */}
-      {isLive && (
-        <PlayBoard
-          boardId={boardId}
-          size={board.size}
-          linesToWin={board.lines_to_win}
-          myUserId={user.id}
-          myEntry={myEntry}
-          entries={allEntries}
-          grid={gridState.grid}
-          cells={gridState.cells}
-        />
-      )}
+      {/* 2단계: 내 빙고판 + 피드 — 배열 타이머가 도는 동안만 이동 가능, 그 외엔 잠금. */}
+      {isLive &&
+        (() => {
+          const locked = !(
+            board.arrange_ends_at &&
+            new Date(board.arrange_ends_at).getTime() > Date.now()
+          );
+          return (
+            <PlayBoard
+              boardId={boardId}
+              size={board.size}
+              linesToWin={board.lines_to_win}
+              myUserId={user.id}
+              myEntry={myEntry}
+              entries={allEntries}
+              grid={gridState.grid}
+              cells={gridState.cells}
+              calledEntryIds={checkedEntryIds}
+              qrReleasedIds={qrReleasedIds}
+              locked={locked}
+            />
+          );
+        })()}
 
       {/* 순위 */}
       {board.show_ranking && leaderboard.length > 0 && (
@@ -129,7 +162,8 @@ export default async function BingoPlayPage({
                     )}
                   </span>
                   <span className="text-[#6B6560]">
-                    {l.lines_completed}줄 · {l.cells_filled}칸
+                    {l.lines_completed}줄 ·{" "}
+                    <span className="font-bold text-rose-500">⭕{l.cells_checked}</span>
                   </span>
                 </li>
               );

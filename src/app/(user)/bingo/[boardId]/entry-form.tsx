@@ -117,18 +117,27 @@ export function EntryForm({ boardId, keywordTheme, existingEntry }: Props) {
 
         <div>
           <label className="block text-xs font-bold text-amber-900">
-            🗝 키워드 (30자 이내)
+            🗝 키워드{" "}
+            <span className="font-normal text-amber-700">
+              (빙고판엔 6글자까지만 보여요)
+            </span>
           </label>
           <input
             type="text"
             value={keyword}
             onChange={(e) => setKeyword(e.target.value)}
-            placeholder={keywordTheme ?? "예) 우리 가족의 추억"}
+            placeholder={keywordTheme ?? "예) 수박, 물풍선"}
             maxLength={30}
             required
             disabled={pending}
             className="mt-1 w-full rounded-lg border-2 border-amber-300 bg-white px-3 py-2.5 text-sm text-[#2D5A3D] focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-300/40"
           />
+          {keyword.trim().length > 6 && (
+            <p className="mt-1 text-[11px] font-semibold text-rose-600">
+              ⚠ 빙고판엔 앞 6글자 「{keyword.trim().slice(0, 6)}」만 보이고
+              뒷부분 「{keyword.trim().slice(6)}」은 안 보여요
+            </p>
+          )}
         </div>
 
         {error && (

@@ -5,7 +5,6 @@ import { LiveEventCard } from "./live-event-card";
 import { RecentParticipantsCard } from "./recent-participants-card";
 import { ControlRoomBanner } from "./control-room-banner";
 import { ResourceFamilyCard } from "./resource-family-card";
-import { ToriFmCard } from "./tori-fm-card";
 import { PartnerNewCard } from "./partner-new-card";
 import { FooterLinksCard } from "./footer-links-card";
 import { CollapsibleCard } from "./collapsible-card";
@@ -51,11 +50,6 @@ export function OrgHomeStack({ snapshot, orgId }: Props) {
         icon="📚"
       >
         <ResourceFamilyCard resources={snapshot.resources} orgId={orgId} />
-      </CollapsibleCard>
-
-      {/* 부가 카드 4: 토리FM */}
-      <CollapsibleCard storageKey="tori-fm" title="토리FM" icon="📻">
-        <ToriFmCard fm={snapshot.fm} orgId={orgId} />
       </CollapsibleCard>
 
       {/* 부가 카드 5: 파트너 신규 */}

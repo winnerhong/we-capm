@@ -10,7 +10,11 @@
 import { revalidatePath } from "next/cache";
 import { getAppUser } from "@/lib/user-auth-guard";
 import { createClient } from "@/lib/supabase/server";
-import { countCompletedLines } from "./lines";
+import {
+  loadCheckedEntryIds,
+  loadFixedOrgCells,
+  recomputeGridStats,
+} from "./grid-stats";
 import type { BingoSize } from "./types";
 
 type Row = Record<string, unknown>;
@@ -22,6 +26,7 @@ type BoardLite = {
   size: BingoSize;
   lines_to_win: number;
   status: string;
+  arrange_ends_at: string | null;
 };
 
 async function loadBoardLite(boardId: string): Promise<BoardLite | null> {
@@ -37,7 +42,7 @@ async function loadBoardLite(boardId: string): Promise<BoardLite | null> {
       };
     }
   )
-    .select("id, org_id, size, lines_to_win, status")
+    .select("id, org_id, size, lines_to_win, status, arrange_ends_at")
     .eq("id", boardId)
     .maybeSingle()) as { data: BoardLite | null };
   return resp.data;
@@ -48,6 +53,25 @@ async function requireLiveBoard(boardId: string): Promise<BoardLite> {
   if (!board) throw new Error("빙고 보드를 찾을 수 없어요");
   if (board.status !== "LIVE") throw new Error("이 빙고는 지금 진행 중이 아니에요");
   return board;
+}
+
+/**
+ * 셀 배치/이동/제거 시점에 배열 타이머가 "지금 돌고 있는지" 검증.
+ * 타이머가 돌아가는 시간이 아니면 참가자는 절대 이동할 수 없다.
+ *  - arrange_ends_at = null  → 타이머 미시작 — 거부
+ *  - arrange_ends_at > now() → 진행중 — 허용
+ *  - arrange_ends_at <= now() → 마감 — 거부
+ */
+function assertArrangementOpen(board: BoardLite): void {
+  if (
+    board.arrange_ends_at &&
+    new Date(board.arrange_ends_at).getTime() > Date.now()
+  ) {
+    return;
+  }
+  throw new Error(
+    "지금은 배열 시간이 아니에요 — 운영자가 타이머를 시작하면 빙고판을 옮길 수 있어요"
+  );
 }
 
 async function requireAuthedUser() {
@@ -103,69 +127,6 @@ async function ensureGrid(
     throw new Error("빙고판을 만들지 못했어요");
   }
   return inserted.data.id;
-}
-
-async function recomputeGridStats(
-  gridId: string,
-  size: BingoSize,
-  linesToWin: number
-): Promise<void> {
-  const supabase = await createClient();
-  const cellsResp = (await (
-    supabase.from("org_bingo_grid_cells" as never) as unknown as {
-      select: (c: string) => {
-        eq: (k: string, v: string) => Promise<{
-          data: Array<{ position: number }> | null;
-        }>;
-      };
-    }
-  )
-    .select("position")
-    .eq("grid_id", gridId)) as {
-    data: Array<{ position: number }> | null;
-  };
-  const positions = (cellsResp.data ?? []).map((c) => c.position);
-  const filled = positions.length;
-  const lines = countCompletedLines(size, positions);
-
-  // 이미 완료 처리됐는지 확인 — 한 번 finished_at 이 찍히면 라인 줄어도 유지 안 함(엄격 갱신).
-  const gridResp = (await (
-    supabase.from("org_bingo_grids" as never) as unknown as {
-      select: (c: string) => {
-        eq: (k: string, v: string) => {
-          maybeSingle: () => Promise<{
-            data: { finished_at: string | null } | null;
-          }>;
-        };
-      };
-    }
-  )
-    .select("finished_at")
-    .eq("id", gridId)
-    .maybeSingle()) as { data: { finished_at: string | null } | null };
-
-  const reachedGoal = lines >= linesToWin;
-  const patch: Row = {
-    lines_completed: lines,
-    cells_filled: filled,
-    updated_at: new Date().toISOString(),
-  };
-  if (reachedGoal && !gridResp.data?.finished_at) {
-    patch.finished_at = new Date().toISOString();
-  } else if (!reachedGoal && gridResp.data?.finished_at) {
-    // 라인이 다시 줄어들면 (스왑/제거로) finished_at 무효화 — 공정성.
-    patch.finished_at = null;
-  }
-
-  await (
-    supabase.from("org_bingo_grids" as never) as unknown as {
-      update: (p: Row) => {
-        eq: (k: string, v: string) => Promise<{ error: SbErr }>;
-      };
-    }
-  )
-    .update(patch)
-    .eq("id", gridId);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -225,12 +186,12 @@ export async function placeEntryOnCellAction(
 ): Promise<void> {
   const user = await requireAuthedUser();
   const board = await requireLiveBoard(boardId);
+  assertArrangementOpen(board);
   const maxPos = board.size * board.size;
   if (position < 0 || position >= maxPos) {
     throw new Error("잘못된 칸 위치예요");
   }
 
-  // 자기 entry 는 본인 판에 못 올림 (게임 룰).
   const supabase = await createClient();
   const entryResp = (await (
     supabase.from("org_bingo_entries" as never) as unknown as {
@@ -252,8 +213,14 @@ export async function placeEntryOnCellAction(
   if (!entry || entry.board_id !== boardId) {
     throw new Error("이 빙고의 사진이 아니에요");
   }
-  if (entry.user_id === user.id) {
-    throw new Error("우리 가족 사진은 다른 가족들의 판에만 올라가요");
+
+  // 기관 고정 타일 — 그 칸은 운영자 전용, 가족이 덮을 수 없음.
+  const fixedCells = await loadFixedOrgCells(boardId);
+  if (fixedCells.some((f) => f.position === position)) {
+    throw new Error("운영자가 고정한 칸이에요");
+  }
+  if (fixedCells.some((f) => f.entryId === entryId)) {
+    throw new Error("이 칸은 운영자가 이미 배치했어요");
   }
 
   const gridId = await ensureGrid(boardId, user.id);
@@ -301,7 +268,14 @@ export async function placeEntryOnCellAction(
     throw new Error("배치에 실패했어요");
   }
 
-  await recomputeGridStats(gridId, board.size, board.lines_to_win);
+  const checkedIds = await loadCheckedEntryIds(boardId, user.id);
+  await recomputeGridStats(
+    gridId,
+    board.size,
+    board.lines_to_win,
+    checkedIds,
+    fixedCells
+  );
 
   revalidatePath(`/bingo/${boardId}`);
   revalidatePath(`/org/${board.org_id}/bingo/${boardId}/live`);
@@ -313,6 +287,7 @@ export async function removeEntryFromCellAction(
 ): Promise<void> {
   const user = await requireAuthedUser();
   const board = await requireLiveBoard(boardId);
+  assertArrangementOpen(board);
 
   const supabase = await createClient();
   const gridResp = (await (
@@ -335,6 +310,11 @@ export async function removeEntryFromCellAction(
   if (!gridResp.data) return;
   const gridId = gridResp.data.id;
 
+  const fixedCells = await loadFixedOrgCells(boardId);
+  if (fixedCells.some((f) => f.position === position)) {
+    throw new Error("운영자가 고정한 칸이에요");
+  }
+
   await (
     supabase.from("org_bingo_grid_cells" as never) as unknown as {
       delete: () => {
@@ -348,7 +328,14 @@ export async function removeEntryFromCellAction(
     .eq("grid_id", gridId)
     .eq("position", position);
 
-  await recomputeGridStats(gridId, board.size, board.lines_to_win);
+  const checkedIds = await loadCheckedEntryIds(boardId, user.id);
+  await recomputeGridStats(
+    gridId,
+    board.size,
+    board.lines_to_win,
+    checkedIds,
+    fixedCells
+  );
 
   revalidatePath(`/bingo/${boardId}`);
   revalidatePath(`/org/${board.org_id}/bingo/${boardId}/live`);
@@ -361,7 +348,13 @@ export async function swapBingoCellsAction(
 ): Promise<void> {
   const user = await requireAuthedUser();
   const board = await requireLiveBoard(boardId);
+  assertArrangementOpen(board);
   if (posA === posB) return;
+
+  const fixedCells = await loadFixedOrgCells(boardId);
+  if (fixedCells.some((f) => f.position === posA || f.position === posB)) {
+    throw new Error("운영자가 고정한 칸이에요");
+  }
 
   const supabase = await createClient();
   const gridResp = (await (
@@ -433,7 +426,152 @@ export async function swapBingoCellsAction(
     ).insert(toInsert);
   }
 
-  await recomputeGridStats(gridId, board.size, board.lines_to_win);
+  const checkedIds = await loadCheckedEntryIds(boardId, user.id);
+  await recomputeGridStats(
+    gridId,
+    board.size,
+    board.lines_to_win,
+    checkedIds,
+    fixedCells
+  );
+
+  revalidatePath(`/bingo/${boardId}`);
+  revalidatePath(`/org/${board.org_id}/bingo/${boardId}/live`);
+}
+
+/* -------------------------------------------------------------------------- */
+/* 📷 QR 인증 — 운영자가 호명(=QR 띄움)한 그림의 QR을 참가자가 찍어 칸 인증       */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * 참가자가 운영자 화면의 QR을 찍으면 호출. entryId 는 QR 에 인코딩됨.
+ *  - 그 그림이 QR 방식으로 호명(called + call_mode='QR')된 상태여야 함
+ *  - 그 그림이 내 판(배치 또는 기관 고정)에 있어야 함 → 그 칸이 ⭕
+ */
+export async function submitQrScanAction(
+  boardId: string,
+  entryId: string
+): Promise<void> {
+  const user = await requireAuthedUser();
+  const board = await requireLiveBoard(boardId);
+  if (!entryId) throw new Error("QR을 다시 찍어 주세요");
+
+  const supabase = await createClient();
+
+  // 이 그림이 이 보드의 것이고 + QR 방식으로 호명(=QR 띄움)됐는지 검증.
+  const entryResp = (await (
+    supabase.from("org_bingo_entries" as never) as unknown as {
+      select: (c: string) => {
+        eq: (k: string, v: string) => {
+          maybeSingle: () => Promise<{
+            data: {
+              id: string;
+              board_id: string;
+              keyword: string;
+              called_at: string | null;
+              call_mode: "CIRCLE" | "QR";
+            } | null;
+          }>;
+        };
+      };
+    }
+  )
+    .select("id, board_id, keyword, called_at, call_mode")
+    .eq("id", entryId)
+    .maybeSingle()) as {
+    data: {
+      id: string;
+      board_id: string;
+      keyword: string;
+      called_at: string | null;
+      call_mode: "CIRCLE" | "QR";
+    } | null;
+  };
+  const entry = entryResp.data;
+  if (!entry || entry.board_id !== boardId) {
+    throw new Error("이 빙고의 QR이 아니에요");
+  }
+  if (!entry.called_at || entry.call_mode !== "QR") {
+    throw new Error("아직 운영자가 QR로 띄운 그림이 아니에요");
+  }
+
+  // 이 그림이 내 판에 있는지 — 기관 고정 타일 또는 내 배치 셀.
+  const fixedCells = await loadFixedOrgCells(boardId);
+  const onMyBoardByFixed = fixedCells.some((f) => f.entryId === entryId);
+
+  const gridResp = (await (
+    supabase.from("org_bingo_grids" as never) as unknown as {
+      select: (c: string) => {
+        eq: (k: string, v: string) => {
+          eq: (k: string, v: string) => {
+            maybeSingle: () => Promise<{ data: { id: string } | null }>;
+          };
+        };
+      };
+    }
+  )
+    .select("id")
+    .eq("board_id", boardId)
+    .eq("user_id", user.id)
+    .maybeSingle()) as { data: { id: string } | null };
+
+  let onMyBoard = onMyBoardByFixed;
+  if (!onMyBoard && gridResp.data) {
+    const cellResp = (await (
+      supabase.from("org_bingo_grid_cells" as never) as unknown as {
+        select: (c: string) => {
+          eq: (k: string, v: string) => {
+            eq: (k: string, v: string) => {
+              maybeSingle: () => Promise<{
+                data: { entry_id: string } | null;
+              }>;
+            };
+          };
+        };
+      }
+    )
+      .select("entry_id")
+      .eq("grid_id", gridResp.data.id)
+      .eq("entry_id", entryId)
+      .maybeSingle()) as { data: { entry_id: string } | null };
+    onMyBoard = !!cellResp.data;
+  }
+  if (!onMyBoard) {
+    throw new Error(
+      `😢 죄송해요! 「${entry.keyword}」 그림이 내 빙고판에 없어요`
+    );
+  }
+
+  // 인증 기록 저장 (중복 무시).
+  const insertResp = (await (
+    supabase.from("org_bingo_signatures" as never) as unknown as {
+      upsert: (
+        p: Row,
+        opts: { onConflict: string }
+      ) => Promise<{ error: SbErr }>;
+    }
+  ).upsert(
+    {
+      board_id: boardId,
+      user_id: user.id,
+      entry_id: entryId,
+    } satisfies Row,
+    { onConflict: "board_id,user_id,entry_id" }
+  )) as { error: SbErr };
+  if (insertResp.error) {
+    console.error("[bingo/submitQrScan]", insertResp.error);
+    throw new Error("인증 저장에 실패했어요");
+  }
+
+  const gridId = gridResp.data?.id ?? (await ensureGrid(boardId, user.id));
+  const checkedIds = await loadCheckedEntryIds(boardId, user.id);
+  await recomputeGridStats(
+    gridId,
+    board.size,
+    board.lines_to_win,
+    checkedIds,
+    fixedCells
+  );
 
   revalidatePath(`/bingo/${boardId}`);
   revalidatePath(`/org/${board.org_id}/bingo/${boardId}/live`);

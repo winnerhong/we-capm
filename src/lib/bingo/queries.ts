@@ -146,8 +146,10 @@ export async function loadEntriesForBoard(
   const entries = resp.data ?? [];
   if (entries.length === 0) return [];
 
-  // 보호자명 + 대표 자녀명 조회.
-  const userIds = Array.from(new Set(entries.map((e) => e.user_id)));
+  // 보호자명 + 대표 자녀명 조회 (기관 타일은 user_id=null 이라 제외).
+  const userIds = Array.from(
+    new Set(entries.map((e) => e.user_id).filter((id): id is string => !!id))
+  );
   const usersResp = (await (
     supabase.from("app_users" as never) as unknown as {
       select: (c: string) => {
@@ -194,8 +196,8 @@ export async function loadEntriesForBoard(
 
   return entries.map((e) => ({
     ...e,
-    parent_name: parentMap.get(e.user_id) ?? "",
-    child_name: childMap.get(e.user_id) ?? null,
+    parent_name: e.is_org ? "기관" : e.user_id ? parentMap.get(e.user_id) ?? "" : "",
+    child_name: e.user_id ? childMap.get(e.user_id) ?? null : null,
   }));
 }
 
@@ -299,6 +301,56 @@ export async function loadGridForUser(
   return { grid, cells: cellsResp.data ?? [] };
 }
 
+/** 보드의 모든 가족 grid 셀 (user_id 포함) — 관제실 미리보기용. */
+export async function loadAllGridCellsForBoard(
+  boardId: string
+): Promise<Array<{ user_id: string; position: number; entry_id: string }>> {
+  if (!boardId) return [];
+  const supabase = await createClient();
+
+  const gridsResp = (await (
+    supabase.from("org_bingo_grids" as never) as unknown as {
+      select: (c: string) => {
+        eq: (k: string, v: string) => Promise<{
+          data: Array<{ id: string; user_id: string }> | null;
+        }>;
+      };
+    }
+  )
+    .select("id, user_id")
+    .eq("board_id", boardId)) as {
+    data: Array<{ id: string; user_id: string }> | null;
+  };
+  const grids = gridsResp.data ?? [];
+  if (grids.length === 0) return [];
+
+  const userByGrid = new Map<string, string>();
+  for (const g of grids) userByGrid.set(g.id, g.user_id);
+
+  const cellsResp = (await (
+    supabase.from("org_bingo_grid_cells" as never) as unknown as {
+      select: (c: string) => {
+        in: (k: string, v: string[]) => Promise<{
+          data: Array<{ grid_id: string; position: number; entry_id: string }> | null;
+        }>;
+      };
+    }
+  )
+    .select("grid_id, position, entry_id")
+    .in(
+      "grid_id",
+      grids.map((g) => g.id)
+    )) as {
+    data: Array<{ grid_id: string; position: number; entry_id: string }> | null;
+  };
+
+  return (cellsResp.data ?? []).map((c) => ({
+    user_id: userByGrid.get(c.grid_id) ?? "",
+    position: c.position,
+    entry_id: c.entry_id,
+  }));
+}
+
 /* -------------------------------------------------------------------------- */
 /* Leaderboard                                                                */
 /* -------------------------------------------------------------------------- */
@@ -309,6 +361,7 @@ export interface LeaderboardRow {
   child_name: string | null;
   lines_completed: number;
   cells_filled: number;
+  cells_checked: number;
   finished_at: string | null;
 }
 
@@ -328,12 +381,17 @@ export async function loadLeaderboard(
           ) => {
             order: (
               c: string,
-              o: { ascending: boolean; nullsFirst: boolean }
+              o: { ascending: boolean }
             ) => {
-              limit: (n: number) => Promise<{
-                data: BingoGridRow[] | null;
-                error: SbErr;
-              }>;
+              order: (
+                c: string,
+                o: { ascending: boolean; nullsFirst: boolean }
+              ) => {
+                limit: (n: number) => Promise<{
+                  data: BingoGridRow[] | null;
+                  error: SbErr;
+                }>;
+              };
             };
           };
         };
@@ -343,6 +401,7 @@ export async function loadLeaderboard(
     .select("*")
     .eq("board_id", boardId)
     .order("lines_completed", { ascending: false })
+    .order("cells_checked", { ascending: false })
     .order("finished_at", { ascending: true, nullsFirst: false })
     .limit(limit)) as {
     data: BingoGridRow[] | null;
@@ -404,6 +463,7 @@ export async function loadLeaderboard(
     child_name: childMap.get(g.user_id) ?? null,
     lines_completed: g.lines_completed,
     cells_filled: g.cells_filled,
+    cells_checked: g.cells_checked ?? 0,
     finished_at: g.finished_at,
   }));
 }
