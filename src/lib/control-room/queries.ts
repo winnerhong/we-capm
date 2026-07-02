@@ -21,6 +21,7 @@ import type {
   ControlRoomLive,
   ControlRoomLiveAttempt,
   ControlRoomMissionProgressRow,
+  ControlRoomParticipant,
   ControlRoomPendingItem,
   ControlRoomPhotoItem,
   ControlRoomSnapshot,
@@ -28,6 +29,7 @@ import type {
   FamilyMissionCellState,
 } from "./types";
 import { PHOTO_BEARING_MISSION_KINDS } from "@/lib/missions/types";
+import { loadOrgMembers } from "@/lib/org-members/queries";
 
 type SbResp<T> = { data: T[] | null; error: unknown };
 type SbRespOne<T> = { data: T | null; error: unknown };
@@ -238,6 +240,7 @@ const EMPTY_SNAPSHOT_BASE = {
     missions: [],
     rows: [],
   } as import("./types").ControlRoomFamilyGrid,
+  participants: [] as import("./types").ControlRoomParticipant[],
   live: {
     attempts: [],
     stuckCount: 0,
@@ -305,6 +308,7 @@ export async function loadControlRoomSnapshot(
     familyGrid,
     live,
     coopSessions,
+    participantDirectory,
   ] = await Promise.all([
     loadLiveEvents(supabase, orgId),
     loadParticipants(supabase, orgId, todayIso),
@@ -321,6 +325,7 @@ export async function loadControlRoomSnapshot(
     loadFamilyGrid(supabase, orgId, participantUserIds),
     loadLiveAttempts(supabase, orgId),
     loadCoopSessions(supabase, orgId),
+    loadParticipantDirectory(orgId),
   ]);
 
   return {
@@ -341,9 +346,53 @@ export async function loadControlRoomSnapshot(
     photoWall,
     missionProgress,
     familyGrid,
+    participants: participantDirectory,
     live,
     coopSessions,
   };
+}
+
+/* -------------------------------------------------------------------------- */
+/* 참가자 명단 — org 등록 가족 전체 (LIVE 미션과 무관, 모달에서 사용)          */
+/* -------------------------------------------------------------------------- */
+
+async function loadParticipantDirectory(
+  orgId: string
+): Promise<ControlRoomParticipant[]> {
+  try {
+    const { families } = await loadOrgMembers(orgId);
+    return families.map((f) => {
+      const childNames = f.children.map((c) => c.name).filter(Boolean);
+      const classNames = Array.from(
+        new Set(
+          f.children
+            .map((c) => c.className)
+            .filter((c): c is string => !!c && c.trim().length > 0)
+        )
+      );
+      return {
+        userId: f.userId,
+        displayName:
+          childNames.length > 0
+            ? childNames.join(", ")
+            : f.parentName || "이름 없음",
+        parentName: f.parentName,
+        phone: (f.parentPhone ?? "").replace(/\D/g, ""),
+        classNames,
+        children: f.children.map((c) => ({
+          name: c.name,
+          className: c.className,
+        })),
+        acorns: f.acornBalance ?? 0,
+        submissions: f.submissionCount ?? 0,
+        status: f.status,
+        lastActivityAt: f.lastActivityAt,
+      };
+    });
+  } catch (e) {
+    console.error("[control-room/participantDirectory]", e);
+    return [];
+  }
 }
 
 /* -------------------------------------------------------------------------- */
@@ -2031,6 +2080,7 @@ async function loadPhotoWall(
         url: firstUrl,
         missionTitle: mission.title,
         missionIcon: mission.icon ?? null,
+        userId: s.user_id,
         userDisplayName: formatFamilyDisplayName(
           parentName,
           enrolledMap.get(s.user_id) ?? [],

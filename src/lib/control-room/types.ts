@@ -91,6 +91,8 @@ export interface ControlRoomPhotoItem {
   url: string;
   missionTitle: string;
   missionIcon: string | null;
+  /** 제출한 참가자 app_user id — 참가자별 사진 묶기용. */
+  userId: string;
   userDisplayName: string;
   submittedAt: string;
   status: string; // SUBMITTED | AUTO_APPROVED | APPROVED | PENDING_REVIEW
@@ -141,6 +143,28 @@ export interface ControlRoomFamilyRow {
   parentName: string;
   /** 보호자 전화번호(숫자만) — 검색용. 없으면 빈 문자열. */
   phone: string;
+}
+
+/**
+ * 관제실 참가자 명단 항목 — LIVE 미션과 무관하게 org 에 등록된 모든 가족.
+ * (familyGrid 는 LIVE 팩 진행 매트릭스라 미션 없으면 비지만, 이건 항상 전체.)
+ */
+export interface ControlRoomParticipant {
+  userId: string;
+  /** 대표 표시명 — 자녀 이름들, 없으면 보호자명. */
+  displayName: string;
+  parentName: string;
+  /** 숫자만. */
+  phone: string;
+  /** 자녀 반명 unique. */
+  classNames: string[];
+  children: Array<{ name: string; className: string | null }>;
+  acorns: number;
+  /** 누적 미션 제출 수 (스탬프 랭킹용). */
+  submissions: number;
+  status: string; // ACTIVE | SUSPENDED | CLOSED
+  /** 마지막 미션 제출 시각. null=활동 없음. */
+  lastActivityAt: string | null;
 }
 
 export interface ControlRoomFamilyGrid {
@@ -208,6 +232,8 @@ export interface ControlRoomSnapshot {
   photoWall: ControlRoomPhotoItem[]; // 최근 30장
   missionProgress: ControlRoomMissionProgressRow[]; // 활성 미션 전부
   familyGrid: ControlRoomFamilyGrid;
+  /** org 등록 참가자 전체 명단 (미션과 무관). 참가자 모달에서 사용. */
+  participants: ControlRoomParticipant[];
   // Phase 2 — 라이브 수행 telemetry
   live: ControlRoomLive;
   /** COOP 미션 세션 현황 (대기/매칭/완료 등) */

@@ -2,7 +2,7 @@ import type { ControlRoomSnapshot } from "@/lib/control-room/types";
 import { loadOrgGiftTemplates } from "@/lib/gifts/queries";
 import styles from "./control-room.module.css";
 import { HeaderBar } from "./widgets/header-bar";
-import { ParticipantsTile } from "./widgets/participants-tile";
+import { ParticipantsTile, RankingLauncher } from "./widgets/participants-tile";
 // FmTile · ChatTile · PendingTile · MissionProgressTile · LeaderboardTile 제거됨.
 //  - 토리FM 라이브 스튜디오가 페이지 하단 풀콘솔로 임베드 → FM/채팅 중복 회피
 //  - 검토 대기는 사진월/짝꿍 세션의 인라인 검수 모달로 흡수
@@ -60,8 +60,12 @@ export async function ControlRoomGrid({ snapshot, orgId, isTvMode }: Props) {
           }`}
         >
           <ParticipantsTile snapshot={snapshot} orgId={orgId} />
-          <StampsTile stamps={snapshot.stamps} isTvMode={isTvMode} />
-          <AcornsTile acorns={snapshot.acorns} isTvMode={isTvMode} />
+          <RankingLauncher snapshot={snapshot} orgId={orgId} rankBy="submissions">
+            <StampsTile stamps={snapshot.stamps} isTvMode={isTvMode} />
+          </RankingLauncher>
+          <RankingLauncher snapshot={snapshot} orgId={orgId} rankBy="acorns">
+            <AcornsTile acorns={snapshot.acorns} isTvMode={isTvMode} />
+          </RankingLauncher>
         </div>
 
         {/* row 2.3: Phase 2 — 🔴 라이브 수행 (정체 가족 강조) */}
@@ -72,6 +76,7 @@ export async function ControlRoomGrid({ snapshot, orgId, isTvMode }: Props) {
         {/* row 2.5: 👥 가족 × 미션 매트릭스 (가로 풀폭) — 포토월/짝꿍세션보다 위 */}
         <div className="grid grid-cols-1">
           <FamilyGridTile
+            orgId={orgId}
             grid={snapshot.familyGrid}
             photos={snapshot.photoWall}
             missionProgress={snapshot.missionProgress}

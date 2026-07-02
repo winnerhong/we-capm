@@ -29,31 +29,52 @@ type Props = {
   render: (count: number, isLive: boolean) => ReactNode;
 };
 
-export function OrgPresenceCounter({ orgId, initialFallback, render }: Props) {
-  const [count, setCount] = useState(0);
-  const [isLive, setIsLive] = useState(false);
+export type OrgPresence = {
+  /** 접속중인 고유 참가자 수. */
+  count: number;
+  /** presence sync 가 한 번이라도 왔는지. */
+  isLive: boolean;
+  /** 접속중인 참가자 userId 집합. (viewer:* key 는 제외) */
+  onlineIds: Set<string>;
+};
+
+/**
+ * `org-presence:{orgId}` 채널을 **한 번만** 구독해 접속 현황을 반환한다.
+ * count(수) + onlineIds(누구) 를 함께 제공 → 한 트리에서 이 훅은 orgId 당 1회만 호출할 것.
+ * (같은 topic 을 두 번 구독하면 singleton 채널 충돌로 에러가 난다.)
+ */
+export function useOrgPresence(orgId: string): OrgPresence {
+  const [state, setState] = useState<OrgPresence>(() => ({
+    count: 0,
+    isLive: false,
+    onlineIds: new Set<string>(),
+  }));
 
   useEffect(() => {
     if (!orgId) return;
 
     const supa = createClient();
     // viewer 는 track 하지 않음 — 관전자이므로 stat 에 포함 X.
-    // 고유 viewer key 로 중복 생성 시 노이즈 방지.
     const channel = supa.channel(`org-presence:${orgId}`, {
       config: {
-        presence: { key: `viewer:${Date.now()}:${Math.random().toString(36).slice(2, 8)}` },
+        presence: {
+          key: `viewer:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`,
+        },
       },
     });
 
     channel
       .on("presence", { event: "sync" }, () => {
-        const state = channel.presenceState();
+        const presence = channel.presenceState();
         // key 기준 unique — viewer:* 로 시작하는 key 는 관전자라 제외
-        const uniqueParticipantKeys = Object.keys(state).filter(
+        const keys = Object.keys(presence).filter(
           (k) => !k.startsWith("viewer:")
         );
-        setCount(uniqueParticipantKeys.length);
-        setIsLive(true);
+        setState({
+          count: keys.length,
+          isLive: true,
+          onlineIds: new Set(keys),
+        });
       })
       .subscribe();
 
@@ -62,5 +83,10 @@ export function OrgPresenceCounter({ orgId, initialFallback, render }: Props) {
     };
   }, [orgId]);
 
+  return state;
+}
+
+export function OrgPresenceCounter({ orgId, initialFallback, render }: Props) {
+  const { count, isLive } = useOrgPresence(orgId);
   return <>{render(isLive ? count : initialFallback, isLive)}</>;
 }

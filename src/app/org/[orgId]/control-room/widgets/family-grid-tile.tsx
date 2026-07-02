@@ -23,6 +23,7 @@ export type FamilyGridGiftTemplate = {
 };
 
 type Props = {
+  orgId: string;
   grid: ControlRoomFamilyGrid;
   /** 가족 클릭 시 그 가족의 사진을 모아 보여주기 위해 photoWall 도 함께 받음 */
   photos: ControlRoomPhotoItem[];
@@ -60,6 +61,7 @@ const STATE_META: Record<
  * - 가족 행 클릭 → 우측 패널에 그 가족의 사진/상태 자세히.
  */
 export function FamilyGridTile({
+  orgId,
   grid,
   photos,
   missionProgress,
@@ -277,6 +279,32 @@ export function FamilyGridTile({
             </button>
           )}
         </div>
+
+        {/* 📥 사진 일괄 다운로드 — 현재 반 필터 기준 (전체 / 해당 반) */}
+        {(() => {
+          const clsLabel =
+            classFilter === null
+              ? "전체"
+              : classFilter === "__no_class__"
+                ? "반미지정"
+                : classFilter;
+          const href =
+            classFilter === null
+              ? `/api/org/photo-download?org=${orgId}&scope=all`
+              : `/api/org/photo-download?org=${orgId}&scope=class&class=${encodeURIComponent(
+                  classFilter === "__no_class__" ? "반미지정" : classFilter
+                )}`;
+          return (
+            <a
+              href={href}
+              title={`${clsLabel} 가족들이 올린 사진을 zip으로 받기`}
+              className="flex shrink-0 items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1.5 text-[11px] font-bold text-white transition hover:bg-emerald-500"
+            >
+              <span aria-hidden>📥</span>
+              {clsLabel} 사진 받기
+            </a>
+          );
+        })()}
       </div>
 
       {/* 반별 필터 칩 — 반 데이터가 하나도 없으면 숨김 */}
@@ -545,6 +573,18 @@ export function FamilyGridTile({
                 displayName={previewRow.displayName}
                 templates={giftTemplates}
               />
+
+              {/* 📥 이 가족 사진 받기 — 그 가족이 올린 사진 zip */}
+              {previewPhotos.length > 0 && (
+                <a
+                  href={`/api/org/photo-download?org=${orgId}&scope=user&userId=${previewRow.userId}`}
+                  title="이 가족이 올린 사진을 zip으로 받기"
+                  className="mt-2 flex items-center justify-center gap-1.5 rounded-lg bg-emerald-600 py-2 text-[11px] font-bold text-white transition hover:bg-emerald-500"
+                >
+                  <span aria-hidden>📥</span>
+                  이 가족 사진 받기 ({previewPhotos.length})
+                </a>
+              )}
 
               {/* 미션별 상태 리스트 */}
               <ul className="mt-3 space-y-1">
