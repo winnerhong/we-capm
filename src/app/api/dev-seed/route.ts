@@ -52,8 +52,16 @@ export async function GET() {
   log.push(regErr ? `❌ 등록명단: ${regErr.message}` : `✅ 등록명단: ${registrations.length}명`);
 
   // 3. 참가자 (입장한 사람 12명)
-  await supabase.from("reward_claims").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-  await supabase.from("submissions").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+  // ⚠ 다른 행사 데이터 보호 — 테스트 행사(EVENT_ID) 참가자의 것만 삭제.
+  const { data: oldParts } = await supabase
+    .from("participants")
+    .select("id")
+    .eq("event_id", EVENT_ID);
+  const oldPartIds = (oldParts ?? []).map((p) => p.id);
+  if (oldPartIds.length > 0) {
+    await supabase.from("reward_claims").delete().in("participant_id", oldPartIds);
+    await supabase.from("submissions").delete().in("participant_id", oldPartIds);
+  }
   await supabase.from("participants").delete().eq("event_id", EVENT_ID);
 
   const enteredPhones = registrations.slice(0, 12); // 첫 12명 입장
@@ -271,10 +279,11 @@ export async function GET() {
   // ================================
 
   // 8. Partners (3 samples)
+  // ⚠ 실제 파트너((주)위너기획 등)를 보호하기 위해 시드가 넣는 테스트 계정만 삭제.
   try {
-    await (supabase.from("partners" as never) as unknown as { delete: () => { neq: (k: string, v: string) => Promise<unknown> } })
+    await (supabase.from("partners" as never) as unknown as { delete: () => { in: (k: string, v: string[]) => Promise<unknown> } })
       .delete()
-      .neq("id", "00000000-0000-0000-0000-000000000000");
+      .in("username", ["partner_test1", "partner_test2", "partner_test3"]);
     const partnerInserts = [
       { name: "숲속친구 체험원", business_name: "(주)숲속친구", username: "partner_test1", password: "1234", email: "test1@toriro.com", phone: "010-5555-1111", tier: "TREE", commission_rate: 15, acorn_balance: 500000, total_sales: 12000000, total_events: 45, avg_rating: 4.7, status: "ACTIVE" },
       { name: "자연놀이터", business_name: "(주)자연놀이터", username: "partner_test2", password: "1234", email: "test2@toriro.com", phone: "010-5555-2222", tier: "EXPLORER", commission_rate: 18, acorn_balance: 150000, total_sales: 3500000, total_events: 12, avg_rating: 4.3, status: "ACTIVE" },
@@ -302,10 +311,15 @@ export async function GET() {
   }
 
   // 10. Coupons (3 samples) + Coupon Deliveries
+  // ⚠ 실제 쿠폰 보호 — 시드가 넣는 테스트 쿠폰만 삭제.
   try {
-    await (supabase.from("coupons" as never) as unknown as { delete: () => { neq: (k: string, v: string) => Promise<unknown> } })
+    await (supabase.from("coupons" as never) as unknown as { delete: () => { in: (k: string, v: string[]) => Promise<unknown> } })
       .delete()
-      .neq("id", "00000000-0000-0000-0000-000000000000");
+      .in("title", [
+        "아메리카노 30% 할인",
+        "피자 1판 무료 사이드",
+        "다음 체험 5,000원 할인",
+      ]);
     const couponInserts = [
       { affiliate_name: "숲속 카페", title: "아메리카노 30% 할인", description: "따뜻한 음료 한잔", discount_type: "PERCENT", discount_value: 30, category: "CAFE", send_delay_minutes: 30, valid_from: new Date().toISOString(), valid_until: new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString(), max_uses: 100, status: "ACTIVE" },
       { affiliate_name: "도토리 피자", title: "피자 1판 무료 사이드", description: "치즈 스틱 증정", discount_type: "FREE", category: "FOOD", send_delay_minutes: 30, valid_from: new Date().toISOString(), valid_until: new Date(Date.now() + 14 * 24 * 3600 * 1000).toISOString(), status: "ACTIVE" },
@@ -383,10 +397,11 @@ export async function GET() {
   }
 
   // 12. Ad Campaigns (2 samples, DRAFT/PENDING)
+  // ⚠ 실제 광고 보호 — 시드가 넣는 테스트 광고만 삭제.
   try {
-    await (supabase.from("ad_campaigns" as never) as unknown as { delete: () => { neq: (k: string, v: string) => Promise<unknown> } })
+    await (supabase.from("ad_campaigns" as never) as unknown as { delete: () => { in: (k: string, v: string[]) => Promise<unknown> } })
       .delete()
-      .neq("id", "00000000-0000-0000-0000-000000000000");
+      .in("title", ["봄맞이 숲길 이벤트 광고", "텐트 특가"]);
     const adInserts = [
       { advertiser_name: "토리로 플랫폼 자체", title: "봄맞이 숲길 이벤트 광고", target_portal: "FAMILY", placement: "BANNER", budget: 500000, status: "DRAFT" },
       { advertiser_name: "캠핑용품 브랜드", title: "텐트 특가", target_portal: "PARTNER", placement: "CARD", budget: 1000000, status: "PENDING" },
@@ -403,9 +418,15 @@ export async function GET() {
 
   // 13. Invoices (4 samples — ACORN_RECHARGE pending/confirmed, B2B_CONTRACT, SUBSCRIPTION)
   try {
-    await (supabase.from("invoices" as never) as unknown as { delete: () => { neq: (k: string, v: string) => Promise<unknown> } })
+    // ⚠ 실제 청구서 보호 — 시드가 넣는 샘플 청구서 번호만 삭제.
+    await (supabase.from("invoices" as never) as unknown as { delete: () => { in: (k: string, v: string[]) => Promise<unknown> } })
       .delete()
-      .neq("id", "00000000-0000-0000-0000-000000000000");
+      .in("invoice_number", [
+        "INV-20260420-A001",
+        "INV-20260419-A002",
+        "INV-20260420-B001",
+        "INV-20260415-S001",
+      ]);
 
     const sampleInvoices = [
       // Partner acorn recharge (pending, 7일 후 만료)
@@ -500,9 +521,11 @@ export async function GET() {
 
   // 14. Settlements (정산 샘플 1건 — partner_id는 FK 제약 있을 수 있어 skip-safe)
   try {
-    await (supabase.from("settlements" as never) as unknown as { delete: () => { neq: (k: string, v: string) => Promise<unknown> } })
+    // ⚠ 실제 정산 보호 — 시드 샘플 기간(2026-03월)만 삭제.
+    await (supabase.from("settlements" as never) as unknown as { delete: () => { eq: (k: string, v: string) => { eq: (k: string, v: string) => Promise<unknown> } } })
       .delete()
-      .neq("id", "00000000-0000-0000-0000-000000000000");
+      .eq("period_start", "2026-03-01")
+      .eq("period_end", "2026-03-31");
     // 실제 파트너 id가 있어야 FK 통과 → partners 테이블에서 가져오기
     const { data: partnerIds } = await (supabase.from("partners" as never) as unknown as { select: (c: string) => { limit: (n: number) => Promise<{ data: Array<{ id: string }> | null }> } }).select("id").limit(1);
     if (partnerIds && partnerIds.length > 0) {
