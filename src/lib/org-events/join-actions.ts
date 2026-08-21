@@ -4,12 +4,12 @@
 //
 // 흐름:
 //  1) campnic_user 쿠키에서 세션 로드 (없으면 join 페이지로 돌려보냄)
-//  2) org_events 조회 → 해당 기관 소속을 확보 (app_user_orgs 멱등 upsert)
+//  2) org_events 조회 (기관 소속은 만들지 않는다 — 참가 ≠ 소속)
 //  3) org_event_participants 에 upsert (PK: event_id, user_id)
 //  4) /home?event_id=... 로 redirect (Next redirect 는 throw — try/catch 바깥에서 호출)
 //
-// 기관 벽 없음: 예전에는 session.orgId 와 event.org_id 가 다르면 거부했으나,
-// 한 보호자가 여러 기관 초대장을 받는 게 정상 시나리오라 거부 대신 소속을 넓힌다.
+// 기관 벽 없음: 예전에는 session.orgId 와 event.org_id 가 다르면 거부했다.
+// 한 보호자가 여러 기관 초대장을 받는 게 정상이므로 참가 기록만 남긴다.
 //
 // 주의: Next 16 cookies() 는 async. redirect() 는 내부적으로 throw 하므로
 //       에러 흐름이 아닌 정상 흐름으로 간주해야 한다. 그래서 try/catch 로
@@ -19,7 +19,6 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
-import { addOrgMembership } from "@/lib/app-user/orgs";
 import { switchActiveOrg } from "@/lib/app-user/session";
 
 type SbErr = { message: string; code?: string } | null;
@@ -95,10 +94,10 @@ export async function joinOrgEventAction(eventId: string): Promise<void> {
   const evt = eventResp.data;
   if (!evt) throw new Error("행사를 찾을 수 없어요");
 
-  // 3) 소속 확보 — 타 기관 행사여도 막지 않는다.
-  //    한 보호자가 여러 기관 초대장을 받는 건 정상 시나리오이므로,
-  //    거부 대신 그 기관 소속을 추가해 준다 (app_user_orgs 멱등 upsert).
-  await addOrgMembership(session.id, evt.org_id, "invitation");
+  // 3) 소속은 만들지 않는다 — 행사 참가 ≠ 기관 소속.
+  //    초대장으로 행사 하나에 참가한 것만으로 그 기관이 "내 기관"이 되면,
+  //    등록한 적 없는 기관 화면이 홈처럼 뜬다. 접근 권한은 아래 참가 기록
+  //    (org_event_participants) 만으로 충분하다.
 
   // 4) org_event_participants upsert (PK: event_id,user_id → 멱등)
   const upResp = (await (

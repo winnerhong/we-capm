@@ -45,6 +45,11 @@ function formatDate(iso: string | null): string {
   }
 }
 
+/** 우리 기관 소속인지, 행사만 참가한 손님인지. */
+function kindLabel(kind: OrgMemberFamily["kind"]): string {
+  return kind === "GUEST" ? "행사 참가" : "원생";
+}
+
 /** CSV 필드 quoting — 쉼표/줄바꿈/따옴표 안전. */
 function csvField(v: unknown): string {
   const s = v == null ? "" : String(v);
@@ -99,6 +104,7 @@ export function buildMembersCsv(
   if (view === "child") {
     lines.push(
       joinRow([
+        "구분",
         "반",
         "자녀 이름",
         "생일",
@@ -114,6 +120,7 @@ export function buildMembersCsv(
       for (const c of childPool) {
         lines.push(
           joinRow([
+            kindLabel(f.kind),
             c.className ?? "",
             c.name,
             c.birthDate ?? "",
@@ -129,6 +136,7 @@ export function buildMembersCsv(
   } else {
     lines.push(
       joinRow([
+        "구분",
         "보호자",
         "연락처",
         "자녀 수",
@@ -156,6 +164,7 @@ export function buildMembersCsv(
         .join("; ");
       lines.push(
         joinRow([
+          kindLabel(f.kind),
           f.parentName,
           formatPhone(f.parentPhone),
           childPool.length,

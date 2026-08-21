@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { requireOrg } from "@/lib/org-auth-guard";
 import { createClient } from "@/lib/supabase/server";
-import { hasOrgMembership } from "@/lib/app-user/orgs";
+import { hasOrgAccess } from "@/lib/app-user/orgs";
 
 /**
  * 기관 전용 — 자기 기관 참가자(app_user)로 즉시 로그인 전환.
@@ -55,10 +55,10 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  // 소유권 검증: 이 기관에 소속된 참가자여야 함.
+  // 소유권 검증: 이 기관 소속이거나 이 기관 행사 참가자여야 함.
   //   app_users.org_id 는 홈(최초) 기관일 뿐이라, 타 기관이 홈이면서 이 기관
   //   행사에 참가한 보호자를 막아버린다. 소속 전체(app_user_orgs)로 판단.
-  if (!(await hasOrgMembership(user.id, org.orgId))) {
+  if (!(await hasOrgAccess(user.id, org.orgId))) {
     return NextResponse.json(
       { error: "이 참가자는 이 기관에 속하지 않아요" },
       { status: 403 }

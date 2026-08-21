@@ -224,12 +224,10 @@ export async function listUserOrgs(
 }
 
 /**
- * 기관에 소속된 보호자 id 목록 — 관제 명단·CSV 내보내기용.
- *
- * 기존 `app_users.org_id = orgId` 필터를 이걸로 교체해야, 타 기관 소속이지만
- * 이 기관 행사에 참가한 보호자가 명단에서 누락되지 않는다.
+ * 이 기관에 **소속된** 보호자 id — 기관이 명단에 올린 사람만.
+ * (일괄등록·수동등록·셀프가입. 타 기관 행사에 참가한 손님은 포함하지 않는다)
  */
-export async function listOrgUserIds(orgId: string): Promise<string[]> {
+export async function listOrgMemberUserIds(orgId: string): Promise<string[]> {
   if (!orgId) return [];
   const supabase = await createClient();
   const resp = (await (
@@ -244,10 +242,104 @@ export async function listOrgUserIds(orgId: string): Promise<string[]> {
 
   if (resp.error) {
     if (isMissingTable(resp.error)) return legacyHomeOrgUserIds(orgId);
-    console.error("[app-user/orgs] listOrgUserIds error", resp.error);
+    console.error("[app-user/orgs] listOrgMemberUserIds error", resp.error);
     return [];
   }
   return Array.from(
     new Set((resp.data ?? []).map((r) => r.user_id).filter(Boolean))
   );
+}
+
+/** 이 기관의 행사에 참가한 보호자 id — 소속 여부와 무관. */
+export async function listOrgEventParticipantUserIds(
+  orgId: string
+): Promise<string[]> {
+  if (!orgId) return [];
+  const supabase = await createClient();
+
+  const evResp = (await (
+    supabase.from("org_events" as never) as unknown as {
+      select: (c: string) => {
+        eq: (k: string, v: string) => Promise<SbResp<{ id: string }>>;
+      };
+    }
+  )
+    .select("id")
+    .eq("org_id", orgId)) as SbResp<{ id: string }>;
+  const eventIds = (evResp.data ?? []).map((e) => e.id);
+  if (eventIds.length === 0) return [];
+
+  const partResp = (await (
+    supabase.from("org_event_participants" as never) as unknown as {
+      select: (c: string) => {
+        in: (
+          k: string,
+          v: string[]
+        ) => Promise<SbResp<{ user_id: string }>>;
+      };
+    }
+  )
+    .select("user_id")
+    .in("event_id", eventIds)) as SbResp<{ user_id: string }>;
+
+  if (partResp.error) {
+    console.error("[app-user/orgs] listOrgEventParticipantUserIds", partResp.error);
+    return [];
+  }
+  return Array.from(
+    new Set((partResp.data ?? []).map((r) => r.user_id).filter(Boolean))
+  );
+}
+
+/**
+ * 관제 명단에 실을 보호자 전체 = 소속 ∪ 이 기관 행사 참가자.
+ *
+ * 둘을 합치는 이유: 초대장으로 행사만 참가한 사람은 "우리 기관 소속"이 아니지만,
+ * 그 행사를 운영하는 입장에서는 반드시 명단에 보여야 한다. 소속으로만 뽑으면
+ * "참가는 했는데 명단엔 없는" 유령 참가자가 생긴다.
+ */
+export async function listOrgUserIds(orgId: string): Promise<string[]> {
+  if (!orgId) return [];
+  const [members, guests] = await Promise.all([
+    listOrgMemberUserIds(orgId),
+    listOrgEventParticipantUserIds(orgId),
+  ]);
+  return Array.from(new Set([...members, ...guests]));
+}
+
+/** 명단 행의 성격 — 우리 원생(MEMBER) 인지, 행사만 온 손님(GUEST) 인지. */
+export type OrgRosterKind = "MEMBER" | "GUEST";
+
+/**
+ * userId → MEMBER | GUEST.
+ * 화면에서 "우리 원생"과 "행사 참가자"를 구분해 보여주기 위한 것.
+ */
+export async function loadOrgRosterKinds(
+  orgId: string
+): Promise<Map<string, OrgRosterKind>> {
+  const map = new Map<string, OrgRosterKind>();
+  if (!orgId) return map;
+  const [members, guests] = await Promise.all([
+    listOrgMemberUserIds(orgId),
+    listOrgEventParticipantUserIds(orgId),
+  ]);
+  for (const id of guests) map.set(id, "GUEST");
+  for (const id of members) map.set(id, "MEMBER"); // 소속이면 소속이 우선
+  return map;
+}
+
+/**
+ * 이 기관 화면·데이터에 접근할 자격이 있는가.
+ *   소속이거나, 이 기관 행사에 참가했으면 OK.
+ *
+ * hasOrgMembership 은 "소속인가"만 본다. 접근 판단에는 이쪽을 쓸 것.
+ */
+export async function hasOrgAccess(
+  userId: string,
+  orgId: string
+): Promise<boolean> {
+  if (!userId || !orgId) return false;
+  if (await hasOrgMembership(userId, orgId)) return true;
+  const guests = await listOrgEventParticipantUserIds(orgId);
+  return guests.includes(userId);
 }

@@ -15,7 +15,7 @@
 import "server-only";
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
-import { hasOrgMembership } from "@/lib/app-user/orgs";
+import { hasOrgAccess } from "@/lib/app-user/orgs";
 
 export const USER_COOKIE = "campnic_user";
 
@@ -97,7 +97,7 @@ export async function setAppUserSession(
  * 안전장치:
  *  - 세션이 없으면 no-op (미로그인은 전환할 것이 없다)
  *  - 이미 그 기관이면 no-op (불필요한 Set-Cookie 방지)
- *  - **소속이 아닌 기관으로는 전환하지 않는다.** 이 값이 곧 앱 전역의 권한
+ *  - **자격 없는 기관으로는 전환하지 않는다** (소속도 아니고 참가자도 아님). 이 값이 곧 앱 전역의 권한
  *    컨텍스트라, 검증 없이 바꾸면 임의 기관 데이터에 접근하게 된다.
  *
  * @returns 전환됐으면 true
@@ -126,7 +126,7 @@ export async function switchActiveOrg(orgId: string): Promise<boolean> {
   if (parsed.orgId === orgId) return false;
 
   // 소속 검증 — 없으면 전환하지 않는다 (fail-closed)
-  const allowed = await hasOrgMembership(id, orgId);
+  const allowed = await hasOrgAccess(id, orgId);
   if (!allowed) return false;
 
   await setAppUserSession({

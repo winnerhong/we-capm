@@ -14,13 +14,12 @@
 //   미로그인        → /join/event/{id} (연락처 확인 후 참가)
 //   행사 없음       → /home
 //   미참가          → /join/event/{id}
-//   참가자          → 소속 보장 + 활성 기관 전환 → /home?event_id={id}
+//   참가자          → 활성 기관 전환 → /home?event_id={id}
 
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getAppUser } from "@/lib/user-auth-guard";
 import { isEventParticipant } from "@/lib/org-events/queries";
-import { addOrgMembership } from "@/lib/app-user/orgs";
 import { switchActiveOrg } from "@/lib/app-user/session";
 
 export const dynamic = "force-dynamic";
@@ -69,8 +68,8 @@ export async function GET(request: Request) {
   );
   if (!joined) return to(request, `/join/event/${eventId}`);
 
-  // 참가 기록은 있는데 소속이 비어 있는 레거시 행 대비 — 멱등이라 비용 낮음.
-  await addOrgMembership(session.id, evt.org_id, "invitation");
+  // 소속은 만들지 않는다 — 행사 참가 ≠ 기관 소속.
+  // 활성 기관 전환은 참가자 자격만으로 허용된다(hasOrgAccess).
   await switchActiveOrg(evt.org_id);
 
   return to(request, `/home?event_id=${eventId}`);

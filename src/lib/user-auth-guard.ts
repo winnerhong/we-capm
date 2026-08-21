@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { hasOrgMembership } from "@/lib/app-user/orgs";
+import { hasOrgAccess } from "@/lib/app-user/orgs";
 
 export interface AppUserSession {
   id: string;
@@ -74,6 +74,7 @@ export async function requireAppUser(): Promise<AppUserSession> {
  * 기관 하나**일 뿐이라, 두 기관에 소속된 보호자가 지금 A기관 컨텍스트에 있으면
  * B기관 리소스가 전부 막혀버린다. 소속 전체(app_user_orgs)로 판단해야 한다.
  *
+ * 소속이거나 그 기관 행사 참가자면 통과.
  * 빠른 경로: 활성 기관과 같으면 DB 조회 없이 통과.
  */
 export async function canAccessOrg(
@@ -82,5 +83,5 @@ export async function canAccessOrg(
 ): Promise<boolean> {
   if (!orgId) return false;
   if (session.orgId === orgId) return true;
-  return hasOrgMembership(session.id, orgId);
+  return hasOrgAccess(session.id, orgId);
 }

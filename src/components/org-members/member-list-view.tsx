@@ -85,6 +85,12 @@ export function MemberListView({
   const [openUserId, setOpenUserId] = useState<string | null>(null);
 
   // 필터 적용된 가족 목록
+  // 이 기관 소속은 아니고 행사에만 참가한 보호자 수.
+  const guestCount = useMemo(
+    () => families.filter((f) => f.kind === "GUEST").length,
+    [families]
+  );
+
   const filteredFamilies = useMemo(() => {
     const q = search.trim().toLowerCase();
     return families.filter((f) => {
@@ -182,6 +188,14 @@ export function MemberListView({
             {totalEnrolled.toLocaleString("ko-KR")}
           </p>
         </div>
+        {guestCount > 0 && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
+            <p className="text-[10px] text-amber-700">행사 참가</p>
+            <p className="text-lg font-bold text-amber-800">
+              {guestCount.toLocaleString("ko-KR")}
+            </p>
+          </div>
+        )}
       </div>
 
       {/* 뷰 토글 + CSV */}
@@ -329,6 +343,16 @@ function FamilyList({
               <div className="min-w-0 flex-1">
                 <p className="flex flex-wrap items-center gap-2 text-sm font-bold text-[#2D5A3D]">
                   <span>{f.parentName}</span>
+                  {/* 소속 ≠ 참가. 초대장으로 이 기관 행사에만 온 보호자는
+                      "우리 원생" 과 섞이지 않도록 구분해 표시한다. */}
+                  {f.kind === "GUEST" && (
+                    <span
+                      className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-800"
+                      title="우리 기관 소속은 아니고, 이 기관 행사에 참가한 보호자예요"
+                    >
+                      🎟 행사 참가
+                    </span>
+                  )}
                   <span className="font-mono text-[12px] font-normal text-[#6B6560]">
                     {formatPhone(f.parentPhone)}
                   </span>

@@ -11,7 +11,12 @@
 
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
-import { hasOrgMembership, listOrgUserIds } from "@/lib/app-user/orgs";
+import {
+  hasOrgAccess,
+  listOrgUserIds,
+  loadOrgRosterKinds,
+  type OrgRosterKind,
+} from "@/lib/app-user/orgs";
 
 type SbResp<T> = { data: T[] | null; error: { message: string } | null };
 
@@ -40,6 +45,11 @@ export interface OrgMemberFamily {
   lastActivityAt: string | null;
   /** 누적 미션 제출 수 (REVOKED 제외) */
   submissionCount: number;
+  /**
+   * 우리 기관 원생(MEMBER) 인지, 행사만 참가한 손님(GUEST) 인지.
+   * 초대장으로 타 기관 행사에 온 보호자를 "우리 원생"과 섞어 보여주지 않기 위한 구분.
+   */
+  kind: OrgRosterKind;
 }
 
 export interface OrgMembersResult {
@@ -49,6 +59,10 @@ export interface OrgMembersResult {
   totalFamilies: number;
   totalChildren: number;
   totalEnrolled: number;
+  /** 우리 기관 소속 가족 수 */
+  totalMembers: number;
+  /** 행사만 참가한 손님 가족 수 */
+  totalGuests: number;
 }
 
 export interface OrgMemberSubmissionLite {
@@ -133,6 +147,8 @@ export async function loadOrgMembers(
     totalFamilies: 0,
     totalChildren: 0,
     totalEnrolled: 0,
+    totalMembers: 0,
+    totalGuests: 0,
   };
   if (!orgId) return empty;
 
@@ -143,6 +159,7 @@ export async function loadOrgMembers(
   //    참가한 보호자가 명단에서 통째로 빠진다.
   const memberIds = await listOrgUserIds(orgId);
   if (memberIds.length === 0) return empty;
+  const kindByUser = await loadOrgRosterKinds(orgId);
 
   const usersResp = (await (
     supabase.from("app_users" as never) as unknown as {
@@ -252,6 +269,7 @@ export async function loadOrgMembers(
     children: childrenByUser.get(u.id) ?? [],
     lastActivityAt: lastActivityByUser.get(u.id) ?? null,
     submissionCount: submissionCountByUser.get(u.id) ?? 0,
+    kind: kindByUser.get(u.id) ?? "MEMBER",
   }));
 
   // 5) 통계
@@ -272,6 +290,8 @@ export async function loadOrgMembers(
     totalFamilies: families.length,
     totalChildren,
     totalEnrolled,
+    totalMembers: families.filter((f) => f.kind === "MEMBER").length,
+    totalGuests: families.filter((f) => f.kind === "GUEST").length,
   };
 }
 
@@ -329,8 +349,8 @@ export async function loadOrgMemberDetail(
 
   // 1) 접근 검증 — 이 기관에 소속된 보호자인지 먼저 확인.
   //    (app_users.org_id 비교는 홈 기관만 보므로 타 기관 소속 참가자를 막아버린다)
-  const member = await hasOrgMembership(userId, orgId);
-  if (!member) return null;
+  const allowed = await hasOrgAccess(userId, orgId);
+  if (!allowed) return null;
 
   const userResp = (await (
     supabase.from("app_users" as never) as unknown as {
