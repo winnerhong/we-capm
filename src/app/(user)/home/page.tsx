@@ -112,39 +112,42 @@ export default async function UserHomePage({
   const sp = await searchParams;
   const urlEventId = sp.event_id;
 
-  const [
-    acornBalance,
-    children,
-    activeEvents,
-    userDetail,
-    freshOrgName,
-    topFamilies,
-  ] = await Promise.all([
+  const [acornBalance, children, activeEvents, userDetail] = await Promise.all([
     getAcornBalance(user.id),
     loadChildrenForUser(user.id),
     loadActiveAndUpcomingEventsForUser(user.id),
     loadAppUserById(user.id),
-    loadOrgNameById(user.orgId, user.orgName || "소속 기관"),
-    loadTopAcornFamilies(user.orgId, 5),
   ]);
 
-  // 선택 규칙:
-  //   - URL ?event_id= 가 activeEvents 에 있으면 그걸 사용
-  //   - 아니면 LIVE 행사 우선 (DRAFT/예정 보다 진행 중 먼저)
-  //   - 둘 다 없으면 첫 번째 (DRAFT)
-  //   - activeEvents 비면 null
-  const liveEvents = activeEvents.filter((e) => e.status === "LIVE");
+  // 선택 규칙 — 행사가 곧 컨텍스트.
+  //   1) URL ?event_id= (미들웨어가 이미 활성 기관을 여기 맞춰 놨다)
+  //   2) 활성 기관의 LIVE 행사
+  //   3) 활성 기관의 아무 행사
+  //   4) 그래도 없으면 아무 LIVE → 아무 행사
+  //
+  //   2·3 이 중요하다. 예전에는 기관을 안 보고 LIVE 행사부터 골라서,
+  //   두 기관에 다니는 보호자가 `?event_id=` 없이 /home 에 들어오면
+  //   "헤더는 A기관, 선택된 행사는 B기관" 으로 어긋났다.
+  const inActiveOrg = activeEvents.filter((e) => e.org_id === user.orgId);
   const selectedEvent: OrgEventRow | null =
     (urlEventId && activeEvents.find((e) => e.id === urlEventId)) ||
-    liveEvents[0] ||
+    inActiveOrg.find((e) => e.status === "LIVE") ||
+    inActiveOrg[0] ||
+    activeEvents.find((e) => e.status === "LIVE") ||
     activeEvents[0] ||
     null;
 
-  // 활성 기관 동기화는 미들웨어(proxy.ts → resolveActiveOrgPatch)가 담당한다.
-  //   `?event_id=` 가 붙은 요청은 렌더 전에 세션 orgId 가 그 행사의 기관으로
-  //   교정되므로, 여기서는 user.orgId 를 그대로 신뢰하면 된다.
-  //   (Server Component 에서는 쿠키를 쓸 수 없고, redirect() 로 우회하면
-  //    스트리밍 시작 후라 soft redirect 가 되어 불안정하다)
+  // 기관 종속 정보는 세션이 아니라 **선택된 행사**에서 끌어온다.
+  //   화면에 보이는 행사와 기관명·랭킹·방송이 언제나 같은 기관이 되도록.
+  const ctxOrgId = selectedEvent?.org_id ?? user.orgId;
+
+  const [freshOrgName, topFamilies] = await Promise.all([
+    loadOrgNameById(
+      ctxOrgId,
+      ctxOrgId === user.orgId ? user.orgName || "소속 기관" : "소속 기관"
+    ),
+    loadTopAcornFamilies(ctxOrgId, 5),
+  ]);
 
   // 행사가 두 기관 이상에 걸쳐 있으면 선택기 라벨에 기관명을 붙인다.
   //   (두 기관에 다니는 보호자에겐 행사 선택기가 곧 기관 스위처)
@@ -159,7 +162,7 @@ export default async function UserHomePage({
 
   const primaryPack = await pickPrimaryLivePackForEvent(
     user.id,
-    user.orgId,
+    ctxOrgId,
     selectedEvent?.id ?? null
   );
 
@@ -402,14 +405,14 @@ export default async function UserHomePage({
       )}
 
       {/* 돌발 미션 — 시간 임계이므로 FM 보다 위 */}
-      <BroadcastCard orgId={user.orgId} />
+      <BroadcastCard orgId={ctxOrgId} />
 
       {/* 🎯 토리 빙고 — LIVE 보드 있을 때만 자동 노출. 사진 등록 진입 카드 역할. */}
-      <BingoCard orgId={user.orgId} userId={user.id} />
+      <BingoCard orgId={ctxOrgId} userId={user.id} />
 
       {/* 토리FM 라이브 (선택된 행사의 LIVE 세션만, 행사 없으면 org fallback) */}
       <ToriFmCard
-        orgId={user.orgId}
+        orgId={ctxOrgId}
         eventId={selectedEvent?.id ?? null}
       />
 

@@ -7,6 +7,45 @@ import { hashPassword, verifyPassword } from "@/lib/password";
 import { loadAppUserById, loadChildrenForUser } from "@/lib/app-user/queries";
 import { computeOnboardingProgress } from "@/lib/app-user/onboarding";
 
+/**
+ * 도토리 지급을 원장(user_acorn_transactions)에도 기록.
+ *
+ * 온보딩 보상·형제 보너스는 오랫동안 app_users.acorn_balance 만 올리고 원장을
+ * 남기지 않았다. 그 결과 231명 중 79명의 잔액이 원장 합계와 어긋나 있었고,
+ * 도토리를 행사 단위로 집계할 수가 없었다(원장에 없는 건 귀속할 곳이 없다).
+ * 지급 경로는 전부 원장을 남긴다 — 잔액은 원장의 파생값이어야 한다.
+ *
+ * best-effort: 실패해도 지급 자체를 막지 않는다(미션 지급 경로와 동일한 정책).
+ */
+async function recordAcornGrant(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  input: {
+    userId: string;
+    amount: number;
+    reason: string;
+    sourceType: string;
+    sourceId: string | null;
+    memo: string;
+  }
+): Promise<void> {
+  const resp = (await (
+    supabase.from("user_acorn_transactions" as never) as unknown as {
+      insert: (r: unknown) => Promise<{ error: { message: string } | null }>;
+    }
+  ).insert({
+    user_id: input.userId,
+    amount: input.amount,
+    reason: input.reason,
+    source_type: input.sourceType,
+    source_id: input.sourceId,
+    memo: input.memo,
+  })) as { error: { message: string } | null };
+
+  if (resp.error) {
+    console.error("[profile/recordAcornGrant] tx insert error", resp.error);
+  }
+}
+
 function toStr(v: FormDataEntryValue | null, fallback = ""): string {
   if (v === null) return fallback;
   return String(v).trim();
@@ -390,23 +429,46 @@ export async function addBonusSiblingAction(formData: FormData): Promise<{
 
   const supabase = await createClient();
 
-  const { error: insErr } = (await (
+  const { data: newChild, error: insErr } = (await (
     supabase.from("app_children" as never) as unknown as {
-      insert: (p: unknown) => Promise<{ error: { message: string } | null }>;
+      insert: (p: unknown) => {
+        select: (c: string) => {
+          single: () => Promise<{
+            data: { id: string } | null;
+            error: { message: string } | null;
+          }>;
+        };
+      };
     }
-  ).insert({
-    user_id: session.id,
-    name,
-    birth_date,
-    gender: genderRaw,
-    is_enrolled: false, // 온보딩에서 추가하는 건 형제/자매
-  } as never)) as { error: { message: string } | null };
+  )
+    .insert({
+      user_id: session.id,
+      name,
+      birth_date,
+      gender: genderRaw,
+      is_enrolled: false, // 온보딩에서 추가하는 건 형제/자매
+    } as never)
+    .select("id")
+    .single()) as {
+    data: { id: string } | null;
+    error: { message: string } | null;
+  };
 
   if (insErr) {
     return { ok: false, error: insErr.message ?? "자녀 추가 실패" };
   }
 
   const nextBalance = (user.acorn_balance ?? 0) + 1;
+
+  // 잔액을 올리기 전에 원장부터 — 순서가 뒤집히면 실패 시 잔액만 늘어난다.
+  await recordAcornGrant(supabase, {
+    userId: session.id,
+    amount: 1,
+    reason: "ONBOARDING_SIBLING",
+    sourceType: "onboarding_sibling",
+    sourceId: newChild?.id ?? null,
+    memo: `형제·자매 등록 보너스 (${name})`,
+  });
   const nextBonusCount = prevBonusCount + 1;
   const { error: updErr } = (await (
     supabase.from("app_users" as never) as unknown as {
@@ -465,6 +527,17 @@ export async function claimOnboardingRewardAction(): Promise<{
   const nextBalance = (user.acorn_balance ?? 0) + 1;
 
   const supabase = await createClient();
+
+  // 원장 먼저 — onboarding_rewarded 플래그가 멱등을 보장하므로 중복 기록은 없다.
+  await recordAcornGrant(supabase, {
+    userId: user.id,
+    amount: 1,
+    reason: "ONBOARDING",
+    sourceType: "onboarding",
+    sourceId: user.id,
+    memo: "온보딩 완료 보상",
+  });
+
   const { error } = (await (
     supabase.from("app_users" as never) as unknown as {
       update: (p: unknown) => {
