@@ -2,22 +2,28 @@
 //
 // 보호자 ↔ 기관 다중 소속(app_user_orgs) 조회·기록 헬퍼.
 //
-// 배경: app_users.org_id 는 "홈(최초) 기관" 일 뿐이고, 실제 접근 권한은
-//       app_user_orgs 가 정한다. 한 보호자가 여러 기관 초대장을 받는 것이
-//       정상 시나리오이므로 org_id 직접 비교는 더 이상 권한 판단에 쓰면 안 된다.
+// 배경: app_users.org_id 는 "홈(최초) 기관" 일 뿐이라 권한 판단에 쓰면 안 된다.
+//       한 보호자가 여러 기관 초대장을 받는 것이 정상 시나리오다.
 //
-//       ✗ user.org_id === event.org_id
-//       ○ await hasOrgMembership(user.id, event.org_id)
+// 두 개념을 구분한다:
+//   소속(membership)   = 기관이 명단에 올린 사람  → app_user_orgs
+//   참가(participation) = 그 기관 행사에 참여한 사람 → org_event_participants
+//
+//   ✗ user.org_id === event.org_id
+//   ○ await hasOrgAccess(user.id, orgId)   ← 소속 ∪ 참가. 접근 판단은 이것.
+//   · hasOrgMembership 은 "소속인가" 만 본다 (명단 구분용).
 
 import { createClient } from "@/lib/supabase/server";
 
-/** 소속이 생긴 경로. 감사·통계용이며 권한 판단에는 쓰지 않는다. */
+/** 소속이 생긴 경로 = 기관이 명단에 올린 방식. 권한 판단에는 쓰지 않는다. */
 export type OrgMembershipSource =
   | "backfill"
   | "bulk_import"
   | "self_register"
-  | "invitation"
   | "admin";
+// "invitation" 은 폐기 — 행사 참가는 소속이 아니다.
+//   초대장으로 행사에 참가한 것만으로 소속이 생기면, 등록한 적 없는 기관이
+//   그 보호자의 "내 기관" 이 된다. 참가 권한은 org_event_participants 로 충분.
 
 export interface UserOrgSummary {
   orgId: string;

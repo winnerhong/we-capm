@@ -1,7 +1,7 @@
 // 기관별 토리FM 표시명(브랜드명) 로더.
 // partner_orgs.fm_brand_name 컬럼에서 읽어오고, 없거나 빈 값이면 기본값 "토리FM".
 // 사용처:
-//  - 참가자 홈 카드 (src/app/(user)/home/tori-fm-card.tsx)
+//  - 참가자 홈 카드 (src/app/(event)/e/[eventId]/tori-fm-card.tsx)
 //  - 참가자 토리FM 페이지 (src/app/(event)/e/[eventId]/radio/page.tsx)
 //  - 기관 토리FM 제어실 헤더 (선택)
 

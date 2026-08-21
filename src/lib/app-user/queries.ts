@@ -223,6 +223,11 @@ export async function loadChildrenForUser(
  * "{자녀이름들} 가족", 둘 다 없으면 "{보호자명} 가족".
  * acorn_balance > 0 만, 동점은 created_at ASC (먼저 가입 우선).
  */
+/**
+ * 도토리 랭킹 행. 집계는 행사 단위로 옮겨갔다
+ * (@see lib/app-user/event-acorns.ts → loadTopAcornFamiliesForEvent).
+ * 기관 기준 랭킹은 두 기관에 다니는 집이 양쪽에서 유리해 폐기됨.
+ */
 export interface TopAcornFamily {
   userId: string;
   rank: number;
@@ -230,76 +235,6 @@ export interface TopAcornFamily {
   /** 등록 자녀의 대표 반 이름 — 없으면 null. */
   className: string | null;
   acorns: number;
-}
-
-export async function loadTopAcornFamilies(
-  orgId: string,
-  limit: number
-): Promise<TopAcornFamily[]> {
-  if (!orgId) return [];
-  const n = Math.max(1, Math.min(20, Math.floor(limit) || 5));
-  const supabase = await createClient();
-
-  type Row = {
-    id: string;
-    parent_name: string | null;
-    acorn_balance: number | null;
-    created_at: string;
-  };
-  const usersResp = (await (
-    supabase.from("app_users" as never) as unknown as {
-      select: (c: string) => {
-        eq: (k: string, v: string) => {
-          eq: (k: string, v: string) => {
-            gt: (k: string, v: number) => {
-              order: (
-                c: string,
-                o: { ascending: boolean }
-              ) => {
-                order: (
-                  c: string,
-                  o: { ascending: boolean }
-                ) => {
-                  limit: (n: number) => Promise<SbResp<Row>>;
-                };
-              };
-            };
-          };
-        };
-      };
-    }
-  )
-    .select("id, parent_name, acorn_balance, created_at")
-    .eq("org_id", orgId)
-    .eq("status", "ACTIVE")
-    .gt("acorn_balance", 0)
-    .order("acorn_balance", { ascending: false })
-    .order("created_at", { ascending: true })
-    .limit(n)) as SbResp<Row>;
-
-  const users = usersResp.data ?? [];
-  if (users.length === 0) return [];
-
-  const ids = users.map((u) => u.id);
-  const [childMap, classMap] = await Promise.all([
-    loadChildNamesByUserIds(ids),
-    loadPrimaryClassByUserIds(ids),
-  ]);
-
-  return users.map((u, idx) => {
-    const childNames = childMap.get(u.id) ?? [];
-    const familyLabel =
-      childNames.length > 0
-        ? `${childNames.join("·")} 가족`
-        : `${(u.parent_name ?? "").trim() || "보호자"} 가족`;
-    return {
-      userId: u.id,
-      rank: idx + 1,
-      familyLabel,
-      className: classMap.get(u.id) ?? null,
-      acorns: u.acorn_balance ?? 0,
-    };
-  });
 }
 
 /**
