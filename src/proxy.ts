@@ -1,5 +1,9 @@
 import type { NextRequest } from "next/server";
 import { updateSession } from "@/lib/supabase/proxy";
+import {
+  resolveActiveOrgPatch,
+  ACTIVE_ORG_COOKIE_OPTS,
+} from "@/lib/app-user/active-org-proxy";
 
 /**
  * 한 브라우저 다중 기관 로그인 지원.
@@ -47,7 +51,22 @@ function injectOrgSession(request: NextRequest) {
 
 export async function proxy(request: NextRequest) {
   injectOrgSession(request);
-  return updateSession(request);
+
+  // 참가자 활성 기관 동기화 — URL 의 event_id 와 세션의 orgId 가 어긋나면 교정.
+  //   요청 쿠키는 여기서 이미 바뀌므로(updateSession 의 NextResponse.next({request})
+  //   가 이어받는다) 이번 렌더부터 올바른 기관이 보인다.
+  //   대부분의 요청은 event_id 가 없어 즉시 null 로 빠진다.
+  const activeOrgPatch = await resolveActiveOrgPatch(request);
+
+  const response = await updateSession(request);
+  if (activeOrgPatch) {
+    response.cookies.set(
+      "campnic_user",
+      activeOrgPatch,
+      ACTIVE_ORG_COOKIE_OPTS
+    );
+  }
+  return response;
 }
 
 export const config = {

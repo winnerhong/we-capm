@@ -1,4 +1,5 @@
 import Link from "next/link";
+
 import { requireAppUser } from "@/lib/user-auth-guard";
 import {
   getAcornBalance,
@@ -138,6 +139,12 @@ export default async function UserHomePage({
     liveEvents[0] ||
     activeEvents[0] ||
     null;
+
+  // 활성 기관 동기화는 미들웨어(proxy.ts → resolveActiveOrgPatch)가 담당한다.
+  //   `?event_id=` 가 붙은 요청은 렌더 전에 세션 orgId 가 그 행사의 기관으로
+  //   교정되므로, 여기서는 user.orgId 를 그대로 신뢰하면 된다.
+  //   (Server Component 에서는 쿠키를 쓸 수 없고, redirect() 로 우회하면
+  //    스트리밍 시작 후라 soft redirect 가 되어 불안정하다)
 
   // 행사가 두 기관 이상에 걸쳐 있으면 선택기 라벨에 기관명을 붙인다.
   //   (두 기관에 다니는 보호자에겐 행사 선택기가 곧 기관 스위처)
