@@ -14,6 +14,7 @@ import {
   todayISO,
 } from "@/lib/csv-export";
 import { requireOrg } from "@/lib/org-auth-guard";
+import { listOrgUserIds } from "@/lib/app-user/orgs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -50,11 +51,15 @@ export async function GET(
     .maybeSingle()) as { data: { org_name: string } | null };
   const orgName = orgResp.data?.org_name ?? "기관";
 
-  // 2) app_users — 이 기관 소속 전체
+  // 2) app_users — 이 기관 소속 전체 (app_user_orgs 기준)
+  const memberIds = await listOrgUserIds(orgId);
   const usersResp = (await (
     supabase.from("app_users" as never) as unknown as {
       select: (c: string) => {
-        eq: (k: string, v: string) => {
+        in: (
+          k: string,
+          v: string[]
+        ) => {
           order: (
             c: string,
             o: { ascending: boolean }
@@ -77,7 +82,7 @@ export async function GET(
     .select(
       "id, parent_name, phone, acorn_balance, status, first_login_at, last_login_at, created_at"
     )
-    .eq("org_id", orgId)
+    .in("id", memberIds)
     .order("created_at", { ascending: false })) as {
     data: Array<{
       id: string;

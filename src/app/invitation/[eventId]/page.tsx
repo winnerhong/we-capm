@@ -1,12 +1,11 @@
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { getAppUser } from "@/lib/user-auth-guard";
 import {
   loadOrgEventById,
   isEventParticipant,
 } from "@/lib/org-events/queries";
-import { loadAppUserById } from "@/lib/app-user/queries";
 import { loadPartnerDisplayNameForOrg } from "@/lib/org-partner";
 import { loadTimelineSlots } from "@/lib/event-timeline/queries";
 import { TimelineCollapsible } from "./timeline-collapsible";
@@ -180,16 +179,17 @@ export default async function EventInvitationPage({
 }) {
   const { eventId } = await params;
 
-  // 로그인 — 미로그인이면 로그인 페이지로 리다이렉트 (return URL 포함)
+  // 열람 정책 — 링크(UUID)가 곧 자격(credential).
+  //  - 로그인 여부와 무관하게 누구나 열람. 이 페이지는 개인정보를 렌더하지 않는다
+  //    (행사명·일시·장소·주차·타임테이블만). QR 을 인쇄·게시판 부착하는 운영을
+  //    지원하려면 공개가 전제.
+  //  - 기관 게이트 없음. 한 보호자가 여러 기관 초대장을 받을 수 있으므로
+  //    "다른 기관 계정" 이라는 이유로 막지 않는다.
+  //  - 유일한 비공개 조건은 미발행(invitation_published_at IS NULL).
+  //  세션은 하단 CTA 문구를 고르는 용도로만 사용한다.
   const session = await getAppUser();
-  if (!session) {
-    redirect(`/user-login?return=/invitation/${eventId}`);
-  }
 
-  const [event, user] = await Promise.all([
-    loadOrgEventById(eventId),
-    loadAppUserById(session.id),
-  ]);
+  const event = await loadOrgEventById(eventId);
 
   if (!event) notFound();
 
@@ -198,17 +198,10 @@ export default async function EventInvitationPage({
     return <PendingState eventName={event.name} />;
   }
 
-  // 기관 분리 — 다른 기관 계정으로 로그인한 상태면 차단.
-  //  - 비로그인: 초대장 링크(UUID)가 credential → 열람 허용 (참여 시 로그인 유도)
-  //  - 같은 기관 로그인: 허용
-  //  - 다른 기관 로그인이지만 이 행사에 참가자로 연결된 경우: 허용 (cross-org 참여)
-  //  - 그 외 다른 기관 로그인: 차단 (로그아웃 후 재시도 안내)
-  if (user && user.org_id !== event.org_id) {
-    const linked = await isEventParticipant(eventId, user.id);
-    if (!linked) {
-      return <NoAccessState eventId={eventId} />;
-    }
-  }
+  // CTA 분기용 — 이 행사에 이미 참가 중인지. 미로그인이면 조회 자체를 건너뛴다.
+  const joined = session
+    ? await isEventParticipant(eventId, session.id).catch(() => false)
+    : false;
 
   const orgName = await loadPartnerDisplayNameForOrg(event.org_id).catch(
     () => null
@@ -617,21 +610,12 @@ export default async function EventInvitationPage({
       )}
 
       {/* ─── 앱 입장 CTA — 초대장은 (user) 레이아웃 밖이라 앱 진입 버튼을 직접 제공 ─── */}
-      <section className="mx-auto max-w-md px-6 pb-14 pt-2">
-        <Link
-          href="/home"
-          className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#2D5A3D] to-[#3A7A52] px-6 py-4 text-base font-bold text-white shadow-lg transition hover:from-[#234a30] hover:to-[#2D5A3D]"
-        >
-          <span aria-hidden>{event.status === "LIVE" ? "🎪" : "🏠"}</span>
-          <span>
-            {event.status === "LIVE" ? "행사 입장하기" : "토리로 앱 홈으로"}
-          </span>
-          <span aria-hidden>→</span>
-        </Link>
-        <p className="mt-2 text-center text-[11px] text-[#8B7F75]">
-          미션·스탬프북·토리FM 라이브를 앱에서 즐겨보세요
-        </p>
-      </section>
+      <InvitationCta
+        eventId={eventId}
+        eventStatus={event.status}
+        joined={joined}
+        loggedIn={!!session}
+      />
 
     </div>
   );
@@ -718,42 +702,59 @@ function PendingState({ eventName }: { eventName: string }) {
   );
 }
 
-function NoAccessState({ eventId }: { eventId: string }) {
-  // 로그아웃 후 다시 이 초대장으로 — 비로그인 상태가 되면 열람 가능,
-  // 또는 해당 기관 계정으로 다시 로그인하면 정상 진입.
-  const logoutHref = `/api/auth/user-logout?redirect=${encodeURIComponent(
-    `/invitation/${eventId}`
-  )}`;
+
+/**
+ * 하단 CTA — 열람자 상태별 3분기.
+ *
+ *  1) 미로그인            → "이 행사 참가하기" (/join/event/{id} 에서 연락처 확인)
+ *  2) 로그인 + 참가 완료  → "행사 입장하기" (/home?event_id={id})
+ *  3) 로그인 + 미참가     → "이 행사 참가하기" (기관이 달라도 동일 — 기관 벽 없음)
+ *
+ * 기관 일치 여부로는 분기하지 않는다. 한 보호자가 여러 기관 초대장을 받는 것이
+ * 정상 시나리오이므로, 판단 기준은 "이 행사에 참가했는가" 하나뿐.
+ */
+function InvitationCta({
+  eventId,
+  eventStatus,
+  joined,
+  loggedIn,
+}: {
+  eventId: string;
+  eventStatus: string;
+  joined: boolean;
+  loggedIn: boolean;
+}) {
+  const isLive = eventStatus === "LIVE";
+
+  // 참가 완료 → 앱으로. 미참가 → 참가 플로우로.
+  // 입장은 /api/user/enter-event 경유 — 활성 기관을 이 행사의 기관으로 전환한다.
+  // (다른 기관 컨텍스트로 로그인한 채 들어와도 이 행사 화면이 뜨도록)
+  const href = joined
+    ? `/api/user/enter-event?event_id=${eventId}`
+    : `/join/event/${eventId}`;
+  const icon = joined ? (isLive ? "🎪" : "🏠") : "🌲";
+  const label = joined
+    ? isLive
+      ? "행사 입장하기"
+      : "토리로 앱 홈으로"
+    : "이 행사 참가하기";
+  const hint = joined
+    ? "미션·스탬프북·토리FM 라이브를 앱에서 즐겨보세요"
+    : loggedIn
+      ? "참가하면 스탬프북·프로그램을 바로 시작할 수 있어요"
+      : "연락처만 입력하면 바로 참가할 수 있어요";
+
   return (
-    <div className="flex min-h-dvh flex-col items-center justify-center bg-[#FFFDF8] px-6 py-12 text-center">
-      <p className="text-6xl" aria-hidden>
-        🚫
-      </p>
-      <h1 className="mt-6 text-xl font-bold text-rose-700">
-        다른 기관 계정으로 로그인되어 있어요
-      </h1>
-      <p className="mt-2 max-w-sm text-sm text-[#6B6560]">
-        이 초대장은 다른 기관의 행사예요. 지금 로그인된 계정은 이 초대장을 볼 수
-        없어요. 로그아웃하면 초대장을 열람하거나, 해당 기관 계정으로 다시
-        로그인할 수 있어요.
-      </p>
-      {/* 로그아웃은 쿠키 삭제라 POST — form 으로 처리 */}
-      <form action={logoutHref} method="post" className="mt-6">
-        <button
-          type="submit"
-          className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-[#2D5A3D] to-[#3A7A52] px-5 py-2.5 text-sm font-bold text-white shadow-md hover:from-[#234a30]"
-        >
-          <span aria-hidden>🔓</span>
-          <span>로그아웃하고 이 초대장 보기</span>
-        </button>
-      </form>
+    <section className="mx-auto max-w-md px-6 pb-14 pt-2">
       <Link
-        href="/home"
-        className="mt-3 inline-flex items-center gap-1.5 rounded-xl border border-[#D4E4BC] bg-white px-4 py-2 text-xs font-semibold text-[#2D5A3D] hover:bg-[#F5F1E8]"
+        href={href}
+        className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#2D5A3D] to-[#3A7A52] px-6 py-4 text-base font-bold text-white shadow-lg transition hover:from-[#234a30] hover:to-[#2D5A3D]"
       >
-        <span aria-hidden>🏠</span>
-        <span>내 기관 홈으로</span>
+        <span aria-hidden>{icon}</span>
+        <span>{label}</span>
+        <span aria-hidden>→</span>
       </Link>
-    </div>
+      <p className="mt-2 text-center text-[11px] text-[#8B7F75]">{hint}</p>
+    </section>
   );
 }

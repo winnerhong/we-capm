@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { requireAppUser } from "@/lib/user-auth-guard";
+import { requireAppUser, canAccessOrg } from "@/lib/user-auth-guard";
 import {
   isRoomMember,
   isToritalkEnabled,
@@ -29,7 +29,7 @@ export default async function ToriTalkRoomPage({
   if (!enabled) redirect("/tori-talk");
 
   const room = await loadRoom(roomId);
-  if (!room || room.org_id !== user.orgId) notFound();
+  if (!room || !(await canAccessOrg(user, room.org_id))) notFound();
 
   const isMember = await isRoomMember(roomId, user.id);
   if (!isMember) {

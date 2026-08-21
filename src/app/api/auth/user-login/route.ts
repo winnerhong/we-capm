@@ -5,13 +5,13 @@
 //
 // 보안: 세미-프라이빗 환경. 기관이 pre-register 한 번호만 접근 가능.
 
-import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { logAccess, getRequestMeta } from "@/lib/audit-log";
 import { normalizeUserPhone } from "@/lib/app-user/account";
 import { trySelfRegister } from "@/lib/app-user/self-register";
+import { setAppUserSession } from "@/lib/app-user/session";
 import type { AppUserRow } from "@/lib/app-user/queries";
 import {
   rateLimit,
@@ -22,18 +22,7 @@ import {
 
 type SbRespOne<T> = { data: T | null; error: unknown };
 
-type OrgNameRow = { org_name: string | null };
-
-const USER_COOKIE = "campnic_user";
-
-const cookieOpts = {
-  httpOnly: true,
-  secure: process.env.NODE_ENV === "production",
-  sameSite: "lax" as const,
-  // 30일
-  maxAge: 60 * 60 * 24 * 30,
-  path: "/",
-};
+// 쿠키 발급은 @/lib/app-user/session 의 setAppUserSession 단일 창구를 쓴다.
 
 function jsonError(message: string, status: number) {
   return NextResponse.json({ ok: false, error: message }, { status });
@@ -232,20 +221,14 @@ export async function POST(request: Request) {
       );
 
       if (selfRegisterResult.kind === "SUCCESS") {
-        const nowIso = new Date().toISOString();
-        const cookieStore = await cookies();
-        cookieStore.set(
-          USER_COOKIE,
-          JSON.stringify({
-            id: selfRegisterResult.userId,
-            phone,
-            parentName: selfRegisterResult.parentName,
-            orgId: selfRegisterResult.orgId,
-            orgName: selfRegisterResult.orgName,
-            loginAt: nowIso,
-          }),
-          cookieOpts
-        );
+        // 활성 기관 = 방금 가입한 행사의 기관 (홈 기관과 다를 수 있다)
+        await setAppUserSession({
+          id: selfRegisterResult.userId,
+          phone,
+          parentName: selfRegisterResult.parentName,
+          orgId: selfRegisterResult.orgId,
+          orgName: selfRegisterResult.orgName,
+        });
 
         await logAccess(supabase as unknown as SupabaseClient, {
           user_type: "USER",
@@ -303,39 +286,18 @@ export async function POST(request: Request) {
     return jsonError("계정이 종료됐어요.", 403);
   }
 
-  // 3) 기관명 조회
-  const orgResp = (await (
-    supabase.from("partner_orgs" as never) as unknown as {
-      select: (c: string) => {
-        eq: (k: string, v: string) => {
-          maybeSingle: () => Promise<SbRespOne<OrgNameRow>>;
-        };
-      };
-    }
-  )
-    .select("org_name")
-    .eq("id", user.org_id)
-    .maybeSingle()) as SbRespOne<OrgNameRow>;
-
-  const orgName = orgResp.data?.org_name ?? "";
-
-  // 4) 세션 쿠키 설정
+  // 3) 세션 쿠키 설정 — 활성 기관은 홈 기관으로 시작.
+  //    초대장 경유라면 이후 참가 시점(joinOrgEventAction)이나 행사 입장
+  //    (/api/user/enter-event)에서 해당 행사의 기관으로 전환된다.
   const nowIso = new Date().toISOString();
-  const cookieStore = await cookies();
-  cookieStore.set(
-    USER_COOKIE,
-    JSON.stringify({
-      id: user.id,
-      phone: user.phone,
-      parentName: user.parent_name,
-      orgId: user.org_id,
-      orgName,
-      loginAt: nowIso,
-    }),
-    cookieOpts
-  );
+  await setAppUserSession({
+    id: user.id,
+    phone: user.phone,
+    parentName: user.parent_name,
+    orgId: user.org_id,
+  });
 
-  // 5) last_login_at / first_login_at 갱신
+  // 4) last_login_at / first_login_at 갱신
   const patch: Record<string, string> = { last_login_at: nowIso };
   if (!user.first_login_at) patch.first_login_at = nowIso;
   try {

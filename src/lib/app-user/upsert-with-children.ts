@@ -3,16 +3,19 @@
 //   양쪽에서 재사용. redirect 는 호출자가 담당.
 //
 // 동작:
-//   1) 핸드폰 번호로 기존 유저 조회 — 다른 기관 충돌이면 throw
-//   2) 같은 기관에 있으면 → userId 반환 (merged=true)
+//   1) 핸드폰 번호로 기존 유저 조회 — 기관이 달라도 같은 사람이면 재사용
+//      (phone 이 전역 UNIQUE 라 한 사람 = 한 계정. 기관은 app_user_orgs 로 N개)
+//   2) 있으면 → userId 반환 (merged=true)
 //   3) 없으면 새 app_users + auto 계정(생성·hash) → userId 반환 (merged=false)
-//   4) 자녀 이름 dedup 후 추가 (이미 있는 이름은 skip)
+//   4) 어느 쪽이든 app_user_orgs 에 이 기관 소속 추가 (멱등)
+//   5) 자녀 이름 dedup 후 추가 (이미 있는 이름은 skip)
 
 import { createClient } from "@/lib/supabase/server";
 import {
   createAppUserAccountFromPhone,
   normalizeUserPhone,
 } from "@/lib/app-user/account";
+import { addOrgMembership } from "@/lib/app-user/orgs";
 
 type SbErr = { message: string } | null;
 type SbOne<T> = { data: T | null; error: SbErr };
@@ -169,6 +172,10 @@ export async function upsertParticipantWithChildren(
     }
     userId = insResp.data.id;
   }
+
+  // 1-b) 이 기관 소속 확보 (멱등). 위 재사용 분기(다른 기관 계정)에서 특히 중요 —
+  //      이게 없으면 기관 명단·CSV 에서 이 보호자가 통째로 누락된다.
+  await addOrgMembership(userId, orgId, "bulk_import");
 
   // 2) 자녀 dedup 후 추가 — class_name 도 함께 저장.
   //    이미 있는 자녀 이름이 다시 들어오고 class_name 이 다르면 UPDATE.

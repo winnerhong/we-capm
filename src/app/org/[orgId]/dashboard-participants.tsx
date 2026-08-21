@@ -4,6 +4,7 @@
 
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { listOrgUserIds } from "@/lib/app-user/orgs";
 import { AttendanceToggle } from "./users/attendance-toggle";
 import { AcornAdjuster } from "./users/acorn-adjuster";
 import { UserRowActions } from "./users/user-row-actions";
@@ -78,44 +79,38 @@ async function loadRecentParticipants(
 ): Promise<{ rows: AppUserWithCount[]; total: number }> {
   const supabase = await createClient();
 
-  const [listResp, countResp] = await Promise.all([
-    (
-      supabase.from("app_users" as never) as unknown as {
-        select: (c: string) => {
-          eq: (k: string, v: string) => {
-            order: (
-              c: string,
-              o: { ascending: boolean }
-            ) => {
-              limit: (n: number) => Promise<{ data: AppUserListRow[] | null }>;
-            };
+  // 소속 범위는 app_user_orgs 기준 — 총원도 여기서 바로 나온다(별도 count 쿼리 불필요).
+  const memberIds = await listOrgUserIds(orgId);
+  const total = memberIds.length;
+  if (total === 0) return { rows: [], total: 0 };
+
+  const listResp = (await (
+    supabase.from("app_users" as never) as unknown as {
+      select: (c: string) => {
+        in: (
+          k: string,
+          v: string[]
+        ) => {
+          order: (
+            c: string,
+            o: { ascending: boolean }
+          ) => {
+            limit: (n: number) => Promise<{ data: AppUserListRow[] | null }>;
           };
         };
-      }
+      };
+    }
+  )
+    .select(
+      "id, phone, parent_name, org_id, acorn_balance, status, last_login_at, created_at, attendance_status, attendance_date"
     )
-      .select(
-        "id, phone, parent_name, org_id, acorn_balance, status, last_login_at, created_at, attendance_status, attendance_date"
-      )
-      .eq("org_id", orgId)
-      .order("created_at", { ascending: false })
-      .limit(limit),
-    (
-      supabase.from("app_users" as never) as unknown as {
-        select: (
-          c: string,
-          o: { count: "exact"; head: true }
-        ) => {
-          eq: (k: string, v: string) => Promise<{ count: number | null }>;
-        };
-      }
-    )
-      .select("id", { count: "exact", head: true })
-      .eq("org_id", orgId),
-  ]);
+    .in("id", memberIds)
+    .order("created_at", { ascending: false })
+    .limit(limit)) as { data: AppUserListRow[] | null };
 
   const rows = (listResp.data ?? []) as AppUserListRow[];
   if (rows.length === 0) {
-    return { rows: [], total: countResp.count ?? 0 };
+    return { rows: [], total };
   }
 
   const ids = rows.map((r) => r.id);
@@ -171,7 +166,7 @@ async function loadRecentParticipants(
     class_names: classByUser.get(r.id) ?? [],
   }));
 
-  return { rows: enriched, total: countResp.count ?? enriched.length };
+  return { rows: enriched, total };
 }
 
 const INLINE_LIMIT = 10;

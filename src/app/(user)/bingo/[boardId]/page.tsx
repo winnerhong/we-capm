@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { getAppUser } from "@/lib/user-auth-guard";
+import { getAppUser, canAccessOrg } from "@/lib/user-auth-guard";
 import {
   loadBoardById,
   loadEntriesForBoard,
@@ -28,8 +28,9 @@ export default async function BingoPlayPage({
 
   const board = await loadBoardById(boardId);
   if (!board) notFound();
-  if (board.org_id !== user.orgId) {
-    // 같은 기관 보드만 진행 가능. 다른 기관 보드 링크 → 목록으로.
+  // 소속 기관의 보드만 진행 가능. 활성 기관이 아니어도 소속이면 허용
+  // (두 기관에 다니는 보호자가 다른 쪽 보드 링크를 열 수 있어야 한다).
+  if (!(await canAccessOrg(user, board.org_id))) {
     redirect("/bingo");
   }
 

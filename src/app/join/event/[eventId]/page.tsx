@@ -1,18 +1,21 @@
 // 기관 행사 초대 링크 수신자용 가입·참가 페이지.
 //
-// 분기 3가지:
+// 분기 2가지:
 //  1) 미로그인 → JoinEventForm (폰 입력) 렌더. 로그인 성공 시 이 페이지로 redirect 돼
 //     AutoJoinPanel 렌더되는 구조.
-//  2) 로그인 + 같은 org → AutoJoinPanel ("{이름}님 반가워요!" + [참가하기] 버튼)
-//  3) 로그인 + 다른 org → OrgMismatchPanel (타 기관 안내 + 로그아웃 가이드)
+//  2) 로그인 → AutoJoinPanel ("{이름}님 반가워요!" + [참가하기] 버튼)
+//
+// 기관 벽 없음: 예전에는 세션 org 와 행사 org 가 다르면 OrgMismatchPanel 로
+// 로그아웃을 유도했다. 한 보호자가 여러 기관 초대장을 받는 게 정상이므로 제거.
+// 참가 시점(joinOrgEventAction)에 소속 추가 + 활성 기관 전환이 일어난다.
 //
 // 주의: notFound() 처리는 행사 자체가 없을 때만. 이미 참가한 경우는 AutoJoinPanel 에서
 //       joinOrgEventAction 이 멱등 upsert 로 처리 후 /home 으로 redirect.
 
 import Link from "next/link";
-import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getAppUser } from "@/lib/user-auth-guard";
 import { joinOrgEventAction } from "@/lib/org-events/join-actions";
 import { JoinEventForm } from "./join-event-form";
 
@@ -162,38 +165,21 @@ export default async function JoinEventPage({
 
   const orgName = orgResp.data?.org_name ?? "소속 기관";
 
-  // 2) 현재 로그인 상태 파싱
-  const cookieStore = await cookies();
-  const userCookie = cookieStore.get("campnic_user")?.value;
-  let loggedInUserOrgId: string | null = null;
-  let loggedInName: string | null = null;
-  if (userCookie) {
-    try {
-      const parsed = JSON.parse(userCookie) as {
-        orgId?: unknown;
-        parentName?: unknown;
-      };
-      loggedInUserOrgId =
-        typeof parsed.orgId === "string" ? parsed.orgId : null;
-      loggedInName =
-        typeof parsed.parentName === "string" ? parsed.parentName : null;
-    } catch {
-      // 손상된 쿠키는 무시 — 미로그인 취급
-    }
-  }
-
-  const isLoggedIn = !!userCookie && !!loggedInUserOrgId;
-  const sameOrg = isLoggedIn && loggedInUserOrgId === evt.org_id;
+  // 2) 현재 로그인 상태.
+  //    기관 일치 여부는 더 이상 따지지 않는다 — 한 보호자가 여러 기관 초대장을
+  //    받는 게 정상 시나리오라, 로그인만 돼 있으면 바로 참가할 수 있어야 한다.
+  //    참가 시점(joinOrgEventAction)에 소속이 추가되고 활성 기관이 전환된다.
+  const session = await getAppUser();
+  const isLoggedIn = !!session;
+  const loggedInName = session?.parentName || null;
 
   return (
     <main className="min-h-dvh bg-gradient-to-b from-[#FFF8F0] via-[#F5F1E8] to-[#E8F0E4] px-4 py-8">
       <div className="mx-auto max-w-md space-y-4">
         <EventPreviewCard event={evt} orgName={orgName} />
 
-        {isLoggedIn && sameOrg ? (
+        {isLoggedIn ? (
           <AutoJoinPanel eventId={eventId} loggedInName={loggedInName} />
-        ) : isLoggedIn && !sameOrg ? (
-          <OrgMismatchPanel targetOrgName={orgName} eventId={eventId} />
         ) : (
           <JoinEventForm
             eventId={eventId}
@@ -302,49 +288,3 @@ function AutoJoinPanel({
   );
 }
 
-/**
- * 로그인은 돼 있지만 다른 기관 계정일 때 — 로그아웃 유도.
- * 로그아웃 후 자동으로 이 초대 페이지로 복귀 (user-logout 이 ?redirect= 지원).
- */
-function OrgMismatchPanel({
-  targetOrgName,
-  eventId,
-}: {
-  targetOrgName: string;
-  eventId: string;
-}) {
-  const inviteHref = `/join/event/${eventId}`;
-  const logoutUrl = `/api/auth/user-logout?redirect=${encodeURIComponent(inviteHref)}`;
-  return (
-    <section className="rounded-3xl border border-amber-200 bg-amber-50 p-6 text-center shadow-sm">
-      <p className="text-3xl" aria-hidden>
-        🧭
-      </p>
-      <h2 className="mt-2 text-lg font-bold text-amber-900">
-        계정 확인이 필요해요
-      </h2>
-      <p className="mt-1.5 text-sm leading-relaxed text-amber-800">
-        이 행사는 <span className="font-bold">{targetOrgName}</span> 소속이에요.
-        <br />
-        현재 로그인한 계정은 다른 기관에 속해 있어요.
-      </p>
-
-      <form action={logoutUrl} method="post" className="mt-4">
-        <button
-          type="submit"
-          className="min-h-[48px] w-full rounded-2xl bg-amber-600 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-amber-700 active:scale-[0.99]"
-        >
-          로그아웃하고 다른 계정으로 로그인
-        </button>
-      </form>
-
-      <p className="mt-3 text-[11px] text-amber-700">
-        로그아웃하면 이 초대 페이지로 다시 돌아와서 올바른 계정으로 입장할 수
-        있어요.
-      </p>
-      <p className="mt-3 text-[11px] text-amber-700">
-        문의: {targetOrgName} 담당자에게 연락해 주세요.
-      </p>
-    </section>
-  );
-}

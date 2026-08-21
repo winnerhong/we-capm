@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireOrg } from "@/lib/org-auth-guard";
 import { createClient } from "@/lib/supabase/server";
+import { listOrgUserIds } from "@/lib/app-user/orgs";
 import { QuickAddUser } from "./quick-add-user";
 import { UsersTable } from "./users-table";
 import {
@@ -139,10 +140,17 @@ function fmtEventRange(starts: string | null, ends: string | null): string {
 async function loadUsers(orgId: string): Promise<AppUserWithCount[]> {
   const supabase = await createClient();
 
+  // 소속 범위는 app_user_orgs 기준 — 타 기관이 홈인 참가자도 명단에 포함.
+  const memberIds = await listOrgUserIds(orgId);
+  if (memberIds.length === 0) return [];
+
   const { data: users } = await (
     supabase.from("app_users" as never) as unknown as {
       select: (c: string) => {
-        eq: (k: string, v: string) => {
+        in: (
+          k: string,
+          v: string[]
+        ) => {
           order: (
             c: string,
             o: { ascending: boolean }
@@ -154,7 +162,7 @@ async function loadUsers(orgId: string): Promise<AppUserWithCount[]> {
     .select(
       "id, phone, parent_name, org_id, acorn_balance, status, last_login_at, created_at, attendance_status, attendance_date"
     )
-    .eq("org_id", orgId)
+    .in("id", memberIds)
     .order("created_at", { ascending: false });
 
   const rows: AppUserListRow[] = (users ?? []) as AppUserListRow[];
@@ -213,21 +221,7 @@ async function loadUsers(orgId: string): Promise<AppUserWithCount[]> {
  */
 async function loadClassSuggestions(orgId: string): Promise<string[]> {
   const supabase = await createClient();
-  type UserIdRow = { id: string };
-  const { data: users } = (await (
-    supabase.from("app_users" as never) as unknown as {
-      select: (c: string) => {
-        eq: (
-          k: string,
-          v: string
-        ) => Promise<{ data: UserIdRow[] | null }>;
-      };
-    }
-  )
-    .select("id")
-    .eq("org_id", orgId)) as { data: UserIdRow[] | null };
-
-  const userIds = (users ?? []).map((u) => u.id);
+  const userIds = await listOrgUserIds(orgId);
   if (userIds.length === 0) return [];
 
   type ClassRow = { class_name: string | null };

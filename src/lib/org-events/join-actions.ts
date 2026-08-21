@@ -4,9 +4,12 @@
 //
 // 흐름:
 //  1) campnic_user 쿠키에서 세션 로드 (없으면 join 페이지로 돌려보냄)
-//  2) org_events 조회 + 현재 사용자 orgId 와 일치하는지 검증
+//  2) org_events 조회 → 해당 기관 소속을 확보 (app_user_orgs 멱등 upsert)
 //  3) org_event_participants 에 upsert (PK: event_id, user_id)
 //  4) /home?event_id=... 로 redirect (Next redirect 는 throw — try/catch 바깥에서 호출)
+//
+// 기관 벽 없음: 예전에는 session.orgId 와 event.org_id 가 다르면 거부했으나,
+// 한 보호자가 여러 기관 초대장을 받는 게 정상 시나리오라 거부 대신 소속을 넓힌다.
 //
 // 주의: Next 16 cookies() 는 async. redirect() 는 내부적으로 throw 하므로
 //       에러 흐름이 아닌 정상 흐름으로 간주해야 한다. 그래서 try/catch 로
@@ -16,6 +19,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
+import { addOrgMembership } from "@/lib/app-user/orgs";
+import { switchActiveOrg } from "@/lib/app-user/session";
 
 type SbErr = { message: string; code?: string } | null;
 
@@ -90,12 +95,10 @@ export async function joinOrgEventAction(eventId: string): Promise<void> {
   const evt = eventResp.data;
   if (!evt) throw new Error("행사를 찾을 수 없어요");
 
-  // 3) 소속 기관 체크 — 타 기관 행사는 자가 등록 불가
-  if (evt.org_id !== session.orgId) {
-    throw new Error(
-      "다른 기관의 행사에는 참여할 수 없어요. 기관에 문의해 주세요."
-    );
-  }
+  // 3) 소속 확보 — 타 기관 행사여도 막지 않는다.
+  //    한 보호자가 여러 기관 초대장을 받는 건 정상 시나리오이므로,
+  //    거부 대신 그 기관 소속을 추가해 준다 (app_user_orgs 멱등 upsert).
+  await addOrgMembership(session.id, evt.org_id, "invitation");
 
   // 4) org_event_participants upsert (PK: event_id,user_id → 멱등)
   const upResp = (await (
@@ -122,7 +125,12 @@ export async function joinOrgEventAction(eventId: string): Promise<void> {
     throw new Error(`참가 등록에 실패했어요: ${upResp.error.message}`);
   }
 
-  // 5) 홈으로 리다이렉트
+  // 5) 활성 기관을 이 행사의 기관으로 전환 — 홈·스탬프북·FM 이 전부 세션의
+  //    orgId 를 컨텍스트로 읽으므로, 전환하지 않으면 방금 참가한 행사가 아니라
+  //    이전 기관 화면이 뜬다. (4단계에서 소속을 넣었으므로 검증도 통과)
+  await switchActiveOrg(evt.org_id);
+
+  // 6) 홈으로 리다이렉트
   revalidatePath("/home");
   redirect(`/home?event_id=${eventId}`);
 }

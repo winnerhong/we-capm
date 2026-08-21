@@ -1,7 +1,7 @@
 // 스탬프북 상세 페이지 — 뒤로가기 + StampbookDetail 공용 뷰
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { requireAppUser } from "@/lib/user-auth-guard";
+import { requireAppUser, canAccessOrg } from "@/lib/user-auth-guard";
 import { userHasAnyLiveEvent } from "@/lib/org-events/queries";
 import {
   loadOrgQuestPackById,
@@ -28,7 +28,7 @@ export default async function StampbookDetailPage({
 
   const pack = await loadOrgQuestPackById(packId);
   if (!pack) notFound();
-  if (pack.org_id !== user.orgId) redirect("/home");
+  if (!(await canAccessOrg(user, pack.org_id))) redirect("/home");
 
   const [
     missions,

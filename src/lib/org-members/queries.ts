@@ -2,7 +2,8 @@
 // 어린이집(조직) 가족 명단 + 가족 상세 조회.
 //
 // 핵심 테이블:
-//   app_users        : 보호자 (org_id, phone, parent_name, acorn_balance ...)
+//   app_users        : 보호자 (phone, parent_name, acorn_balance ... / org_id 는 홈 기관)
+//   app_user_orgs    : 보호자 ↔ 기관 다중 소속. 명단 범위는 이 테이블이 정한다
 //   app_children     : 자녀 (user_id, name, class_name, is_enrolled, birth_date)
 //   mission_submissions : 미션 제출 (user_id, submitted_at, status)
 //   user_acorn_transactions : 도토리 원장
@@ -10,6 +11,7 @@
 
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
+import { hasOrgMembership, listOrgUserIds } from "@/lib/app-user/orgs";
 
 type SbResp<T> = { data: T[] | null; error: { message: string } | null };
 
@@ -136,11 +138,19 @@ export async function loadOrgMembers(
 
   const supabase = await createClient();
 
-  // 1) 보호자 목록
+  // 1) 보호자 목록 — 소속은 app_user_orgs 가 정한다.
+  //    app_users.org_id(홈 기관)로 거르면, 타 기관 소속이지만 이 기관 행사에
+  //    참가한 보호자가 명단에서 통째로 빠진다.
+  const memberIds = await listOrgUserIds(orgId);
+  if (memberIds.length === 0) return empty;
+
   const usersResp = (await (
     supabase.from("app_users" as never) as unknown as {
       select: (c: string) => {
-        eq: (k: string, v: string) => {
+        in: (
+          k: string,
+          v: string[]
+        ) => {
           order: (
             c: string,
             o: { ascending: boolean }
@@ -152,7 +162,7 @@ export async function loadOrgMembers(
     .select(
       "id, phone, parent_name, status, acorn_balance, last_login_at, created_at"
     )
-    .eq("org_id", orgId)
+    .in("id", memberIds)
     .order("created_at", { ascending: false })) as SbResp<AppUserRow>;
 
   if (usersResp.error) {
@@ -317,17 +327,19 @@ export async function loadOrgMemberDetail(
 
   const supabase = await createClient();
 
-  // 1) user — orgId 검증 포함
+  // 1) 접근 검증 — 이 기관에 소속된 보호자인지 먼저 확인.
+  //    (app_users.org_id 비교는 홈 기관만 보므로 타 기관 소속 참가자를 막아버린다)
+  const member = await hasOrgMembership(userId, orgId);
+  if (!member) return null;
+
   const userResp = (await (
     supabase.from("app_users" as never) as unknown as {
       select: (c: string) => {
         eq: (k: string, v: string) => {
-          eq: (k: string, v: string) => {
-            maybeSingle: () => Promise<{
-              data: AppUserRow | null;
-              error: { message: string } | null;
-            }>;
-          };
+          maybeSingle: () => Promise<{
+            data: AppUserRow | null;
+            error: { message: string } | null;
+          }>;
         };
       };
     }
@@ -336,7 +348,6 @@ export async function loadOrgMemberDetail(
       "id, phone, parent_name, status, acorn_balance, last_login_at, created_at"
     )
     .eq("id", userId)
-    .eq("org_id", orgId)
     .maybeSingle()) as {
     data: AppUserRow | null;
     error: { message: string } | null;

@@ -10,6 +10,7 @@ import {
   normalizeUserPhone,
 } from "@/lib/app-user/account";
 import { linkUsersToEvent } from "@/lib/app-user/upsert-with-children";
+import { addOrgMembership } from "@/lib/app-user/orgs";
 import type { BulkImportResult, BulkImportRowResult } from "./types";
 
 type ExistingUser = {
@@ -351,17 +352,13 @@ async function processGroup(
 
     const existing = existingResp.data;
 
-    if (existing && existing.org_id !== orgId) {
-      return {
-        row: g.firstRowNum,
-        phone: g.phoneDisplay,
-        parentName: g.parentName,
-        status: "ERROR",
-        error: "이미 다른 기관에 등록된 번호예요",
-      };
-    }
-
+    // 타 기관에 이미 등록된 번호도 거부하지 않는다.
+    //   phone 이 전역 UNIQUE 라 한 사람 = 한 계정이고, 기관은 app_user_orgs 로
+    //   여러 개 가질 수 있다. 예전에는 여기서 "이미 다른 기관에 등록된 번호예요"
+    //   로 튕겨서, 두 기관 행사에 다니는 학부모를 명단에 올릴 수가 없었다.
     if (existing) {
+      // 이 기관 소속 추가 (멱등) — 타 기관 계정이면 두 번째 소속이 된다.
+      await addOrgMembership(existing.id, orgId, "bulk_import");
       // Merge children only — dedup by existing child names
       const added = await mergeChildren(supabase, existing.id, g.children);
       // 토리톡 자동 가입 — 이번에 추가한 자녀들의 unique 반명 기반
@@ -418,6 +415,9 @@ async function processGroup(
     }
 
     const newUserId = insertUserResp.data.id;
+
+    // 소속 확보 (멱등)
+    await addOrgMembership(newUserId, orgId, "bulk_import");
 
     // Insert all children in a single batch
     if (g.children.length > 0) {

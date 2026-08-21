@@ -1,7 +1,7 @@
 // 미션 runner (dispatcher)
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { requireAppUser } from "@/lib/user-auth-guard";
+import { requireAppUser, canAccessOrg } from "@/lib/user-auth-guard";
 import { userHasAnyLiveEvent } from "@/lib/org-events/queries";
 import { loadChildrenForUser } from "@/lib/app-user/queries";
 import { createClient } from "@/lib/supabase/server";
@@ -89,7 +89,7 @@ export default async function MissionRunnerPage({
     null
   );
   if (!mission) notFound();
-  if (mission.org_id !== user.orgId) redirect("/home");
+  if (!(await canAccessOrg(user, mission.org_id))) redirect("/home");
 
   const meta = MISSION_KIND_META[mission.kind];
   const packId = mission.quest_pack_id;

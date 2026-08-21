@@ -6,6 +6,7 @@ import { requireOrg } from "@/lib/org-auth-guard";
 import { createClient } from "@/lib/supabase/server";
 import { loadOrgEvents } from "@/lib/org-events/queries";
 import { loadOrgGiftTemplates } from "@/lib/gifts/queries";
+import { listOrgUserIds } from "@/lib/app-user/orgs";
 import { GrantForm, type RecipientRow } from "./grant-form";
 
 export const dynamic = "force-dynamic";
@@ -18,21 +19,30 @@ async function loadOrgUsers(orgId: string): Promise<RecipientRow[]> {
     parent_name: string | null;
     status: string | null;
   };
-  const resp = (await (
-    supabase.from("app_users" as never) as unknown as {
-      select: (c: string) => {
-        eq: (k: string, v: string) => {
-          order: (
-            c: string,
-            o: { ascending: boolean }
-          ) => Promise<{ data: Row[] | null }>;
-        };
-      };
-    }
-  )
-    .select("id, phone, parent_name, status")
-    .eq("org_id", orgId)
-    .order("created_at", { ascending: false })) as { data: Row[] | null };
+  // 소속 범위는 app_user_orgs 기준 — 타 기관이 홈인 참가자에게도 선물 지급 가능.
+  const memberIds = await listOrgUserIds(orgId);
+  const resp = (memberIds.length === 0
+    ? { data: [] as Row[] }
+    : ((await (
+        supabase.from("app_users" as never) as unknown as {
+          select: (c: string) => {
+            in: (
+              k: string,
+              v: string[]
+            ) => {
+              order: (
+                c: string,
+                o: { ascending: boolean }
+              ) => Promise<{ data: Row[] | null }>;
+            };
+          };
+        }
+      )
+        .select("id, phone, parent_name, status")
+        .in("id", memberIds)
+        .order("created_at", { ascending: false })) as {
+        data: Row[] | null;
+      })) as { data: Row[] | null };
 
   const rows = resp.data ?? [];
 

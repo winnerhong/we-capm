@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireOrg } from "@/lib/org-auth-guard";
+import { addOrgMembership } from "@/lib/app-user/orgs";
 import {
   createAppUserAccountFromPhone,
   normalizeUserPhone,
@@ -192,6 +193,10 @@ export async function createSingleAppUserAction(
     }
     userId = insResp.data.id;
   }
+
+  // 2-b) 이 기관 소속 확보 (멱등). 기존 계정 재사용 분기에서 특히 중요 —
+  //      없으면 기관 명단·CSV 에서 누락된다.
+  await addOrgMembership(userId, orgId, "admin");
 
   // 3) 자녀 추가 (기존 이름과 dedup) — class_name 도 함께 저장
   //    기존 자녀 이름이 다시 들어오고 class_name 이 다르면 UPDATE 로 반영.

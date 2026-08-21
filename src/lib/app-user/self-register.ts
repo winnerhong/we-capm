@@ -18,6 +18,7 @@
 
 import type { createClient } from "@/lib/supabase/server";
 import { hashPassword } from "@/lib/password";
+import { addOrgMembership } from "@/lib/app-user/orgs";
 
 type Supa = Awaited<ReturnType<typeof createClient>>;
 
@@ -132,8 +133,11 @@ export async function trySelfRegister(
     error: { message: string; code?: string } | null;
   };
 
-  // 23505 = unique_violation. 찰나에 다른 경로로 같은 phone 이 가입됐을 수 있음.
-  // 그 경우 기존 row 재로드.
+  // 23505 = unique_violation. phone 이 전역 UNIQUE 라 두 경우가 여기로 온다.
+  //   (a) 찰나에 다른 경로로 같은 phone 이 가입된 경합
+  //   (b) 이 학부모가 이미 "다른 기관" 계정을 갖고 있는 흔한 케이스
+  // 어느 쪽이든 기존 row 를 재사용한다. (b) 에서 app_users.org_id 는 원래
+  // 기관(홈 기관)으로 남고, 이 행사 기관 소속은 아래 app_user_orgs 로 추가된다.
   let finalUserId = insertResp.data?.id;
   if (insertResp.error && insertResp.error.code === "23505") {
     const existResp = (await (
@@ -163,6 +167,11 @@ export async function trySelfRegister(
     });
     return { kind: "NOT_ALLOWED" };
   }
+
+  // ---- 3-b) 이 행사 기관의 소속 확보 (멱등).
+  //   신규 가입이면 홈 기관과 동일하고, 위 (b) 케이스면 두 번째 소속이 된다.
+  //   이걸 빼먹으면 "참가는 했는데 기관 명단엔 없는" 유령 참가자가 생긴다.
+  await addOrgMembership(finalUserId, evt.org_id, "self_register");
 
   // ---- 4) 원아 등록 — 같은 이름 자녀가 이미 있으면 skip (재제출 멱등성).
   //   app_children 에는 (user_id, name) UNIQUE 제약이 없으므로 직접 조회 후 분기.

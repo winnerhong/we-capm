@@ -33,6 +33,7 @@ import { NextUpCard } from "./next-up-card";
 import { BingoCard } from "./bingo-card";
 import { loadTimelineSlots } from "@/lib/event-timeline/queries";
 import { loadOrgNameById } from "@/lib/org-partner";
+import { listUserOrgs } from "@/lib/app-user/orgs";
 import { StampbookDetail } from "@/components/stampbook-detail";
 import { AcornIcon } from "@/components/acorn-icon";
 import { fmtAmPmClockKst, fmtFullDateKst } from "@/lib/datetime/kst";
@@ -138,6 +139,17 @@ export default async function UserHomePage({
     activeEvents[0] ||
     null;
 
+  // 행사가 두 기관 이상에 걸쳐 있으면 선택기 라벨에 기관명을 붙인다.
+  //   (두 기관에 다니는 보호자에겐 행사 선택기가 곧 기관 스위처)
+  const spansMultipleOrgs =
+    new Set(activeEvents.map((e) => e.org_id)).size > 1;
+  const orgNames: Record<string, string> = {};
+  if (spansMultipleOrgs) {
+    for (const o of await listUserOrgs(user.id)) {
+      orgNames[o.orgId] = o.orgName;
+    }
+  }
+
   const primaryPack = await pickPrimaryLivePackForEvent(
     user.id,
     user.orgId,
@@ -201,6 +213,7 @@ export default async function UserHomePage({
           <EventSelector
             events={activeEvents}
             selectedId={selectedEvent.id}
+            orgNames={orgNames}
           />
         )}
 
@@ -365,7 +378,11 @@ export default async function UserHomePage({
           </p>
         </section>
       ) : activeEvents.length >= 2 && selectedEvent ? (
-        <EventSelector events={activeEvents} selectedId={selectedEvent.id} />
+        <EventSelector
+          events={activeEvents}
+          selectedId={selectedEvent.id}
+          orgNames={orgNames}
+        />
       ) : null}
 
       {/* 오늘의 일정 — 진행 중 + 다음 슬롯 압축 미리보기 */}

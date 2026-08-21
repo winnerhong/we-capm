@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { requireAppUser } from "@/lib/user-auth-guard";
+import { requireAppUser, canAccessOrg } from "@/lib/user-auth-guard";
 import {
   loadBroadcastById,
   loadOrgMissionById,
@@ -86,7 +86,7 @@ export async function uploadMissionPhotoAction(
 
     const mission = await loadOrgMissionById(orgMissionId);
     if (!mission) return fail("미션을 찾을 수 없어요");
-    if (mission.org_id !== user.orgId) {
+    if (!(await canAccessOrg(user, mission.org_id))) {
       return fail("다른 기관의 미션에는 업로드할 수 없어요");
     }
     if (!mission.is_active) return fail("현재 진행할 수 없는 미션이에요");
@@ -250,7 +250,7 @@ async function submitMissionActionInner(
 
   const mission = await loadOrgMissionById(orgMissionId);
   if (!mission) throw new Error("미션을 찾을 수 없어요");
-  if (mission.org_id !== user.orgId) {
+  if (!(await canAccessOrg(user, mission.org_id))) {
     throw new Error("다른 기관의 미션은 제출할 수 없어요");
   }
   if (!mission.is_active) throw new Error("현재 진행할 수 없는 미션이에요");
@@ -459,13 +459,13 @@ async function submitMissionActionInner(
     // target_scope 검증 — ORG/EVENT 는 기관 소속 확인, ALL 은 통과
     if (
       broadcast.target_scope === "ORG" &&
-      broadcast.triggered_by_org_id !== user.orgId
+      !(await canAccessOrg(user, broadcast.triggered_by_org_id))
     ) {
       throw new Error("이 기관의 돌발 미션이 아니에요");
     }
     if (
       broadcast.target_scope === "EVENT" &&
-      broadcast.triggered_by_org_id !== user.orgId
+      !(await canAccessOrg(user, broadcast.triggered_by_org_id))
     ) {
       throw new Error("이 기관의 돌발 미션이 아니에요");
     }
@@ -544,7 +544,10 @@ async function submitMissionActionInner(
     awardedAcorns !== null &&
     awardedAcorns > 0
   ) {
-    const ctx = await loadAcornCapContext(user.id, user.orgId);
+    // 도토리 상한은 이 미션이 속한 기관 기준. 세션의 활성 기관을 쓰면
+    // 두 기관에 소속된 보호자가 다른 기관 컨텍스트에서 제출했을 때 엉뚱한
+    // 기관의 상한이 적용된다.
+    const ctx = await loadAcornCapContext(user.id, mission.org_id);
     const { allowed, reason } = capAcornAmount(awardedAcorns, ctx);
     if (allowed !== awardedAcorns) {
       awardedAcorns = allowed; // 0 가능
@@ -719,7 +722,7 @@ export async function replaceMissionPhotosAction(
 
     const mission = await loadOrgMissionById(orgMissionId);
     if (!mission) return { ok: false, error: "미션을 찾을 수 없어요" };
-    if (mission.org_id !== user.orgId) {
+    if (!(await canAccessOrg(user, mission.org_id))) {
       return { ok: false, error: "다른 기관의 미션은 수정할 수 없어요" };
     }
     if (mission.kind !== "PHOTO" && mission.kind !== "PHOTO_APPROVAL") {
@@ -837,7 +840,7 @@ export async function unlockTreasureStepAction(
 
     const mission = await loadOrgMissionById(orgMissionId);
     if (!mission) return fail("미션을 찾을 수 없어요");
-    if (mission.org_id !== user.orgId) {
+    if (!(await canAccessOrg(user, mission.org_id))) {
       return fail("다른 기관의 미션이에요");
     }
     if (mission.kind !== "TREASURE") {
@@ -955,13 +958,13 @@ export async function issueFinalRewardAction(
   if (mission.kind !== "FINAL_REWARD") {
     throw new Error("최종 보상 미션이 아니에요");
   }
-  if (mission.org_id !== user.orgId) {
+  if (!(await canAccessOrg(user, mission.org_id))) {
     throw new Error("다른 기관의 미션은 발급할 수 없어요");
   }
   if (!pack || pack.id !== mission.quest_pack_id) {
     throw new Error("스탬프북을 찾을 수 없어요");
   }
-  if (pack.org_id !== user.orgId) {
+  if (!(await canAccessOrg(user, pack.org_id))) {
     throw new Error("다른 기관의 스탬프북이에요");
   }
 
@@ -1032,7 +1035,8 @@ export async function issueFinalRewardAction(
       const days = Math.max(1, Math.ceil(ttlHours / 24));
       await grantGiftAction({
         userId: user.id,
-        orgId: user.orgId,
+        // 선물은 미션을 연 기관 소유 — 활성 기관이 아니라 미션 기준.
+        orgId: mission.org_id,
         sourceType: "mission_reward",
         sourceId: redemptionId,
         displayName: userName,
