@@ -451,6 +451,7 @@ export function ParticipantsTab({
                             userId={r.id}
                             balance={r.acorn_balance}
                             size="row"
+                            eventId={eventId}
                           />
                         </td>
                         <td className="px-2 py-2 text-right text-[11px] text-[#6B6560]">
@@ -568,6 +569,7 @@ export function ParticipantsTab({
                         userId={r.id}
                         balance={r.acorn_balance}
                         size="row"
+                        eventId={eventId}
                       />
                     </div>
                     <div className="rounded-lg bg-[#E8F0E4] p-2">

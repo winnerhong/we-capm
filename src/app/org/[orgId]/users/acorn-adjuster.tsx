@@ -9,6 +9,12 @@ type Props = {
   balance: number;
   /** "row" = 테이블용 컴팩트, "card" = 모바일 카드용 조금 크게 */
   size?: "row" | "card";
+  /**
+   * 어느 행사의 도토리인지. 행사 참가자 탭에서 넘긴다.
+   * 도토리는 행사 단위로 집계되므로, 없으면 서버가 그 기관에서 먼저 참가한
+   * 행사로 귀속시킨다.
+   */
+  eventId?: string;
 };
 
 /**
@@ -16,7 +22,12 @@ type Props = {
  *  - +/- 버튼: ±1
  *  - 가운데 input: 키보드로 직접 입력. blur 또는 Enter 시 delta 계산 후 server action 호출.
  */
-export function AcornAdjuster({ userId, balance, size = "row" }: Props) {
+export function AcornAdjuster({
+  userId,
+  balance,
+  size = "row",
+  eventId,
+}: Props) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [draft, setDraft] = useState(String(balance));
@@ -31,7 +42,7 @@ export function AcornAdjuster({ userId, balance, size = "row" }: Props) {
     if (delta < 0 && balance + delta < 0) return;
     start(async () => {
       try {
-        await adjustAcornBalanceAction(userId, delta);
+        await adjustAcornBalanceAction(userId, delta, eventId);
         router.refresh();
       } catch (e) {
         alert(e instanceof Error ? e.message : "도토리 조정 실패");
