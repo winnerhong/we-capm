@@ -1,6 +1,8 @@
+import Link from "next/link";
 import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { requireEventContext } from "@/lib/event-context";
+import { loadActiveAndUpcomingEventsForUser } from "@/lib/org-events/queries";
 import {
   getEventAcornBalance,
   loadEventAcornTransactions,
@@ -44,10 +46,15 @@ export default async function AcornsPage({
   const user = ctx.user;
   // 행사 시작 전에는 도토리 내역이 의미가 없다.
   if (ctx.event.status !== "LIVE") redirect(ctx.href());
-  const [balance, txs] = await Promise.all([
+  const [balance, txs, myEvents] = await Promise.all([
     getEventAcornBalance(user.id, eventId),
     loadEventAcornTransactions(user.id, eventId, 20),
+    loadActiveAndUpcomingEventsForUser(user.id).catch(() => []),
   ]);
+
+  // 도토리가 행사별로 나뉘면서, 여러 행사에 다니는 가족은 "내 도토리가
+  // 줄었나?" 로 읽을 수 있다. 다른 행사가 있을 때만 짚어 준다.
+  const hasOtherEvents = myEvents.some((e) => e.id !== eventId);
 
   return (
     <div className="space-y-4">
@@ -60,8 +67,25 @@ export default async function AcornsPage({
           <AcornIcon size={48} />
           <span className="tabular-nums">{balance}</span>
         </p>
-        <p className="mt-2 text-xs text-[#D4E4BC]">도토리</p>
+        <p className="mt-2 text-xs text-[#D4E4BC]">
+          {ctx.event.name} 에서 모은 도토리
+        </p>
       </section>
+
+      {hasOtherEvents && (
+        <section className="rounded-2xl border border-[#D4E4BC] bg-white/80 px-4 py-3 shadow-sm">
+          <p className="text-[11px] leading-relaxed text-[#6B6560]">
+            🌰 도토리는 <b className="text-[#2D5A3D]">행사마다 따로</b> 모여요.
+            다른 행사에서 모은 도토리는 그 행사 화면에서 볼 수 있어요.
+          </p>
+          <Link
+            href="/home"
+            className="mt-2 inline-flex text-[11px] font-bold text-[#3A7A52] hover:underline"
+          >
+            내 행사 전체 보기 →
+          </Link>
+        </section>
+      )}
 
       {/* Info card */}
       <section className="rounded-3xl border border-[#D4E4BC] bg-[#FAE7D0]/50 p-5 shadow-sm">
