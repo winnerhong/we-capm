@@ -38,7 +38,7 @@ const PICKS: RpsPick[] = ["rock", "paper", "scissors"];
 
 function revalidateRoom(_roomId: string, orgId?: string): void {
   // RPS 는 토리FM 라이브 방송 안에서 모달로 동작하므로 토리FM 경로만 갱신.
-  revalidatePath(`/tori-fm`);
+  revalidatePath("/e/[eventId]/radio", "page");
   if (orgId) {
     revalidatePath(`/org/${orgId}/tori-fm`);
     revalidatePath(`/screen/tori-fm/${orgId}`);

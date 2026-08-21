@@ -159,7 +159,7 @@ async function approveSubmissionActionInner(
 
   revalidatePath(`/org/${org.orgId}/missions/review`);
   revalidatePath(`/org/${org.orgId}/missions/radio`);
-  revalidatePath("/stampbook");
+  revalidatePath("/e/[eventId]/stampbook", "page");
   revalidatePath("/home");
   return { ok: true };
 }
@@ -669,7 +669,7 @@ export async function startFmBroadcastAction(
   revalidatePath(`/org/${org.orgId}/tori-fm`);
   revalidatePath(`/org/${org.orgId}/control-room`);
   revalidatePath(`/screen/tori-fm/${org.orgId}`);
-  revalidatePath("/tori-fm");
+  revalidatePath("/e/[eventId]/radio", "page");
 }
 
 /* -------------------------------------------------------------------------- */
@@ -713,7 +713,7 @@ export async function stopFmBroadcastAction(
   revalidatePath(`/org/${org.orgId}/tori-fm`);
   revalidatePath(`/org/${org.orgId}/control-room`);
   revalidatePath(`/screen/tori-fm/${org.orgId}`);
-  revalidatePath("/tori-fm");
+  revalidatePath("/e/[eventId]/radio", "page");
 }
 
 /* -------------------------------------------------------------------------- */
@@ -829,7 +829,7 @@ export async function setCurrentQueueAction(
 
   revalidatePath(`/org/${org.orgId}/tori-fm`);
   revalidatePath(`/screen/tori-fm/${org.orgId}`);
-  revalidatePath("/tori-fm");
+  revalidatePath("/e/[eventId]/radio", "page");
 }
 
 /* -------------------------------------------------------------------------- */

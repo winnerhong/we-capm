@@ -77,8 +77,8 @@ export default async function RewardRedemptionPage({
   return (
     <div className="space-y-4">
       <nav className="text-[11px] text-[#6B6560]">
-        <Link href="/stampbook" className="hover:underline">
-          ← 스탬프북으로
+        <Link href="/home" className="hover:underline">
+          ← 내 행사로
         </Link>
       </nav>
 
@@ -201,10 +201,10 @@ export default async function RewardRedemptionPage({
       )}
 
       <Link
-        href="/stampbook"
+        href="/home"
         className="block w-full rounded-2xl border border-[#D4E4BC] bg-white px-4 py-3 text-center text-sm font-bold text-[#2D5A3D] shadow-sm transition hover:bg-[#F5F1E8]"
       >
-        ← 스탬프북으로 돌아가기
+        ← 내 행사로 돌아가기
       </Link>
     </div>
   );

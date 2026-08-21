@@ -219,9 +219,9 @@ async function awardCoopAcorns(
 }
 
 function revalidateAll(orgMissionId: string): void {
-  revalidatePath(`/missions/${orgMissionId}`);
+  revalidatePath("/e/[eventId]/missions/[orgMissionId]", "page");
   revalidatePath("/home");
-  revalidatePath("/stampbook");
+  revalidatePath("/e/[eventId]/stampbook", "page");
 }
 
 /* -------------------------------------------------------------------------- */

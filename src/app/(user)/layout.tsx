@@ -1,19 +1,19 @@
-import Link from "next/link";
+// 계정 단위 화면의 레이아웃 — 행사 허브(/home)·내 정보·보상·토리톡.
+//
+// 행사 안(/e/[eventId]/…)의 레이아웃은 별도다.
+//   → src/app/(event)/e/[eventId]/layout.tsx
+// 크롬(상단바·탭바)은 둘 다 ParticipantShell 을 공유한다.
+//
+// 여기서 orgId 는 세션의 활성 기관을 그대로 쓴다. 이 화면들은 특정 행사에
+// 속하지 않기 때문이다. 행사에 속한 화면은 URL 의 eventId 에서 기관을 얻는다.
+
 import { requireAppUser } from "@/lib/user-auth-guard";
 import { getAcornBalance, loadChildrenForUser } from "@/lib/app-user/queries";
 import { loadActiveEventsForUser } from "@/lib/org-events/queries";
-import { loadOrgHomepageBanner } from "@/lib/org-banner/queries";
-import { AcornIcon } from "@/components/acorn-icon";
-import { HomepageBannerDisplay } from "@/components/homepage-banner-display";
-import { OrgPresenceTracker } from "@/components/presence/org-presence-tracker";
-import { PinnedNoticeBanner } from "./PinnedNoticeBanner";
+import { ParticipantShell, type ShellTab } from "@/components/participant-shell";
 
 export const dynamic = "force-dynamic";
 
-// 안전 헬퍼 — 어떤 쿼리도 layout 전체를 죽이지 않도록 fallback.
-// 서버 액션 후 자동 RSC refresh 단계에서 throw 가 발생하면 클라이언트가
-// "An error occurred in the Server Components render" 만 보게 되므로,
-// 각 쿼리를 개별 try/catch 로 격리하고 실제 원인은 console.error 로 남긴다.
 async function safeQuery<T>(
   label: string,
   fn: () => Promise<T>,
@@ -33,165 +33,54 @@ export default async function UserLayout({
   children: React.ReactNode;
 }) {
   const user = await requireAppUser();
-  const [acornBalance, liveEvents, kids, homepageBanner] =
-    await Promise.all([
-      safeQuery("getAcornBalance", () => getAcornBalance(user.id), 0),
-      safeQuery(
-        "loadActiveEventsForUser",
-        () => loadActiveEventsForUser(user.id),
-        []
-      ),
-      safeQuery("loadChildrenForUser", () => loadChildrenForUser(user.id), []),
-      safeQuery(
-        "loadOrgHomepageBanner",
-        () => loadOrgHomepageBanner(user.orgId),
-        null
-      ),
-    ]);
-  const hasLive = liveEvents.length > 0;
-  // 헤더 "초대장" 버튼이 가리킬 행사 — LIVE 중 가장 최근 1개.
-  const firstLiveEventId = liveEvents[0]?.id ?? null;
+  const [acornBalance, liveEvents, kids] = await Promise.all([
+    safeQuery("getAcornBalance", () => getAcornBalance(user.id), 0),
+    safeQuery(
+      "loadActiveEventsForUser",
+      () => loadActiveEventsForUser(user.id),
+      []
+    ),
+    safeQuery("loadChildrenForUser", () => loadChildrenForUser(user.id), []),
+  ]);
+
+  // 헤더 "초대장" 버튼이 가리킬 행사 — 활성 기관의 LIVE 를 우선.
+  //   (기관을 안 보고 고르면 다른 기관 초대장이 뜬다)
+  const liveHere = liveEvents.filter((e) => e.org_id === user.orgId);
+  const invitationEventId = liveHere[0]?.id ?? liveEvents[0]?.id ?? null;
 
   // 아바타 글자 우선순위:
   //   1) 원생(is_enrolled=true) 자녀의 첫 글자 — "홍유빈" → "홍"
   //   2) 보호자 이름 첫 글자 — fallback
   //   3) 🌱 — 그것도 없을 때
-  const firstLetter = (() => {
+  const avatarLetter = (() => {
     const enrolled = kids.find((c) => c.is_enrolled && c.name?.trim());
     if (enrolled) return enrolled.name.trim().charAt(0);
     const parentFirst = (user.parentName ?? "").trim().charAt(0);
     return parentFirst || "🌱";
   })();
 
+  // 계정 단위 탭 — 행사 기능(스탬프·라디오·선물)은 행사 안에서만 의미가 있어
+  // 여기엔 두지 않는다. 행사로 들어가는 입구는 /home 의 행사 카드.
+  const tabs: ShellTab[] = [
+    { href: "/home", label: "홈", icon: "🏠" },
+    { href: "/tori-talk", label: "토리톡", icon: "💬" },
+    { href: "/profile", label: "내 정보", icon: "👤" },
+  ];
+
   return (
-    <div className="min-h-dvh bg-gradient-to-b from-[#FFF8F0] via-[#F5F1E8] to-[#E8F0E4]">
-      {/* 호스트 공지사항 — 활성 LIVE 세션의 BANNER spotlight 가 있으면 상단 고정 노출 */}
-      <PinnedNoticeBanner orgId={user.orgId} />
-
-      {/* Top bar */}
-      <header className="sticky top-0 z-30 border-b border-[#D4E4BC]/60 bg-white/85 backdrop-blur-md">
-        <div className="mx-auto flex max-w-md items-center gap-2 px-4 py-3">
-          <Link
-            href="/home"
-            className="flex items-center gap-1.5 font-bold text-[#2D5A3D]"
-            aria-label="토리로 홈"
-          >
-            <AcornIcon size={24} />
-            <span className="text-base">토리로</span>
-          </Link>
-
-          <div className="ml-auto flex items-center gap-2">
-            {firstLiveEventId && (
-              <Link
-                href={`/invitation/${firstLiveEventId}`}
-                className="inline-flex items-center gap-1 rounded-full border border-[#D4E4BC] bg-[#FFF8F0] px-2.5 py-1 text-[11px] font-semibold text-[#2D5A3D] shadow-sm transition hover:bg-[#FAE7D0]"
-                aria-label="초대장 보기"
-                title="초대장 보기"
-              >
-                <span aria-hidden>💌</span>
-                <span>초대장</span>
-              </Link>
-            )}
-
-            <span
-              className="inline-flex items-center gap-1 rounded-full border border-[#D4E4BC] bg-[#E8F0E4] px-3 py-1 text-sm font-bold text-[#2D5A3D]"
-              aria-label={`도토리 잔액 ${acornBalance}`}
-            >
-              <AcornIcon />
-              <span className="tabular-nums">{acornBalance}</span>
-            </span>
-
-            <Link
-              href="/profile"
-              className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-[#3A7A52] to-[#4A7C59] text-sm font-bold text-white shadow-sm transition hover:scale-105"
-              aria-label="내 정보"
-              title={user.parentName}
-            >
-              {firstLetter}
-            </Link>
-
-            <form action="/api/auth/user-logout" method="post" className="inline">
-              <button
-                type="submit"
-                className="inline-flex items-center gap-1 rounded-full border border-[#D4E4BC] bg-white px-3 py-1 text-[11px] font-semibold text-[#6B6560] transition hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200"
-                aria-label="로그아웃"
-                title="로그아웃"
-              >
-                <span aria-hidden>🚪</span>
-                <span>로그아웃</span>
-              </button>
-            </form>
-          </div>
-        </div>
-      </header>
-
-      <main className="mx-auto max-w-md px-4 py-4 pb-24">
-        {children}
-        {/* 하단 홈페이지 배너 — 기관 admin 이 설정했을 때만 노출. 탭바와 겹치지
-            않도록 main 안쪽 (pb-24 영역 내부 상단) 마지막에 배치. */}
-        {homepageBanner && (
-          <div className="mt-6">
-            <HomepageBannerDisplay banner={homepageBanner} />
-          </div>
-        )}
-      </main>
-
-      {/* Supabase Presence: 이 참가자의 접속 상태를 org 채널에 track — 관제실이 구독 */}
-      <OrgPresenceTracker
-        orgId={user.orgId}
-        userId={user.id}
-        parentName={user.parentName}
-      />
-
-      {/* Bottom tab bar */}
-      <nav
-        className="fixed inset-x-0 bottom-0 z-40 border-t border-[#D4E4BC]/60 bg-white/95 backdrop-blur-md"
-        aria-label="주요 메뉴"
-      >
-        {/* LIVE 행사가 없으면 스탬프/선물 탭 숨김 — 행사 시작 후 활성화.
-            토리톡 탭은 의도적으로 하단 메뉴에서 제외 — 기능은 그대로(/tori-talk
-            직접 접근 / 헤더 등 다른 경로로 진입 가능). */}
-        <ul className="mx-auto flex max-w-md items-stretch">
-          <TabItem href="/home" label="홈" icon="🏠" />
-          <TabItem href="/schedule" label="일정" icon="📅" />
-          {hasLive && (
-            <TabItem
-              href="/stamps"
-              label="스탬프"
-              icon={<AcornIcon size={20} />}
-            />
-          )}
-          {hasLive && (
-            <TabItem href="/tori-fm" label="라디오" icon="📻" />
-          )}
-          {hasLive && <TabItem href="/gifts" label="선물함" icon="🎁" />}
-          <TabItem href="/profile" label="내 정보" icon="👤" />
-        </ul>
-      </nav>
-    </div>
+    <ParticipantShell
+      tabs={tabs}
+      orgId={user.orgId}
+      userId={user.id}
+      parentName={user.parentName}
+      avatarLetter={avatarLetter}
+      acornBalance={acornBalance}
+      acornLabel="전체 누적 도토리"
+      invitationEventId={invitationEventId}
+      homeHref="/home"
+    >
+      {children}
+    </ParticipantShell>
   );
 }
 
-function TabItem({
-  href,
-  label,
-  icon,
-}: {
-  href: string;
-  label: string;
-  icon: React.ReactNode;
-}) {
-  return (
-    <li className="flex-1">
-      <Link
-        href={href}
-        className="flex min-h-[56px] flex-col items-center justify-center gap-0.5 py-2 text-[11px] font-semibold text-[#6B6560] transition hover:bg-[#F5F1E8] hover:text-[#2D5A3D]"
-      >
-        <span className="text-xl leading-none" aria-hidden>
-          {icon}
-        </span>
-        <span>{label}</span>
-      </Link>
-    </li>
-  );
-}

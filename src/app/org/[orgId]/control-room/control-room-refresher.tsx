@@ -5,7 +5,7 @@
 //   chat_messages, mission_submissions 변경을 하나의 채널로 구독.
 // - 어떤 이벤트든 들어오면 1500ms 디바운스 후 router.refresh().
 // - Fallback: 15초마다 router.refresh() (웹소켓 끊어져도 최신성 유지).
-// - 참고 패턴: src/app/(user)/tori-fm/LiveFmRefresher.tsx
+// - 참고 패턴: src/app/(event)/e/[eventId]/radio/LiveFmRefresher.tsx
 
 import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";

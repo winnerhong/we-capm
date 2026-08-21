@@ -5,7 +5,7 @@
 // DJ side:   requireOrg    (campnic_org 쿠키)
 //
 // 채팅/리액션/신청곡/하트를 한 파일에 묶음. revalidatePath 는
-// /(user)/tori-fm 와 /org/[orgId]/tori-fm/[sessionId] 양쪽을 찍는다.
+// /e/[eventId]/radio 와 /org/[orgId]/tori-fm/[sessionId] 양쪽을 찍는다.
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
@@ -29,7 +29,7 @@ type SbRespOne<T> = { data: T | null; error: SbErr };
 /* -------------------------------------------------------------------------- */
 
 function revalidateFm(sessionId?: string, orgId?: string): void {
-  revalidatePath("/tori-fm");
+  revalidatePath("/e/[eventId]/radio", "page");
   if (orgId && sessionId) {
     revalidatePath(`/org/${orgId}/tori-fm/${sessionId}`);
     revalidatePath(`/org/${orgId}/tori-fm`);

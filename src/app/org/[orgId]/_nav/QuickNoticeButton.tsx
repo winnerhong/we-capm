@@ -10,7 +10,7 @@
 //   triggerSpotlightAction(sessionId, "BANNER", { text })
 //     → fm_spotlight_events row 생성 (expires_at NULL — LIVE 종료/dismiss 까지)
 //     → Supabase Realtime publication
-//     → (user)/PinnedNoticeBanner 가 수신 → 모든 참가자 화면 상단에 슬라이드 인
+//     → components/pinned-notice-banner 가 수신 → 모든 참가자 화면 상단에 슬라이드 인
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import {

@@ -114,7 +114,7 @@ export async function triggerBroadcastAction(
   }
 
   revalidatePath(`/org/${org.orgId}/missions/broadcast`);
-  revalidatePath("/broadcasts");
+  revalidatePath("/e/[eventId]/broadcasts", "page");
   revalidatePath("/home");
 }
 
@@ -204,7 +204,7 @@ export async function cancelBroadcastAction(
   }
 
   revalidatePath(`/org/${org.orgId}/missions/broadcast`);
-  revalidatePath("/broadcasts");
+  revalidatePath("/e/[eventId]/broadcasts", "page");
   revalidatePath("/home");
 }
 

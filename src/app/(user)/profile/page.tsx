@@ -67,10 +67,10 @@ export default async function UserProfilePage() {
         </div>
       </section>
 
-      {/* 도토리 / 선물함 바로가기 */}
+      {/* 도토리 / 선물함 — 행사 단위라 허브에서 행사를 고른 뒤 들어간다 */}
       <section className="grid grid-cols-2 gap-3">
         <Link
-          href="/acorns"
+          href="/home"
           className="group rounded-3xl border border-[#D4E4BC] bg-white p-4 shadow-sm transition hover:border-[#3A7A52] hover:shadow-md active:scale-[0.99]"
         >
           <div className="flex items-center justify-between">
@@ -94,11 +94,11 @@ export default async function UserProfilePage() {
             {acornBalance}
             <span className="text-[11px] font-bold text-[#8B7F75]">개</span>
           </p>
-          <p className="mt-1 text-[10px] text-[#8B7F75]">내역 보기 →</p>
+          <p className="mt-1 text-[10px] text-[#8B7F75]">행사 선택 →</p>
         </Link>
 
         <Link
-          href="/gifts"
+          href="/home"
           className="group rounded-3xl border border-[#D4E4BC] bg-white p-4 shadow-sm transition hover:border-[#3A7A52] hover:shadow-md active:scale-[0.99]"
         >
           <div className="flex items-center justify-between">

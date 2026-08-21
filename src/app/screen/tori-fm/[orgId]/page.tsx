@@ -21,7 +21,7 @@ import {
 import { loadOrgFmBrandName } from "@/lib/tori-fm/branding";
 import { loadPlayingGroup } from "@/lib/tori-fm/queries";
 import { anonLabelFromUserId } from "@/lib/tori-fm/types";
-import { LiveFmRefresher } from "@/app/(user)/tori-fm/LiveFmRefresher";
+import { LiveFmRefresher } from "@/app/(event)/e/[eventId]/radio/LiveFmRefresher";
 import { ForestBackdrop } from "./ForestBackdrop";
 import { ScreenLive, type ScreenNowPlaying } from "./ScreenLive";
 

@@ -184,7 +184,7 @@ export async function grantGiftAction(input: {
       .maybeSingle()) as SbRespOne<{ id: string; coupon_code: string }>;
 
     if (insResp.data?.id) {
-      revalidatePath("/gifts");
+      revalidatePath("/e/[eventId]/gifts", "page");
       revalidatePath(`/org/${orgId}/gifts`);
       revalidatePath(`/org/${orgId}/gifts/redeem`);
       return {
@@ -313,7 +313,7 @@ export async function redeemGiftAction(input: {
     throw new Error("이미 처리된 선물이에요. 새로고침 후 다시 확인해 주세요");
   }
 
-  revalidatePath("/gifts");
+  revalidatePath("/e/[eventId]/gifts", "page");
   revalidatePath(`/org/${org.orgId}/gifts`);
   revalidatePath(`/org/${org.orgId}/gifts/redeem`);
 
@@ -382,7 +382,7 @@ export async function cancelGiftAction(giftId: string): Promise<void> {
     throw new Error("선물 취소에 실패했어요");
   }
 
-  revalidatePath("/gifts");
+  revalidatePath("/e/[eventId]/gifts", "page");
   revalidatePath(`/org/${org.orgId}/gifts`);
   revalidatePath(`/org/${org.orgId}/gifts/redeem`);
 }

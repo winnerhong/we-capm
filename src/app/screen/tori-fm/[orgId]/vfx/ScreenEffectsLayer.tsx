@@ -242,7 +242,7 @@ export function ScreenEffectsLayer({
           break;
         }
         case "BANNER": {
-          // 공지사항은 (user)/PinnedNoticeBanner 가 상단 고정 마퀴로 전담.
+          // 공지사항은 components/pinned-notice-banner 가 상단 고정 마퀴로 전담.
           // 여기서는 오버레이를 띄우지 않음 — 중복 노출 방지.
           break;
         }

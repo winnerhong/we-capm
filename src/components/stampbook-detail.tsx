@@ -75,6 +75,11 @@ export interface StampbookDetailProps {
   /** 미리 계산된 progress 를 넘기면 재계산 생략 (옵션) */
   progress?: PackProgress;
   /**
+   * 미션 링크 prefix — 행사 안에서는 `/e/{eventId}`.
+   * 미션은 행사에 속하므로 행사 밖으로 나가는 링크가 생기면 안 된다.
+   */
+  base: string;
+  /**
    * 카드 상단에 합쳐서 보여줄 가족 헤더. 홈 화면에서 Hero + 스탬프북을 한 카드로
    * 묶기 위해 사용. 미전달 시 헤더 영역 미렌더 (스탬프북 단독 상세 페이지용).
    */
@@ -94,6 +99,7 @@ export function StampbookDetail({
   userAcornsInPack,
   progress: passedProgress,
   familyHeader,
+  base,
 }: StampbookDetailProps) {
   const progress =
     passedProgress ??
@@ -256,7 +262,7 @@ export function StampbookDetail({
             <ul className="grid grid-cols-3 gap-2 md:grid-cols-5">
               {tiles.map((t, idx) => (
                 <li key={t.mission.id}>
-                  <MissionTile tile={t} index={idx + 1} />
+                  <MissionTile tile={t} index={idx + 1} base={base} />
                 </li>
               ))}
             </ul>
@@ -289,7 +295,7 @@ export function StampbookDetail({
             </div>
           </div>
           <Link
-            href={`/missions/${progress.nextMission.id}`}
+            href={`${base}/missions/${progress.nextMission.id}`}
             className="mt-4 block w-full rounded-2xl bg-[#2D5A3D] px-4 py-3 text-center text-sm font-bold text-white shadow-sm transition hover:bg-[#3A7A52] active:scale-[0.99]"
           >
             미션 시작하기 →
@@ -305,9 +311,12 @@ export function StampbookDetail({
 function MissionTile({
   tile,
   index,
+  base,
 }: {
   tile: TileInfo;
   index: number;
+  /** 미션 링크 prefix — `/e/{eventId}` */
+  base: string;
 }) {
   const { mission, state, submission, reason } = tile;
   const meta = MISSION_KIND_META[mission.kind];
@@ -430,7 +439,7 @@ function MissionTile({
   if (state === "LOCKED") {
     return (
       <Link
-        href={`/missions/${mission.id}`}
+        href={`${base}/missions/${mission.id}`}
         aria-label={`${mission.title} (잠김: ${reason ?? ""})`}
       >
         {content}
@@ -439,7 +448,7 @@ function MissionTile({
   }
 
   return (
-    <Link href={`/missions/${mission.id}`} aria-label={mission.title}>
+    <Link href={`${base}/missions/${mission.id}`} aria-label={mission.title}>
       {content}
     </Link>
   );

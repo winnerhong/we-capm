@@ -238,7 +238,7 @@ export async function addOrgBingoTileAction(
 
   revalidatePath(`/org/${org.orgId}/bingo/${boardId}`);
   revalidatePath(`/org/${org.orgId}/control-room`);
-  revalidatePath(`/bingo/${boardId}`);
+  revalidatePath("/e/[eventId]/bingo/[boardId]", "page");
 }
 
 /**
@@ -313,7 +313,7 @@ export async function setOrgTilePositionAction(
 
   revalidatePath(`/org/${org.orgId}/control-room`);
   revalidatePath(`/org/${org.orgId}/bingo/${boardId}`);
-  revalidatePath(`/bingo/${boardId}`);
+  revalidatePath("/e/[eventId]/bingo/[boardId]", "page");
 }
 
 export async function deleteOrgBingoTileAction(
@@ -351,7 +351,7 @@ export async function deleteOrgBingoTileAction(
 
   revalidatePath(`/org/${org.orgId}/bingo/${boardId}`);
   revalidatePath(`/org/${org.orgId}/control-room`);
-  revalidatePath(`/bingo/${boardId}`);
+  revalidatePath("/e/[eventId]/bingo/[boardId]", "page");
 }
 
 /* -------------------------------------------------------------------------- */
@@ -429,7 +429,7 @@ export async function setBingoCallAction(
 
   revalidatePath(`/org/${org.orgId}/control-room`);
   revalidatePath(`/org/${org.orgId}/bingo/${boardId}`);
-  revalidatePath(`/bingo/${boardId}`);
+  revalidatePath("/e/[eventId]/bingo/[boardId]", "page");
 }
 
 /**
@@ -486,7 +486,7 @@ export async function toggleBingoCallAction(
 
   revalidatePath(`/org/${org.orgId}/control-room`);
   revalidatePath(`/org/${org.orgId}/bingo/${boardId}`);
-  revalidatePath(`/bingo/${boardId}`);
+  revalidatePath("/e/[eventId]/bingo/[boardId]", "page");
 }
 
 /**
@@ -515,7 +515,7 @@ export async function resetBingoCallsAction(boardId: string): Promise<void> {
 
   revalidatePath(`/org/${org.orgId}/control-room`);
   revalidatePath(`/org/${org.orgId}/bingo/${boardId}`);
-  revalidatePath(`/bingo/${boardId}`);
+  revalidatePath("/e/[eventId]/bingo/[boardId]", "page");
 }
 
 /* -------------------------------------------------------------------------- */
@@ -572,7 +572,7 @@ export async function toggleSignatureModeAction(
 
   revalidatePath(`/org/${org.orgId}/control-room`);
   revalidatePath(`/org/${org.orgId}/bingo/${boardId}`);
-  revalidatePath(`/bingo/${boardId}`);
+  revalidatePath("/e/[eventId]/bingo/[boardId]", "page");
 }
 
 /* -------------------------------------------------------------------------- */
@@ -654,7 +654,7 @@ export async function startBingoTimerAction(
   }
   revalidatePath(`/org/${org.orgId}/bingo/${boardId}`);
   revalidatePath(`/org/${org.orgId}/control-room`);
-  revalidatePath(`/bingo/${boardId}`);
+  revalidatePath("/e/[eventId]/bingo/[boardId]", "page");
 }
 
 export async function cancelBingoTimerAction(
@@ -683,7 +683,7 @@ export async function cancelBingoTimerAction(
   }
   revalidatePath(`/org/${org.orgId}/bingo/${boardId}`);
   revalidatePath(`/org/${org.orgId}/control-room`);
-  revalidatePath(`/bingo/${boardId}`);
+  revalidatePath("/e/[eventId]/bingo/[boardId]", "page");
 }
 
 export async function lockBingoArrangementAction(
@@ -714,7 +714,7 @@ export async function lockBingoArrangementAction(
   }
   revalidatePath(`/org/${org.orgId}/bingo/${boardId}`);
   revalidatePath(`/org/${org.orgId}/control-room`);
-  revalidatePath(`/bingo/${boardId}`);
+  revalidatePath("/e/[eventId]/bingo/[boardId]", "page");
 }
 
 export async function clearManualRankingAction(

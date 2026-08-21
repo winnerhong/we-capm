@@ -9,7 +9,7 @@
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { sendDjMessageAction } from "@/lib/tori-fm/actions";
 import type { FmChatMessageRow } from "@/lib/tori-fm/types";
-import { LiveChatStream } from "@/app/(user)/tori-fm/LiveChatStream";
+import { LiveChatStream } from "@/app/(event)/e/[eventId]/radio/LiveChatStream";
 import { createClient } from "@/lib/supabase/client";
 import { SpotlightTriggerBar } from "./SpotlightTriggerBar";
 

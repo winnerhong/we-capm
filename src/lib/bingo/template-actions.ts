@@ -322,7 +322,7 @@ export async function applyTemplateToBoardAction(
 
   revalidatePath(`/org/${org.orgId}/bingo/${boardId}`);
   revalidatePath(`/org/${org.orgId}/control-room`);
-  revalidatePath(`/bingo/${boardId}`);
+  revalidatePath("/e/[eventId]/bingo/[boardId]", "page");
 }
 
 export async function saveBoardAsOrgTemplateAction(

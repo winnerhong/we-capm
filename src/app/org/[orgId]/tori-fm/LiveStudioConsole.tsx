@@ -28,7 +28,7 @@ import { LiveStudioPanel, type PlayingItem } from "./LiveStudioPanel";
 import { DjChatPanel } from "./DjChatPanel";
 import { RequestModerationList } from "./RequestModerationList";
 import { BroadcastQueueCard } from "./BroadcastQueueCard";
-import { RequestsWithHearts } from "@/app/(user)/tori-fm/RequestsWithHearts";
+import { RequestsWithHearts } from "@/app/(event)/e/[eventId]/radio/RequestsWithHearts";
 import type { FmChatMessageRow, FmRequestRow } from "@/lib/tori-fm/types";
 import type { RpsRoomRow } from "@/lib/rps/types";
 import { HostRpsModal } from "@/lib/rps/HostRpsModal";

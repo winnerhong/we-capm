@@ -171,7 +171,7 @@ export async function submitBingoEntryAction(
 
   await ensureGrid(boardId, user.id);
 
-  revalidatePath(`/bingo/${boardId}`);
+  revalidatePath("/e/[eventId]/bingo/[boardId]", "page");
   revalidatePath(`/org/${board.org_id}/bingo/${boardId}/live`);
 }
 
@@ -277,7 +277,7 @@ export async function placeEntryOnCellAction(
     fixedCells
   );
 
-  revalidatePath(`/bingo/${boardId}`);
+  revalidatePath("/e/[eventId]/bingo/[boardId]", "page");
   revalidatePath(`/org/${board.org_id}/bingo/${boardId}/live`);
 }
 
@@ -337,7 +337,7 @@ export async function removeEntryFromCellAction(
     fixedCells
   );
 
-  revalidatePath(`/bingo/${boardId}`);
+  revalidatePath("/e/[eventId]/bingo/[boardId]", "page");
   revalidatePath(`/org/${board.org_id}/bingo/${boardId}/live`);
 }
 
@@ -435,7 +435,7 @@ export async function swapBingoCellsAction(
     fixedCells
   );
 
-  revalidatePath(`/bingo/${boardId}`);
+  revalidatePath("/e/[eventId]/bingo/[boardId]", "page");
   revalidatePath(`/org/${board.org_id}/bingo/${boardId}/live`);
 }
 
@@ -573,6 +573,6 @@ export async function submitQrScanAction(
     fixedCells
   );
 
-  revalidatePath(`/bingo/${boardId}`);
+  revalidatePath("/e/[eventId]/bingo/[boardId]", "page");
   revalidatePath(`/org/${board.org_id}/bingo/${boardId}/live`);
 }
