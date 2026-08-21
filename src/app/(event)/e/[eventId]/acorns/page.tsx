@@ -2,8 +2,10 @@ import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { requireEventContext } from "@/lib/event-context";
 import {
-  getAcornBalance,
-  loadRecentAcornTransactions,
+  getEventAcornBalance,
+  loadEventAcornTransactions,
+} from "@/lib/app-user/event-acorns";
+import {
   type AcornReason,
   type AcornTransactionRow,
 } from "@/lib/app-user/queries";
@@ -43,8 +45,8 @@ export default async function AcornsPage({
   // 행사 시작 전에는 도토리 내역이 의미가 없다.
   if (ctx.event.status !== "LIVE") redirect(ctx.href());
   const [balance, txs] = await Promise.all([
-    getAcornBalance(user.id),
-    loadRecentAcornTransactions(user.id, 20),
+    getEventAcornBalance(user.id, eventId),
+    loadEventAcornTransactions(user.id, eventId, 20),
   ]);
 
   return (

@@ -6,6 +6,42 @@ import { requireAppUser } from "@/lib/user-auth-guard";
 import { hashPassword, verifyPassword } from "@/lib/password";
 import { loadAppUserById, loadChildrenForUser } from "@/lib/app-user/queries";
 import { computeOnboardingProgress } from "@/lib/app-user/onboarding";
+import { insertAcornTx } from "@/lib/app-user/acorn-ledger";
+
+/** 이 보호자가 가장 먼저 참가한 행사 — 행사 특정이 안 되는 지급의 귀속처. */
+async function firstJoinedEventId(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string
+): Promise<string | null> {
+  try {
+    const resp = (await (
+      supabase.from("org_event_participants" as never) as unknown as {
+        select: (c: string) => {
+          eq: (
+            k: string,
+            v: string
+          ) => {
+            order: (
+              c: string,
+              o: { ascending: boolean }
+            ) => {
+              limit: (
+                n: number
+              ) => Promise<{ data: { event_id: string }[] | null }>;
+            };
+          };
+        };
+      }
+    )
+      .select("event_id")
+      .eq("user_id", userId)
+      .order("joined_at", { ascending: true })
+      .limit(1)) as { data: { event_id: string }[] | null };
+    return resp.data?.[0]?.event_id ?? null;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * 도토리 지급을 원장(user_acorn_transactions)에도 기록.
@@ -28,17 +64,18 @@ async function recordAcornGrant(
     memo: string;
   }
 ): Promise<void> {
-  const resp = (await (
-    supabase.from("user_acorn_transactions" as never) as unknown as {
-      insert: (r: unknown) => Promise<{ error: { message: string } | null }>;
-    }
-  ).insert({
+  // 온보딩 보상은 특정 행사의 것이 아니다 — 그 보호자가 가장 먼저 참가한
+  // 행사에 귀속시킨다(마이그레이션의 잔여분 처리와 같은 규칙).
+  const eventId = await firstJoinedEventId(supabase, input.userId);
+
+  const resp = (await insertAcornTx(supabase, {
     user_id: input.userId,
     amount: input.amount,
     reason: input.reason,
     source_type: input.sourceType,
     source_id: input.sourceId,
     memo: input.memo,
+    event_id: eventId,
   })) as { error: { message: string } | null };
 
   if (resp.error) {

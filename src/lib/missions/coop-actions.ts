@@ -17,6 +17,10 @@ import { revalidatePath } from "next/cache";
 import { requireAppUser } from "@/lib/user-auth-guard";
 import { createClient } from "@/lib/supabase/server";
 import {
+  insertAcornTx,
+  eventIdForSubmission,
+} from "@/lib/app-user/acorn-ledger";
+import {
   loadActiveCoopSessionForUser,
   loadCoopSessionById,
   loadCoopSessionByPairCode,
@@ -160,18 +164,15 @@ async function awardCoopAcorns(
     .eq("id", submissionId);
 
   // 2) ledger insert (23505 → idempotent)
-  const txResp = (await (
-    supabase.from("user_acorn_transactions" as never) as unknown as {
-      insert: (r: Row) => Promise<{ error: SbErr }>;
-    }
-  ).insert({
+  const txResp = (await insertAcornTx(supabase, {
     user_id: userId,
     amount,
     reason: "MISSION",
     source_type: "mission_submission",
     source_id: submissionId,
     memo,
-  } satisfies Row)) as { error: SbErr };
+    event_id: await eventIdForSubmission(supabase, submissionId),
+  })) as { error: SbErr };
 
   if (txResp.error) {
     if (txResp.error.code === "23505") return; // 이미 크레딧 — balance 도 예전에 반영됨

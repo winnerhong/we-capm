@@ -1,12 +1,12 @@
 import Link from "next/link";
 
 import { requireEventContext } from "@/lib/event-context";
+import { loadAppUserById } from "@/lib/app-user/queries";
 import {
-  getAcornBalance,
-  loadAppUserById,
-  loadChildrenForUser,
-  loadTopAcornFamilies,
-} from "@/lib/app-user/queries";
+  getEventAcornBalance,
+  loadTopAcornFamiliesForEvent,
+} from "@/lib/app-user/event-acorns";
+import { loadChildrenForEvent } from "@/lib/app-user/event-children";
 import { AcornTopBoard } from "@/components/acorn-top-board";
 import { OnboardingWizard } from "./onboarding-wizard";
 import {
@@ -109,14 +109,15 @@ export default async function EventHomePage({
   const selectedEvent = ctx.event;
   const ctxOrgId = ctx.orgId;
 
+  // 도토리·자녀 모두 이 행사 기준 — 다른 행사 것이 섞이지 않는다.
   const [acornBalance, children, userDetail] = await Promise.all([
-    getAcornBalance(user.id),
-    loadChildrenForUser(user.id),
+    getEventAcornBalance(user.id, eventId),
+    loadChildrenForEvent(user.id, eventId),
     loadAppUserById(user.id),
   ]);
 
   const freshOrgName = ctx.orgName;
-  const topFamilies = await loadTopAcornFamilies(ctxOrgId, 5);
+  const topFamilies = await loadTopAcornFamiliesForEvent(eventId, 5);
 
   const primaryPack = await pickPrimaryLivePackForEvent(
     user.id,

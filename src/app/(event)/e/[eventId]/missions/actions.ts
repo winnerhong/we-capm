@@ -5,6 +5,10 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAppUser, canAccessOrg } from "@/lib/user-auth-guard";
 import {
+  insertAcornTx,
+  eventIdForQuestPack,
+} from "@/lib/app-user/acorn-ledger";
+import {
   loadBroadcastById,
   loadOrgMissionById,
   loadOrgQuestPackById,
@@ -623,19 +627,19 @@ async function submitMissionActionInner(
   // awardedAcorns 는 상한 클램프를 이미 거친 값. 0 이면 스탬프만 찍고 지급 생략(일일 상한 초과 등).
   if (status === "AUTO_APPROVED" && awardedAcorns && awardedAcorns > 0) {
     // 1) Insert user_acorn_transactions (idempotent via unique index on source_type/source_id)
-    const txResp = (await (
-      supabase.from("user_acorn_transactions" as never) as unknown as {
-        insert: (r: Row) => Promise<{
-          error: { message: string } | null;
-        }>;
-      }
-    ).insert({
+    // 이 미션이 속한 행사에 귀속시킨다 — 빠지면 어느 행사에도 안 잡힌다.
+    const txEventId = await eventIdForQuestPack(
+      supabase,
+      mission.quest_pack_id
+    );
+    const txResp = (await insertAcornTx(supabase, {
       user_id: user.id,
       amount: awardedAcorns,
       reason: "MISSION",
       source_type: "mission_submission",
       source_id: submissionId,
       memo: `${mission.title}${capMemoSuffix}`,
+      event_id: txEventId,
     })) as { error: { message: string } | null };
 
     if (txResp.error) {

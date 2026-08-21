@@ -14,6 +14,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
 import { requireOrg } from "@/lib/org-auth-guard";
 import { createClient } from "@/lib/supabase/server";
+import {
+  insertAcornTx,
+  eventIdForSubmission,
+} from "@/lib/app-user/acorn-ledger";
 import { toIsoKstFromLocalInput } from "@/lib/datetime/kst";
 import {
   loadFmSessionById,
@@ -220,18 +224,16 @@ async function rejectSubmissionActionInner(
 
   if (wasApproved && awardedAmount > 0) {
     // user_acorn_transactions: 음수 amount + reason='MISSION_REVERSE'
-    const txResp = (await (
-      supabase.from("user_acorn_transactions" as never) as unknown as {
-        insert: (r: Row) => Promise<{ error: SbErr }>;
-      }
-    ).insert({
+    // 회수도 지급과 같은 행사에 기록해야 그 행사 잔액이 맞는다.
+    const txResp = (await insertAcornTx(supabase, {
       user_id: submission.user_id,
       amount: -awardedAmount,
       reason: "MISSION_REVERSE",
       source_type: "mission_submission_reverse",
       source_id: submission.id,
       memo: `반려 회수: ${trimmed.slice(0, 50)}`,
-    } satisfies Row)) as { error: SbErr };
+      event_id: await eventIdForSubmission(supabase, submission.id),
+    })) as { error: SbErr };
     if (txResp.error) {
       console.error("[review/reject] ledger reverse failed", {
         code: txResp.error.code,

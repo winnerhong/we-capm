@@ -49,7 +49,8 @@ export default async function UserGiftsPage({
   const user = ctx.user;
   // 행사 시작 전에는 선물함이 열리지 않는다.
   if (ctx.event.status !== "LIVE") redirect(ctx.href());
-  const gifts = await loadUserGifts(user.id);
+  // 이 행사에서 받은 선물만.
+  const gifts = await loadUserGifts(user.id, eventId);
   const now = new Date();
 
   return (

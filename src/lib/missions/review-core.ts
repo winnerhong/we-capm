@@ -7,6 +7,10 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { loadOrgMissionById } from "@/lib/missions/queries";
 import {
+  insertAcornTx,
+  eventIdForSubmission,
+} from "@/lib/app-user/acorn-ledger";
+import {
   capAcornAmount,
   loadAcornCapContext,
 } from "@/lib/missions/acorn-cap";
@@ -71,17 +75,14 @@ async function awardAcorns(
   const { userId, amount, submissionId, memo } = params;
   if (!amount || amount <= 0) return;
 
-  const txResp = (await (
-    supabase.from("user_acorn_transactions" as never) as unknown as {
-      insert: (r: Row) => Promise<{ error: SbErr }>;
-    }
-  ).insert({
+  const txResp = (await insertAcornTx(supabase, {
     user_id: userId,
     amount,
     reason: "MISSION",
     source_type: "mission_submission",
     source_id: submissionId,
     memo,
+    event_id: await eventIdForSubmission(supabase, submissionId),
   })) as { error: SbErr };
 
   if (txResp.error) {

@@ -9,6 +9,10 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import {
+  insertAcornTx,
+  eventIdForFmSession,
+} from "@/lib/app-user/acorn-ledger";
 import { requireAppUser } from "@/lib/user-auth-guard";
 import { requireOrg } from "@/lib/org-auth-guard";
 import { loadChildrenForUser } from "@/lib/app-user/queries";
@@ -108,6 +112,9 @@ async function awardRadioPlayedRewards(
   const cfg = (cfgRaw ?? null) as RadioMissionConfig | null;
 
   // 3) 각 신청에 대해 중복 방지 + INSERT
+  // 이 FM 세션이 속한 행사 — 루프 밖에서 한 번만 조회.
+  const fmEventId = await eventIdForFmSession(supabase, sessionId);
+
   for (const req of playedRequests) {
     if (!req.user_id) continue;
     const amount = calcRadioPlayedReward(cfg, req.kind, req.story);
@@ -137,18 +144,15 @@ async function awardRadioPlayedRewards(
       : existResp.data;
     if (existing) continue;
 
-    const insertResp = (await (
-      supabase.from("user_acorn_transactions" as never) as unknown as {
-        insert: (r: Row) => Promise<{ error: SbErr }>;
-      }
-    ).insert({
+    const insertResp = (await insertAcornTx(supabase, {
       user_id: req.user_id,
       amount,
       reason: "FM_PLAYED",
       source_type: "fm_request",
       source_id: req.id,
       memo: `FM played reward (${req.kind === "story_only" ? "story" : (req.story ?? "").trim() ? "song+story" : "song"})`,
-    } satisfies Row)) as { error: SbErr };
+      event_id: fmEventId,
+    })) as { error: SbErr };
 
     if (insertResp.error) {
       console.error("[fm/played-reward] insert failed", {

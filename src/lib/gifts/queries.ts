@@ -28,9 +28,48 @@ const GIFT_STATUS_ORDER: Record<GiftStatus, number> = {
   cancelled: 3,
 };
 
-export async function loadUserGifts(userId: string): Promise<UserGiftRow[]> {
+/**
+ * 한 보호자의 선물 목록.
+ *
+ * eventId 를 주면 그 행사에서 받은 선물만. 선물함은 행사 안에서 열리므로
+ * 다른 행사에서 받은 선물이 섞이면 안 된다.
+ *
+ * 배포 순서 안전장치: event_id 컬럼이 아직 없으면(마이그레이션 미적용)
+ * 전체 목록으로 폴백한다 — 선물함이 통째로 비는 것보다 낫다.
+ */
+export async function loadUserGifts(
+  userId: string,
+  eventId?: string
+): Promise<UserGiftRow[]> {
   if (!userId) return [];
   const supabase = await createClient();
+
+  if (eventId) {
+    const scoped = (await (
+      supabase.from("user_gifts" as never) as unknown as {
+        select: (c: string) => {
+          eq: (k: string, v: string) => {
+            eq: (k: string, v: string) => {
+              order: (
+                c: string,
+                o: { ascending: boolean }
+              ) => Promise<SbResp<UserGiftRow>>;
+            };
+          };
+        };
+      }
+    )
+      .select("*")
+      .eq("user_id", userId)
+      .eq("event_id", eventId)
+      .order("granted_at", { ascending: false })) as SbResp<UserGiftRow>;
+
+    const err = scoped.error as { code?: string } | null;
+    const missingColumn = err?.code === "42703" || err?.code === "PGRST204";
+    if (!missingColumn) return sortGifts(scoped.data ?? []);
+    // 컬럼 미존재 → 아래 전체 조회로 폴백
+  }
+
   const resp = (await (
     supabase.from("user_gifts" as never) as unknown as {
       select: (c: string) => {
@@ -46,12 +85,15 @@ export async function loadUserGifts(userId: string): Promise<UserGiftRow[]> {
     .select("*")
     .eq("user_id", userId)
     .order("granted_at", { ascending: false })) as SbResp<UserGiftRow>;
-  const rows = resp.data ?? [];
+  return sortGifts(resp.data ?? []);
+}
+
+/** 미사용(pending) 먼저, 같은 상태 안에서는 최신순. */
+function sortGifts(rows: UserGiftRow[]): UserGiftRow[] {
   return rows.slice().sort((a, b) => {
     const sa = GIFT_STATUS_ORDER[a.status] ?? 99;
     const sb = GIFT_STATUS_ORDER[b.status] ?? 99;
     if (sa !== sb) return sa - sb;
-    // 동일 status 내 granted_at DESC
     return new Date(b.granted_at).getTime() - new Date(a.granted_at).getTime();
   });
 }

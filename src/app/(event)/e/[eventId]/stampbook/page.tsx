@@ -14,7 +14,7 @@ import type { OrgQuestPackRow } from "@/lib/missions/types";
 import { QUEST_PACK_STATUS_META } from "@/lib/missions/types";
 import { AcornIcon } from "@/components/acorn-icon";
 import { AcornTopBoard } from "@/components/acorn-top-board";
-import { loadTopAcornFamilies } from "@/lib/app-user/queries";
+import { loadTopAcornFamiliesForEvent } from "@/lib/app-user/event-acorns";
 import { loadOrgNameById } from "@/lib/org-partner";
 import { fmtDateRangeKst } from "@/lib/datetime/kst";
 
@@ -92,7 +92,7 @@ export default async function StampbookListPage({
   const eventPacks = await loadLiveQuestPacksForEvent(ctx.event.id);
   const [orgPacks, topFamilies, freshOrgName] = await Promise.all([
     eventPacks.length > 0 ? Promise.resolve([]) : loadOrgQuestPacks(ctx.orgId),
-    loadTopAcornFamilies(ctx.orgId, 5),
+    loadTopAcornFamiliesForEvent(ctx.event.id, 5),
     loadOrgNameById(ctx.orgId, ctx.orgName),
   ]);
   const allPacks = eventPacks.length > 0 ? eventPacks : orgPacks;

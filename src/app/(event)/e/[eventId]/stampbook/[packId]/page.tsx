@@ -10,7 +10,7 @@ import {
 } from "@/lib/missions/queries";
 import { StampbookDetail } from "@/components/stampbook-detail";
 import { AcornTopBoard } from "@/components/acorn-top-board";
-import { loadTopAcornFamilies } from "@/lib/app-user/queries";
+import { loadTopAcornFamiliesForEvent } from "@/lib/app-user/event-acorns";
 import { loadOrgNameById } from "@/lib/org-partner";
 
 export const dynamic = "force-dynamic";
@@ -41,7 +41,7 @@ export default async function StampbookDetailPage({
     loadOrgMissionsByQuestPack(packId),
     loadUserSubmissions(user.id, { packId }),
     sumAcornsForPack(user.id, packId),
-    loadTopAcornFamilies(ctx.orgId, 5),
+    loadTopAcornFamiliesForEvent(ctx.event.id, 5),
     loadOrgNameById(ctx.orgId, ctx.orgName),
   ]);
 

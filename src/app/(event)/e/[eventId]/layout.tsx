@@ -9,7 +9,8 @@
 // 이 레이아웃은 (user) 그룹 밖에 있다. 안에 두면 상단바·탭바가 두 번 그려진다.
 
 import { requireEventContext } from "@/lib/event-context";
-import { getAcornBalance, loadChildrenForUser } from "@/lib/app-user/queries";
+import { getEventAcornBalance } from "@/lib/app-user/event-acorns";
+import { loadChildrenForEvent } from "@/lib/app-user/event-children";
 import { AcornIcon } from "@/components/acorn-icon";
 import { ParticipantShell, type ShellTab } from "@/components/participant-shell";
 
@@ -25,7 +26,7 @@ export default async function EventLayout({
   const { eventId } = await params;
   const ctx = await requireEventContext(eventId);
 
-  const kids = await loadChildrenForUser(ctx.user.id).catch(() => []);
+  const kids = await loadChildrenForEvent(ctx.user.id, eventId).catch(() => []);
 
   const avatarLetter = (() => {
     const enrolled = kids.find((c) => c.is_enrolled && c.name?.trim());
@@ -54,8 +55,10 @@ export default async function EventLayout({
     { href: "/home", label: "내 행사", icon: "🏠" },
   ];
 
-  // 도토리는 아직 계정 전역 잔액이다. 행사 단위 집계는 다음 단계(M2)에서.
-  const acornBalance = await getAcornBalance(ctx.user.id).catch(() => 0);
+  // 이 행사에서 모은 도토리만. 다른 행사 도토리는 여기 뜨지 않는다.
+  const acornBalance = await getEventAcornBalance(ctx.user.id, eventId).catch(
+    () => 0
+  );
 
   return (
     <ParticipantShell
@@ -65,7 +68,7 @@ export default async function EventLayout({
       parentName={ctx.user.parentName}
       avatarLetter={avatarLetter}
       acornBalance={acornBalance}
-      acornLabel="전체 누적 도토리"
+      acornLabel={`${ctx.event.name} 도토리`}
       invitationEventId={ctx.event.invitation_published_at ? eventId : null}
       homeHref={ctx.href()}
     >

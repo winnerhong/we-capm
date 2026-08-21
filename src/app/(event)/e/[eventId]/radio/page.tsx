@@ -5,10 +5,12 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireEventContext } from "@/lib/event-context";
 import {
-  getAcornBalance,
-  loadChildrenForUser,
+  getEventAcornBalance,
+  loadTopAcornFamiliesForEvent,
+} from "@/lib/app-user/event-acorns";
+import { loadChildrenForEvent } from "@/lib/app-user/event-children";
+import {
   loadPrimaryClassByUserIds,
-  loadTopAcornFamilies,
 } from "@/lib/app-user/queries";
 import { AcornTopBoard } from "@/components/acorn-top-board";
 import { loadOrgNameById } from "@/lib/org-partner";
@@ -68,9 +70,9 @@ export default async function ToriFmPage({
     loadFmSessionsByOrg(ctx.orgId),
     loadFirstActiveOrgMissionByKind(ctx.orgId, "RADIO"),
     loadOrgFmBrandName(ctx.orgId),
-    loadChildrenForUser(user.id),
-    getAcornBalance(user.id),
-    loadTopAcornFamilies(ctx.orgId, 5),
+    loadChildrenForEvent(user.id, eventId),
+    getEventAcornBalance(user.id, eventId),
+    loadTopAcornFamiliesForEvent(eventId, 5),
     loadOrgNameById(ctx.orgId, ctx.orgName),
   ]);
 
