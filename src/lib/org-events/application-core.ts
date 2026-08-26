@@ -29,10 +29,12 @@ export type ApplicationInput = {
 };
 
 export type Headcount = {
-  /** 참가 아이 + 아동 동반인. */
+  /** 유아 — 참가 아이 + 아동 동반인. */
   childCount: number;
-  /** 성인 동반인. */
+  /** 성인 동반인 (조부모 제외). */
   adultCount: number;
+  /** 조부모 동반인. */
+  seniorCount: number;
   total: number;
 };
 
@@ -47,6 +49,16 @@ export type NormalizedApplication = Headcount & {
 export type ValidationResult =
   | { ok: true; value: NormalizedApplication }
   | { ok: false; message: string };
+
+/**
+ * 알 수 없는 값 → 성인. 폼·jsonb 양쪽에서 같은 규칙을 쓴다.
+ * (조부모 분류가 나중에 생겨서, 그 전 데이터는 SENIOR 가 아닌 값으로 들어온다)
+ */
+export function normalizeCompanionKind(v: unknown): CompanionKind {
+  if (v === "CHILD") return "CHILD";
+  if (v === "SENIOR") return "SENIOR";
+  return "ADULT";
+}
 
 /** 하이픈/공백 제거. account.ts 의 normalizeUserPhone 과 같은 규칙(클라 공용). */
 export function digitsOnly(input: string): string {
@@ -67,16 +79,24 @@ export function computeHeadcount(
   companions: readonly { kind: CompanionKind }[]
 ): Headcount {
   const childCompanions = companions.filter((c) => c?.kind === "CHILD").length;
-  const adultCount = companions.filter((c) => c?.kind === "ADULT").length;
+  const seniorCount = companions.filter((c) => c?.kind === "SENIOR").length;
+  // 성인은 나머지 전부 — kind 가 깨진 값이어도 인원에서 누락되지 않게.
+  const adultCount = companions.length - childCompanions - seniorCount;
   const childCount = children.length + childCompanions;
-  return { childCount, adultCount, total: childCount + adultCount };
+  return {
+    childCount,
+    adultCount,
+    seniorCount,
+    total: childCount + adultCount + seniorCount,
+  };
 }
 
-/** "아동 2 · 성인 3 · 총 5명" — 관리자 화면과 폼이 함께 쓰는 라벨. */
+/** "유아 2 · 성인 3 · 조부모 1 · 총 6명" — 관리자 화면과 폼이 함께 쓰는 라벨. */
 export function formatHeadcount(h: Headcount): string {
   const parts: string[] = [];
-  if (h.childCount > 0) parts.push(`👶 아동 ${h.childCount}`);
+  if (h.childCount > 0) parts.push(`👶 유아 ${h.childCount}`);
   if (h.adultCount > 0) parts.push(`🧑 성인 ${h.adultCount}`);
+  if (h.seniorCount > 0) parts.push(`👴 조부모 ${h.seniorCount}`);
   parts.push(`총 ${h.total}명`);
   return parts.join(" · ");
 }
@@ -139,10 +159,7 @@ export function validateApplicationInput(
         message: `함께 오시는 분은 ${MAX_COMPANION_LABEL_LENGTH}자 이내로 적어주세요`,
       };
     }
-    companions.push({
-      label,
-      kind: raw.kind === "CHILD" ? "CHILD" : "ADULT",
-    });
+    companions.push({ label, kind: normalizeCompanionKind(raw.kind) });
   }
 
   if (companions.length > MAX_APPLICATION_COMPANIONS) {
@@ -199,7 +216,7 @@ export function parseApplicationCompanions(
     const rec = item as { label?: unknown; kind?: unknown };
     const label = typeof rec.label === "string" ? rec.label.trim() : "";
     if (!label) continue;
-    out.push({ label, kind: rec.kind === "CHILD" ? "CHILD" : "ADULT" });
+    out.push({ label, kind: normalizeCompanionKind(rec.kind) });
   }
   return out;
 }

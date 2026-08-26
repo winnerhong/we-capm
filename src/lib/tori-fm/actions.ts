@@ -8,6 +8,8 @@
 // /e/[eventId]/radio 와 /org/[orgId]/tori-fm/[sessionId] 양쪽을 찍는다.
 
 import { revalidatePath } from "next/cache";
+// 도토리는 행사 단위 — 차감도 그 행사에서 번 만큼만.
+import { getEventAcornBalance } from "@/lib/app-user/event-acorns";
 import { createClient } from "@/lib/supabase/server";
 import {
   insertAcornTx,
@@ -1567,8 +1569,22 @@ export async function boostRequestAction(
       return { ok: false, error: "이 신청곡은 더 이상 끌어올릴 수 없어요" };
     }
 
-    // 1) 잔액 조회 → 차감 (read-modify-write).
-    //    동시성 보호는 차감 update 의 .gte("acorn_balance", amount) 조건으로 atomic 처리.
+    // 1) 이 행사에서 번 도토리로만 쓸 수 있다.
+    //    전역 잔액(app_users.acorn_balance)은 타 기관 행사에서 모은 것까지
+    //    포함하므로, 그것만 보고 차감하면 남의 기관 도토리를 여기서 쓰게 된다.
+    //    아래 조건부 update(.gte)는 원자성·전역 음수 방지용으로 그대로 둔다.
+    const fmEventId = await eventIdForFmSession(supabase, reqRow.session_id);
+    if (fmEventId) {
+      const eventBal = await getEventAcornBalance(user.id, fmEventId);
+      if (eventBal < amount) {
+        return {
+          ok: false,
+          error: `이 행사에서 모은 도토리가 부족해요 (보유 ${eventBal.toLocaleString("ko-KR")})`,
+        };
+      }
+    }
+
+    //    전역 잔액 조회 → 차감 (read-modify-write).
     const balResp = (await (
       supabase.from("app_users" as never) as unknown as {
         select: (c: string) => {
@@ -1627,18 +1643,17 @@ export async function boostRequestAction(
     }
 
     // 2) ledger insert (best-effort; 실패해도 차감은 이미 됨 → 운영 reconcile)
-    const txInsert = (await (
-      supabase.from("user_acorn_transactions" as never) as unknown as {
-        insert: (r: Row) => Promise<{ error: SbErr }>;
-      }
-    ).insert({
+    //    insertAcornTx 로 event_id 를 남긴다. 예전엔 raw insert 라 쓴 도토리가
+    //    어느 행사에도 안 잡혀 행사 잔액이 줄지 않았다.
+    const txInsert = await insertAcornTx(supabase, {
       user_id: user.id,
       amount: -amount, // 차감 → 음수
       reason: "FM_BOOST",
       source_type: "fm_request",
       source_id: requestId,
       memo: `FM boost +${amount}`,
-    } satisfies Row)) as { error: SbErr };
+      event_id: fmEventId,
+    });
     if (txInsert.error) {
       console.error("[fm/boost] tx insert failed (drift)", {
         code: txInsert.error.code,
@@ -1894,7 +1909,15 @@ export async function jumpToQueueFirstAction(
       return { ok: false, error: "이미 처리된 신청은 올릴 수 없어요" };
     }
 
-    // 2) 현재 보유 도토리 확인 → 차감.
+    // 2) 이 행사에서 번 도토리로만 — 전역 잔액은 타 기관 몫까지 포함한다.
+    const fmEventId = await eventIdForFmSession(supabase, reqRow.session_id);
+    if (fmEventId) {
+      const eventBal = await getEventAcornBalance(user.id, fmEventId);
+      if (eventBal < amount) {
+        return { ok: false, error: "이 행사에서 모은 도토리가 부족해요" };
+      }
+    }
+
     const balResp = (await (
       supabase.from("app_users" as never) as unknown as {
         select: (c: string) => {
@@ -1926,19 +1949,16 @@ export async function jumpToQueueFirstAction(
       .update({ acorn_balance: newBalance })
       .eq("id", user.id);
 
-    // 3) 큐 transaction ledger (차감).
-    await (
-      supabase.from("user_acorn_transactions" as never) as unknown as {
-        insert: (r: Row) => Promise<{ error: SbErr }>;
-      }
-    ).insert({
+    // 3) 큐 transaction ledger (차감) — event_id 를 남겨야 행사 잔액이 줄어든다.
+    await insertAcornTx(supabase, {
       user_id: user.id,
       amount: -amount,
       reason: "FM_JUMP_FIRST",
       source_type: "fm_request",
       source_id: requestId,
       memo: `FM jump-to-queue-first ${amount}`,
-    } satisfies Row);
+      event_id: fmEventId,
+    });
 
     // 4) 같은 세션의 모든 QUEUED 의 queue_position += 1 (한 칸씩 밀림).
     //    Postgres 의 atomic update 가 없으면 SELECT → 각 row UPDATE.
@@ -2055,6 +2075,7 @@ export async function cheerNowPlayingAction(
             maybeSingle: () => Promise<
               SbRespOne<{
                 id: string;
+                session_id: string;
                 user_id: string;
                 status: string;
               }>
@@ -2063,10 +2084,11 @@ export async function cheerNowPlayingAction(
         };
       }
     )
-      .select("id, user_id, status")
+      .select("id, session_id, user_id, status")
       .eq("id", requestId)
       .maybeSingle()) as SbRespOne<{
       id: string;
+      session_id: string;
       user_id: string;
       status: string;
     }>;
@@ -2080,7 +2102,15 @@ export async function cheerNowPlayingAction(
       return { ok: false, error: "본인 곡에는 응원할 수 없어요" };
     }
 
-    // 2) 누른 사람 잔액 확인.
+    // 2) 누른 사람 잔액 확인 — 이 행사에서 번 것만 쓸 수 있다.
+    const fmEventId = await eventIdForFmSession(supabase, reqRow.session_id);
+    if (fmEventId) {
+      const eventBal = await getEventAcornBalance(user.id, fmEventId);
+      if (eventBal < 1) {
+        return { ok: false, error: "이 행사에서 모은 도토리가 부족해요" };
+      }
+    }
+
     const balResp = (await (
       supabase.from("app_users" as never) as unknown as {
         select: (c: string) => {
@@ -2113,18 +2143,15 @@ export async function cheerNowPlayingAction(
       .update({ acorn_balance: newBalance })
       .eq("id", user.id);
 
-    await (
-      supabase.from("user_acorn_transactions" as never) as unknown as {
-        insert: (r: Row) => Promise<{ error: SbErr }>;
-      }
-    ).insert({
+    await insertAcornTx(supabase, {
       user_id: user.id,
       amount: -1,
       reason: "FM_CHEER_SEND",
       source_type: "fm_request",
       source_id: requestId,
       memo: "FM cheer send -1",
-    } satisfies Row);
+      event_id: fmEventId,
+    });
 
     // 4) 신청자 +1 (잔액 update + ledger).
     const recvBalResp = (await (
@@ -2153,18 +2180,16 @@ export async function cheerNowPlayingAction(
       .update({ acorn_balance: recvBal + 1 })
       .eq("id", reqRow.user_id);
 
-    await (
-      supabase.from("user_acorn_transactions" as never) as unknown as {
-        insert: (r: Row) => Promise<{ error: SbErr }>;
-      }
-    ).insert({
+    // 받는 쪽도 같은 행사에 귀속 — 안 그러면 받은 도토리가 미귀속으로 남는다.
+    await insertAcornTx(supabase, {
       user_id: reqRow.user_id,
       amount: 1,
       reason: "FM_CHEER_RECEIVE",
       source_type: "fm_request",
       source_id: requestId,
       memo: `FM cheer received from ${user.id.slice(0, 8)}`,
-    } satisfies Row);
+      event_id: fmEventId,
+    });
 
     // 5) 신청자가 이 곡에서 누적 받은 응원 카운트 — 단순 SELECT (전체 FM_CHEER_RECEIVE 수).
     const cheerCountResp = (await (

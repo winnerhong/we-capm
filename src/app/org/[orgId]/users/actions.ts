@@ -6,6 +6,10 @@ import { createClient } from "@/lib/supabase/server";
 import { requireOrg } from "@/lib/org-auth-guard";
 import { hasOrgAccess } from "@/lib/app-user/orgs";
 import { insertAcornTx } from "@/lib/app-user/acorn-ledger";
+import {
+  getEventAcornBalance,
+  getOrgAcornBalance,
+} from "@/lib/app-user/event-acorns";
 
 export type UserStatus = "ACTIVE" | "SUSPENDED" | "CLOSED";
 export type AttendanceStatus = "PRESENT" | "LATE" | "ABSENT";
@@ -649,9 +653,14 @@ async function firstEventInOrgForUser(
 /**
  * 참가자 도토리 잔액 조정 (+1 / -1 등). 음수 방지 — 최소 0.
  *
- * 원장(user_acorn_transactions)에도 반드시 남긴다. 도토리는 이제 행사 단위로
- * 집계되고 잔액은 원장의 파생값이라, 잔액만 고치면 (a) 그 도토리가 어느 행사에도
- * 안 잡히고 (b) 잔액≠원장 불일치가 다시 쌓인다.
+ * **기준은 화면에 보이는 값과 같다.**
+ *   행사 참가자 탭  → 그 행사에서 번 도토리
+ *   기관 전체 명단  → 우리 기관 행사 전체 합계
+ *
+ * 예전에는 전역 잔액(app_users.acorn_balance)을 기준으로 클램프하고 그 값을
+ * 그대로 덮어썼다. 그래서 관리자가 명단에서 0 을 입력하면 그 보호자가 **다른
+ * 기관에서 모은 도토리까지** 지워졌다. 이제 전역 잔액은 실제 변화량만큼
+ * 가감(+= applied)해서 원장 합계와 계속 일치시킨다.
  *
  * @param eventId 어느 행사의 도토리인지. 행사 참가자 탭에서는 그 행사를 넘긴다.
  *                생략하면 이 기관 행사 중 그 보호자가 먼저 참가한 것으로 귀속.
@@ -669,7 +678,15 @@ export async function adjustAcornBalanceAction(
 
   const supabase = await createClient();
 
-  // 현재 잔액 조회
+  // 1) 기준 잔액 — 화면에 보이는 것과 같은 범위(행사 또는 기관)
+  const scoped = eventId
+    ? await getEventAcornBalance(owner.id, eventId)
+    : await getOrgAcornBalance(owner.id, session.orgId);
+  const nextScoped = Math.max(0, scoped + delta);
+  const applied = nextScoped - scoped;
+  if (applied === 0) return; // 이미 0인데 더 빼려는 경우
+
+  // 2) 전역 잔액은 **가감**. 대입하면 다른 기관 몫이 날아간다.
   const curResp = (await (
     supabase.from("app_users" as never) as unknown as {
       select: (c: string) => {
@@ -683,8 +700,8 @@ export async function adjustAcornBalanceAction(
     .eq("id", owner.id)
     .maybeSingle()) as SbOne<{ acorn_balance: number }>;
 
-  const current = curResp.data?.acorn_balance ?? 0;
-  const next = Math.max(0, current + delta);
+  const globalCurrent = curResp.data?.acorn_balance ?? 0;
+  const globalNext = Math.max(0, globalCurrent + applied);
 
   const upd = (await (
     supabase.from("app_users" as never) as unknown as {
@@ -693,31 +710,31 @@ export async function adjustAcornBalanceAction(
       };
     }
   )
-    .update({ acorn_balance: next })
+    .update({ acorn_balance: globalNext })
     .eq("id", owner.id)) as { error: SbErr };
 
   if (upd.error) {
     throw new Error(`도토리 조정 실패: ${upd.error.message}`);
   }
 
-  // 실제 반영된 변화량으로 원장 기록 (0 클램프 때문에 delta 와 다를 수 있다).
-  const applied = next - current;
-  if (applied !== 0) {
-    const targetEvent =
-      eventId ?? (await firstEventInOrgForUser(supabase, owner.id, session.orgId));
-    await insertAcornTx(supabase, {
-      user_id: owner.id,
-      amount: applied,
-      reason: applied > 0 ? "ADMIN_GRANT" : "ADMIN_DEDUCT",
-      source_type: "org_adjust",
-      source_id: null,
-      memo: `기관 조정 (${session.orgName})`,
-      event_id: targetEvent,
-    });
-  }
+  // 3) 원장 기록 — 잔액은 원장의 파생값이라 한 건도 빠지면 안 된다.
+  const targetEvent =
+    eventId ?? (await firstEventInOrgForUser(supabase, owner.id, session.orgId));
+  await insertAcornTx(supabase, {
+    user_id: owner.id,
+    amount: applied,
+    reason: applied > 0 ? "ADMIN_GRANT" : "ADMIN_DEDUCT",
+    source_type: "org_adjust",
+    source_id: null,
+    memo: `기관 조정 (${session.orgName})`,
+    event_id: targetEvent,
+  });
 
   revalidatePath(`/org/${session.orgId}/users`);
   revalidatePath(`/org/${session.orgId}/users/${owner.id}`);
+  if (eventId) {
+    revalidatePath(`/org/${session.orgId}/events/${eventId}`);
+  }
 }
 
 /**

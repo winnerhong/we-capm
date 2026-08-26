@@ -14,6 +14,7 @@ import { useRouter } from "next/navigation";
 import {
   approveEventApplicationAction,
   approveEventApplicationsBulkAction,
+  cancelEventApplicationAction,
   rejectEventApplicationAction,
   revertEventApplicationAction,
 } from "@/lib/org-events/application-actions";
@@ -30,8 +31,14 @@ import {
   type OrgEventApplicationRow,
 } from "@/lib/org-events/types";
 import { ApplicationSettings } from "./application-settings";
+import { ConsentEditor } from "./consent-editor";
 
-type FilterKey = "PENDING" | "APPROVED" | "REJECTED" | "ALL";
+type FilterKey =
+  | "PENDING"
+  | "APPROVED"
+  | "REJECTED"
+  | "CANCELED"
+  | "ALL";
 
 type Props = {
   orgId: string;
@@ -46,6 +53,17 @@ type Props = {
   defaultCloseLabel: string | null;
   /** 이미 이 행사 참가자인 연락처 — "이미 참가 중" 배지용. */
   participantPhones: string[];
+  /**
+   * 개인정보 동의 문구 — **기관 단위** 설정이라 행사 설정과 범위가 다르다.
+   * 편집 화면은 치환 전 원본을 봐야 하므로 {기관명} 토큰이 살아 있는 값이다.
+   */
+  consent: {
+    orgName: string;
+    body: string;
+    optionalBody: string;
+    optionalEnabled: boolean;
+    updatedAt: string | null;
+  };
 };
 
 export function ApplicationsTab({
@@ -59,6 +77,7 @@ export function ApplicationsTab({
   invitationPublished,
   defaultCloseLabel,
   participantPhones,
+  consent,
 }: Props) {
   const router = useRouter();
   const [filter, setFilter] = useState<FilterKey>("PENDING");
@@ -172,11 +191,31 @@ export function ApplicationsTab({
     );
   }
 
+  function cancel(a: OrgEventApplicationRow) {
+    const warn =
+      a.status === "APPROVED"
+        ? "이 가족의 참가를 취소할까요?\n참가자 명단에서 빠지고 정원 자리가 반환됩니다.\n(계정·자녀·도토리는 그대로)"
+        : "이 신청을 취소 처리할까요?";
+    if (!window.confirm(warn)) return;
+    const reason = window.prompt(
+      "취소 사유를 남겨주세요 (선택 — 신청자가 알려준 내용)",
+      ""
+    );
+    if (reason === null) return;
+    run(
+      a.id,
+      () => cancelEventApplicationAction(orgId, eventId, a.id, reason),
+      "취소 처리했어요 — [취소] 필터에서 계속 보실 수 있어요"
+    );
+  }
+
   function revert(a: OrgEventApplicationRow) {
     const warn =
       a.status === "APPROVED"
         ? "승인을 취소하면 이 가족이 행사 참가자에서 빠집니다.\n(계정과 도토리는 남습니다)\n\n계속할까요?"
-        : "대기 상태로 되돌릴까요?";
+        : a.status === "CANCELED"
+          ? "취소를 되돌려 대기 상태로 만들까요?\n취소 사유 기록도 함께 지워집니다."
+          : "대기 상태로 되돌릴까요?";
     if (!window.confirm(warn)) return;
     run(
       a.id,
@@ -213,6 +252,7 @@ export function ApplicationsTab({
     { key: "PENDING", label: "대기", count: counts.pending_count },
     { key: "APPROVED", label: "승인", count: counts.approved_count },
     { key: "REJECTED", label: "거절", count: counts.rejected_count },
+    { key: "CANCELED", label: "취소", count: counts.canceled_count },
     { key: "ALL", label: "전체", count: applications.length },
   ];
 
@@ -228,6 +268,18 @@ export function ApplicationsTab({
         invitationPublished={invitationPublished}
         defaultCloseLabel={defaultCloseLabel}
       />
+
+      {/* 접수를 켠 행사에서만 — 신청서가 없으면 동의문도 뜰 일이 없다. */}
+      {enabled && (
+        <ConsentEditor
+          orgId={orgId}
+          orgName={consent.orgName}
+          initialBody={consent.body}
+          initialOptionalBody={consent.optionalBody}
+          initialOptionalEnabled={consent.optionalEnabled}
+          updatedAt={consent.updatedAt}
+        />
+      )}
 
       {(message || error) && (
         <p
@@ -321,6 +373,7 @@ export function ApplicationsTab({
               onApprove={() => approve(a)}
               onReject={() => reject(a)}
               onRevert={() => revert(a)}
+              onCancel={() => cancel(a)}
             />
           ))}
         </ul>
@@ -341,6 +394,7 @@ function ApplicationRow({
   onApprove,
   onReject,
   onRevert,
+  onCancel,
 }: {
   application: OrgEventApplicationRow;
   selected: boolean;
@@ -351,9 +405,11 @@ function ApplicationRow({
   onApprove: () => void;
   onReject: () => void;
   onRevert: () => void;
+  onCancel: () => void;
 }) {
   const meta = ORG_EVENT_APPLICATION_STATUS_META[a.status];
   const isPending = a.status === "PENDING";
+  const [openConsent, setOpenConsent] = useState(false);
 
   return (
     <li className="rounded-2xl border border-[#D4E4BC] bg-white p-3 shadow-sm">
@@ -404,7 +460,33 @@ function ApplicationRow({
             <span className="tabular-nums text-[#8B7F75]">
               {fmtDateTimeKst(a.created_at)}
             </span>
+            <ConsentBadge
+              application={a}
+              open={openConsent}
+              onToggle={() => setOpenConsent((v) => !v)}
+            />
           </p>
+
+          {openConsent && a.consent_snapshot && (
+            <div className="mt-2 space-y-2">
+              <ConsentProof
+                label="[필수] 개인정보 수집·이용"
+                at={a.consent_agreed_at}
+                body={a.consent_snapshot.required}
+              />
+              {a.consent_snapshot.optional ? (
+                <ConsentProof
+                  label="[선택] 계열사 공동이용"
+                  at={a.consent_optional_agreed_at}
+                  body={a.consent_snapshot.optional}
+                />
+              ) : (
+                <p className="text-[10px] text-[#8B7F75]">
+                  [선택] 계열사 공동이용 — 동의하지 않으셨어요 (참가에는 영향 없음)
+                </p>
+              )}
+            </div>
+          )}
 
           {/* 누가 오는지 한눈에 — 유형 칩 */}
           {a.companions.length > 0 && (
@@ -434,14 +516,20 @@ function ApplicationRow({
           )}
           {a.status === "REJECTED" && a.note && (
             <p className="mt-1 text-[11px] text-[#8B7F75]">
-              메모: {a.note}
+              기관 메모: {a.note}
+            </p>
+          )}
+          {a.status === "CANCELED" && (
+            <p className="mt-1 text-[11px] font-semibold text-rose-700">
+              🚫 {a.canceled_at ? fmtDateTimeKst(a.canceled_at) : ""} 취소
+              {a.cancel_reason ? ` · 사유: ${a.cancel_reason}` : ""}
             </p>
           )}
         </div>
 
         {/* 작업 */}
         <div className="flex shrink-0 flex-col gap-1.5">
-          {isPending ? (
+          {isPending && (
             <>
               <button
                 type="button"
@@ -460,18 +548,106 @@ function ApplicationRow({
                 ❌ 거절
               </button>
             </>
-          ) : (
+          )}
+          {!isPending && (
             <button
               type="button"
               disabled={disabled}
               onClick={onRevert}
               className="rounded-xl border border-[#D4E4BC] bg-white px-3 py-1.5 text-xs font-bold text-[#6B6560] hover:bg-[#F5F1E8] disabled:opacity-40"
             >
-              {a.status === "APPROVED" ? "승인 취소" : "대기로"}
+              {a.status === "APPROVED"
+                ? "승인 취소"
+                : a.status === "CANCELED"
+                  ? "대기로 되돌리기"
+                  : "대기로"}
+            </button>
+          )}
+          {/* 전화로 취소 통보를 받는 경우가 잦아 관리자도 대행할 수 있게. */}
+          {(a.status === "PENDING" || a.status === "APPROVED") && (
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={onCancel}
+              className="rounded-xl border border-rose-200 bg-white px-3 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-50 disabled:opacity-40"
+            >
+              🚫 취소 처리
             </button>
           )}
         </div>
       </div>
     </li>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* 개인정보 동의 기록                                                          */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * 동의 여부 배지.
+ *
+ * 기록이 없는 신청서(consent_agreed_at = null)는 "거부" 가 아니라 **동의 기능
+ * 도입 전에 접수된 건**이다. 그 구분이 안 보이면 관리자가 잘못 판단한다.
+ */
+function ConsentBadge({
+  application: a,
+  open,
+  onToggle,
+}: {
+  application: OrgEventApplicationRow;
+  open: boolean;
+  onToggle: () => void;
+}) {
+  if (!a.consent_agreed_at || !a.consent_snapshot) {
+    return (
+      <span className="rounded-full bg-[#F5F1E8] px-2 py-0.5 text-[10px] font-semibold text-[#8B7F75]">
+        📜 동의 기록 없음 (도입 전)
+      </span>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-expanded={open}
+      className="rounded-full bg-[#E8F0E4] px-2 py-0.5 text-[10px] font-bold text-[#2D5A3D] hover:bg-[#D4E4BC]"
+    >
+      📜 동의{a.consent_optional_agreed_at ? " · 계열사 ✓" : ""}
+      <span className="ml-1 font-semibold opacity-70">
+        {open ? "접기" : "보기"}
+      </span>
+    </button>
+  );
+}
+
+/**
+ * 동의 당시 전문. **지금 문구가 아니라 그때 문구**를 보여준다 — 기관이 나중에
+ * 문구를 고쳐도 이 사람이 동의한 내용은 바뀌지 않는다는 게 이 기록의 요점이다.
+ */
+function ConsentProof({
+  label,
+  at,
+  body,
+}: {
+  label: string;
+  at: string | null;
+  body: string;
+}) {
+  return (
+    <div className="rounded-xl border border-[#E8DDC8] bg-[#FFFDF8] p-2.5">
+      <p className="flex flex-wrap items-baseline justify-between gap-2 text-[10px] font-bold text-[#2D5A3D]">
+        <span>{label}</span>
+        {at && (
+          <span className="tabular-nums font-semibold text-[#8B7F75]">
+            {fmtDateTimeKst(at)} 동의
+          </span>
+        )}
+      </p>
+      <pre className="mt-1.5 max-h-48 overflow-y-auto whitespace-pre-wrap font-sans text-[10px] leading-relaxed text-[#4A4340]">
+        {body}
+      </pre>
+    </div>
   );
 }

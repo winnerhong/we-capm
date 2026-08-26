@@ -4,11 +4,12 @@
 // 바로 이 카드다. 쿠키(toriro_apply_{eventId}) 또는 연락처 조회로 신청서를
 // 찾았을 때 폼 대신 렌더된다.
 //
-// REJECTED 는 여기서 다루지 않는다 — 재신청을 허용하므로 페이지가 폼을
-// 다시 띄우고, 그 위에 안내 문구만 얹는다.
+// REJECTED / CANCELED 는 여기서 다루지 않는다 — 재신청을 허용하므로 페이지가
+// 폼을 다시 띄우고, 그 위에 안내 문구만 얹는다.
 
 import Link from "next/link";
 import { fmtDateTimeKst } from "@/lib/datetime/kst";
+import { CancelApplicationButton } from "./cancel-application-button";
 import type { OrgEventApplicationRow } from "@/lib/org-events/types";
 
 export function ApplicationStatusCard({
@@ -66,8 +67,10 @@ export function ApplicationStatusCard({
         </dl>
 
         {approved ? (
+          // 승인된 사람은 한 번 더 묻지 않는다 — 신청 쿠키로 세션을 발급해
+          // 바로 입장시킨다. (미로그인이어도 동작)
           <Link
-            href={`/join/event/${eventId}`}
+            href={`/api/invitation/enter?event_id=${eventId}`}
             className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#2D5A3D] to-[#3A7A52] px-6 py-3.5 text-base font-bold text-white shadow-md transition hover:from-[#234a30] hover:to-[#2D5A3D]"
           >
             <span aria-hidden>🎪</span>
@@ -80,6 +83,10 @@ export function ApplicationStatusCard({
             보낸 내용으로 덮어써집니다.
           </p>
         )}
+
+        {/* 못 가게 됐을 때 스스로 뺄 수 있어야 한다. 취소해도 기록은
+            남아서 기관이 [취소] 목록으로 따로 관리한다. */}
+        <CancelApplicationButton eventId={eventId} approved={approved} />
       </div>
     </section>
   );

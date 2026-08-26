@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
+// 입장가능시간 미리보기 — 초대장이 쓰는 것과 같은 함수라 저장 전후가 어긋나지 않는다.
+import { resolveEntryTime } from "@/lib/org-events/entry-time";
 import {
   deleteOrgEventAction,
   updateOrgEventAction,
@@ -175,6 +177,8 @@ export function EditEventForm({
     invitation_address: string;
     invitation_location_image_url: string;
     invitation_dress_code: string;
+    /** 입장가능시간(분). 비었으면 초대장에서 숨김. */
+    invitation_entry_lead_min: string;
     invitation_parkings: ParkingItem[];
     invitation_host: string;
     invitation_organizer: string;
@@ -211,6 +215,9 @@ export function EditEventForm({
     initial.invitation_location_image_url
   );
   const [invDressCode, setInvDressCode] = useState(initial.invitation_dress_code);
+  const [invEntryLead, setInvEntryLead] = useState(
+    initial.invitation_entry_lead_min
+  );
   const [invParkings, setInvParkings] = useState<ParkingItem[]>(
     initial.invitation_parkings.length > 0
       ? initial.invitation_parkings
@@ -246,6 +253,13 @@ export function EditEventForm({
     const end = new Date(start.getTime() + durationMin * 60 * 1000);
     return toLocalIsoMinute(end);
   }, [startsAt, durationMin]);
+
+  // 입장가능시간 미리보기. 폼이 들고 있는 시작 시각으로 즉시 환산한다
+  // (서버 왕복 없음). startsAt 은 datetime-local 문자열이라 KST 로 해석시킨다.
+  const entryPreview = useMemo(() => {
+    if (!startsAt) return null;
+    return resolveEntryTime(`${startsAt}:00+09:00`, Number(invEntryLead));
+  }, [startsAt, invEntryLead]);
 
   // 사용자가 시각 필드를 만지지 않았으면 starts_at/ends_at 을 절대 update 에
   // 넣지 않는다 — round-trip 마다 9h 가 깎이던 버그를 봉합.
@@ -337,6 +351,7 @@ export function EditEventForm({
     fd.set("invitation_address", invAddress.trim());
     fd.set("invitation_location_image_url", invLocationImage.trim());
     fd.set("invitation_dress_code", invDressCode.trim());
+    fd.set("invitation_entry_lead_min", invEntryLead.trim());
     fd.set("invitation_host", invHost.trim());
     fd.set("invitation_organizer", invOrganizer.trim());
     // 주차장: 빈 행 제외, JSON 직렬화 (사진은 비어있으면 키 자체 제외)
@@ -525,6 +540,44 @@ export function EditEventForm({
                   </div>
                   <p className="mt-0.5 text-[10px] text-[#6B6560]">
                     시작 일시 + 기간 슬라이더로 자동 계산됩니다.
+                  </p>
+                </div>
+
+                {/* 🚪 입장가능시간 — 시각이 아니라 '몇 분 전' 으로 받는다.
+                    행사 시각을 나중에 옮겨도 입장시간이 따라오게 하려는 것.
+                    시작·기간·종료와 같은 묶음에 둔다(전부 시간 설정). */}
+                <div className="rounded-xl border border-[#E5D3B8] bg-[#FFF8F0] px-3 py-2.5">
+                  <label
+                    htmlFor="invitation_entry_lead_min"
+                    className="mb-1.5 block text-xs font-semibold text-[#6B4423]"
+                  >
+                    🚪 입장가능시간 (선택)
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <span className="shrink-0 text-xs text-[#6B6560]">
+                      행사 시작
+                    </span>
+                    <input
+                      id="invitation_entry_lead_min"
+                      type="number"
+                      min={0}
+                      max={240}
+                      inputMode="numeric"
+                      value={invEntryLead}
+                      onChange={(e) => setInvEntryLead(e.target.value)}
+                      placeholder="20"
+                      className="w-20 rounded-lg border border-[#E5D3B8] bg-white px-3 py-1.5 text-sm text-[#2D5A3D] focus:border-[#2D5A3D] focus:outline-none focus:ring-2 focus:ring-[#2D5A3D]/30"
+                    />
+                    <span className="shrink-0 text-xs text-[#6B6560]">
+                      분 전부터
+                    </span>
+                  </div>
+                  <p className="mt-1 text-[10px] leading-relaxed text-[#8B7F75]">
+                    {!startsAt
+                      ? "행사 시작 일시를 정하면 입장시간이 계산돼요."
+                      : entryPreview
+                        ? `초대장에 “${entryPreview.label}” 로 표시돼요.`
+                        : "비우면 초대장에 입장 안내가 표시되지 않아요."}
                   </p>
                 </div>
               </>
@@ -800,6 +853,7 @@ export function EditEventForm({
                   💡 줄바꿈이 그대로 초대장에 표시돼요.
                 </p>
               </div>
+
 
               {/* 🏫 주최 / 🎯 주관 — 자유 입력. 비우면 초대장에서 줄 자체 숨김. */}
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

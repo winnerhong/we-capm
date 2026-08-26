@@ -6,7 +6,14 @@ import {
   loadOrgEventById,
   isEventParticipant,
 } from "@/lib/org-events/queries";
-import { loadPartnerDisplayNameForOrg } from "@/lib/org-partner";
+import {
+  loadOrgNameById,
+  loadPartnerDisplayNameForOrg,
+} from "@/lib/org-partner";
+import {
+  resolveOrgConsent,
+  type OrgConsent,
+} from "@/lib/org-events/consent-core";
 import { loadTimelineSlots } from "@/lib/event-timeline/queries";
 import { TimelineCollapsible } from "./timeline-collapsible";
 // 시간 포맷은 KST 강제 (SSR/CSR 일치 보장).
@@ -17,10 +24,13 @@ import {
   fmtKoreanLongDateKst,
 } from "@/lib/datetime/kst";
 import { CopyButton } from "./copy-button";
+// 입장가능시간 계산·문구는 한 곳에서 — 히어로 배지와 상세 행이 같은 값을 쓴다.
+import { resolveEntryTime } from "@/lib/org-events/entry-time";
 // 참가 접수(승인제) — 켜져 있으면 하단 CTA 자리가 신청 폼/상태 카드로 바뀐다.
 import {
   loadEventApplicationCounts,
   loadMyApplication,
+  loadOrgApplicationConsent,
 } from "@/lib/org-events/application-queries";
 import {
   resolveApplicationGate,
@@ -56,6 +66,7 @@ function fmtDuration(startsAt: string | null, endsAt: string | null): string {
   if (mins) parts.push(`${mins}분`);
   return parts.join(" ");
 }
+
 
 function fmtSlotTime(iso: string): string {
   return fmtClockKstAlways(iso);
@@ -237,6 +248,13 @@ export default async function EventInvitationPage({
   const myApplication = applicationsOn
     ? await loadMyApplication(eventId).catch(() => null)
     : null;
+  // 동의 문구 — 기관 단위. {기관명} 은 지사명(orgName)이 아니라 기관명이다.
+  const applicationConsent: OrgConsent | null = applicationsOn
+    ? resolveOrgConsent(
+        await loadOrgApplicationConsent(event.org_id).catch(() => ({})),
+        await loadOrgNameById(event.org_id).catch(() => "소속 기관")
+      )
+    : null;
   const applicationGate = resolveApplicationGate({
     enabled: applicationsOn,
     closeAt: event.applications_close_at,
@@ -250,14 +268,12 @@ export default async function EventInvitationPage({
   const startClock = fmtClock(event.starts_at);
   const endClock = fmtClock(event.ends_at);
   const dDay = calcDDay(event.starts_at);
-  // 입장가능시간 — 시작 20분 전
-  const earlyArrivalLabel = (() => {
-    if (!event.starts_at) return "";
-    const start = new Date(event.starts_at);
-    if (Number.isNaN(start.getTime())) return "";
-    const early = new Date(start.getTime() - 20 * 60_000);
-    return fmtClock(early.toISOString());
-  })();
+  // 입장가능시간 — 기관이 정한 분 단위 리드타임.
+  //   null 이면 히어로 배지와 상세 행 두 곳 모두 렌더하지 않는다.
+  const entry = resolveEntryTime(
+    event.starts_at,
+    event.invitation_entry_lead_min
+  );
   const dur = fmtDuration(event.starts_at, event.ends_at);
   const timeLabel =
     startClock || endClock
@@ -270,10 +286,7 @@ export default async function EventInvitationPage({
   const location = event.invitation_location?.trim();
   const address = event.invitation_address?.trim();
   const dressCode = event.invitation_dress_code?.trim();
-  // 입장가능시간 라벨
-  const earlyArrivalRow = earlyArrivalLabel
-    ? `${earlyArrivalLabel}부터 (20분 전)`
-    : "";
+
   const parkings = (event.invitation_parkings ?? []).filter(
     (p) => p.name?.trim() || p.address?.trim()
   );
@@ -342,13 +355,11 @@ export default async function EventInvitationPage({
               ⏰ {timeLabel}
             </p>
           )}
-          {earlyArrivalLabel && (
+          {entry && (
             <p className="mt-1 text-xs text-white/85 drop-shadow">
               🚪 입장가능시간:{" "}
-              <span className="font-bold text-amber-200">
-                {earlyArrivalLabel}
-              </span>{" "}
-              <span className="text-white/70">(20분 전)</span>
+              <span className="font-bold text-amber-200">{entry.clock}</span>{" "}
+              <span className="text-white/70">({entry.leadMin}분 전)</span>
             </p>
           )}
           {(event.invitation_host || event.invitation_organizer) && (
@@ -419,60 +430,28 @@ export default async function EventInvitationPage({
           </div>
         )}
 
-        <div className="mx-auto my-6 flex items-center justify-center gap-2 text-[#D4C8B8]">
-          <span className="h-px w-10 bg-current" />
-          <span aria-hidden>◇</span>
-          <span className="h-px w-10 bg-current" />
-        </div>
-
-        <div className="space-y-2 rounded-2xl bg-gradient-to-br from-[#2D5A3D] to-[#3A7A52] p-4 text-white shadow-md">
-          {dateLabel !== "-" && (
-            <DetailRow icon="📅" label="날짜" value={dateLabel} dark />
-          )}
-          {timeLabel && (
-            <DetailRow icon="⏰" label="일시" value={timeLabel} dark />
-          )}
-          {earlyArrivalRow && (
-            <DetailRow
-              icon="🚪"
-              label="입장"
-              value={earlyArrivalRow}
-              dark
-            />
-          )}
-          {/* 장소 — 비어있어도 placeholder 로 노출해 운영자가 비어있음을 인지하게 함 */}
-          <div className="flex items-start gap-2">
-            <span aria-hidden className="shrink-0 text-base leading-snug">
-              📍
-            </span>
-            <div className="min-w-0 flex-1 text-sm leading-snug">
-              <span className="text-white/70">장소:</span>{" "}
-              {location ? (
-                <span className="font-bold text-white">{location}</span>
-              ) : !address ? (
-                <span className="italic text-white/60">
-                  장소 안내가 곧 업데이트됩니다
-                </span>
-              ) : null}
-              {address && (
-                <span className="text-white/85">
-                  {location ? " · " : ""}
-                  {address}
-                </span>
-              )}
+        {/* 준비물만 — 날짜·일시·입장·장소는 상단 히어로에 이미 있고,
+            장소는 아래 '오시는 길' 에서 한 번 더 다룬다. 같은 정보를 세 번
+            읽게 하지 않는다. 안내문 카드와 같은 톤으로 맞춰 한 덩어리로 읽히게. */}
+        {dressCode && (
+          <>
+            <div className="mx-auto my-6 flex items-center justify-center gap-2 text-[#D4C8B8]">
+              <span className="h-px w-10 bg-current" />
+              <span aria-hidden>◇</span>
+              <span className="h-px w-10 bg-current" />
             </div>
-            {(address || location) && (
-              <CopyButton
-                text={address || location || ""}
-                label="📋 복사"
-                className="shrink-0 self-start rounded-full border border-white/30 bg-white/15 px-2 py-0.5 text-[10px] font-bold text-white shadow-sm backdrop-blur-sm hover:bg-white/25"
-              />
-            )}
-          </div>
-          {dressCode && (
-            <DetailRow icon="🎒" label="준비물" value={dressCode} multiline dark />
-          )}
-        </div>
+
+            <div className="rounded-2xl border border-[#E5D3B8] bg-[#FFF8F0] p-5 shadow-sm">
+              <h2 className="mb-3 flex items-center gap-2 text-sm font-bold text-[#6B4423]">
+                <span aria-hidden>🎒</span>
+                <span>준비물</span>
+              </h2>
+              <p className="whitespace-pre-line break-words text-sm leading-relaxed text-[#3D3A36]">
+                {dressCode}
+              </p>
+            </div>
+          </>
+        )}
       </section>
 
       {/* ─── 오시는 길 (장소 또는 주소가 있을 때만) ─── */}
@@ -654,6 +633,7 @@ export default async function EventInvitationPage({
         gate={applicationGate}
         myApplication={myApplication}
         counts={applicationCounts}
+        consent={applicationConsent}
       />
 
     </div>
@@ -661,61 +641,6 @@ export default async function EventInvitationPage({
 }
 
 /* ────────────────────────── 보조 컴포넌트 ────────────────────────── */
-
-function DetailRow({
-  icon,
-  label,
-  value,
-  multiline = false,
-  copyText,
-  large = false,
-  dark = false,
-}: {
-  icon: string;
-  label: string;
-  value: string;
-  multiline?: boolean;
-  /** 있으면 행 우측에 📋 주소복사 버튼 표시 — 클립보드 텍스트. */
-  copyText?: string;
-  /** true 면 값 글씨 크게. */
-  large?: boolean;
-  /** 어두운(초록 그라데이션) 배경에서 흰 글씨 모드. */
-  dark?: boolean;
-}) {
-  const labelCls = dark ? "text-white/70" : "text-[#8B7F75]";
-  const valueCls = dark ? "text-white" : "text-[#2C2C2C]";
-  return (
-    <div className="flex items-start gap-2">
-      <span
-        aria-hidden
-        className={`shrink-0 leading-snug ${large ? "text-lg" : "text-base"}`}
-      >
-        {icon}
-      </span>
-      <p
-        className={`min-w-0 flex-1 ${
-          large ? "text-base" : "text-sm"
-        } leading-snug ${
-          multiline ? "whitespace-pre-line break-words" : ""
-        }`}
-      >
-        <span className={labelCls}>{label}:</span>{" "}
-        <span className={`font-bold ${valueCls}`}>{value}</span>
-      </p>
-      {copyText && (
-        <CopyButton
-          text={copyText}
-          label="📋 복사"
-          className={
-            dark
-              ? "shrink-0 self-start rounded-full border border-white/30 bg-white/15 px-2 py-0.5 text-[10px] font-bold text-white shadow-sm backdrop-blur-sm hover:bg-white/25"
-              : "shrink-0 self-start rounded-full border border-[#D4E4BC] bg-[#F5F1E8] px-2 py-0.5 text-[10px] font-bold text-[#2D5A3D] shadow-sm hover:bg-[#E8DDC8]"
-          }
-        />
-      )}
-    </div>
-  );
-}
 
 function PendingState({ eventName }: { eventName: string }) {
   return (
@@ -759,6 +684,7 @@ function InvitationFooter({
   gate,
   myApplication,
   counts,
+  consent,
 }: {
   eventId: string;
   eventStatus: string;
@@ -767,6 +693,8 @@ function InvitationFooter({
   gate: ApplicationGate;
   myApplication: OrgEventApplicationRow | null;
   counts: OrgEventApplicationCounts | null;
+  /** 접수를 쓰지 않는 행사면 null — 신청 폼 자체가 뜨지 않는다. */
+  consent: OrgConsent | null;
 }) {
   if (gate.kind === "DISABLED") {
     return (
@@ -780,7 +708,11 @@ function InvitationFooter({
   }
 
   // 대기/승인 중인 내 신청서가 있으면 마감보다 상태 카드가 우선.
-  if (myApplication && myApplication.status !== "REJECTED") {
+  // 거절·취소는 재신청을 허용하므로 카드 대신 폼을 다시 띄운다.
+  const live =
+    myApplication?.status === "PENDING" ||
+    myApplication?.status === "APPROVED";
+  if (myApplication && live) {
     return (
       <ApplicationStatusCard eventId={eventId} application={myApplication} />
     );
@@ -809,12 +741,24 @@ function InvitationFooter({
           </p>
         </div>
       )}
+      {myApplication?.status === "CANCELED" && (
+        <div className="mx-auto max-w-md px-6 pt-2">
+          <p className="rounded-2xl border border-rose-200 bg-rose-50/70 px-4 py-3 text-xs leading-relaxed text-rose-800">
+            🚫 참가를 취소하셨어요
+            {myApplication.canceled_at
+              ? ` (${fmtDateTimeKst(myApplication.canceled_at)})`
+              : ""}
+            . 다시 오시려면 아래에서 신청서를 새로 내주세요.
+          </p>
+        </div>
+      )}
       <ApplicationForm
         eventId={eventId}
         atCapacity={gate.atCapacity}
         capacity={gate.capacity}
         approvedPeople={counts?.approved_people ?? 0}
         closeLabel={closeLabel}
+        consent={consent ?? resolveOrgConsent(null, "소속 기관")}
       />
     </>
   );

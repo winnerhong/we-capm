@@ -110,6 +110,14 @@ export default async function EditOrgEventPage({
           invitation_location_image_url:
             event.invitation_location_image_url ?? "",
           invitation_dress_code: event.invitation_dress_code ?? "",
+          // null 이면 빈 문자열 = 입장 안내 숨김. 컬럼 미적용(undefined) 이면
+          // 기본 20 을 채워 지금과 같은 화면을 유지한다.
+          invitation_entry_lead_min:
+            event.invitation_entry_lead_min === undefined
+              ? "20"
+              : event.invitation_entry_lead_min == null
+                ? ""
+                : String(event.invitation_entry_lead_min),
           invitation_parkings: event.invitation_parkings ?? [],
           invitation_host: event.invitation_host ?? "",
           invitation_organizer: event.invitation_organizer ?? "",

@@ -64,6 +64,129 @@ export async function getEventAcornBalance(
   return (resp.data ?? []).reduce((sum, r) => sum + (r.amount ?? 0), 0);
 }
 
+/**
+ * 이 행사의 user_id → 잔액. 관리자 명단처럼 수십 명을 한 번에 그릴 때 쓴다.
+ * (1인용 getEventAcornBalance 를 행마다 부르면 조회가 인원수만큼 늘어난다)
+ *
+ * 반환이 Map 이 아니라 Record 인 이유: 서버 → 클라이언트 prop 직렬화.
+ * 원장에 기록이 없는 사람은 키 자체가 없다 → 호출부에서 0 으로 읽으면 된다.
+ */
+export async function loadEventAcornBalances(
+  eventId: string
+): Promise<Record<string, number>> {
+  if (!eventId) return {};
+  const supabase = await createClient();
+
+  const resp = (await (
+    supabase.from("user_acorn_transactions" as never) as unknown as {
+      select: (c: string) => {
+        eq: (
+          k: string,
+          v: string
+        ) => Promise<SbResp<{ user_id: string; amount: number }>>;
+      };
+    }
+  )
+    .select("user_id, amount")
+    .eq("event_id", eventId)) as SbResp<{ user_id: string; amount: number }>;
+
+  if (resp.error) {
+    // 컬럼 미존재(마이그레이션 전)면 빈 값 — 호출부가 기존 전역 값을 그대로 쓴다.
+    if (!isMissingColumn(resp.error)) {
+      console.error("[event-acorns] batch balance error", resp.error);
+    }
+    return {};
+  }
+
+  const out: Record<string, number> = {};
+  for (const t of resp.data ?? []) {
+    out[t.user_id] = (out[t.user_id] ?? 0) + (t.amount ?? 0);
+  }
+  return out;
+}
+
+/**
+ * 이 기관 행사 전체에서의 user_id → 잔액.
+ *
+ * 행사 컨텍스트가 없는 기관 화면(전체 명단·관제실·CSV)용. 우리 기관 행사에서
+ * 벌고 쓴 것만 세므로, 타 기관에서 모은 도토리가 우리 숫자에 얹히지 않는다.
+ *
+ * 기관에 행사가 하나도 없으면 빈 객체 — 호출부가 0 으로 읽는다.
+ */
+export async function loadOrgAcornBalances(
+  orgId: string,
+  userIds: string[]
+): Promise<Record<string, number>> {
+  const ids = Array.from(new Set((userIds ?? []).filter(Boolean)));
+  if (!orgId || ids.length === 0) return {};
+  const supabase = await createClient();
+
+  const evResp = (await (
+    supabase.from("org_events" as never) as unknown as {
+      select: (c: string) => {
+        eq: (k: string, v: string) => Promise<SbResp<{ id: string }>>;
+      };
+    }
+  )
+    .select("id")
+    .eq("org_id", orgId)) as SbResp<{ id: string }>;
+
+  if (evResp.error) {
+    console.error("[event-acorns] org events error", evResp.error);
+    return {};
+  }
+  const eventIds = (evResp.data ?? []).map((e) => e.id);
+  if (eventIds.length === 0) return {};
+
+  const txResp = (await (
+    supabase.from("user_acorn_transactions" as never) as unknown as {
+      select: (c: string) => {
+        in: (
+          k: string,
+          v: string[]
+        ) => {
+          in: (
+            k: string,
+            v: string[]
+          ) => Promise<SbResp<{ user_id: string; amount: number }>>;
+        };
+      };
+    }
+  )
+    .select("user_id, amount")
+    .in("user_id", ids)
+    .in("event_id", eventIds)) as SbResp<{
+    user_id: string;
+    amount: number;
+  }>;
+
+  if (txResp.error) {
+    if (!isMissingColumn(txResp.error)) {
+      console.error("[event-acorns] org balance error", txResp.error);
+    }
+    return {};
+  }
+
+  const out: Record<string, number> = {};
+  for (const t of txResp.data ?? []) {
+    out[t.user_id] = (out[t.user_id] ?? 0) + (t.amount ?? 0);
+  }
+  return out;
+}
+
+/**
+ * 이 기관 행사 전체에서 이 보호자가 보유한 도토리 (1인).
+ * 관리자 도토리 조정이 "화면에 보이는 값" 과 같은 기준을 쓰도록.
+ */
+export async function getOrgAcornBalance(
+  userId: string,
+  orgId: string
+): Promise<number> {
+  if (!userId || !orgId) return 0;
+  const map = await loadOrgAcornBalances(orgId, [userId]);
+  return map[userId] ?? 0;
+}
+
 /** 이 행사의 도토리 내역 (최신순). */
 export async function loadEventAcornTransactions(
   userId: string,

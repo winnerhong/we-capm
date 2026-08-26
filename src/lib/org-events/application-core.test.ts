@@ -11,12 +11,16 @@ import {
   resolveApplicationGate,
   validateApplicationInput,
 } from "./application-core";
-import { COMPANION_PRESETS } from "./types";
+import {
+  COMPANION_PRESETS,
+  ORG_EVENT_APPLICATION_STATUS_META,
+} from "./types";
 
 const KST_NOON = Date.parse("2026-09-01T12:00:00+09:00");
 
 const ADULT = (label: string) => ({ label, kind: "ADULT" as const });
 const CHILD = (label: string) => ({ label, kind: "CHILD" as const });
+const SENIOR = (label: string) => ({ label, kind: "SENIOR" as const });
 
 describe("validateApplicationInput", () => {
   it("정상 입력을 정규화한다 — 연락처 숫자만, 반명 trim", () => {
@@ -180,18 +184,24 @@ describe("validateApplicationInput", () => {
 });
 
 describe("computeHeadcount", () => {
-  it("사용자 예시 — 원생 1 + 아빠·엄마·삼촌·할머니·할아버지 = 아동1 성인5", () => {
+  it("사용자 예시 — 원생 1 + 아빠·엄마·삼촌·할머니·할아버지 = 총 6명", () => {
+    // 칩 기본값대로면 할머니·할아버지는 조부모로 빠진다.
     const h = computeHeadcount(
       [{ name: "홍길동", class_name: "햇살반" }],
       [
         ADULT("아빠"),
         ADULT("엄마"),
         ADULT("삼촌"),
-        ADULT("할머니"),
-        ADULT("할아버지"),
+        SENIOR("할머니"),
+        SENIOR("할아버지"),
       ]
     );
-    expect(h).toEqual({ childCount: 1, adultCount: 5, total: 6 });
+    expect(h).toEqual({
+      childCount: 1,
+      adultCount: 3,
+      seniorCount: 2,
+      total: 6,
+    });
   });
 
   it("아동 동반인은 아이 쪽으로 합산된다", () => {
@@ -199,29 +209,88 @@ describe("computeHeadcount", () => {
       [{ name: "홍유빈" }, { name: "홍서준" }],
       [ADULT("아빠"), ADULT("엄마"), CHILD("동생")]
     );
-    expect(h).toEqual({ childCount: 3, adultCount: 2, total: 5 });
+    expect(h).toEqual({ childCount: 3, adultCount: 2, seniorCount: 0, total: 5 });
   });
 
   it("동반인이 없으면 아이 수가 곧 총 인원", () => {
     expect(computeHeadcount([{ name: "홍유빈" }], [])).toEqual({
       childCount: 1,
       adultCount: 0,
+      seniorCount: 0,
       total: 1,
     });
   });
 });
 
 describe("formatHeadcount", () => {
-  it("아동·성인이 있으면 둘 다 적는다", () => {
+  it("유아·성인·조부모를 순서대로 적는다", () => {
     expect(
-      formatHeadcount({ childCount: 2, adultCount: 3, total: 5 })
-    ).toBe("👶 아동 2 · 🧑 성인 3 · 총 5명");
+      formatHeadcount({
+        childCount: 2,
+        adultCount: 3,
+        seniorCount: 1,
+        total: 6,
+      })
+    ).toBe("👶 유아 2 · 🧑 성인 3 · 👴 조부모 1 · 총 6명");
   });
 
   it("0인 항목은 생략한다", () => {
-    expect(formatHeadcount({ childCount: 1, adultCount: 0, total: 1 })).toBe(
-      "👶 아동 1 · 총 1명"
+    expect(
+      formatHeadcount({
+        childCount: 1,
+        adultCount: 0,
+        seniorCount: 0,
+        total: 1,
+      })
+    ).toBe("👶 유아 1 · 총 1명");
+  });
+});
+
+describe("조부모 분류", () => {
+  it("할머니·할아버지 칩은 조부모로 잡힌다", () => {
+    const h = computeHeadcount(
+      [{ name: "홍길동" }],
+      [ADULT("아빠"), ADULT("엄마"), SENIOR("할머니"), SENIOR("할아버지")]
     );
+    expect(h).toEqual({
+      childCount: 1,
+      adultCount: 2,
+      seniorCount: 2,
+      total: 5,
+    });
+  });
+
+  it("프리셋에서 할머니·할아버지만 조부모", () => {
+    const seniors = COMPANION_PRESETS.filter((p) => p.kind === "SENIOR");
+    expect(seniors.map((p) => p.label)).toEqual(["할머니", "할아버지"]);
+  });
+
+  it("kind 가 깨진 값이면 성인으로 세서 인원이 누락되지 않는다", () => {
+    const h = computeHeadcount(
+      [{ name: "홍길동" }],
+      // 조부모 분류가 생기기 전 데이터를 흉내
+      [{ kind: "WEIRD" as never }]
+    );
+    expect(h.total).toBe(2);
+    expect(h.adultCount).toBe(1);
+  });
+
+  it("검증도 SENIOR 를 그대로 보존한다", () => {
+    const r = validateApplicationInput({
+      phone: "01012345678",
+      children: [{ name: "홍길동", className: "" }],
+      companions: [SENIOR("외할머니")],
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.value.companions).toEqual([{ label: "외할머니", kind: "SENIOR" }]);
+    expect(r.value.seniorCount).toBe(1);
+  });
+
+  it("jsonb 파싱도 SENIOR 를 보존한다", () => {
+    expect(
+      parseApplicationCompanions([{ label: "할머니", kind: "SENIOR" }])
+    ).toEqual([{ label: "할머니", kind: "SENIOR" }]);
   });
 });
 
@@ -475,5 +544,20 @@ describe("formatPhoneDisplay", () => {
   it("10/11자리를 하이픈으로 끊는다", () => {
     expect(formatPhoneDisplay("01012345678")).toBe("010-1234-5678");
     expect(formatPhoneDisplay("0311234567")).toBe("031-123-4567");
+  });
+});
+
+describe("취소 상태", () => {
+  it("네 가지 상태에 모두 배지 메타가 있다", () => {
+    const keys = Object.keys(ORG_EVENT_APPLICATION_STATUS_META).sort();
+    expect(keys).toEqual(["APPROVED", "CANCELED", "PENDING", "REJECTED"]);
+  });
+
+  it("취소 배지는 거절과 구분된다", () => {
+    const canceled = ORG_EVENT_APPLICATION_STATUS_META.CANCELED;
+    const rejected = ORG_EVENT_APPLICATION_STATUS_META.REJECTED;
+    expect(canceled.label).toBe("취소");
+    expect(canceled.icon).not.toBe(rejected.icon);
+    expect(canceled.color).not.toBe(rejected.color);
   });
 });

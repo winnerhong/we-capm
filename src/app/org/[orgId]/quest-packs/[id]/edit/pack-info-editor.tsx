@@ -16,6 +16,8 @@ import {
   type StampIconSet,
 } from "@/lib/missions/types";
 import { CoverImagePicker } from "@/components/cover-image-picker";
+import { DurationRangePicker } from "@/components/duration-range-picker";
+import { toLocalInputFromIsoKst } from "@/lib/datetime/kst";
 
 type Props = {
   pack: OrgQuestPackRow;
@@ -42,30 +44,16 @@ const ICON_SET_OPTIONS: Array<{
   { value: "SEASON", label: "사계절", sample: "🌸" },
 ];
 
-function toLocalInput(iso: string | null): string {
-  if (!iso) return "";
-  try {
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return "";
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const dd = String(d.getDate()).padStart(2, "0");
-    const hh = String(d.getHours()).padStart(2, "0");
-    const mm = String(d.getMinutes()).padStart(2, "0");
-    return `${y}-${m}-${dd}T${hh}:${mm}`;
-  } catch {
-    return "";
-  }
-}
-
 export function PackInfoEditor({ pack, missionCount }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
   const [name, setName] = useState(pack.name);
   const [description, setDescription] = useState(pack.description ?? "");
-  const [startsAt, setStartsAt] = useState(toLocalInput(pack.starts_at));
-  const [endsAt, setEndsAt] = useState(toLocalInput(pack.ends_at));
+  const [startsAt, setStartsAt] = useState(
+    toLocalInputFromIsoKst(pack.starts_at)
+  );
+  const [endsAt, setEndsAt] = useState(toLocalInputFromIsoKst(pack.ends_at));
   const [layoutMode, setLayoutMode] = useState<LayoutMode>(pack.layout_mode);
   const [iconSet, setIconSet] = useState<StampIconSet>(pack.stamp_icon_set);
   const [coverUrl, setCoverUrl] = useState(pack.cover_image_url ?? "");
@@ -330,32 +318,19 @@ export function PackInfoEditor({ pack, missionCount }: Props) {
             />
           </Field>
 
-          <div className="grid gap-4 md:grid-cols-2">
-            <Field label="시작 일시" htmlFor="starts_at">
-              <input
-                id="starts_at"
-                type="datetime-local"
-                value={startsAt}
-                onChange={(e) => {
-                  setStartsAt(e.target.value);
-                  markDirty();
-                }}
-                className={inputCls}
-              />
-            </Field>
-            <Field label="종료 일시" htmlFor="ends_at">
-              <input
-                id="ends_at"
-                type="datetime-local"
-                value={endsAt}
-                onChange={(e) => {
-                  setEndsAt(e.target.value);
-                  markDirty();
-                }}
-                className={inputCls}
-              />
-            </Field>
-          </div>
+          <DurationRangePicker
+            startsAt={startsAt}
+            endsAt={endsAt}
+            onChange={(next) => {
+              setStartsAt(next.startsAt);
+              setEndsAt(next.endsAt);
+              markDirty();
+            }}
+            scale="days"
+            durationLabel="진행 기간"
+            optional
+            idPrefix="pack_edit"
+          />
 
           <Field label="레이아웃" htmlFor="layout_mode">
             <div className="flex flex-wrap gap-2">

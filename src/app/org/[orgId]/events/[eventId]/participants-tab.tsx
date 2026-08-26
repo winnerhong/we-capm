@@ -72,13 +72,84 @@ type Props = {
    * 관리자가 직접 등록한 참가자는 항목이 없거나 0/0 이라 배지를 숨긴다.
    */
   partyCounts: Record<string, EventPartyCount>;
+  /**
+   * user_id → 계정 전역 누적 도토리.
+   *
+   * 행에 보이는 숫자는 **이 행사에서 번 것**(acorn_balance 를 서버가 덮어씀)이라,
+   * 타 기관에서 모아온 사람은 0 으로 뜬다. 왜 0인지 알 수 있게 전역 누적을
+   * 툴팁으로만 곁들인다.
+   */
+  globalAcorns: Record<string, number>;
 };
 
-/** "👶2·🧑3" — 구성을 모르면(직접 등록분) null 이라 배지를 렌더하지 않는다. */
+/** "전체 누적 21개 (다른 기관 포함)" — 이 행사 값과 다를 때만. */
+function acornTitle(
+  eventAcorns: number,
+  global: number | undefined
+): string {
+  if (global === undefined || global === eventAcorns) {
+    return `이 행사에서 모은 도토리 ${eventAcorns}개`;
+  }
+  return `이 행사 ${eventAcorns}개 · 전체 누적 ${global}개 (다른 기관 행사 포함)`;
+}
+
+/** "👶2·🧑3·👴1" — 구성을 모르면(직접 등록분) null 이라 배지를 렌더하지 않는다. */
 function partyBadge(pc: EventPartyCount | undefined): string | null {
   if (!pc) return null;
-  if (pc.adult_count === 0 && pc.child_count === 0) return null;
-  return `👶${pc.child_count}·🧑${pc.adult_count}`;
+  const senior = pc.senior_count ?? 0;
+  if (pc.adult_count === 0 && pc.child_count === 0 && senior === 0) {
+    return null;
+  }
+  const parts = [`👶${pc.child_count}`, `🧑${pc.adult_count}`];
+  if (senior > 0) parts.push(`👴${senior}`);
+  return parts.join("·");
+}
+
+/**
+ * 이 행사 참가자 전체의 구성 합계.
+ *
+ * 접수를 거치지 않고 관리자가 직접 등록한 가족은 구성이 0/0/0 이라 인원을 알 수
+ * 없다. 그런 가족을 0명으로 더해버리면 합계가 실제보다 적게 나오므로, 따로
+ * unknownFamilies 로 세서 화면에 명시한다.
+ */
+function summarizeParty(
+  rows: ParticipantOption[],
+  partyCounts: Record<string, EventPartyCount>
+): {
+  child: number;
+  adult: number;
+  senior: number;
+  total: number;
+  knownFamilies: number;
+  unknownFamilies: number;
+} {
+  let child = 0;
+  let adult = 0;
+  let senior = 0;
+  let knownFamilies = 0;
+  let unknownFamilies = 0;
+  for (const r of rows) {
+    const pc = partyCounts[r.id];
+    const c = pc?.child_count ?? 0;
+    const a = pc?.adult_count ?? 0;
+    const sn = pc?.senior_count ?? 0;
+    if (c === 0 && a === 0 && sn === 0) {
+      unknownFamilies += 1;
+      continue;
+    }
+    child += c;
+    adult += a;
+    senior += sn;
+    knownFamilies += 1;
+  }
+  return {
+    child,
+    adult,
+    senior,
+    total: child + adult + senior,
+    knownFamilies,
+    unknownFamilies,
+  };
 }
 
 const STATUS_META: Record<UserStatus, { label: string; chip: string }> = {
@@ -139,6 +210,7 @@ export function ParticipantsTab({
   allowSelfRegister,
   eventStatus,
   partyCounts,
+  globalAcorns,
 }: Props) {
   const router = useRouter();
   const todayIso = todayIsoDate();
@@ -161,6 +233,12 @@ export function ParticipantsTab({
 
   // 검색 (client-side, 풍부한 행 테이블 대상)
   const [query, setQuery] = useState("");
+  // 구성 합계 — 검색 필터와 무관하게 이 행사 참가자 전체 기준.
+  const partySummary = useMemo(
+    () => summarizeParty(inEvent, partyCounts),
+    [inEvent, partyCounts]
+  );
+
   const filteredInEvent = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return inEvent;
@@ -294,6 +372,52 @@ export function ParticipantsTab({
           ›
         </span>
       </Link>
+
+      {/* ───────────────── 참가 구성 요약 ───────────────── */}
+      <section className="rounded-2xl border border-[#D4E4BC] bg-gradient-to-br from-[#F5F1E8] via-white to-[#E8F0E4] p-4 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-sm font-bold text-[#2D5A3D]">
+            👨‍👩‍👧‍👦 참가 구성
+          </h3>
+          <p className="text-xs font-semibold text-[#6B6560]">
+            {inEvent.length.toLocaleString("ko-KR")}가족
+          </p>
+        </div>
+
+        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {[
+            { icon: "👶", label: "유아", value: partySummary.child, tone: "bg-[#FAE7D0] text-[#6B4423]" },
+            { icon: "🧑", label: "성인", value: partySummary.adult, tone: "bg-[#E8F0E4] text-[#2D5A3D]" },
+            { icon: "👴", label: "조부모", value: partySummary.senior, tone: "bg-[#EDE7F6] text-[#4A3A6B]" },
+            { icon: "🧮", label: "합계", value: partySummary.total, tone: "bg-[#2D5A3D] text-white" },
+          ].map((it) => (
+            <div
+              key={it.label}
+              className={`rounded-xl px-3 py-2.5 text-center ${it.tone}`}
+            >
+              <div className="text-[10px] font-semibold opacity-80">
+                <span aria-hidden>{it.icon}</span> {it.label}
+              </div>
+              <div className="text-lg font-extrabold tabular-nums">
+                {it.value.toLocaleString("ko-KR")}
+                <span className="text-[11px] font-bold">명</span>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {partySummary.unknownFamilies > 0 && (
+          <p className="mt-2 text-[11px] leading-relaxed text-[#8B7F75]">
+            ⚠️ {partySummary.unknownFamilies}가족은 구성이 기록돼 있지 않아 합계에서
+            빠져 있어요. 접수(신청서)를 거치지 않고 등록된 참가자예요.
+          </p>
+        )}
+        {partySummary.unknownFamilies === 0 && partySummary.total === 0 && (
+          <p className="mt-2 text-[11px] text-[#8B7F75]">
+            아직 참가자가 없어요.
+          </p>
+        )}
+      </section>
 
       {/* ───────────────── 검색 ───────────────── */}
       <div className="rounded-2xl border border-[#D4E4BC] bg-white p-4 shadow-sm">
@@ -485,7 +609,10 @@ export function ParticipantsTab({
                             );
                           })()}
                         </td>
-                        <td className="px-2 py-2 text-center">
+                        <td
+                          className="px-2 py-2 text-center"
+                          title={acornTitle(r.acorn_balance, globalAcorns[r.id])}
+                        >
                           <AcornAdjuster
                             userId={r.id}
                             balance={r.acorn_balance}
@@ -622,7 +749,10 @@ export function ParticipantsTab({
                         </div>
                       </div>
                     )}
-                    <div className="rounded-lg bg-[#F4EFE8] p-2">
+                    <div
+                      className="rounded-lg bg-[#F4EFE8] p-2"
+                      title={acornTitle(r.acorn_balance, globalAcorns[r.id])}
+                    >
                       <div className="mb-1 text-[10px] text-[#6B4423]">
                         <AcornIcon /> 도토리
                       </div>

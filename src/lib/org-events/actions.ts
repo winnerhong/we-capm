@@ -47,6 +47,18 @@ function revalidateEvents(orgId: string, eventId?: string): void {
   }
 }
 
+/**
+ * 폼 숫자 입력 → 저장값. 빈 값·0·비숫자는 null(=미설정).
+ * clampString 의 숫자판 — 같은 자리에서 같은 방식으로 쓰라고 옆에 둔다.
+ */
+function clampInt(raw: unknown, min: number, max: number): number | null {
+  const s = String(raw ?? "").trim();
+  if (!s) return null;
+  const n = Math.floor(Number(s));
+  if (!Number.isFinite(n) || n < min) return null;
+  return Math.min(max, n);
+}
+
 function clampString(
   raw: string | null | undefined,
   max: number
@@ -144,6 +156,7 @@ function extractEventFields(formData: FormData): {
   invitation_address: string | null;
   invitation_location_image_url: string | null;
   invitation_dress_code: string | null;
+  invitation_entry_lead_min: number | null;
   invitation_parkings: ParkingItem[];
   invitation_host: string | null;
   invitation_organizer: string | null;
@@ -192,6 +205,12 @@ function extractEventFields(formData: FormData): {
     invitation_location_image_url: clampString(
       String(formData.get("invitation_location_image_url") ?? ""),
       500
+    ),
+    // 0 이하는 null — 관리자가 0을 넣는 의도는 "입장 안내 안 씀" 이다.
+    invitation_entry_lead_min: clampInt(
+      formData.get("invitation_entry_lead_min"),
+      1,
+      240
     ),
     invitation_dress_code: clampString(
       String(formData.get("invitation_dress_code") ?? ""),

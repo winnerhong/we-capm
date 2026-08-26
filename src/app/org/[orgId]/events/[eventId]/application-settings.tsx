@@ -193,6 +193,11 @@ export function ApplicationSettings({
                       ❌ 거절 {counts.rejected_count}건
                     </span>
                   )}
+                  {counts.canceled_count > 0 && (
+                    <span className="text-rose-700">
+                      🚫 취소 {counts.canceled_count}건
+                    </span>
+                  )}
                 </div>
                 {hasCapacity && (
                   <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-[#EDEAE2]">

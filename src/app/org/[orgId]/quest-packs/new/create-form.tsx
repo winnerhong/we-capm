@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { createQuestPackAction } from "../../missions/actions";
 import type { LayoutMode, StampIconSet } from "@/lib/missions/types";
 import { CoverImagePicker } from "@/components/cover-image-picker";
+import { DurationRangePicker } from "@/components/duration-range-picker";
 
 type Props = {
   orgId: string;
@@ -129,26 +130,18 @@ export function CreateQuestPackForm({ orgId }: Props) {
             />
           </Field>
 
-          <div className="grid gap-4 md:grid-cols-2">
-            <Field label="시작 일시" htmlFor="starts_at">
-              <input
-                id="starts_at"
-                type="datetime-local"
-                value={startsAt}
-                onChange={(e) => setStartsAt(e.target.value)}
-                className={inputCls}
-              />
-            </Field>
-            <Field label="종료 일시" htmlFor="ends_at">
-              <input
-                id="ends_at"
-                type="datetime-local"
-                value={endsAt}
-                onChange={(e) => setEndsAt(e.target.value)}
-                className={inputCls}
-              />
-            </Field>
-          </div>
+          <DurationRangePicker
+            startsAt={startsAt}
+            endsAt={endsAt}
+            onChange={(next) => {
+              setStartsAt(next.startsAt);
+              setEndsAt(next.endsAt);
+            }}
+            scale="days"
+            durationLabel="진행 기간"
+            optional
+            idPrefix="pack_new"
+          />
 
           <Field label="커버 이미지 (선택)" htmlFor="cover_image_url">
             <CoverImagePicker

@@ -17,6 +17,12 @@ import {
   loadOrgRosterKinds,
   type OrgRosterKind,
 } from "@/lib/app-user/orgs";
+// 도토리는 행사 단위로 집계된다. 기관 화면은 우리 기관 행사 합계만 보여준다
+// — app_users.acorn_balance 는 타 기관에서 모은 것까지 포함한 전역 누적이다.
+import {
+  getOrgAcornBalance,
+  loadOrgAcornBalances,
+} from "@/lib/app-user/event-acorns";
 
 type SbResp<T> = { data: T[] | null; error: { message: string } | null };
 
@@ -257,6 +263,13 @@ export async function loadOrgMembers(
     );
   }
 
+  // 3-b) 도토리 — 우리 기관 행사에서 벌고 쓴 것만.
+  //      기록이 없는 사람은 키가 없어 0 으로 읽힌다.
+  const orgAcorns = await loadOrgAcornBalances(
+    orgId,
+    users.map((u) => u.id)
+  );
+
   // 4) 조립
   const families: OrgMemberFamily[] = users.map((u) => ({
     userId: u.id,
@@ -265,7 +278,7 @@ export async function loadOrgMembers(
     status: u.status,
     createdAt: u.created_at,
     lastLoginAt: u.last_login_at,
-    acornBalance: u.acorn_balance ?? 0,
+    acornBalance: orgAcorns[u.id] ?? 0,
     children: childrenByUser.get(u.id) ?? [],
     lastActivityAt: lastActivityByUser.get(u.id) ?? null,
     submissionCount: submissionCountByUser.get(u.id) ?? 0,
@@ -381,19 +394,22 @@ export async function loadOrgMemberDetail(
   const u = userResp.data;
 
   // 2) 자녀 + 3) 최근 제출 + 4) 참여 행사 + 5) 도토리 거래 병렬 로드
-  const [childrenP, submissionsP, eventsP, acornTxP] = await Promise.all([
-    loadChildrenForDetail(supabase, userId),
-    loadRecentSubmissionsForDetail(supabase, userId),
-    loadParticipatedEventsForDetail(supabase, userId),
-    loadRecentAcornTxForDetail(supabase, userId),
-  ]);
+  const [childrenP, submissionsP, eventsP, acornTxP, orgAcorn] =
+    await Promise.all([
+      loadChildrenForDetail(supabase, userId),
+      loadRecentSubmissionsForDetail(supabase, userId),
+      loadParticipatedEventsForDetail(supabase, userId),
+      loadRecentAcornTxForDetail(supabase, userId),
+      // 우리 기관 행사 합계 — 전역 누적이 아니다.
+      getOrgAcornBalance(userId, orgId),
+    ]);
 
   return {
     userId: u.id,
     parentName: u.parent_name,
     parentPhone: u.phone,
     status: u.status,
-    acornBalance: u.acorn_balance ?? 0,
+    acornBalance: orgAcorn,
     createdAt: u.created_at,
     lastLoginAt: u.last_login_at,
     children: childrenP,

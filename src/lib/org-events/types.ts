@@ -2,6 +2,8 @@
 // org_event_programs / org_event_trails / org_event_participants 와 1:1 대응.
 // DB migration 은 병렬로 작성되는 중이므로 이 타입이 먼저 스키마를 정의하는 계약.
 
+import type { ConsentSnapshot } from "./consent-core";
+
 export type OrgEventStatus = "DRAFT" | "LIVE" | "ENDED" | "ARCHIVED";
 
 export interface OrgEventRow {
@@ -31,6 +33,12 @@ export interface OrgEventRow {
   invitation_location_image_url: string | null;
   /** 복장·준비물 안내. */
   invitation_dress_code: string | null;
+  /**
+   * 입장가능시간 — 행사 시작 몇 분 전부터.
+   * null/0 이면 초대장에서 입장 안내 줄을 숨긴다. 시각이 아니라 분으로 두는
+   * 이유: 행사 시각이 바뀌어도 자동으로 따라오게.
+   */
+  invitation_entry_lead_min: number | null;
   /** 초대장 주차장 — 최대 5개. */
   invitation_parkings: ParkingItem[] | null;
   /** 초대장 주최 (자유 입력). 예: "구미혜당학교". 비우면 줄 자체 숨김. */
@@ -89,8 +97,10 @@ export interface OrgEventParticipantRow {
   joined_at: string;
   /** 이 가족의 총 참석 인원(어른 포함). 접수 승인 시 신청서 값 복사. */
   party_size: number;
-  /** 성인 참석 인원. 관리자 직접 등록분은 0(미상) — 화면에서 배지를 숨긴다. */
+  /** 성인(조부모 제외) 참석 인원. 직접 등록분은 0(미상) — 배지를 숨긴다. */
   adult_count: number;
+  /** 조부모 참석 인원. 직접 등록분은 0(미상). */
+  senior_count: number;
   /** 아동 참석 인원(참가 아이 + 아동 동반인). 직접 등록분은 0(미상). */
   child_count: number;
 }
@@ -99,7 +109,16 @@ export interface OrgEventParticipantRow {
 /* 참가 접수(신청서) — org_event_applications                                  */
 /* -------------------------------------------------------------------------- */
 
-export type OrgEventApplicationStatus = "PENDING" | "APPROVED" | "REJECTED";
+/**
+ * 신청서 상태.
+ * CANCELED 는 신청자(또는 대신 처리한 관리자)가 취소한 것 — 삭제가 아니라
+ * 상태 전환이라 접수 탭 [취소] 목록에 그대로 남는다.
+ */
+export type OrgEventApplicationStatus =
+  | "PENDING"
+  | "APPROVED"
+  | "REJECTED"
+  | "CANCELED";
 
 /** 신청서에 적힌 아이 한 명 — 제출 당시 스냅샷. */
 export interface ApplicationChild {
@@ -109,8 +128,11 @@ export interface ApplicationChild {
   class_name: string | null;
 }
 
-/** 동반인이 성인인지 아동인지. 인원 집계의 기준. */
-export type CompanionKind = "ADULT" | "CHILD";
+/**
+ * 동반인 구분 — 인원 집계의 기준.
+ * 조부모를 성인에서 떼어낸 이유: 좌석·간식·이동 준비가 셋으로 나뉜다.
+ */
+export type CompanionKind = "ADULT" | "SENIOR" | "CHILD";
 
 /**
  * 함께 오는 사람 한 명 — 이름은 받지 않고 관계 호칭만 받는다.
@@ -141,6 +163,19 @@ export interface OrgEventApplicationRow {
   /** 검토자 식별자 = OrgSession.managerId (uuid 아님). */
   reviewed_by: string | null;
   reviewed_at: string | null;
+  /** 취소 시각. CANCELED 일 때만. 재신청하면 다시 null. */
+  canceled_at: string | null;
+  /** 신청자가 남긴 취소 사유(선택). note(관리자 거절 메모)와 방향이 반대다. */
+  cancel_reason: string | null;
+  /**
+   * [필수] 개인정보 수집·이용 동의 시각.
+   * null 은 "거부" 가 아니라 **동의 기능 도입 전에 접수된 신청서** 다.
+   */
+  consent_agreed_at: string | null;
+  /** [선택] 계열사 공동이용 동의 시각. null = 동의 안 함(참가에는 무영향). */
+  consent_optional_agreed_at: string | null;
+  /** 동의 당시 전문. 기관이 문구를 고쳐도 이 값은 바뀌지 않는다. */
+  consent_snapshot: ConsentSnapshot | null;
   created_at: string;
   updated_at: string;
 }
@@ -150,6 +185,7 @@ export interface OrgEventApplicationCounts {
   pending_count: number;
   approved_count: number;
   rejected_count: number;
+  canceled_count: number;
   /** 승인 인원 합계 — applications_capacity 와 직접 비교하는 값. */
   approved_people: number;
 }
@@ -173,6 +209,11 @@ export const ORG_EVENT_APPLICATION_STATUS_META: Record<
     icon: "❌",
     color: "bg-zinc-100 text-zinc-600 border-zinc-200",
   },
+  CANCELED: {
+    label: "취소",
+    icon: "🚫",
+    color: "bg-rose-50 text-rose-700 border-rose-200",
+  },
 };
 
 /** 신청서 한 건에 넣을 수 있는 자녀 수 상한. */
@@ -189,13 +230,14 @@ export const MAX_COMPANION_LABEL_LENGTH = 20;
 
 /**
  * 신청 폼의 빠른 선택 칩.
- * 형제·자매만 기본 아동 — 나머지는 성인으로 두고 줄에서 바꿀 수 있게 한다.
+ * 칩마다 기본 구분이 정해져 있고(할머니·할아버지=조부모, 형제·자매=아동),
+ * 줄에서 언제든 바꿀 수 있다. 직접 입력은 성인으로 시작한다.
  */
 export const COMPANION_PRESETS: readonly ApplicationCompanion[] = [
   { label: "아빠", kind: "ADULT" },
   { label: "엄마", kind: "ADULT" },
-  { label: "할머니", kind: "ADULT" },
-  { label: "할아버지", kind: "ADULT" },
+  { label: "할머니", kind: "SENIOR" },
+  { label: "할아버지", kind: "SENIOR" },
   { label: "삼촌", kind: "ADULT" },
   { label: "이모", kind: "ADULT" },
   { label: "고모", kind: "ADULT" },
@@ -207,6 +249,7 @@ export const COMPANION_KIND_META: Record<
   { label: string; icon: string }
 > = {
   ADULT: { label: "성인", icon: "🧑" },
+  SENIOR: { label: "조부모", icon: "👴" },
   CHILD: { label: "아동", icon: "👶" },
 };
 

@@ -23,12 +23,11 @@ import {
   ORG_EVENT_STATUS_META,
   type OrgEventStatus,
 } from "@/lib/org-events/types";
-import {
-  updateOrgEventStatusAction,
-  deleteOrgEventAction,
-} from "@/lib/org-events/actions";
+import { deleteOrgEventAction } from "@/lib/org-events/actions";
 import { loadTrailsAssignedToOrg } from "@/lib/trails/queries";
 import { DeleteEventButton } from "./delete-button";
+// 상태 변경은 목록 카드와 같은 4종 셀렉터를 재사용한다.
+import { EventStatusToggle } from "../status-toggle";
 import {
   QuestPacksTab,
   type QuestPackOption,
@@ -48,10 +47,18 @@ import {
   loadEventApplications,
   loadEventParticipantPhones,
   loadEventPartyCounts,
+  loadOrgApplicationConsent,
 } from "@/lib/org-events/application-queries";
+import {
+  DEFAULT_CONSENT_BODY,
+  DEFAULT_CONSENT_OPTIONAL_BODY,
+  type OrgConsentSettings,
+} from "@/lib/org-events/consent-core";
+import { loadOrgNameById } from "@/lib/org-partner";
 import type { OrgEventApplicationCounts } from "@/lib/org-events/types";
 import { computeEffectiveCloseAt } from "@/lib/org-events/application-core";
 import { loadEventChildrenByUser } from "@/lib/app-user/event-children";
+import { loadEventAcornBalances } from "@/lib/app-user/event-acorns";
 import { InvitationCardShare } from "./invitation-card-share";
 
 export const dynamic = "force-dynamic";
@@ -257,7 +264,8 @@ export default async function OrgEventDetailPage({
               )}
             </div>
 
-            {/* Right CTA group */}
+            {/* Right CTA group — 액션 버튼과 상태 칩이 한 줄에서 높이가 맞는다.
+                (상태 칩은 EventStatusToggle 의 inline 변형) */}
             <div className="flex flex-wrap items-center gap-2">
               <Link
                 href={`/org/${orgId}/events/${eventId}?tab=participants`}
@@ -283,9 +291,18 @@ export default async function OrgEventDetailPage({
                 <span aria-hidden>✏️</span>
                 <span>편집</span>
               </Link>
-              <StatusTransitionButtons
+              {/* 상태 — 4종 전부 직접 고를 수 있게. 예전에는 "다음 단계"
+                  버튼 하나(예정→시작, 진행중→종료…)뿐이라 되돌리거나 건너뛸
+                  수 없었다. 목록 카드와 같은 컨트롤의 inline 변형.
+                  구분선으로 "작업" 과 "상태 전환" 을 눈으로 가른다. */}
+              <span
+                aria-hidden
+                className="mx-1 hidden h-7 w-px shrink-0 bg-[#E5D3B8] sm:block"
+              />
+              <EventStatusToggle
                 eventId={eventId}
-                status={event.status}
+                initialStatus={event.status}
+                variant="inline"
               />
             </div>
           </div>
@@ -490,86 +507,6 @@ export default async function OrgEventDetailPage({
       {/* 위험 영역 */}
       <DangerZone eventId={eventId} eventName={event.name} />
     </div>
-  );
-}
-
-function StatusTransitionButtons({
-  eventId,
-  status,
-}: {
-  eventId: string;
-  status: OrgEventStatus;
-}) {
-  if (status === "DRAFT") {
-    return (
-      <form
-        action={async () => {
-          "use server";
-          await updateOrgEventStatusAction(eventId, "LIVE");
-        }}
-      >
-        <button
-          type="submit"
-          className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-bold text-white shadow-sm hover:bg-emerald-700"
-        >
-          <span aria-hidden>🚀</span>
-          <span>시작</span>
-        </button>
-      </form>
-    );
-  }
-  if (status === "LIVE") {
-    return (
-      <form
-        action={async () => {
-          "use server";
-          await updateOrgEventStatusAction(eventId, "ENDED");
-        }}
-      >
-        <button
-          type="submit"
-          className="inline-flex items-center gap-1.5 rounded-xl bg-sky-600 px-3.5 py-2 text-xs font-bold text-white shadow-sm hover:bg-sky-700"
-        >
-          <span aria-hidden>🛑</span>
-          <span>종료</span>
-        </button>
-      </form>
-    );
-  }
-  if (status === "ENDED") {
-    return (
-      <form
-        action={async () => {
-          "use server";
-          await updateOrgEventStatusAction(eventId, "ARCHIVED");
-        }}
-      >
-        <button
-          type="submit"
-          className="inline-flex items-center gap-1.5 rounded-xl bg-zinc-600 px-3.5 py-2 text-xs font-bold text-white shadow-sm hover:bg-zinc-700"
-        >
-          <span aria-hidden>🗑</span>
-          <span>보관</span>
-        </button>
-      </form>
-    );
-  }
-  // ARCHIVED — 되돌리기
-  return (
-    <form
-      action={async () => {
-        "use server";
-        await updateOrgEventStatusAction(eventId, "ENDED");
-      }}
-    >
-      <button
-        type="submit"
-        className="inline-flex items-center gap-1.5 rounded-xl border border-[#D4E4BC] bg-white px-3.5 py-2 text-xs font-bold text-[#2D5A3D] hover:bg-[#F5F1E8]"
-      >
-        <span aria-hidden>↩️</span>
-        <span>보관 해제</span>
-      </button>
-    </form>
   );
 }
 
@@ -1030,10 +967,26 @@ async function ApplicationsTabPanel({
   counts: OrgEventApplicationCounts;
   defaultCloseLabel: string | null;
 }) {
-  const [applications, participantPhones] = await Promise.all([
-    loadEventApplications(eventId),
-    loadEventParticipantPhones(eventId),
-  ]);
+  const [applications, participantPhones, consentRow, orgName] =
+    await Promise.all([
+      loadEventApplications(eventId),
+      loadEventParticipantPhones(eventId),
+      loadOrgApplicationConsent(orgId).catch((): OrgConsentSettings => ({})),
+      loadOrgNameById(orgId).catch(() => "소속 기관"),
+    ]);
+
+  // 편집 화면에는 **치환 전 원본**을 넘긴다 — 관리자가 {기관명} 토큰을
+  // 그대로 보고 고칠 수 있어야 하기 때문. 치환은 미리보기에서만 한다.
+  const consent = {
+    orgName,
+    body: consentRow.application_consent_body?.trim() || DEFAULT_CONSENT_BODY,
+    optionalBody:
+      consentRow.application_consent_optional_body?.trim() ||
+      DEFAULT_CONSENT_OPTIONAL_BODY,
+    optionalEnabled:
+      consentRow.application_consent_optional_enabled !== false,
+    updatedAt: consentRow.application_consent_updated_at ?? null,
+  };
 
   return (
     <ApplicationsTab
@@ -1047,6 +1000,7 @@ async function ApplicationsTabPanel({
       invitationPublished={invitationPublished}
       defaultCloseLabel={defaultCloseLabel}
       participantPhones={participantPhones}
+      consent={consent}
     />
   );
 }
@@ -1062,16 +1016,24 @@ async function ParticipantsTabPanel({
   allowSelfRegister: boolean;
   eventStatus: OrgEventStatus;
 }) {
-  const [orgPool, selectedIds, orgEvents, partyCounts, eventChildren] =
-    await Promise.all([
-      loadParticipantOptionsForOrg(orgId),
-      loadEventParticipantIds(eventId),
-      loadOrgEvents(orgId),
-      // 접수 승인분의 아동/성인 구성 — 행별 "참석" 배지용.
-      loadEventPartyCounts(eventId),
-      // 이 행사에 참가하는 아동만 — 계정 전체 자녀가 아니라.
-      loadEventChildrenByUser(eventId),
-    ]);
+  const [
+    orgPool,
+    selectedIds,
+    orgEvents,
+    partyCounts,
+    eventChildren,
+    eventAcorns,
+  ] = await Promise.all([
+    loadParticipantOptionsForOrg(orgId),
+    loadEventParticipantIds(eventId),
+    loadOrgEvents(orgId),
+    // 접수 승인분의 아동/성인 구성 — 행별 "참석" 배지용.
+    loadEventPartyCounts(eventId),
+    // 이 행사에 참가하는 아동만 — 계정 전체 자녀가 아니라.
+    loadEventChildrenByUser(eventId),
+    // 이 행사에서 번 도토리만 — 계정 전역 누적이 아니라.
+    loadEventAcornBalances(eventId),
+  ]);
   // 이 행사에 연결됐지만 기관 풀에 없는 = 다른 기관 소속(cross-org) 참가자.
   const poolIds = new Set(orgPool.map((p) => p.id));
   const crossIds = selectedIds.filter((id) => !poolIds.has(id));
@@ -1085,11 +1047,18 @@ async function ParticipantsTabPanel({
   //   app_children 은 계정 단위(사람)라, 그냥 두면 다른 기관 원생까지 우리 명단에
   //   뜬다. 지정이 없는 보호자는 기존 값(전체 자녀)을 그대로 둔다 — 명단이
   //   갑자기 빈칸이 되는 게 더 나쁘다.
+  //
+  // 도토리도 마찬가지 — app_users.acorn_balance 는 계정 전역 누적이라 참좋은에서
+  // 모은 21개가 도원센트럴 명단에 얹혀 보였다. 이 행사에서 번 것만 센다.
+  // 전역 누적은 globalAcorns 로 따로 넘겨 툴팁으로만 보여준다.
+  const globalAcorns: Record<string, number> = {};
   const allParticipants = rawParticipants.map((p) => {
+    globalAcorns[p.id] = p.acorn_balance;
     const picked = eventChildren[p.id];
-    if (!picked || picked.length === 0) return p;
+    const next = { ...p, acorn_balance: eventAcorns[p.id] ?? 0 };
+    if (!picked || picked.length === 0) return next;
     return {
-      ...p,
+      ...next,
       children_count: picked.length,
       enrolled_child_names: picked.map((c) => c.name),
       class_name: picked.find((c) => c.class_name)?.class_name ?? p.class_name,
@@ -1110,6 +1079,7 @@ async function ParticipantsTabPanel({
       allowSelfRegister={allowSelfRegister}
       eventStatus={eventStatus}
       partyCounts={partyCounts}
+      globalAcorns={globalAcorns}
     />
   );
 }

@@ -14,6 +14,10 @@ import {
   parseApplicationChildren,
   parseApplicationCompanions,
 } from "./application-core";
+import {
+  parseConsentSnapshot,
+  type OrgConsentSettings,
+} from "./consent-core";
 import type {
   OrgEventApplicationCounts,
   OrgEventApplicationRow,
@@ -27,6 +31,7 @@ const EMPTY_COUNTS: OrgEventApplicationCounts = {
   pending_count: 0,
   approved_count: 0,
   rejected_count: 0,
+  canceled_count: 0,
   approved_people: 0,
 };
 
@@ -60,6 +65,13 @@ function normalizeRow(raw: Record<string, unknown>): OrgEventApplicationRow {
     approved_user_id: (raw.approved_user_id as string | null) ?? null,
     reviewed_by: (raw.reviewed_by as string | null) ?? null,
     reviewed_at: (raw.reviewed_at as string | null) ?? null,
+    canceled_at: (raw.canceled_at as string | null) ?? null,
+    cancel_reason: (raw.cancel_reason as string | null) ?? null,
+    // 컬럼 미적용 배포 창에서는 undefined → null(기록 없음)로 떨어진다.
+    consent_agreed_at: (raw.consent_agreed_at as string | null) ?? null,
+    consent_optional_agreed_at:
+      (raw.consent_optional_agreed_at as string | null) ?? null,
+    consent_snapshot: parseConsentSnapshot(raw.consent_snapshot),
     created_at: String(raw.created_at ?? ""),
     updated_at: String(raw.updated_at ?? ""),
   };
@@ -122,7 +134,9 @@ export async function loadEventApplicationCounts(
       };
     }
   )
-    .select("pending_count, approved_count, rejected_count, approved_people")
+    // "*" 인 이유: canceled_count 는 나중에 실행될 마이그레이션 컬럼이라,
+    // 명시 열거하면 SQL 적용 전 배포 창에서 뷰 조회가 통째로 실패한다.
+    .select("*")
     .eq("event_id", eventId)
     .maybeSingle()) as SbRespOne<Record<string, unknown>>;
 
@@ -136,6 +150,7 @@ export async function loadEventApplicationCounts(
     pending_count: Number(d.pending_count ?? 0),
     approved_count: Number(d.approved_count ?? 0),
     rejected_count: Number(d.rejected_count ?? 0),
+    canceled_count: Number(d.canceled_count ?? 0),
     approved_people: Number(d.approved_people ?? 0),
   };
 }
@@ -192,6 +207,7 @@ export async function loadEventParticipantPhones(
 export type EventPartyCount = {
   party_size: number;
   adult_count: number;
+  senior_count: number;
   child_count: number;
 };
 
@@ -235,6 +251,7 @@ export async function loadEventPartyCounts(
     out[userId] = {
       party_size: Number(row.party_size ?? 1),
       adult_count: Number(row.adult_count ?? 0),
+      senior_count: Number(row.senior_count ?? 0),
       child_count: Number(row.child_count ?? 0),
     };
   }
@@ -318,4 +335,57 @@ export async function loadMyApplication(
   const row = await loadApplicationById(id);
   if (!row || row.event_id !== eventId) return null;
   return row;
+}
+
+/* -------------------------------------------------------------------------- */
+/* 개인정보 동의 문구 (기관 단위)                                              */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * 이 기관이 쓰는 동의 문구 설정. **화면에 뿌릴 문구가 아니라 원본 row** 다 —
+ * 기관명 치환과 기본값 폴백은 순수 함수 `resolveOrgConsent` 가 맡는다
+ * (편집 화면은 원본을, 신청 폼은 치환된 문구를 봐야 하므로 여기서 섞지 않는다).
+ *
+ * 컬럼이 아직 없는 배포 창(42703/PGRST204)이면 빈 객체를 돌려주고,
+ * resolveOrgConsent 가 코드 기본 문구로 채운다 — 동의 화면이 비지 않게.
+ */
+export async function loadOrgApplicationConsent(
+  orgId: string
+): Promise<OrgConsentSettings> {
+  if (!orgId) return {};
+  const supabase = await createClient();
+
+  const resp = (await (
+    supabase.from("partner_orgs" as never) as unknown as {
+      select: (c: string) => {
+        eq: (k: string, v: string) => {
+          maybeSingle: () => Promise<SbRespOne<Record<string, unknown>>>;
+        };
+      };
+    }
+  )
+    // 컬럼을 나열하지 않는 이유: 마이그레이션 전에는 이름을 대는 순간 쿼리가
+    // 통째로 실패한다. "*" 는 있는 것만 돌려준다.
+    .select("*")
+    .eq("id", orgId)
+    .maybeSingle()) as SbRespOne<Record<string, unknown>>;
+
+  if (resp.error || !resp.data) {
+    logUnlessMissing("loadOrgApplicationConsent", resp.error);
+    return {};
+  }
+
+  const raw = resp.data;
+  return {
+    application_consent_body:
+      (raw.application_consent_body as string | null) ?? null,
+    application_consent_optional_body:
+      (raw.application_consent_optional_body as string | null) ?? null,
+    // undefined(컬럼 없음)를 false 로 떨어뜨리면 선택 동의가 사라진다.
+    // 명시적으로 false 일 때만 끈 것으로 본다.
+    application_consent_optional_enabled:
+      raw.application_consent_optional_enabled === false ? false : true,
+    application_consent_updated_at:
+      (raw.application_consent_updated_at as string | null) ?? null,
+  };
 }
