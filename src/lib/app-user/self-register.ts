@@ -66,6 +66,7 @@ export async function trySelfRegister(
               id: string;
               org_id: string;
               allow_self_register: boolean | null;
+              applications_enabled: boolean | null;
               status: string;
             } | null;
             error: unknown;
@@ -74,13 +75,16 @@ export async function trySelfRegister(
       };
     }
   )
-    .select("id, org_id, allow_self_register, status")
+    // "*" 인 이유: applications_enabled 는 나중에 실행될 마이그레이션 컬럼이라,
+    // 명시 열거하면 SQL 적용 전 배포 창에서 undefined column 으로 가입이 막힌다.
+    .select("*")
     .eq("id", eventId)
     .maybeSingle()) as {
     data: {
       id: string;
       org_id: string;
       allow_self_register: boolean | null;
+      applications_enabled: boolean | null;
       status: string;
     } | null;
     error: unknown;
@@ -90,6 +94,9 @@ export async function trySelfRegister(
   if (!evt) return { kind: "NOT_ALLOWED" };
   if (!evt.allow_self_register) return { kind: "NOT_ALLOWED" };
   if (evt.status !== "LIVE") return { kind: "NOT_ALLOWED" };
+  // 접수·승인제가 켜진 행사는 자가 가입을 막는다 — 신청서를 내고 기관이
+  // 수락해야만 계정과 참가 기록이 생긴다(approveEventApplicationAction).
+  if (evt.applications_enabled) return { kind: "NOT_ALLOWED" };
 
   // ---- 2) 이름 검증 (보호자 + 원아 모두 필수) ----
   if (!parentName || parentName.length < 1 || parentName.length > 50) {

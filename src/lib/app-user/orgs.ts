@@ -20,7 +20,13 @@ export type OrgMembershipSource =
   | "backfill"
   | "bulk_import"
   | "self_register"
-  | "admin";
+  | "admin"
+  /**
+   * 참가 접수 신청서를 기관이 직접 수락한 경우.
+   * "참가 ≠ 소속" 원칙과 충돌하지 않는다 — 기관이 한 명씩 보고 수락한 것은
+   * 명단에 직접 올린 것과 같기 때문. (아래 invitation 폐기 사유와 대비)
+   */
+  | "application";
 // "invitation" 은 폐기 — 행사 참가는 소속이 아니다.
 //   초대장으로 행사에 참가한 것만으로 소속이 생기면, 등록한 적 없는 기관이
 //   그 보호자의 "내 기관" 이 된다. 참가 권한은 org_event_participants 로 충분.

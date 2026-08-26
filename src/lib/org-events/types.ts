@@ -39,6 +39,16 @@ export interface OrgEventRow {
   invitation_organizer: string | null;
   /** 초대장 발행 시점. null=초안. */
   invitation_published_at: string | null;
+  /**
+   * 참가 접수·승인제 사용 여부.
+   * true 면 초대장 하단에 신청서가 뜨고, 기관이 수락한 건만 참가자가 된다
+   * (자가 참가 경로 전면 차단 — join-actions / self-register 양쪽).
+   */
+  applications_enabled: boolean | null;
+  /** 접수 마감 시각. null=무기한. 지나면 신청 폼 대신 마감 안내. */
+  applications_close_at: string | null;
+  /** 정원 — 승인 인원(party_size) 합계 기준. null=무제한. */
+  applications_capacity: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -77,7 +87,128 @@ export interface OrgEventParticipantRow {
   event_id: string;
   user_id: string;
   joined_at: string;
+  /** 이 가족의 총 참석 인원(어른 포함). 접수 승인 시 신청서 값 복사. */
+  party_size: number;
+  /** 성인 참석 인원. 관리자 직접 등록분은 0(미상) — 화면에서 배지를 숨긴다. */
+  adult_count: number;
+  /** 아동 참석 인원(참가 아이 + 아동 동반인). 직접 등록분은 0(미상). */
+  child_count: number;
 }
+
+/* -------------------------------------------------------------------------- */
+/* 참가 접수(신청서) — org_event_applications                                  */
+/* -------------------------------------------------------------------------- */
+
+export type OrgEventApplicationStatus = "PENDING" | "APPROVED" | "REJECTED";
+
+/** 신청서에 적힌 아이 한 명 — 제출 당시 스냅샷. */
+export interface ApplicationChild {
+  /** 원아명. 필수. */
+  name: string;
+  /** 반명. 비워둘 수 있다. */
+  class_name: string | null;
+}
+
+/** 동반인이 성인인지 아동인지. 인원 집계의 기준. */
+export type CompanionKind = "ADULT" | "CHILD";
+
+/**
+ * 함께 오는 사람 한 명 — 이름은 받지 않고 관계 호칭만 받는다.
+ * 인원 집계·간식 준비에는 호칭으로 충분하고, 입력 단계를 늘리지 않으려는 결정.
+ */
+export interface ApplicationCompanion {
+  /** "아빠", "할머니", "삼촌" 등. 직접 입력도 가능. */
+  label: string;
+  kind: CompanionKind;
+}
+
+/** 신청서 한 건. children / companions 는 jsonb 컬럼. */
+export interface OrgEventApplicationRow {
+  id: string;
+  event_id: string;
+  org_id: string;
+  /** 하이픈 없는 숫자만 (normalizeUserPhone 결과). */
+  phone: string;
+  children: ApplicationChild[];
+  companions: ApplicationCompanion[];
+  /** 어른 포함 총 참석 인원 — children + companions 로부터 파생된 값. */
+  party_size: number;
+  status: OrgEventApplicationStatus;
+  /** 거절 사유 — 관리자 전용. 신청자에게 노출하지 않는다. */
+  note: string | null;
+  /** 승인으로 생성·연결된 보호자 계정. */
+  approved_user_id: string | null;
+  /** 검토자 식별자 = OrgSession.managerId (uuid 아님). */
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** 행사별 접수 현황 — view_org_event_application_counts. */
+export interface OrgEventApplicationCounts {
+  pending_count: number;
+  approved_count: number;
+  rejected_count: number;
+  /** 승인 인원 합계 — applications_capacity 와 직접 비교하는 값. */
+  approved_people: number;
+}
+
+export const ORG_EVENT_APPLICATION_STATUS_META: Record<
+  OrgEventApplicationStatus,
+  { label: string; icon: string; color: string }
+> = {
+  PENDING: {
+    label: "대기",
+    icon: "⏳",
+    color: "bg-amber-50 text-amber-800 border-amber-200",
+  },
+  APPROVED: {
+    label: "승인",
+    icon: "✅",
+    color: "bg-emerald-50 text-emerald-800 border-emerald-200",
+  },
+  REJECTED: {
+    label: "거절",
+    icon: "❌",
+    color: "bg-zinc-100 text-zinc-600 border-zinc-200",
+  },
+};
+
+/** 신청서 한 건에 넣을 수 있는 자녀 수 상한. */
+export const MAX_APPLICATION_CHILDREN = 6;
+
+/** 동반인 수 상한. 자녀 6 + 동반 14 = 20 으로 아래 총 인원 상한과 맞물린다. */
+export const MAX_APPLICATION_COMPANIONS = 14;
+
+/** 참가 인원 상한 — DB CHECK(party_size BETWEEN 1 AND 20) 와 일치. */
+export const MAX_APPLICATION_PARTY_SIZE = 20;
+
+/** 동반인 유형 라벨 길이 상한. */
+export const MAX_COMPANION_LABEL_LENGTH = 20;
+
+/**
+ * 신청 폼의 빠른 선택 칩.
+ * 형제·자매만 기본 아동 — 나머지는 성인으로 두고 줄에서 바꿀 수 있게 한다.
+ */
+export const COMPANION_PRESETS: readonly ApplicationCompanion[] = [
+  { label: "아빠", kind: "ADULT" },
+  { label: "엄마", kind: "ADULT" },
+  { label: "할머니", kind: "ADULT" },
+  { label: "할아버지", kind: "ADULT" },
+  { label: "삼촌", kind: "ADULT" },
+  { label: "이모", kind: "ADULT" },
+  { label: "고모", kind: "ADULT" },
+  { label: "형제·자매", kind: "CHILD" },
+];
+
+export const COMPANION_KIND_META: Record<
+  CompanionKind,
+  { label: string; icon: string }
+> = {
+  ADULT: { label: "성인", icon: "🧑" },
+  CHILD: { label: "아동", icon: "👶" },
+};
 
 /**
  * 행사 요약 뷰 — view_org_event_summary.

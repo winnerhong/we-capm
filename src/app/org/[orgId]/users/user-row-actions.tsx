@@ -21,6 +21,15 @@ type Props = {
    * 기본 false (기관 전체 /users 페이지에서는 표시).
    */
   hideSuspend?: boolean;
+  /**
+   * 영구삭제 버튼을 숨김.
+   *
+   * 삭제는 app_users 행 자체를 지워 그 사람의 **모든 기관** 데이터를 없애므로
+   * 홈 기관만 할 수 있다. 타 기관 계정 행에 이 버튼을 띄우면 눌러도 반드시
+   * "권한이 없어요" 로 실패한다 — 될 수 없는 버튼은 아예 보이지 않는 게 맞다.
+   * 그 자리에는 [기관에서 빼기](RemoveFromOrgButton)가 대신 있다.
+   */
+  hideDelete?: boolean;
   /** 테이블 좁은 폭에서 아이콘만 노출. variant=table 일 때만 적용. */
   iconOnly?: boolean;
 };
@@ -32,6 +41,7 @@ export function UserRowActions({
   status,
   variant = "table",
   hideSuspend = false,
+  hideDelete = false,
   iconOnly = false,
 }: Props) {
   const router = useRouter();
@@ -135,14 +145,16 @@ export function UserRowActions({
           </a>
         )}
         {!hideSuspend && statusButton}
-        <button
-          type="button"
-          onClick={onDelete}
-          disabled={pending}
-          className={`${cardBase} border border-red-200 bg-white text-red-600 hover:bg-red-50`}
-        >
-          삭제
-        </button>
+        {!hideDelete && (
+          <button
+            type="button"
+            onClick={onDelete}
+            disabled={pending}
+            className={`${cardBase} border border-red-200 bg-white text-red-600 hover:bg-red-50`}
+          >
+            삭제
+          </button>
+        )}
       </div>
     );
   }
@@ -163,16 +175,18 @@ export function UserRowActions({
         </a>
       ) : null}
       {!hideSuspend && statusButton}
-      <button
-        type="button"
-        onClick={onDelete}
-        disabled={pending}
-        title="삭제"
-        aria-label="삭제"
-        className={`${base} border border-red-200 bg-white text-red-600 hover:bg-red-50`}
-      >
-        {iconOnly ? "🗑" : "삭제"}
-      </button>
+      {!hideDelete && (
+        <button
+          type="button"
+          onClick={onDelete}
+          disabled={pending}
+          title="삭제"
+          aria-label="삭제"
+          className={`${base} border border-red-200 bg-white text-red-600 hover:bg-red-50`}
+        >
+          {iconOnly ? "🗑" : "삭제"}
+        </button>
+      )}
     </div>
   );
 }

@@ -27,8 +27,10 @@ import { AcornAdjuster } from "@/app/org/[orgId]/users/acorn-adjuster";
 import { UserRowActions } from "@/app/org/[orgId]/users/user-row-actions";
 import { AcornIcon } from "@/components/acorn-icon";
 import { RemoveFromEventButton } from "./users/remove-from-event-button";
+import { RemoveFromOrgButton } from "./users/remove-from-org-button";
 import { SelfRegisterToggle } from "./self-register-toggle";
 import { fmtFullDateKst } from "@/lib/datetime/kst";
+import type { EventPartyCount } from "@/lib/org-events/application-queries";
 import type { OrgEventStatus } from "@/lib/org-events/types";
 
 type UserStatus = "ACTIVE" | "SUSPENDED" | "CLOSED";
@@ -65,7 +67,19 @@ type Props = {
   allowSelfRegister: boolean;
   /** 현재 행사 상태 — LIVE 가 아니면 셀프 등록이 실제 동작하지 않음을 표시. */
   eventStatus: OrgEventStatus;
+  /**
+   * user_id → 이 행사 참석 인원 구성(접수 승인분만 채워져 있다).
+   * 관리자가 직접 등록한 참가자는 항목이 없거나 0/0 이라 배지를 숨긴다.
+   */
+  partyCounts: Record<string, EventPartyCount>;
 };
+
+/** "👶2·🧑3" — 구성을 모르면(직접 등록분) null 이라 배지를 렌더하지 않는다. */
+function partyBadge(pc: EventPartyCount | undefined): string | null {
+  if (!pc) return null;
+  if (pc.adult_count === 0 && pc.child_count === 0) return null;
+  return `👶${pc.child_count}·🧑${pc.adult_count}`;
+}
 
 const STATUS_META: Record<UserStatus, { label: string; chip: string }> = {
   ACTIVE: {
@@ -124,6 +138,7 @@ export function ParticipantsTab({
   events,
   allowSelfRegister,
   eventStatus,
+  partyCounts,
 }: Props) {
   const router = useRouter();
   const todayIso = todayIsoDate();
@@ -356,6 +371,9 @@ export function ParticipantsTab({
                       👫 자녀
                     </th>
                     <th className="px-2 py-2 text-center text-[10px] font-bold">
+                      👨‍👩‍👧 참석
+                    </th>
+                    <th className="px-2 py-2 text-center text-[10px] font-bold">
                       <AcornIcon /> 도토리
                     </th>
                     <th className="px-2 py-2 text-right text-[10px] font-bold">
@@ -447,6 +465,27 @@ export function ParticipantsTab({
                           </span>
                         </td>
                         <td className="px-2 py-2 text-center">
+                          {(() => {
+                            const pc = partyCounts[r.id];
+                            const badge = partyBadge(pc);
+                            if (!badge || !pc) {
+                              return (
+                                <span className="text-[10px] text-[#C4BBB2]">
+                                  -
+                                </span>
+                              );
+                            }
+                            return (
+                              <span
+                                title={`총 ${pc.party_size}명`}
+                                className="inline-flex items-center gap-0.5 rounded-full bg-[#E8F0E4] px-2 py-0.5 text-[10px] font-bold tabular-nums text-[#2D5A3D]"
+                              >
+                                {badge}
+                              </span>
+                            );
+                          })()}
+                        </td>
+                        <td className="px-2 py-2 text-center">
                           <AcornAdjuster
                             userId={r.id}
                             balance={r.acorn_balance}
@@ -474,6 +513,18 @@ export function ParticipantsTab({
                               variant="table"
                               iconOnly
                             />
+                            {/* 타 기관 계정에만 — 우리 기관 것만 정리하는 버튼.
+                                (영구삭제는 홈 기관만 가능해서 여기선 실패한다) */}
+                            {r.home_org_name && (
+                              <RemoveFromOrgButton
+                                orgId={orgId}
+                                userId={r.id}
+                                displayName={name}
+                                homeOrgName={r.home_org_name}
+                                variant="table"
+                                iconOnly
+                              />
+                            )}
                             <UserRowActions
                               orgId={orgId}
                               userId={r.id}
@@ -481,6 +532,8 @@ export function ParticipantsTab({
                               status={r.status}
                               variant="table"
                               hideSuspend
+                              /* 타 기관 계정은 영구삭제 불가 — 대신 위의 📤 */
+                              hideDelete={!!r.home_org_name}
                               iconOnly
                             />
                           </div>
@@ -561,6 +614,14 @@ export function ParticipantsTab({
                         👫 {r.children_count}명
                       </div>
                     </div>
+                    {partyBadge(partyCounts[r.id]) && (
+                      <div className="rounded-lg bg-[#E8F0E4] p-2">
+                        <div className="text-[10px] text-[#2D5A3D]">참석</div>
+                        <div className="text-sm font-bold tabular-nums text-[#2D5A3D]">
+                          {partyBadge(partyCounts[r.id])}
+                        </div>
+                      </div>
+                    )}
                     <div className="rounded-lg bg-[#F4EFE8] p-2">
                       <div className="mb-1 text-[10px] text-[#6B4423]">
                         <AcornIcon /> 도토리
@@ -579,7 +640,7 @@ export function ParticipantsTab({
                       </div>
                     </div>
                   </div>
-                  <div className="mt-2 flex justify-end">
+                  <div className="mt-2 flex flex-wrap justify-end gap-1.5">
                     <RemoveFromEventButton
                       orgId={orgId}
                       eventId={eventId}
@@ -587,6 +648,15 @@ export function ParticipantsTab({
                       displayName={name}
                       variant="card"
                     />
+                    {r.home_org_name && (
+                      <RemoveFromOrgButton
+                        orgId={orgId}
+                        userId={r.id}
+                        displayName={name}
+                        homeOrgName={r.home_org_name}
+                        variant="card"
+                      />
+                    )}
                   </div>
                   <UserRowActions
                     orgId={orgId}
@@ -595,6 +665,7 @@ export function ParticipantsTab({
                     status={r.status}
                     variant="card"
                     hideSuspend
+                    hideDelete={!!r.home_org_name}
                   />
                 </li>
               );

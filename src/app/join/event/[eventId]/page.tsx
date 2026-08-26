@@ -16,8 +16,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getAppUser } from "@/lib/user-auth-guard";
+import { isEventParticipant } from "@/lib/org-events/queries";
 import { joinOrgEventAction } from "@/lib/org-events/join-actions";
 import { JoinEventForm } from "./join-event-form";
+// 시간 표시는 KST 강제 — 서버(UTC) SSR 에서 getHours() 를 쓰면 초대장/홈보다
+// 9시간 이르게 찍힌다. 메인 화면(/home, /e/[eventId])과 같은 포맷터를 쓴다.
+import { fmtAmPmClockKst, fmtFullDateKst } from "@/lib/datetime/kst";
 
 export const dynamic = "force-dynamic";
 
@@ -30,34 +34,21 @@ type OrgEventLite = {
   ends_at: string | null;
   status: string;
   cover_image_url: string | null;
+  /** 접수·승인제. true 면 이 페이지의 즉시 참가 경로를 쓰지 않는다. */
+  applications_enabled: boolean | null;
 };
 
 type OrgNameRow = { org_name: string | null };
 
-const WEEKDAY = ["일", "월", "화", "수", "목", "금", "토"];
-
-function pad2(n: number): string {
-  return n < 10 ? `0${n}` : `${n}`;
-}
-
-/** "2026.05.16(토)" */
+/** "2026.05.16 (토)" — 값이 없으면 빈 문자열 (fmtFullDateKst 는 "-" 를 반환). */
 function fmtDateWeekday(iso: string | null): string {
   if (!iso) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  return `${d.getFullYear()}.${pad2(d.getMonth() + 1)}.${pad2(d.getDate())}(${WEEKDAY[d.getDay()]})`;
+  const label = fmtFullDateKst(iso);
+  return label === "-" ? "" : label;
 }
 
-/** "10:00" — 자정은 빈 문자열 */
-function fmtClock(iso: string | null): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  const h = d.getHours();
-  const m = d.getMinutes();
-  if (h === 0 && m === 0) return "";
-  return `${pad2(h)}:${pad2(m)}`;
-}
+/** "오전 09:40" / "오후 12:30" — 자정은 빈 문자열(시간 미지정으로 간주). */
+const fmtClock = fmtAmPmClockKst;
 
 /** "3시간" / "1시간 30분" / "2일 3시간" */
 function fmtDurationFromMs(ms: number): string {
@@ -75,9 +66,9 @@ function fmtDurationFromMs(ms: number): string {
 
 /**
  * 행사 일정 라벨.
- *  - 같은 날 + 시간: "2026.05.16(토) 10:00 ~ 13:00 (3시간)"
- *  - 다른 날 + 시간: "2026.05.16(토) 10:00 ~ 2026.05.18(월) 13:00 (2일 3시간)"
- *  - 시간 미지정: "2026.05.16(토) ~ 2026.05.16(토)"
+ *  - 같은 날 + 시간: "2026.05.16 (토) 오전 10:00 ~ 오후 01:00 (3시간)"
+ *  - 다른 날 + 시간: "2026.05.16 (토) 오전 10:00 ~ 2026.05.18 (월) 오후 01:00 (2일 3시간)"
+ *  - 시간 미지정: "2026.05.16 (토) ~ 2026.05.16 (토)"
  */
 function fmtRange(starts: string | null, ends: string | null): string {
   if (!starts && !ends) return "";
@@ -141,9 +132,9 @@ export default async function JoinEventPage({
       };
     }
   )
-    .select(
-      "id, org_id, name, description, starts_at, ends_at, status, cover_image_url"
-    )
+    // "*" 인 이유: applications_enabled 는 나중에 실행될 마이그레이션 컬럼이라,
+    // 명시 열거하면 SQL 적용 전 배포 창에서 undefined column 으로 페이지가 깨진다.
+    .select("*")
     .eq("id", eventId)
     .maybeSingle()) as { data: OrgEventLite | null };
 
@@ -173,20 +164,47 @@ export default async function JoinEventPage({
   const isLoggedIn = !!session;
   const loggedInName = session?.parentName || null;
 
+  // 3) 접수·승인제 행사라면 이 페이지의 즉시 참가 경로를 쓰지 않는다.
+  //    이미 참가자인 사람(기관이 수락했거나 명단에 올린 사람)만 그대로 통과.
+  //
+  //    미로그인은 막지 않는다 — 승인받은 사람이 다른 기기에서 들어오면 여기가
+  //    유일한 로그인 창구라, 막으면 초대장 ↔ 이 페이지를 오가는 루프가 된다.
+  //    로그인해도 참가자가 아니면 아래에서 신청 안내로 보낸다. 미등록 번호는
+  //    self-register 가 이미 차단돼 있어 계정이 새로 생기지도 않는다.
+  const applicationsOn = !!evt.applications_enabled;
+  const alreadyParticipant =
+    applicationsOn && session
+      ? await isEventParticipant(eventId, session.id).catch(() => false)
+      : false;
+  const needsApplication = applicationsOn && isLoggedIn && !alreadyParticipant;
+
   return (
     <main className="min-h-dvh bg-gradient-to-b from-[#FFF8F0] via-[#F5F1E8] to-[#E8F0E4] px-4 py-8">
       <div className="mx-auto max-w-md space-y-4">
         <EventPreviewCard event={evt} orgName={orgName} />
 
-        {isLoggedIn ? (
+        {needsApplication ? (
+          <ApplyFirstPanel eventId={eventId} orgName={orgName} />
+        ) : isLoggedIn ? (
           <AutoJoinPanel eventId={eventId} loggedInName={loggedInName} />
         ) : (
-          <JoinEventForm
-            eventId={eventId}
-            orgName={orgName}
-            initialError={errorMessageFor(sp.err, orgName)}
-            initialNeedsSignup={sp.err === "needs_signup"}
-          />
+          <>
+            <JoinEventForm
+              eventId={eventId}
+              orgName={orgName}
+              initialError={errorMessageFor(sp.err, orgName)}
+              initialNeedsSignup={sp.err === "needs_signup"}
+            />
+            {/* 접수제 행사 — 아직 신청 전인 사람이 여기서 막히지 않도록 안내. */}
+            {applicationsOn && (
+              <Link
+                href={`/invitation/${eventId}#apply`}
+                className="block rounded-2xl border border-[#D4E4BC] bg-white/70 px-4 py-3 text-center text-xs font-semibold text-[#2D5A3D] transition hover:bg-white"
+              >
+                📥 아직 신청 전이신가요? 참가 신청서 작성하기 →
+              </Link>
+            )}
+          </>
         )}
 
         <div className="flex justify-center pt-2">
@@ -241,6 +259,47 @@ function EventPreviewCard({
           </p>
         )}
       </div>
+    </section>
+  );
+}
+
+/**
+ * 접수·승인제 행사 — 신청서를 먼저 받는다.
+ *
+ * 이 페이지로 직접 들어온 사람(옛 링크, 북마크)을 초대장의 신청 폼으로 돌려보낸다.
+ * 여기서 바로 참가시키면 승인제가 무의미해지므로 입력 폼 자체를 노출하지 않는다.
+ */
+function ApplyFirstPanel({
+  eventId,
+  orgName,
+}: {
+  eventId: string;
+  orgName: string;
+}) {
+  return (
+    <section className="rounded-3xl border border-[#D4E4BC] bg-white p-6 text-center shadow-sm">
+      <p className="text-3xl" aria-hidden>
+        📥
+      </p>
+      <h2 className="mt-2 text-lg font-bold text-[#2D5A3D]">
+        참가 신청이 필요해요
+      </h2>
+      <p className="mt-1.5 text-sm leading-relaxed text-[#6B6560]">
+        이 행사는 {orgName}에서 신청을 받아 확인 후 참가를 확정해요.
+        <br />
+        초대장 아래 신청서를 작성해 주세요.
+      </p>
+      <Link
+        href={`/invitation/${eventId}#apply`}
+        className="mt-4 inline-flex min-h-[52px] w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-br from-[#2D5A3D] via-[#3A7A52] to-[#4A7C59] py-3.5 text-base font-bold text-white shadow-md transition hover:shadow-lg active:scale-[0.99]"
+      >
+        <span aria-hidden>🌲</span>
+        <span>신청서 작성하러 가기</span>
+        <span aria-hidden>→</span>
+      </Link>
+      <p className="mt-3 text-[11px] text-[#8B7F75]">
+        이미 신청하셨다면 초대장에서 승인 상태를 확인하실 수 있어요.
+      </p>
     </section>
   );
 }

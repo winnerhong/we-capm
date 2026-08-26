@@ -2,7 +2,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireOrg } from "@/lib/org-auth-guard";
 import { createClient } from "@/lib/supabase/server";
-import { fmtClockKst, fmtFullDateKst } from "@/lib/datetime/kst";
+import {
+  fmtClockKst,
+  fmtDateTimeKst,
+  fmtFullDateKst,
+  toLocalInputFromIsoKst,
+} from "@/lib/datetime/kst";
 import {
   loadOrgEventById,
   loadOrgEvents,
@@ -37,6 +42,16 @@ import {
 import { AnalyticsTabPanel } from "./analytics-tab";
 import { TimelineTabPanel } from "./timeline-tab";
 import { ParticipantsTab } from "./participants-tab";
+import { ApplicationsTab } from "./applications-tab";
+import {
+  loadEventApplicationCounts,
+  loadEventApplications,
+  loadEventParticipantPhones,
+  loadEventPartyCounts,
+} from "@/lib/org-events/application-queries";
+import type { OrgEventApplicationCounts } from "@/lib/org-events/types";
+import { computeEffectiveCloseAt } from "@/lib/org-events/application-core";
+import { loadEventChildrenByUser } from "@/lib/app-user/event-children";
 import { InvitationCardShare } from "./invitation-card-share";
 
 export const dynamic = "force-dynamic";
@@ -44,6 +59,7 @@ export const dynamic = "force-dynamic";
 type TabKey =
   | "overview"
   | "timeline"
+  | "applications"
   | "participants"
   | "questpacks"
   | "fm"
@@ -54,6 +70,8 @@ type TabKey =
 const TABS: { key: TabKey; label: string; icon: string }[] = [
   { key: "overview", label: "개요", icon: "📋" },
   { key: "timeline", label: "타임테이블", icon: "📅" },
+  // 접수는 참가자 바로 앞 — 신청서를 수락해야 참가자가 되는 순서 그대로.
+  { key: "applications", label: "접수", icon: "📥" },
   { key: "participants", label: "참가자", icon: "🙋" },
   { key: "questpacks", label: "스탬프북", icon: "📚" },
   { key: "fm", label: "토리FM", icon: "🎙" },
@@ -65,6 +83,7 @@ const TABS: { key: TabKey; label: string; icon: string }[] = [
 function parseTab(v: string | undefined): TabKey {
   if (
     v === "timeline" ||
+    v === "applications" ||
     v === "participants" ||
     v === "questpacks" ||
     v === "fm" ||
@@ -149,6 +168,10 @@ export default async function OrgEventDetailPage({
 
   // 개요 탭에서만 카운트 표시 — view_org_event_summary 에서 단건 조회
   const summary = await loadOrgEventSummaryById(eventId);
+
+  // 접수 현황 — 탭 배지와 개요 배너에 쓰므로 어느 탭에서든 필요하다(단건 뷰 조회).
+  const applicationCounts = await loadEventApplicationCounts(eventId);
+  const pendingApplications = applicationCounts.pending_count;
 
   const statusMeta = ORG_EVENT_STATUS_META[event.status];
   const isLive = event.status === "LIVE";
@@ -310,6 +333,12 @@ export default async function OrgEventDetailPage({
                   </span>
                   <span aria-hidden>{t.icon}</span>
                   <span>{t.label}</span>
+                  {/* 승인 대기 배지 — 놓치면 참가자가 안 늘어나므로 눈에 띄게. */}
+                  {t.key === "applications" && pendingApplications > 0 && (
+                    <span className="ml-0.5 inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-rose-500 px-1.5 py-0.5 text-[10px] font-extrabold tabular-nums text-white">
+                      {pendingApplications}
+                    </span>
+                  )}
                 </Link>
                 {idx < TABS.length - 1 && (
                   <span
@@ -331,6 +360,29 @@ export default async function OrgEventDetailPage({
       <section>
         {tab === "overview" ? (
           <>
+            {/* 승인 대기 알림 — 방치하면 참가자가 안 늘어난다. */}
+            {pendingApplications > 0 && (
+              <Link
+                href={`/org/${orgId}/events/${eventId}?tab=applications`}
+                className="mb-4 flex items-center gap-3 rounded-2xl border-2 border-rose-300 bg-rose-50 px-4 py-3 shadow-sm transition hover:bg-rose-100"
+              >
+                <span className="text-2xl" aria-hidden>
+                  📥
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-bold text-rose-900">
+                    승인 대기 {pendingApplications}건
+                  </p>
+                  <p className="mt-0.5 text-xs text-rose-800">
+                    초대장으로 참가 신청이 들어왔어요. 수락해야 참가자가 됩니다.
+                  </p>
+                </div>
+                <span aria-hidden className="text-lg text-rose-400">
+                  →
+                </span>
+              </Link>
+            )}
+
             {/* 초대장 정보 미완성 안내 — 장소·주차장이 비어있으면 admin 에게 알림 */}
             {(() => {
               const hasLocation =
@@ -391,6 +443,28 @@ export default async function OrgEventDetailPage({
           </>
         ) : tab === "timeline" ? (
           <TimelineTabPanel orgId={orgId} eventId={eventId} />
+        ) : tab === "applications" ? (
+          <ApplicationsTabPanel
+            orgId={orgId}
+            eventId={eventId}
+            enabled={!!event.applications_enabled}
+            closeAtLocal={toLocalInputFromIsoKst(event.applications_close_at)}
+            capacity={
+              event.applications_capacity
+                ? String(event.applications_capacity)
+                : ""
+            }
+            invitationPublished={!!event.invitation_published_at}
+            counts={applicationCounts}
+            defaultCloseLabel={(() => {
+              // 마감을 비워뒀을 때 실제로 적용될 시각 = 행사 시작 1시간 전.
+              const { at } = computeEffectiveCloseAt(
+                null,
+                event.starts_at
+              );
+              return at ? fmtDateTimeKst(at) : null;
+            })()}
+          />
         ) : tab === "participants" ? (
           <ParticipantsTabPanel
             orgId={orgId}
@@ -933,6 +1007,50 @@ async function QuestPacksTabPanel({
   );
 }
 
+/**
+ * 접수 탭 — 신청서 목록 + 설정.
+ * 참가자 탭과 달리 계정이 아직 없는 데이터라 조회가 가볍다.
+ */
+async function ApplicationsTabPanel({
+  orgId,
+  eventId,
+  enabled,
+  closeAtLocal,
+  capacity,
+  invitationPublished,
+  counts,
+  defaultCloseLabel,
+}: {
+  orgId: string;
+  eventId: string;
+  enabled: boolean;
+  closeAtLocal: string;
+  capacity: string;
+  invitationPublished: boolean;
+  counts: OrgEventApplicationCounts;
+  defaultCloseLabel: string | null;
+}) {
+  const [applications, participantPhones] = await Promise.all([
+    loadEventApplications(eventId),
+    loadEventParticipantPhones(eventId),
+  ]);
+
+  return (
+    <ApplicationsTab
+      orgId={orgId}
+      eventId={eventId}
+      applications={applications}
+      counts={counts}
+      enabled={enabled}
+      closeAtLocal={closeAtLocal}
+      capacity={capacity}
+      invitationPublished={invitationPublished}
+      defaultCloseLabel={defaultCloseLabel}
+      participantPhones={participantPhones}
+    />
+  );
+}
+
 async function ParticipantsTabPanel({
   orgId,
   eventId,
@@ -944,11 +1062,16 @@ async function ParticipantsTabPanel({
   allowSelfRegister: boolean;
   eventStatus: OrgEventStatus;
 }) {
-  const [orgPool, selectedIds, orgEvents] = await Promise.all([
-    loadParticipantOptionsForOrg(orgId),
-    loadEventParticipantIds(eventId),
-    loadOrgEvents(orgId),
-  ]);
+  const [orgPool, selectedIds, orgEvents, partyCounts, eventChildren] =
+    await Promise.all([
+      loadParticipantOptionsForOrg(orgId),
+      loadEventParticipantIds(eventId),
+      loadOrgEvents(orgId),
+      // 접수 승인분의 아동/성인 구성 — 행별 "참석" 배지용.
+      loadEventPartyCounts(eventId),
+      // 이 행사에 참가하는 아동만 — 계정 전체 자녀가 아니라.
+      loadEventChildrenByUser(eventId),
+    ]);
   // 이 행사에 연결됐지만 기관 풀에 없는 = 다른 기관 소속(cross-org) 참가자.
   const poolIds = new Set(orgPool.map((p) => p.id));
   const crossIds = selectedIds.filter((id) => !poolIds.has(id));
@@ -956,7 +1079,23 @@ async function ParticipantsTabPanel({
     crossIds.length > 0
       ? await loadParticipantOptionsByIds(crossIds, orgId)
       : [];
-  const allParticipants = [...orgPool, ...crossParticipants];
+  const rawParticipants = [...orgPool, ...crossParticipants];
+
+  // 원생명을 "이 행사에 참가하는 아동" 으로 좁힌다.
+  //   app_children 은 계정 단위(사람)라, 그냥 두면 다른 기관 원생까지 우리 명단에
+  //   뜬다. 지정이 없는 보호자는 기존 값(전체 자녀)을 그대로 둔다 — 명단이
+  //   갑자기 빈칸이 되는 게 더 나쁘다.
+  const allParticipants = rawParticipants.map((p) => {
+    const picked = eventChildren[p.id];
+    if (!picked || picked.length === 0) return p;
+    return {
+      ...p,
+      children_count: picked.length,
+      enrolled_child_names: picked.map((c) => c.name),
+      class_name: picked.find((c) => c.class_name)?.class_name ?? p.class_name,
+    };
+  });
+
   // 중복 감지 패널에서 선택할 행사 — 진행중/예정만.
   const events = orgEvents
     .filter((e) => e.status === "LIVE" || e.status === "DRAFT")
@@ -970,6 +1109,7 @@ async function ParticipantsTabPanel({
       events={events}
       allowSelfRegister={allowSelfRegister}
       eventStatus={eventStatus}
+      partyCounts={partyCounts}
     />
   );
 }
@@ -1273,6 +1413,11 @@ function Phase2Placeholder({ tab }: { tab: TabKey }) {
       icon: "📅",
       title: "타임테이블",
       empty: "아직 슬롯이 없어요.",
+    },
+    applications: {
+      icon: "📥",
+      title: "접수",
+      empty: "아직 접수된 신청서가 없어요.",
     },
     participants: {
       icon: "🙋",

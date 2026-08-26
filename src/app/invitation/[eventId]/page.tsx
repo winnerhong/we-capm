@@ -13,9 +13,28 @@ import { TimelineCollapsible } from "./timeline-collapsible";
 import {
   fmtAmPmClockKst,
   fmtClockKstAlways,
+  fmtDateTimeKst,
   fmtKoreanLongDateKst,
 } from "@/lib/datetime/kst";
 import { CopyButton } from "./copy-button";
+// 참가 접수(승인제) — 켜져 있으면 하단 CTA 자리가 신청 폼/상태 카드로 바뀐다.
+import {
+  loadEventApplicationCounts,
+  loadMyApplication,
+} from "@/lib/org-events/application-queries";
+import {
+  resolveApplicationGate,
+  type ApplicationGate,
+} from "@/lib/org-events/application-core";
+import type {
+  OrgEventApplicationCounts,
+  OrgEventApplicationRow,
+} from "@/lib/org-events/types";
+import { ApplicationForm } from "./application-form";
+import {
+  ApplicationClosedCard,
+  ApplicationStatusCard,
+} from "./application-status-card";
 
 export const dynamic = "force-dynamic";
 
@@ -209,6 +228,23 @@ export default async function EventInvitationPage({
 
   // 타임테이블 — 행사 전체 흐름을 모두 노출 (참가자가 미리 보고 준비할 수 있도록)
   const slots = await loadTimelineSlots(eventId).catch(() => []);
+
+  // 참가 접수 — 접수제를 쓰는 행사에서만 조회한다(기존 행사는 쿼리 0회 추가).
+  const applicationsOn = !!event.applications_enabled && !joined;
+  const applicationCounts = applicationsOn
+    ? await loadEventApplicationCounts(eventId).catch(() => null)
+    : null;
+  const myApplication = applicationsOn
+    ? await loadMyApplication(eventId).catch(() => null)
+    : null;
+  const applicationGate = resolveApplicationGate({
+    enabled: applicationsOn,
+    closeAt: event.applications_close_at,
+    // 마감을 안 정했으면 "행사 시작 1시간 전" 이 기본 마감.
+    startsAt: event.starts_at,
+    capacity: event.applications_capacity,
+    approvedPeople: applicationCounts?.approved_people ?? 0,
+  });
 
   const dateLabel = fmtFullDate(event.starts_at);
   const startClock = fmtClock(event.starts_at);
@@ -609,12 +645,15 @@ export default async function EventInvitationPage({
         </section>
       )}
 
-      {/* ─── 앱 입장 CTA — 초대장은 (user) 레이아웃 밖이라 앱 진입 버튼을 직접 제공 ─── */}
-      <InvitationCta
+      {/* ─── 하단 — 접수제 여부에 따라 CTA / 신청 폼 / 상태 카드 ─── */}
+      <InvitationFooter
         eventId={eventId}
         eventStatus={event.status}
         joined={joined}
         loggedIn={!!session}
+        gate={applicationGate}
+        myApplication={myApplication}
+        counts={applicationCounts}
       />
 
     </div>
@@ -702,6 +741,84 @@ function PendingState({ eventName }: { eventName: string }) {
   );
 }
 
+
+/**
+ * 초대장 하단 — 접수제 여부로 먼저 갈라진다.
+ *
+ *  접수 OFF                  → 기존 InvitationCta (바로 참가 / 입장)
+ *  접수 ON + 이미 참가자      → InvitationCta (입장)  ※ gate 가 DISABLED 로 온다
+ *  접수 ON + 마감            → 마감 안내 (단, 내 신청서가 있으면 상태 카드 우선)
+ *  접수 ON + 내 신청서 대기/승인 → 상태 카드
+ *  접수 ON + 그 외           → 신청 폼 (거절됐던 경우 재신청 안내 얹어서)
+ */
+function InvitationFooter({
+  eventId,
+  eventStatus,
+  joined,
+  loggedIn,
+  gate,
+  myApplication,
+  counts,
+}: {
+  eventId: string;
+  eventStatus: string;
+  joined: boolean;
+  loggedIn: boolean;
+  gate: ApplicationGate;
+  myApplication: OrgEventApplicationRow | null;
+  counts: OrgEventApplicationCounts | null;
+}) {
+  if (gate.kind === "DISABLED") {
+    return (
+      <InvitationCta
+        eventId={eventId}
+        eventStatus={eventStatus}
+        joined={joined}
+        loggedIn={loggedIn}
+      />
+    );
+  }
+
+  // 대기/승인 중인 내 신청서가 있으면 마감보다 상태 카드가 우선.
+  if (myApplication && myApplication.status !== "REJECTED") {
+    return (
+      <ApplicationStatusCard eventId={eventId} application={myApplication} />
+    );
+  }
+
+  if (gate.kind === "CLOSED") {
+    return (
+      <ApplicationClosedCard closedAt={gate.closedAt} implicit={gate.implicit} />
+    );
+  }
+
+  // 마감 안내 문구 — 기관이 지정한 마감과 "행사 1시간 전" 기본값을 구분해 적는다.
+  const closeLabel = gate.closeAt
+    ? gate.closeIsImplicit
+      ? `${fmtDateTimeKst(gate.closeAt)} 까지 접수 (행사 시작 1시간 전)`
+      : `${fmtDateTimeKst(gate.closeAt)} 까지 접수`
+    : null;
+
+  return (
+    <>
+      {myApplication?.status === "REJECTED" && (
+        <div className="mx-auto max-w-md px-6 pt-2">
+          <p className="rounded-2xl border border-[#E8DDC8] bg-[#F5F1E8]/70 px-4 py-3 text-xs leading-relaxed text-[#6B4423]">
+            🌧 이전 신청은 승인되지 않았어요. 내용을 다시 확인하고 신청하시면
+            기관에서 다시 검토해 드려요.
+          </p>
+        </div>
+      )}
+      <ApplicationForm
+        eventId={eventId}
+        atCapacity={gate.atCapacity}
+        capacity={gate.capacity}
+        approvedPeople={counts?.approved_people ?? 0}
+        closeLabel={closeLabel}
+      />
+    </>
+  );
+}
 
 /**
  * 하단 CTA — 열람자 상태별 3분기.

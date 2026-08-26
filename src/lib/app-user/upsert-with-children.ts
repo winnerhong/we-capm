@@ -15,7 +15,10 @@ import {
   createAppUserAccountFromPhone,
   normalizeUserPhone,
 } from "@/lib/app-user/account";
-import { addOrgMembership } from "@/lib/app-user/orgs";
+import {
+  addOrgMembership,
+  type OrgMembershipSource,
+} from "@/lib/app-user/orgs";
 
 type SbErr = { message: string } | null;
 type SbOne<T> = { data: T | null; error: SbErr };
@@ -24,6 +27,19 @@ type SbMany<T> = { data: T[] | null; error: SbErr };
 export interface UpsertResult {
   userId: string;
   merged: boolean;
+  /**
+   * 이번 폼에 적힌 자녀들의 app_children.id (신규 + 기존 재사용 모두).
+   * 행사별 참가 아동(org_event_participant_children) 연결에 쓴다.
+   */
+  childIds: string[];
+}
+
+export interface UpsertOptions {
+  /**
+   * app_user_orgs.source 로 기록할 경로. 기본 "bulk_import".
+   * 접수 승인 경로는 "application" 을 넘겨 나중에 구분할 수 있게 한다.
+   */
+  membershipSource?: OrgMembershipSource;
 }
 
 export type UpsertChild = {
@@ -73,7 +89,8 @@ export function parseChildrenFromFormData(formData: FormData): UpsertChild[] {
  */
 export async function upsertParticipantWithChildren(
   orgId: string,
-  formData: FormData
+  formData: FormData,
+  opts: UpsertOptions = {}
 ): Promise<UpsertResult> {
   const parentNameRaw = String(formData.get("parent_name") ?? "").trim();
   const phoneRaw = String(formData.get("phone") ?? "").trim();
@@ -175,7 +192,7 @@ export async function upsertParticipantWithChildren(
 
   // 1-b) 이 기관 소속 확보 (멱등). 위 재사용 분기(다른 기관 계정)에서 특히 중요 —
   //      이게 없으면 기관 명단·CSV 에서 이 보호자가 통째로 누락된다.
-  await addOrgMembership(userId, orgId, "bulk_import");
+  await addOrgMembership(userId, orgId, opts.membershipSource ?? "bulk_import");
 
   // 2) 자녀 dedup 후 추가 — class_name 도 함께 저장.
   //    이미 있는 자녀 이름이 다시 들어오고 class_name 이 다르면 UPDATE.
@@ -276,7 +293,36 @@ export async function upsertParticipantWithChildren(
     );
   }
 
-  return { userId, merged };
+  // 4) 이번 폼 자녀들의 id 회수 — 신규 INSERT 분은 id 를 돌려받지 않았고,
+  //    기존 재사용 분도 섞여 있으므로 이름으로 한 번에 다시 조회한다.
+  //    (행사별 참가 아동 연결에 필요. 조회 실패는 치명적이지 않으므로 빈 배열.)
+  const childIds: string[] = [];
+  const wantedNames = new Set(children.map((c) => c.name));
+  const finalChildrenResp = (await (
+    supabase.from("app_children" as never) as unknown as {
+      select: (c: string) => {
+        eq: (
+          k: string,
+          v: string
+        ) => Promise<SbMany<{ id: string; name: string }>>;
+      };
+    }
+  )
+    .select("id, name")
+    .eq("user_id", userId)) as SbMany<{ id: string; name: string }>;
+
+  if (finalChildrenResp.error) {
+    console.error(
+      "[upsertParticipant] child id lookup error",
+      finalChildrenResp.error
+    );
+  } else {
+    for (const row of finalChildrenResp.data ?? []) {
+      if (wantedNames.has(row.name)) childIds.push(row.id);
+    }
+  }
+
+  return { userId, merged, childIds };
 }
 
 /**

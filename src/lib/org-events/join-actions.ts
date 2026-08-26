@@ -27,6 +27,8 @@ type OrgEventLite = {
   id: string;
   org_id: string;
   status: string;
+  /** 접수·승인제. true 면 신청서를 거치지 않은 자가 참가를 막는다. */
+  applications_enabled: boolean | null;
 };
 
 type UserSession = { id: string; orgId: string };
@@ -81,7 +83,10 @@ export async function joinOrgEventAction(eventId: string): Promise<void> {
       };
     }
   )
-    .select("id, org_id, status")
+    // "*" 인 이유: applications_enabled 는 나중에 실행될 마이그레이션 컬럼이라,
+    // 명시 열거하면 SQL 적용 전 배포 창에서 undefined column 으로 참가가 통째로
+    // 막힌다. "*" 는 컬럼이 없으면 그냥 값이 안 올 뿐이다.
+    .select("*")
     .eq("id", eventId)
     .maybeSingle()) as { data: OrgEventLite | null; error: SbErr };
 
@@ -93,6 +98,33 @@ export async function joinOrgEventAction(eventId: string): Promise<void> {
   }
   const evt = eventResp.data;
   if (!evt) throw new Error("행사를 찾을 수 없어요");
+
+  // 2-b) 접수·승인제가 켜진 행사 — 신청서를 거치지 않은 자가 참가는 막는다.
+  //      이미 참가자면(= 기관이 수락했거나 명단에 올렸으면) 그대로 통과.
+  //      redirect 는 throw 이므로 조건만 계산하고 try/catch 밖에서 호출한다.
+  let mustApply = false;
+  if (evt.applications_enabled) {
+    const existingResp = (await (
+      supabase.from("org_event_participants" as never) as unknown as {
+        select: (c: string) => {
+          eq: (k: string, v: string) => {
+            eq: (k: string, v: string) => {
+              maybeSingle: () => Promise<{ data: { user_id: string } | null }>;
+            };
+          };
+        };
+      }
+    )
+      .select("user_id")
+      .eq("event_id", eventId)
+      .eq("user_id", session.id)
+      .maybeSingle()) as { data: { user_id: string } | null };
+
+    mustApply = !existingResp.data;
+  }
+  if (mustApply) {
+    redirect(`/invitation/${eventId}#apply`);
+  }
 
   // 3) 소속은 만들지 않는다 — 행사 참가 ≠ 기관 소속.
   //    초대장으로 행사 하나에 참가한 것만으로 그 기관이 "내 기관"이 되면,

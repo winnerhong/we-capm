@@ -289,3 +289,186 @@ export async function removeUserFromEventAction(
 
   revalidatePath(`/org/${orgId}/events/${eventId}`);
 }
+
+/**
+ * 타 기관 계정을 **이 기관에서만** 내보낸다.
+ *
+ * 왜 필요한가:
+ *   초대장으로 우리 행사에 온 보호자는 계정 주인이 다른 기관이다. 명단에서
+ *   지우려고 영구삭제(🗑)를 누르면 "권한이 없어요" 로 막힌다 — 그 버튼은
+ *   app_users 행을 지워서 그 사람의 **다른 기관 행사 기록·도토리까지** 날리기
+ *   때문에 홈 기관만 쓸 수 있게 해둔 것이다. 그렇다고 행사제외(🚫)만으로는
+ *   기관 명단에 계속 남는다. 그 사이를 메우는 동작이 이것이다.
+ *
+ * 지우는 범위 — 전부 "우리 기관" 것만:
+ *   · app_user_orgs                    우리 기관 소속 한 줄
+ *   · org_event_participants           우리 기관 행사 전부
+ *   · org_event_participant_children   우리 기관 행사 전부
+ *   · org_event_applications           우리 기관 신청서 (남으면 접수 탭에 계속 뜬다)
+ *
+ * 건드리지 않는 것:
+ *   · app_users / app_children         계정과 자녀 (홈 기관 것이다)
+ *   · 도토리 잔액·원장                  잔액을 깎으면 남의 기관 데이터를 손대는 셈
+ *   · 타 기관 소속·행사 기록
+ *
+ * 홈 기관이 우리인 계정에는 쓰지 않는다 — 그건 영구삭제(🗑)가 정상 동작한다.
+ */
+export async function removeUserFromOrgAction(
+  orgId: string,
+  userId: string
+): Promise<{ ok: true; removedEvents: number } | { ok: false; message: string }> {
+  const session = await requireOrg();
+  if (!orgId || orgId !== session.orgId) {
+    return { ok: false, message: "이 기관의 참가자를 관리할 권한이 없습니다" };
+  }
+  if (!userId) return { ok: false, message: "참가자가 없어요" };
+
+  const supabase = await createClient();
+  type SbErr = { message: string; code?: string } | null;
+  type SbResp<T> = { data: T[] | null; error: SbErr };
+
+  // 홈 기관이 우리면 거부 — 소속만 지워도 app_users.org_id 가 우리를 가리켜
+  // 명단에 다시 뜬다. 그 경우 필요한 건 영구삭제다.
+  const userResp = (await (
+    supabase.from("app_users" as never) as unknown as {
+      select: (c: string) => {
+        eq: (k: string, v: string) => {
+          maybeSingle: () => Promise<{
+            data: { id: string; org_id: string; parent_name: string } | null;
+            error: SbErr;
+          }>;
+        };
+      };
+    }
+  )
+    .select("id, org_id, parent_name")
+    .eq("id", userId)
+    .maybeSingle()) as {
+    data: { id: string; org_id: string; parent_name: string } | null;
+    error: SbErr;
+  };
+
+  const user = userResp.data;
+  if (!user) return { ok: false, message: "참가자를 찾을 수 없어요" };
+  if (user.org_id === orgId) {
+    return {
+      ok: false,
+      message:
+        "우리 기관 소속 계정이에요. 명단에서 지우려면 영구 삭제를 사용해 주세요.",
+    };
+  }
+
+  // 우리 기관 행사 전부
+  const evResp = (await (
+    supabase.from("org_events" as never) as unknown as {
+      select: (c: string) => {
+        eq: (k: string, v: string) => Promise<SbResp<{ id: string }>>;
+      };
+    }
+  )
+    .select("id")
+    .eq("org_id", orgId)) as SbResp<{ id: string }>;
+
+  if (evResp.error) {
+    console.error("[event/users/removeFromOrg] events", evResp.error);
+    return { ok: false, message: "기관 행사를 불러오지 못했어요" };
+  }
+  const eventIds = (evResp.data ?? []).map((e) => e.id);
+
+  if (eventIds.length > 0) {
+    // 참가 아동 → 참가 → 신청서 순. 앞이 실패해도 뒤를 막지 않는다
+    // (테이블이 아직 없는 배포 창이 있을 수 있다).
+    const delIn = async (table: string, userKey = "user_id") => {
+      const r = (await (
+        supabase.from(table as never) as unknown as {
+          delete: () => {
+            in: (k: string, v: string[]) => {
+              eq: (k: string, v: string) => Promise<{ error: SbErr }>;
+            };
+          };
+        }
+      )
+        .delete()
+        .in("event_id", eventIds)
+        .eq(userKey, userId)) as { error: SbErr };
+      if (r.error) {
+        console.error(`[event/users/removeFromOrg] ${table}`, {
+          code: r.error.code,
+        });
+      }
+      return r.error;
+    };
+
+    await delIn("org_event_participant_children");
+    const partErr = await delIn("org_event_participants");
+    if (partErr) {
+      return { ok: false, message: `행사 참가 해제 실패: ${partErr.message}` };
+    }
+
+    // 신청서는 phone 으로 걸려 있다 (계정이 없을 때도 받으므로).
+    const phoneResp = (await (
+      supabase.from("app_users" as never) as unknown as {
+        select: (c: string) => {
+          eq: (k: string, v: string) => {
+            maybeSingle: () => Promise<{
+              data: { phone: string } | null;
+              error: SbErr;
+            }>;
+          };
+        };
+      }
+    )
+      .select("phone")
+      .eq("id", userId)
+      .maybeSingle()) as {
+      data: { phone: string } | null;
+      error: SbErr;
+    };
+    const phone = (phoneResp.data?.phone ?? "").replace(/\D/g, "");
+    if (phone) {
+      const appErr = (await (
+        supabase.from("org_event_applications" as never) as unknown as {
+          delete: () => {
+            in: (k: string, v: string[]) => {
+              eq: (k: string, v: string) => Promise<{ error: SbErr }>;
+            };
+          };
+        }
+      )
+        .delete()
+        .in("event_id", eventIds)
+        .eq("phone", phone)) as { error: SbErr };
+      if (appErr.error) {
+        console.error("[event/users/removeFromOrg] applications", {
+          code: appErr.error.code,
+        });
+      }
+    }
+  }
+
+  // 소속 해제 — 이게 빠져야 기관 명단에서 사라진다.
+  const memErr = (await (
+    supabase.from("app_user_orgs" as never) as unknown as {
+      delete: () => {
+        eq: (k: string, v: string) => {
+          eq: (k: string, v: string) => Promise<{ error: SbErr }>;
+        };
+      };
+    }
+  )
+    .delete()
+    .eq("user_id", userId)
+    .eq("org_id", orgId)) as { error: SbErr };
+
+  if (memErr.error) {
+    console.error("[event/users/removeFromOrg] membership", memErr.error);
+    return { ok: false, message: `소속 해제 실패: ${memErr.error.message}` };
+  }
+
+  revalidatePath(`/org/${orgId}/users`);
+  for (const eid of eventIds) {
+    revalidatePath(`/org/${orgId}/events/${eid}`);
+  }
+
+  return { ok: true, removedEvents: eventIds.length };
+}

@@ -53,9 +53,38 @@ async function getOwnedUser(userId: string): Promise<{
   const user = resp.data;
   if (!user) throw new Error("참가자를 찾을 수 없어요");
   if (user.org_id !== session.orgId) {
-    throw new Error("이 참가자를 관리할 권한이 없어요");
+    // 왜 막는지까지 알려준다. 예전 문구("권한이 없어요")는 기관 관리자 입장에서
+    // "내 화면인데 왜?" 로만 읽혔다. 실제 이유는 이 계정이 **다른 기관 것**이라
+    // 지우면 그쪽 행사 기록·도토리까지 사라지기 때문이다.
+    const homeOrg = await loadOrgNameSafe(user.org_id);
+    throw new Error(
+      `이 계정은 ${homeOrg} 소속이에요. 계정을 지우면 그 기관의 기록까지 사라져서 ` +
+        `여기서는 삭제할 수 없어요. 우리 기관에서만 빼려면 [기관에서 빼기]를 눌러 주세요.`
+    );
   }
   return user;
+}
+
+/** 에러 문구용 기관명 — 실패해도 흐름을 막지 않는다. */
+async function loadOrgNameSafe(orgId: string): Promise<string> {
+  try {
+    const supabase = await createClient();
+    const resp = (await (
+      supabase.from("partner_orgs" as never) as unknown as {
+        select: (c: string) => {
+          eq: (k: string, v: string) => {
+            maybeSingle: () => Promise<SbOne<{ org_name: string | null }>>;
+          };
+        };
+      }
+    )
+      .select("org_name")
+      .eq("id", orgId)
+      .maybeSingle()) as SbOne<{ org_name: string | null }>;
+    return resp.data?.org_name?.trim() || "다른 기관";
+  } catch {
+    return "다른 기관";
+  }
 }
 
 /**

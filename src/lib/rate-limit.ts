@@ -72,7 +72,14 @@ export function rateLimit(cfg: LimitConfig): RateLimitResult {
  *       신뢰해야 하며, 본 프로덕션 환경은 Vercel edge 가 첫 프록시이므로 OK.
  */
 export function getClientIp(request: Request): string | null {
-  const h = request.headers;
+  return getClientIpFromHeaders(request.headers);
+}
+
+/**
+ * Headers 만 있을 때의 클라이언트 IP.
+ * 서버 액션에는 Request 객체가 없고 `await headers()` 만 있으므로 이 변형이 필요.
+ */
+export function getClientIpFromHeaders(h: Headers): string | null {
   const xff = h.get("x-forwarded-for");
   if (xff) {
     const first = xff.split(",")[0]?.trim();
