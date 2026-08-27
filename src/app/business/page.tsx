@@ -3,41 +3,34 @@ import Link from "next/link";
 import { SiteFooter } from "@/components/site-footer";
 import { BackToTop } from "@/components/back-to-top";
 import { AcornIcon } from "@/components/acorn-icon";
+import {
+  BUSINESS,
+  PRIVACY_OFFICER_LINE,
+  SUPPORT_LINE,
+} from "@/lib/business-info";
 
 export const metadata: Metadata = {
   title: "사업자 정보 · 토리로",
   description:
-    "토리로의 사업자 등록 정보, 통신판매업 신고, 고객센터, 개인정보보호책임자 연락처를 안내합니다.",
+    "토리로를 운영하는 (주)위너그룹의 사업자 등록 정보, 고객센터, 개인정보보호책임자 연락처를 안내합니다.",
 };
 
 interface Row {
   label: string;
   value: string;
-  placeholder?: boolean;
 }
 
+// 값은 lib/business-info 한 곳에서 온다 — 푸터와 어긋나지 않게.
 const BUSINESS_INFO: Row[] = [
-  { label: "상호", value: "토리로 (TORIRO)" },
-  { label: "대표자", value: "[대표자명]", placeholder: true },
-  { label: "사업자등록번호", value: "[000-00-00000]", placeholder: true },
-  {
-    label: "통신판매업신고번호",
-    value: "[제2026-서울-0000호]",
-    placeholder: true,
-  },
-  {
-    label: "사업장 주소",
-    value: "[서울특별시 ○○구 ○○로 00, 00층]",
-    placeholder: true,
-  },
-  { label: "고객센터", value: "1588-0000 (평일 10:00 ~ 17:00, 공휴일 휴무)" },
-  { label: "이메일", value: "hello@toriro.com" },
-  {
-    label: "개인정보보호책임자",
-    value: "[홍길동] (privacy@toriro.com)",
-    placeholder: true,
-  },
-  { label: "호스팅 제공자", value: "Vercel Inc. / Amazon Web Services" },
+  { label: "서비스명", value: BUSINESS.serviceName },
+  { label: "상호", value: BUSINESS.companyName },
+  { label: "대표자", value: BUSINESS.representative },
+  { label: "사업자등록번호", value: BUSINESS.registrationNumber },
+  { label: "사업장 주소", value: BUSINESS.address },
+  { label: "고객센터", value: SUPPORT_LINE },
+  { label: "이메일", value: BUSINESS.email },
+  { label: "개인정보보호책임자", value: PRIVACY_OFFICER_LINE },
+  { label: "호스팅 제공자", value: BUSINESS.hosting },
 ];
 
 export default function BusinessPage() {
@@ -91,39 +84,13 @@ export default function BusinessPage() {
                 <dt className="text-sm font-bold text-[#2D5A3D]">
                   {row.label}
                 </dt>
-                <dd
-                  className={`text-[15px] leading-relaxed ${
-                    row.placeholder ? "text-[#C4956A]" : "text-[#2C2C2C]"
-                  }`}
-                >
+                <dd className="text-[15px] leading-relaxed text-[#2C2C2C]">
                   {row.value}
                 </dd>
               </div>
             ))}
           </dl>
         </div>
-
-        <section className="mt-8 rounded-3xl border border-[#D4E4BC] bg-white p-6 shadow-sm md:p-8">
-          <h2 className="font-serif text-lg font-extrabold text-[#2D5A3D] md:text-xl">
-            사업자정보 공개시스템
-          </h2>
-          <p className="mt-2 text-sm text-[#6B6560]">
-            공정거래위원회 사업자정보 공개시스템에서 통신판매업 신고 내역을
-            확인하실 수 있습니다.
-          </p>
-          <a
-            href="https://www.ftc.go.kr/bizCommPop.do?wrkr_no=0000000000"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-3 inline-flex items-center gap-2 rounded-xl bg-[#2D5A3D] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#1F4229] focus:outline-none focus:ring-2 focus:ring-[#2D5A3D]/40"
-          >
-            공정거래위원회에서 조회하기
-            <span aria-hidden>↗</span>
-          </a>
-          <p className="mt-2 text-xs text-[#C4956A]">
-            ⚠️ URL의 wrkr_no 값을 실제 사업자등록번호로 교체해주세요.
-          </p>
-        </section>
 
         <section className="mt-8 rounded-3xl border border-[#D4E4BC] bg-[#E8F0E4]/60 p-6 text-sm leading-relaxed text-[#2D5A3D] md:p-8">
           <h2 className="font-serif text-lg font-extrabold">관련 문서</h2>

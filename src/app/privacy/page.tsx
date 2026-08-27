@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { BUSINESS, SUPPORT_LINE } from "@/lib/business-info";
 import Link from "next/link";
 import { SiteFooter } from "@/components/site-footer";
 import { BackToTop } from "@/components/back-to-top";
@@ -537,17 +538,17 @@ const ARTICLES: Article[] = [
             개인정보 보호책임자
           </p>
           <ul className="mt-2 space-y-1 text-[#2C2C2C]">
-            <li>성명: 홍길동</li>
-            <li>이메일: privacy@toriro.com</li>
-            <li>전화: 1588-0000</li>
+            <li>성명: {BUSINESS.privacyOfficer}</li>
+            <li>이메일: {BUSINESS.privacyEmail}</li>
+            <li>전화: {BUSINESS.supportPhone}</li>
           </ul>
           <p className="mt-3 font-semibold text-[#2D5A3D]">
             고충처리·문의 부서
           </p>
           <ul className="mt-2 space-y-1 text-[#2C2C2C]">
             <li>부서명: 고객지원팀</li>
-            <li>이메일: hello@toriro.com</li>
-            <li>전화: 1588-0000 (평일 10:00–18:00, 공휴일 제외)</li>
+            <li>이메일: {BUSINESS.email}</li>
+            <li>전화: {SUPPORT_LINE}</li>
           </ul>
         </div>
       </div>

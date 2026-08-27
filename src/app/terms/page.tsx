@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { BUSINESS } from "@/lib/business-info";
 import Link from "next/link";
 import { SiteFooter } from "@/components/site-footer";
 import { BackToTop } from "@/components/back-to-top";
@@ -256,7 +257,7 @@ const CHAPTERS: Chapter[] = [
         id: "article-19",
         title: "제19조 (분쟁 해결)",
         paragraphs: [
-          "① 회사는 회원이 제기하는 정당한 의견이나 불만을 반영하고 그 피해를 보상·처리하기 위하여 고객센터(1588-0000) 및 이메일(hello@toriro.com)을 운영합니다.",
+          `① 회사는 회원이 제기하는 정당한 의견이나 불만을 반영하고 그 피해를 보상·처리하기 위하여 고객센터(${BUSINESS.supportPhone}) 및 이메일(${BUSINESS.email})을 운영합니다.`,
           "② 회사와 회원 간에 발생한 분쟁에 관하여 회원은 「전자상거래 등에서의 소비자보호에 관한 법률」에 따라 한국소비자원 또는 시·도지사에 분쟁 조정을 신청할 수 있습니다.",
         ],
       },
@@ -411,14 +412,14 @@ export default function TermsPage() {
             <div className="mt-5 rounded-xl bg-[#F6F1E7] p-4 text-xs leading-relaxed text-[#6B6560]">
               <p className="font-semibold text-[#2D5A3D]">사업자 정보</p>
               <p className="mt-1">
-                상호: 토리로(TORIRO) · 대표자: 홍길동 · 사업자등록번호:
-                000-00-00000
+                상호: {BUSINESS.companyName} · 대표자:{" "}
+                {BUSINESS.representative} · 사업자등록번호:{" "}
+                {BUSINESS.registrationNumber}
               </p>
+              <p>주소: {BUSINESS.address}</p>
               <p>
-                통신판매업신고: 제2026-서울-0000호 · 주소: 서울특별시 (상세
-                주소 미기재)
+                대표 전화: {BUSINESS.supportPhone} · 이메일: {BUSINESS.email}
               </p>
-              <p>대표 전화: 1588-0000 · 이메일: hello@toriro.com</p>
             </div>
           </section>
         </div>

@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { BUSINESS } from "@/lib/business-info";
 
 /**
  * 세금계산서 번호: YYMM-XXXXX (국세청 포맷 흉내낸 mock).
@@ -75,10 +76,12 @@ export async function issueTaxInvoice(
       invoice_id: invoiceId,
       tax_invoice_number: generateTaxInvoiceNumber(),
       type: "TAX",
-      supplier_business_number: "000-00-00000",
-      supplier_name: "(주)토리로",
-      supplier_representative: "홍길동",
-      supplier_address: "서울특별시 강남구",
+      // 공급자는 실제 사업자여야 한다 — 세금계산서에 가짜 번호가 들어가면
+      // 문서 자체가 무효다. 값은 lib/business-info 한 곳에서 온다.
+      supplier_business_number: BUSINESS.registrationNumber,
+      supplier_name: BUSINESS.companyName,
+      supplier_representative: BUSINESS.representative,
+      supplier_address: BUSINESS.address,
       buyer_business_number: buyerInfo.business_number,
       buyer_name: buyerInfo.name,
       buyer_representative: buyerInfo.representative,
