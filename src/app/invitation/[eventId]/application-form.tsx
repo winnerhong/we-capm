@@ -621,7 +621,7 @@ function ConsentBox({
             <>
               <ConsentRow
                 label="계열사 제3자 제공 동의"
-                hint="(주)위너그룹 · 위너키즈스포츠 · 위너기획 · 위니키즈카페 · 더위너케어"
+                hint="(주)위너그룹 · 위너키즈스포츠 · 위너기획 · 위니키즈카페 · (주)더위너케어 · 더플레이위너"
                 checked={optionalAgreed}
                 onChange={onOptionalChange}
                 body={consent.optional}
