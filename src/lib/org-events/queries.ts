@@ -4,6 +4,7 @@
 // 실패 정책: throw 하지 않고 빈 배열/null fallback. resp.error 는 console.error
 // 로그만 남긴다. 어디서 호출해도 페이지가 깨지지 않도록.
 
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import type {
   OrgEventRow,
@@ -1096,10 +1097,11 @@ export async function loadActiveAndUpcomingEventsForUser(
  * 행사에 연결된 LIVE 상태 스탬프북 목록.
  * 2단계 쿼리: quest_pack_id 수집 → org_quest_packs.in + status='LIVE'.
  */
-export async function loadLiveQuestPacksForEvent(
-  eventId: string
-): Promise<OrgQuestPackRow[]> {
-  if (!eventId) return [];
+export const loadLiveQuestPacksForEvent = cache(
+  async function loadLiveQuestPacksForEvent(
+    eventId: string
+  ): Promise<OrgQuestPackRow[]> {
+    if (!eventId) return [];
   const supabase = await createClient();
 
   // 1단계: 행사에 묶인 quest_pack_id 수집
@@ -1159,7 +1161,7 @@ export async function loadLiveQuestPacksForEvent(
     return [];
   }
   return packResp.data ?? [];
-}
+});
 
 /**
  * 행사의 LIVE FM 세션 단건.

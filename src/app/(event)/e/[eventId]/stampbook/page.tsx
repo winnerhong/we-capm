@@ -14,6 +14,7 @@ import type { OrgQuestPackRow } from "@/lib/missions/types";
 import { QUEST_PACK_STATUS_META } from "@/lib/missions/types";
 import { AcornIcon } from "@/components/acorn-icon";
 import { AcornTopBoard } from "@/components/acorn-top-board";
+import { loadAcornGuide } from "@/lib/missions/acorn-guide-queries";
 import { loadTopAcornFamiliesForEvent } from "@/lib/app-user/event-acorns";
 import { loadOrgNameById } from "@/lib/org-partner";
 import { fmtDateRangeKst } from "@/lib/datetime/kst";
@@ -90,10 +91,11 @@ export default async function StampbookListPage({
   //   연결이 하나도 없으면 기관 전체 스탬프북으로 fallback (아직 행사에
   //   연결하지 않은 기존 스탬프북 대비). 전부 연결되면 이 fallback 은 죽는다.
   const eventPacks = await loadLiveQuestPacksForEvent(ctx.event.id);
-  const [orgPacks, topFamilies, freshOrgName] = await Promise.all([
+  const [orgPacks, topFamilies, freshOrgName, acornGuide] = await Promise.all([
     eventPacks.length > 0 ? Promise.resolve([]) : loadOrgQuestPacks(ctx.orgId),
     loadTopAcornFamiliesForEvent(ctx.event.id, 5),
     loadOrgNameById(ctx.orgId, ctx.orgName),
+    loadAcornGuide(ctx.event.id),
   ]);
   const allPacks = eventPacks.length > 0 ? eventPacks : orgPacks;
 
@@ -144,6 +146,7 @@ export default async function StampbookListPage({
         families={topFamilies}
         myUserId={user.id}
         orgName={freshOrgName}
+        guide={acornGuide}
       />
 
       <header>

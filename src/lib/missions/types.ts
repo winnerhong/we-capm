@@ -294,6 +294,12 @@ export interface MissionSubmissionRow {
   reject_reason: string | null;
   idempotency_key: string | null;
   submitted_at: string;
+  /**
+   * 다른 가족들이 이 사진에 누른 좋아요 수.
+   * optional 인 이유: 컬럼이 아직 없는 배포 창에서는 select("*") 가 이 키를
+   * 돌려주지 않는다. undefined 는 0 으로 읽는다.
+   */
+  like_count?: number | null;
 }
 
 export interface MissionFinalRedemptionRow {

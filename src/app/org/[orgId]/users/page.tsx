@@ -143,12 +143,22 @@ function fmtEventRange(starts: string | null, ends: string | null): string {
 }
 
 
-async function loadUsers(orgId: string): Promise<AppUserWithCount[]> {
+/**
+ * 기관 명단 + 반명 후보를 **한 번에** 만든다.
+ *
+ * 예전에는 loadClassSuggestions 가 따로 있어서 listOrgUserIds 와 app_children
+ * 전체 스캔을 각각 두 번씩 했다. 반명은 여기서 이미 읽은 자녀 행에 들어 있으므로
+ * 같은 데이터를 두 번 가져올 이유가 없다.
+ */
+async function loadUsers(orgId: string): Promise<{
+  rows: AppUserWithCount[];
+  classNames: string[];
+}> {
   const supabase = await createClient();
 
   // 소속 범위는 app_user_orgs 기준 — 타 기관이 홈인 참가자도 명단에 포함.
   const memberIds = await listOrgUserIds(orgId);
-  if (memberIds.length === 0) return [];
+  if (memberIds.length === 0) return { rows: [], classNames: [] };
 
   const { data: users } = await (
     supabase.from("app_users" as never) as unknown as {
@@ -172,33 +182,65 @@ async function loadUsers(orgId: string): Promise<AppUserWithCount[]> {
     .order("created_at", { ascending: false });
 
   const rows: AppUserListRow[] = (users ?? []) as AppUserListRow[];
-  if (rows.length === 0) return [];
+  if (rows.length === 0) return { rows: [], classNames: [] };
 
   const ids = rows.map((r) => r.id);
 
-  const { data: children } = await (
-    supabase.from("app_children" as never) as unknown as {
-      select: (c: string) => {
-        in: (
-          k: string,
-          v: string[]
-        ) => Promise<{
-          data: Array<{
-            user_id: string;
-            name: string;
-            is_enrolled: boolean;
-            class_name: string | null;
-          }> | null;
-        }>;
-      };
-    }
-  )
-    .select("user_id, name, is_enrolled, class_name")
-    .in("user_id", ids);
+  // 자녀와 타 기관명은 서로를 필요로 하지 않는다 — 같이 띄운다.
+  const otherOrgIds = Array.from(
+    new Set(rows.map((r) => r.org_id).filter((id) => id && id !== orgId))
+  );
+
+  const [childResp, orgResp] = await Promise.all([
+    (
+      supabase.from("app_children" as never) as unknown as {
+        select: (c: string) => {
+          in: (
+            k: string,
+            v: string[]
+          ) => Promise<{
+            data: Array<{
+              user_id: string;
+              name: string;
+              is_enrolled: boolean;
+              class_name: string | null;
+            }> | null;
+          }>;
+        };
+      }
+    )
+      .select("user_id, name, is_enrolled, class_name")
+      .in("user_id", ids),
+    otherOrgIds.length > 0
+      ? (
+          supabase.from("partner_orgs" as never) as unknown as {
+            select: (c: string) => {
+              in: (
+                k: string,
+                v: string[]
+              ) => Promise<{
+                data: Array<{ id: string; org_name: string | null }> | null;
+              }>;
+            };
+          }
+        )
+          .select("id, org_name")
+          .in("id", otherOrgIds)
+      : Promise.resolve({ data: [] as Array<{ id: string; org_name: string | null }> }),
+  ]);
+
+  const children = childResp.data;
+  const orgNameById = new Map<string, string>();
+  for (const o of orgResp.data ?? []) {
+    orgNameById.set(o.id, (o.org_name ?? "").trim() || "다른 기관");
+  }
+
 
   const countByUser = new Map<string, number>();
   const enrolledByUser = new Map<string, string[]>();
   const classByUser = new Map<string, string[]>();
+  // 반명 자동완성 후보 — 같은 순회에서 모은다(따로 스캔하지 않는다).
+  const allClassNames = new Set<string>();
   for (const c of children ?? []) {
     countByUser.set(c.user_id, (countByUser.get(c.user_id) ?? 0) + 1);
     if (c.is_enrolled) {
@@ -211,73 +253,24 @@ async function loadUsers(orgId: string): Promise<AppUserWithCount[]> {
       const list = classByUser.get(c.user_id) ?? [];
       if (!list.includes(cn)) list.push(cn);
       classByUser.set(c.user_id, list);
+      allClassNames.add(cn);
     }
   }
 
-  // 타 기관이 홈인 계정만 이름을 조회한다 (대개 0~몇 건).
-  const otherOrgIds = Array.from(
-    new Set(rows.map((r) => r.org_id).filter((id) => id && id !== orgId))
-  );
-  const orgNameById = new Map<string, string>();
-  if (otherOrgIds.length > 0) {
-    const { data: orgs } = (await (
-      supabase.from("partner_orgs" as never) as unknown as {
-        select: (c: string) => {
-          in: (
-            k: string,
-            v: string[]
-          ) => Promise<{
-            data: Array<{ id: string; org_name: string | null }> | null;
-          }>;
-        };
-      }
-    )
-      .select("id, org_name")
-      .in("id", otherOrgIds)) as {
-      data: Array<{ id: string; org_name: string | null }> | null;
-    };
-    for (const o of orgs ?? []) {
-      orgNameById.set(o.id, (o.org_name ?? "").trim() || "다른 기관");
-    }
-  }
 
-  return rows.map((r) => ({
-    ...r,
-    children_count: countByUser.get(r.id) ?? 0,
-    enrolled_names: enrolledByUser.get(r.id) ?? [],
-    class_names: classByUser.get(r.id) ?? [],
-    home_org_name:
-      r.org_id && r.org_id !== orgId
-        ? (orgNameById.get(r.org_id) ?? "다른 기관")
-        : null,
-  }));
-}
-
-/**
- * 기관에서 사용 중인 모든 반명 (자동완성용).
- */
-async function loadClassSuggestions(orgId: string): Promise<string[]> {
-  const supabase = await createClient();
-  const userIds = await listOrgUserIds(orgId);
-  if (userIds.length === 0) return [];
-
-  type ClassRow = { class_name: string | null };
-  const { data: rows } = (await (
-    supabase.from("app_children" as never) as unknown as {
-      select: (c: string) => {
-        in: (k: string, v: string[]) => Promise<{ data: ClassRow[] | null }>;
-      };
-    }
-  )
-    .select("class_name")
-    .in("user_id", userIds)) as { data: ClassRow[] | null };
-
-  const set = new Set<string>();
-  for (const r of rows ?? []) {
-    const cn = (r.class_name ?? "").trim();
-    if (cn) set.add(cn);
-  }
-  return Array.from(set).sort((a, b) => a.localeCompare(b, "ko"));
+  return {
+    rows: rows.map((r) => ({
+      ...r,
+      children_count: countByUser.get(r.id) ?? 0,
+      enrolled_names: enrolledByUser.get(r.id) ?? [],
+      class_names: classByUser.get(r.id) ?? [],
+      home_org_name:
+        r.org_id && r.org_id !== orgId
+          ? (orgNameById.get(r.org_id) ?? "다른 기관")
+          : null,
+    })),
+    classNames: Array.from(allClassNames).sort((a, b) => a.localeCompare(b, "ko")),
+  };
 }
 
 export default async function OrgUsersPage({
@@ -291,12 +284,9 @@ export default async function OrgUsersPage({
   const sp = await searchParams;
   const org = await requireOrg();
 
-  // 1) 기관 전체 참가자 + 행사 목록 + 반명 후보 동시 로드
-  const [allUsers, events, classSuggestions] = await Promise.all([
-    loadUsers(orgId),
-    loadOrgEventSummaries(orgId),
-    loadClassSuggestions(orgId),
-  ]);
+  // 1) 기관 전체 참가자(+반명 후보) + 행사 목록 동시 로드
+  const [{ rows: allUsers, classNames: classSuggestions }, events] =
+    await Promise.all([loadUsers(orgId), loadOrgEventSummaries(orgId)]);
 
   // 2) 행사 필터 — ?event={id} 가 유효한 이 기관 행사인지 검증
   const requestedEventId = (sp.event ?? "").trim();

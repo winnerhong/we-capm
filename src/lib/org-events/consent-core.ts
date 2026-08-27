@@ -114,6 +114,16 @@ export type OrgConsentSettings = {
   application_consent_updated_at?: string | null;
 };
 
+/**
+ * 동의 문구를 그리는 데 필요한 전부 — 설정 + {기관명} 에 넣을 이름.
+ *
+ * 이름을 따로 조회하지 않는 이유: 둘 다 partner_orgs 의 **같은 행**에 있다.
+ * 예전에는 loadOrgApplicationConsent 와 loadOrgNameById 를 나란히 불러
+ * 같은 행을 두 번 왕복했다. 초대장처럼 왕복 하나가 그대로 체감 지연이 되는
+ * 화면에서는 그 한 번이 아깝다.
+ */
+export type OrgConsentContext = OrgConsentSettings & { org_name: string };
+
 /** 신청서에 저장되는 동의 스냅샷 — 기관이 문구를 고쳐도 바뀌지 않는다. */
 export type ConsentSnapshot = { required: string; optional: string | null };
 

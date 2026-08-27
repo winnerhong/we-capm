@@ -6,13 +6,16 @@ import {
   formatHeadcount,
   formatPhoneDisplay,
   maskName,
+  normalizePartyCounts,
   parseApplicationChildren,
   parseApplicationCompanions,
+  resolveApplicationEdit,
   resolveApplicationGate,
   validateApplicationInput,
 } from "./application-core";
 import {
   COMPANION_PRESETS,
+  MAX_APPLICATION_PARTY_SIZE,
   ORG_EVENT_APPLICATION_STATUS_META,
 } from "./types";
 
@@ -559,5 +562,127 @@ describe("취소 상태", () => {
     expect(canceled.label).toBe("취소");
     expect(canceled.icon).not.toBe(rejected.icon);
     expect(canceled.color).not.toBe(rejected.color);
+  });
+});
+
+describe("resolveApplicationEdit", () => {
+  it("대기 중이면 고칠 수 있다 — 지금은 이 자리가 막다른 길이었다", () => {
+    expect(
+      resolveApplicationEdit({ status: "PENDING", gateKind: "OPEN" })
+    ).toEqual({ canEdit: true });
+  });
+
+  it("승인된 뒤에도 고칠 수 있다 (대가는 재승인 대기)", () => {
+    expect(
+      resolveApplicationEdit({ status: "APPROVED", gateKind: "OPEN" })
+    ).toEqual({ canEdit: true });
+  });
+
+  it("접수가 마감되면 못 고친다 — 기관 문의로 안내", () => {
+    const r = resolveApplicationEdit({ status: "APPROVED", gateKind: "CLOSED" });
+    expect(r.canEdit).toBe(false);
+    if (!r.canEdit) expect(r.reason).toContain("문의");
+  });
+
+  it("마감은 승인 여부와 무관하게 막는다", () => {
+    expect(
+      resolveApplicationEdit({ status: "PENDING", gateKind: "CLOSED" }).canEdit
+    ).toBe(false);
+  });
+
+  it("접수를 아예 안 쓰는 행사면 수정도 없다", () => {
+    expect(
+      resolveApplicationEdit({ status: "PENDING", gateKind: "DISABLED" })
+        .canEdit
+    ).toBe(false);
+  });
+
+  it("거절·취소는 수정이 아니라 새 신청이다", () => {
+    for (const status of ["REJECTED", "CANCELED"] as const) {
+      const r = resolveApplicationEdit({ status, gateKind: "OPEN" });
+      expect(r.canEdit).toBe(false);
+      if (!r.canEdit) expect(r.reason).toContain("새로 신청");
+    }
+  });
+});
+
+describe("normalizePartyCounts", () => {
+  it("합으로 총원을 만든다 — 구성과 총원이 어긋날 수 없다", () => {
+    const r = normalizePartyCounts({
+      childCount: 2,
+      adultCount: 3,
+      seniorCount: 1,
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.value).toEqual({
+      childCount: 2,
+      adultCount: 3,
+      seniorCount: 1,
+      partySize: 6,
+    });
+  });
+
+  it("조부모 0 이어도 정상", () => {
+    const r = normalizePartyCounts({
+      childCount: 1,
+      adultCount: 1,
+      seniorCount: 0,
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.value.partySize).toBe(2);
+  });
+
+  it("전부 0 이면 막는다 — 참석자 없는 참가 행은 의미가 없다", () => {
+    const r = normalizePartyCounts({
+      childCount: 0,
+      adultCount: 0,
+      seniorCount: 0,
+    });
+    expect(r.ok).toBe(false);
+  });
+
+  it("음수는 막는다", () => {
+    expect(
+      normalizePartyCounts({ childCount: -1, adultCount: 2, seniorCount: 0 }).ok
+    ).toBe(false);
+  });
+
+  it("숫자가 아니면 막는다", () => {
+    expect(
+      normalizePartyCounts({
+        childCount: Number.NaN,
+        adultCount: 1,
+        seniorCount: 0,
+      }).ok
+    ).toBe(false);
+  });
+
+  it("상한을 넘으면 막는다 (DB CHECK 과 같은 값)", () => {
+    const r = normalizePartyCounts({
+      childCount: 10,
+      adultCount: 10,
+      seniorCount: 1,
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.message).toContain(String(MAX_APPLICATION_PARTY_SIZE));
+  });
+
+  it("상한과 정확히 같으면 통과", () => {
+    const r = normalizePartyCounts({
+      childCount: MAX_APPLICATION_PARTY_SIZE - 1,
+      adultCount: 1,
+      seniorCount: 0,
+    });
+    expect(r.ok).toBe(true);
+  });
+
+  it("소수는 내림", () => {
+    const r = normalizePartyCounts({
+      childCount: 2.9,
+      adultCount: 1,
+      seniorCount: 0,
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.value.childCount).toBe(2);
   });
 });

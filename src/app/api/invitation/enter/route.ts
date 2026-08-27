@@ -43,6 +43,29 @@ function to(request: Request, path: string): NextResponse {
   return NextResponse.redirect(new URL(path, origin), { status: 303 });
 }
 
+/** 연락처로 계정 찾기 — approved_user_id 가 비었을 때의 대체 경로. */
+async function findUserIdByPhone(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  phone: string
+): Promise<string | null> {
+  const digits = (phone ?? "").replace(/D/g, "");
+  if (!digits) return null;
+  const resp = (await (
+    supabase.from("app_users" as never) as unknown as {
+      select: (c: string) => {
+        eq: (
+          k: string,
+          v: string
+        ) => { maybeSingle: () => Promise<SbOne<{ id: string }>> };
+      };
+    }
+  )
+    .select("id")
+    .eq("phone", digits)
+    .maybeSingle()) as SbOne<{ id: string }>;
+  return resp.data?.id ?? null;
+}
+
 export async function GET(request: Request) {
   const eventId = new URL(request.url).searchParams.get("event_id") ?? "";
   // eventId 를 그대로 경로에 되돌려주므로 형식 검증 필수 (open redirect 방지)
@@ -87,19 +110,20 @@ export async function GET(request: Request) {
   if (!applicationId) return to(request, `/join/event/${eventId}`);
 
   const app = await loadApplicationById(applicationId).catch(() => null);
-  if (
-    !app ||
-    app.event_id !== eventId ||
-    app.status !== "APPROVED" ||
-    !app.approved_user_id
-  ) {
+  if (!app || app.event_id !== eventId || app.status !== "APPROVED") {
     return to(request, `/join/event/${eventId}`);
   }
 
+  // approved_user_id 가 비어 있을 수 있다. org_event_applications 의 FK 가
+  // ON DELETE SET NULL 이라, 계정이 지워지면 이 칸만 조용히 비워지고 신청서는
+  // APPROVED 로 남는다. 같은 번호로 계정이 (다시) 있으면 그쪽으로 잇는다 —
+  // 승인은 사람에게 준 것이지 특정 행 id 에 준 것이 아니다.
+  const userId =
+    app.approved_user_id ?? (await findUserIdByPhone(supabase, app.phone));
+  if (!userId) return to(request, `/join/event/${eventId}`);
+
   // 승인 후 참가가 풀렸을 수 있다(관리자 제외·취소). 실제 참가 기록으로 다시 확인.
-  const stillIn = await isEventParticipant(eventId, app.approved_user_id).catch(
-    () => false
-  );
+  const stillIn = await isEventParticipant(eventId, userId).catch(() => false);
   if (!stillIn) return to(request, `/join/event/${eventId}`);
 
   const userResp = (await (
@@ -122,7 +146,7 @@ export async function GET(request: Request) {
     }
   )
     .select("id, phone, parent_name, status")
-    .eq("id", app.approved_user_id)
+    .eq("id", userId)
     .maybeSingle()) as SbOne<{
     id: string;
     phone: string;

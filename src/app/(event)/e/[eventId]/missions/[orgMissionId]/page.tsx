@@ -32,6 +32,14 @@ import {
 import { MissionAttemptHeartbeat } from "./MissionAttemptHeartbeat";
 import { SubmittedPhotos } from "./submitted-photos";
 import { resignSubmissionPhotoUrls } from "@/lib/missions/resign-photos";
+import {
+  isPhotoFeedEnabled,
+  loadEventPhotoFeed,
+  loadMyLikeCountsByMission,
+  loadSubmissionLikers,
+} from "@/lib/missions/photo-feed-queries";
+import { LIKES_PER_MISSION } from "@/lib/missions/photo-feed-core";
+import { PhotoGrid } from "@/components/photo-feed/photo-grid";
 import { PhotoRunner } from "./runners/PhotoRunner";
 import { QrQuizRunner } from "./runners/QrQuizRunner";
 import { FinalRewardRunner } from "./runners/FinalRewardRunner";
@@ -117,6 +125,173 @@ export default async function MissionRunnerPage({
     mission.kind === "BROADCAST";
   const isDone = hasActiveSubmission && !kindRendersOwnStatus;
 
+  /* ---------------------------------------------------------------------- */
+  /* 사진이 들어가는 미션의 공통 처리                                        */
+  /*                                                                        */
+  /* PHOTO 는 공통 결과 화면으로, PHOTO_APPROVAL 은 자체 상태 패널로 그려진다.  */
+  /* 사진 관련 처리를 각 분기 안에 두었더니 한쪽에만 붙어, PHOTO_APPROVAL 은    */
+  /* 만료된 signed URL 을 그대로 걸어 깨진 사진을 보여주고 "다른 가족들의 사진"  */
+  /* 도 없었다. 같은 사진 미션인데 화면 종류에 따라 다르게 동작할 이유가 없다 —  */
+  /* 여기서 한 번 만들어 두 분기가 같이 쓴다.                                  */
+  /* ---------------------------------------------------------------------- */
+  const isPhotoKind =
+    mission.kind === "PHOTO" || mission.kind === "PHOTO_APPROVAL";
+
+  const existingPayload = (existing?.payload_json ?? {}) as {
+    photo_urls?: unknown;
+    caption?: unknown;
+  };
+  const rawSubmittedUrls =
+    isPhotoKind && Array.isArray(existingPayload.photo_urls)
+      ? existingPayload.photo_urls.filter(
+          (u): u is string => typeof u === "string" && u.length > 0
+        )
+      : [];
+  // 사설 버킷 signed URL 은 24시간 만료 — 페이지 표시 직전 재서명.
+  const submittedUrls =
+    rawSubmittedUrls.length > 0
+      ? await safeQuery(
+          "resignSubmissionPhotoUrls",
+          () => resignSubmissionPhotoUrls(rawSubmittedUrls),
+          rawSubmittedUrls
+        )
+      : [];
+  const submittedCaption =
+    typeof existingPayload.caption === "string" ? existingPayload.caption : "";
+
+  // 사진 나눠보기 — 기관이 이 행사에서 켰을 때만 안내도 피드도 나온다.
+  const feedEnabled = isPhotoKind ? await isPhotoFeedEnabled(eventId) : false;
+  const othersPhotos = feedEnabled
+    ? await safeQuery(
+        "loadEventPhotoFeed",
+        () =>
+          loadEventPhotoFeed({
+            eventId,
+            missionId: mission.id,
+            excludeUserId: ctx.user.id,
+            viewerId: ctx.user.id,
+            limit: 12,
+          }),
+        []
+      )
+    : [];
+  // 좋아요는 미션마다 3개. 남은 개수를 머리말에 적어둬야 신중하게 쓴다.
+  const myLikeCounts = feedEnabled
+    ? await safeQuery(
+        "loadMyLikeCountsByMission",
+        () => loadMyLikeCountsByMission(ctx.user.id, [mission.id]),
+        {}
+      )
+    : {};
+  const likesLeft = LIKES_PER_MISSION - (myLikeCounts[mission.id] ?? 0);
+  /**
+   * 돌아가기 — 미션 화면 어디에서든 바닥에 둔다.
+   *
+   * 예전엔 결과 화면과 잠긴 화면에만 있었다. 정작 미션을 하는 중(러너 화면)에는
+   * 출구가 머리말의 작은 링크뿐이라, 폰에서는 화면 끝까지 내려간 뒤 다시 맨 위로
+   * 올라가야 나갈 수 있었다. 미션은 중간에 그만두는 일이 흔하다.
+   */
+  const backButton = (
+    <Link
+      href={backHref}
+      className="block w-full rounded-2xl bg-[#2D5A3D] px-4 py-3 text-center text-sm font-bold text-white shadow-sm transition hover:bg-[#3A7A52]"
+    >
+      ← 스탬프북으로 돌아가기
+    </Link>
+  );
+
+  // 사진 장수 정책 — 운영자 설정한 min_photos 가 곧 필요 장수(min == max).
+  const photoCfg = (mission.config_json ?? {}) as Record<string, unknown>;
+  const minPhotos =
+    mission.kind === "PHOTO"
+      ? Math.max(1, (photoCfg as Partial<PhotoMissionConfig>).min_photos ?? 1)
+      : mission.kind === "PHOTO_APPROVAL"
+        ? Math.max(
+            1,
+            (photoCfg as Partial<PhotoApprovalMissionConfig>).min_photos ?? 1
+          )
+        : 1;
+
+  // 내 사진에 누가 하트를 눌렀는지 — 숫자만 있으면 "몇 명이 봤나" 로 끝난다.
+  const myLikers =
+    feedEnabled && existing && (existing.like_count ?? 0) > 0
+      ? await safeQuery(
+          "loadSubmissionLikers",
+          () => loadSubmissionLikers(existing.id, eventId),
+          []
+        )
+      : [];
+
+  // 제출한 사진 + 다시 찍기. PHOTO 는 결과 화면에서, PHOTO_APPROVAL 은 자체 상태
+  // 패널 아래에서 — 어느 쪽이든 "다시 찍기" 가 있어야 한다. 반려 상태는 예외로,
+  // 러너가 재제출 폼을 따로 띄우므로 여기서 중복해서 보여주지 않는다.
+  const submittedPhotosSection =
+    isPhotoKind && existing && submittedUrls.length > 0 &&
+    existing.status !== "REJECTED" ? (
+      <SubmittedPhotos
+        missionId={mission.id}
+        initialUrls={submittedUrls}
+        initialCaption={submittedCaption}
+        minPhotos={minPhotos}
+        maxPhotos={minPhotos}
+        photoFeedEnabled={feedEnabled}
+        submissionStatus={existing.status}
+        // 승인제 미션은 사진을 바꾸면 기관 확인을 다시 받는다.
+        needsReviewAfterChange={mission.kind === "PHOTO_APPROVAL"}
+        receivedLikes={existing.like_count ?? 0}
+        likerNames={myLikers.map((l) => l.name)}
+      />
+    ) : null;
+
+  // 제출 전이든 검토 중이든 승인된 뒤든 같은 자리에 있어야 하는 칸.
+  const feedSection = feedEnabled ? (
+    <section className="rounded-3xl border border-[#D4E4BC] bg-white p-5 shadow-sm">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="flex items-center gap-2 text-base font-bold text-[#2D5A3D]">
+          <span aria-hidden>👨‍👩‍👧‍👦</span>
+          다른 가족들의 사진
+        </h2>
+        {othersPhotos.length > 0 && (
+          <span
+            className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
+              likesLeft > 0
+                ? "bg-rose-50 text-rose-600"
+                : "bg-[#F5F1E8] text-[#8B7F75]"
+            }`}
+          >
+            {likesLeft > 0
+              ? `❤️ 좋아요 ${likesLeft}개 남음`
+              : "❤️ 좋아요 다 썼어요"}
+          </span>
+        )}
+      </div>
+      {/* 이 미션 사진만 보이는 자리라, 행사 전체를 보려면 사진 화면으로 — 하단
+          탭을 내린 뒤로 여기가 두 번째 입구다. */}
+      <div className="mb-3">
+        <Link
+          href={ctx.href("/photos")}
+          className="inline-flex items-center gap-1 text-[11px] font-bold text-[#2D5A3D] underline-offset-2 hover:underline"
+        >
+          📸 행사 전체 사진 보기 →
+        </Link>
+      </div>
+      {othersPhotos.length > 0 && (
+        <p className="mb-3 text-[11px] leading-relaxed text-[#8B7F75]">
+          하트를 누르면 그 가족에게 도토리가 1개 전해져요. 한 미션에 
+          {LIKES_PER_MISSION}개까지, 다시 누르면 취소돼요.
+        </p>
+      )}
+      <PhotoGrid
+        photos={othersPhotos}
+        showMissionChip={false}
+        eventId={eventId}
+        viewerId={ctx.user.id}
+        usedByMission={myLikeCounts}
+        channelKey={`mission-${mission.id}`}
+      />
+    </section>
+  ) : null;
+
   // Header component
   const header = (
     <div className="space-y-1.5">
@@ -164,43 +339,6 @@ export default async function MissionRunnerPage({
           : existing.status === "REJECTED"
             ? "반려되었어요"
             : statusMeta.label;
-    // 사진 미션이면 제출한 사진 갤러리 + 사진 교체 버튼 노출.
-    const isPhotoKind =
-      mission.kind === "PHOTO" || mission.kind === "PHOTO_APPROVAL";
-    const existingPayload = (existing.payload_json ?? {}) as {
-      photo_urls?: unknown;
-      caption?: unknown;
-    };
-    const rawSubmittedUrls = Array.isArray(existingPayload.photo_urls)
-      ? existingPayload.photo_urls.filter(
-          (u): u is string => typeof u === "string" && u.length > 0
-        )
-      : [];
-    // 사설 버킷 signed URL 은 24시간 만료 — 페이지 표시 직전 재서명.
-    const submittedUrls = await safeQuery(
-      "resignSubmissionPhotoUrls",
-      () => resignSubmissionPhotoUrls(rawSubmittedUrls),
-      rawSubmittedUrls
-    );
-    const submittedCaption =
-      typeof existingPayload.caption === "string" ? existingPayload.caption : "";
-    // kind 별 사진 장수 정책
-    const cfg = (mission.config_json ?? {}) as Record<string, unknown>;
-    const minPhotos =
-      mission.kind === "PHOTO"
-        ? Math.max(
-            1,
-            (cfg as Partial<PhotoMissionConfig>).min_photos ?? 1
-          )
-        : mission.kind === "PHOTO_APPROVAL"
-          ? Math.max(
-              1,
-              (cfg as Partial<PhotoApprovalMissionConfig>).min_photos ?? 1
-            )
-          : 1;
-    // 운영자 설정한 min_photos 가 곧 필요 장수 — min == max 로 다룸.
-    const maxPhotos = minPhotos;
-
     return (
       <div className="space-y-4">
         {header}
@@ -243,22 +381,11 @@ export default async function MissionRunnerPage({
           )}
         </section>
 
-        {isPhotoKind && submittedUrls.length > 0 && (
-          <SubmittedPhotos
-            missionId={mission.id}
-            initialUrls={submittedUrls}
-            initialCaption={submittedCaption}
-            minPhotos={minPhotos}
-            maxPhotos={maxPhotos}
-          />
-        )}
+        {submittedPhotosSection}
 
-        <Link
-          href={backHref}
-          className="block w-full rounded-2xl bg-[#2D5A3D] px-4 py-3 text-center text-sm font-bold text-white shadow-sm transition hover:bg-[#3A7A52]"
-        >
-          ← 스탬프북으로 돌아가기
-        </Link>
+        {feedSection}
+
+        {backButton}
       </div>
     );
   }
@@ -305,12 +432,7 @@ export default async function MissionRunnerPage({
               {gate.reason ?? "조건을 달성하면 열려요"}
             </p>
           </section>
-          <Link
-            href={backHref}
-            className="block w-full rounded-2xl bg-[#2D5A3D] px-4 py-3 text-center text-sm font-bold text-white shadow-sm transition hover:bg-[#3A7A52]"
-          >
-            ← 스탬프북으로 돌아가기
-          </Link>
+          {backButton}
         </div>
       );
     }
@@ -336,7 +458,13 @@ export default async function MissionRunnerPage({
           ? (configJson.geofence as PhotoMissionConfig["geofence"])
           : undefined,
     };
-    runnerBody = <PhotoRunner mission={mission} config={photoConfig} />;
+    runnerBody = (
+      <PhotoRunner
+        mission={mission}
+        config={photoConfig}
+        photoFeedEnabled={feedEnabled}
+      />
+    );
   } else if (mission.kind === "QR_QUIZ") {
     const qrConfig: QrQuizMissionConfig = {
       qr_token:
@@ -381,6 +509,7 @@ export default async function MissionRunnerPage({
               스탬프북이 연결되지 않았어요
             </p>
           </section>
+          {backButton}
         </div>
       );
     }
@@ -450,6 +579,9 @@ export default async function MissionRunnerPage({
         mission={mission}
         config={paConfig}
         existing={existing ?? null}
+        // payload 의 URL 은 이미 만료됐을 수 있다 — 재서명한 것을 넘긴다.
+        // 사진 표시·다시 찍기·공개 안내는 아래 SubmittedPhotos 카드가 맡는다.
+        existingUrls={submittedUrls}
       />
     );
   } else if (mission.kind === "TREASURE") {
@@ -644,6 +776,9 @@ export default async function MissionRunnerPage({
     <div className="space-y-5">
       {header}
       {runnerBody}
+      {submittedPhotosSection}
+      {feedSection}
+      {backButton}
       {/* 관제 telemetry — 화면에 보이지 않음. */}
       <MissionAttemptHeartbeat orgMissionId={mission.id} />
     </div>

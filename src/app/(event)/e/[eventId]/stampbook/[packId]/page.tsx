@@ -10,6 +10,7 @@ import {
 } from "@/lib/missions/queries";
 import { StampbookDetail } from "@/components/stampbook-detail";
 import { AcornTopBoard } from "@/components/acorn-top-board";
+import { loadAcornGuide } from "@/lib/missions/acorn-guide-queries";
 import { loadTopAcornFamiliesForEvent } from "@/lib/app-user/event-acorns";
 import { loadOrgNameById } from "@/lib/org-partner";
 
@@ -37,12 +38,14 @@ export default async function StampbookDetailPage({
     userAcornsInPack,
     topFamilies,
     freshOrgName,
+    acornGuide,
   ] = await Promise.all([
     loadOrgMissionsByQuestPack(packId),
     loadUserSubmissions(user.id, { packId }),
     sumAcornsForPack(user.id, packId),
     loadTopAcornFamiliesForEvent(ctx.event.id, 5),
     loadOrgNameById(ctx.orgId, ctx.orgName),
+    loadAcornGuide(ctx.event.id),
   ]);
 
   return (
@@ -52,6 +55,7 @@ export default async function StampbookDetailPage({
         families={topFamilies}
         myUserId={user.id}
         orgName={freshOrgName}
+        guide={acornGuide}
       />
 
       {/* 상단 뒤로가기 */}

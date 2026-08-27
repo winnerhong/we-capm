@@ -571,16 +571,6 @@ export function CoopRunner({
             </p>
           )}
         </section>
-        <a
-          href={
-            mission.quest_pack_id
-              ? `/stampbook/${mission.quest_pack_id}`
-              : "/stampbook"
-          }
-          className="block w-full rounded-2xl bg-[#2D5A3D] px-4 py-3 text-center text-sm font-bold text-white shadow-sm transition hover:bg-[#3A7A52]"
-        >
-          ← 스탬프북으로 돌아가기
-        </a>
       </div>
     );
   }
@@ -663,6 +653,27 @@ export function CoopRunner({
                   className="h-auto w-full object-cover"
                 />
               </div>
+              {/* 다시 찍기 — 올리고 나서야 눈 감은 걸 발견하는 게 사진이다.
+                  둘 다 확인해 완료되기 전까지는 언제든 새로 올릴 수 있다. */}
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                disabled={uploading || isPending}
+                className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-2xl border border-[#D4E4BC] bg-[#F5F1E8] px-4 py-2.5 text-sm font-bold text-[#2D5A3D] transition hover:bg-[#E8DDC8] disabled:opacity-50"
+              >
+                {uploading ? (
+                  <span className="inline-flex items-center gap-2">
+                    <span className="animate-pulse">⏳</span>
+                    {uploadStatus ?? "업로드 중..."}
+                  </span>
+                ) : (
+                  <>📷 다시 찍기</>
+                )}
+              </button>
+              <p className="text-center text-[11px] leading-relaxed text-[#8B7F75]">
+                💡 새로 올리면 이 사진을 대신해요. 짝꿍도 새 사진을 보게 돼요.
+              </p>
+
               {!iAmDone && (
                 <button
                   type="button"
@@ -700,22 +711,25 @@ export function CoopRunner({
                   <>📷 함께 찍은 사진 올리기</>
                 )}
               </button>
-              <input
-                ref={fileRef}
-                type="file"
-                accept="image/*"
-                capture="environment"
-                className="hidden"
-                onChange={(e) => {
-                  const files = e.target.files;
-                  if (files && files.length > 0) {
-                    void handleSharedPhotoUpload(files);
-                  }
-                  e.target.value = "";
-                }}
-              />
             </>
           )}
+
+          {/* 사진 입력은 분기 밖에 둔다 — 처음 올릴 때와 다시 찍을 때가 같은 입력을
+              써야 한다. 안쪽에 두면 사진이 있는 화면에서 버튼이 아무 일도 안 한다. */}
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            onChange={(e) => {
+              const files = e.target.files;
+              if (files && files.length > 0) {
+                void handleSharedPhotoUpload(files);
+              }
+              e.target.value = "";
+            }}
+          />
         </section>
       ) : (
         <section className="rounded-3xl border border-[#D4E4BC] bg-white p-5 shadow-sm">

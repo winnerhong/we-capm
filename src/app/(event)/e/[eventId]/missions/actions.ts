@@ -23,6 +23,11 @@ import {
   loadAcornCapContext,
 } from "@/lib/missions/acorn-cap";
 import { loadAppUserById } from "@/lib/app-user/queries";
+import {
+  LIKES_PER_MISSION,
+  LIKE_ACORN_CAP,
+} from "@/lib/missions/photo-feed-core";
+import { isPhotoFeedEnabled } from "@/lib/missions/photo-feed-queries";
 import { grantGiftAction } from "@/lib/gifts/actions";
 import type {
   BroadcastMissionConfig,
@@ -698,15 +703,17 @@ async function submitMissionActionInner(
 /* -------------------------------------------------------------------------- */
 /**
  * 이미 제출(승인) 된 사진 미션의 사진 URL 만 교체.
- *  - 도토리·상태(AUTO_APPROVED/APPROVED 등) 그대로 유지
+ *  - 도토리는 언제나 그대로 유지 (회수 없음)
  *  - PHOTO / PHOTO_APPROVAL kind 만 허용
  *  - 본인 제출만 수정 가능
  *  - payload_json.photo_urls 와 caption (옵션) 교체
  *
- * "더 잘 나온 사진으로 바꾸기" 가족 친화 UX. 도토리 회수 없음.
+ * "더 잘 나온 사진으로 바꾸기" 가족 친화 UX.
+ *
+ * 다만 PHOTO_APPROVAL 은 승인 상태를 유지하지 않는다 — needsReview 참고.
  */
 export type ReplacePhotosResult =
-  | { ok: true }
+  | { ok: true; needsReview: boolean }
   | { ok: false; error: string };
 
 export async function replaceMissionPhotosAction(
@@ -768,6 +775,22 @@ export async function replaceMissionPhotosAction(
     if (caption) nextPayload.caption = caption;
     else delete nextPayload.caption;
 
+    // PHOTO_APPROVAL 은 "기관이 직접 본 사진" 이 승인의 근거다. 승인된 뒤에 사진만
+    // 갈아끼우면 아무도 확인하지 않은 사진이 곧장 다른 가족들 피드에 오른다.
+    // 그래서 사진을 바꾸면 검토 대기로 되돌린다 — 도토리는 그대로 두고(이미 한 일은
+    // 한 일이다) 노출만 멈춘다. PHOTO(자동 승인)는 애초에 검토가 없으니 그대로 둔다.
+    const needsReview =
+      mission.kind === "PHOTO_APPROVAL" &&
+      (existing.status === "APPROVED" || existing.status === "AUTO_APPROVED");
+
+    const patch: Row = { payload_json: nextPayload };
+    if (needsReview) {
+      patch.status = "PENDING_REVIEW";
+      patch.reviewed_by = null;
+      patch.reviewed_at = null;
+      patch.reject_reason = null;
+    }
+
     const supabase = await createClient();
     const { error } = await (
       supabase.from("mission_submissions" as never) as unknown as {
@@ -776,7 +799,7 @@ export async function replaceMissionPhotosAction(
         };
       }
     )
-      .update({ payload_json: nextPayload })
+      .update(patch)
       .eq("id", existing.id);
 
     if (error) {
@@ -789,9 +812,10 @@ export async function replaceMissionPhotosAction(
       revalidatePath(`/stampbook/${mission.quest_pack_id}`);
     }
     revalidatePath("/e/[eventId]/stampbook", "page");
+    revalidatePath("/e/[eventId]/photos", "page");
     revalidatePath("/home");
 
-    return { ok: true };
+    return { ok: true, needsReview };
   } catch (e) {
     console.error("[replaceMissionPhotos] threw", e);
     return {
@@ -1060,4 +1084,111 @@ export async function issueFinalRewardAction(
   if (config.show_in_gift_box) revalidatePath("/e/[eventId]/gifts", "page");
 
   return { redemptionId, qrToken };
+}
+
+/* -------------------------------------------------------------------------- */
+/* togglePhotoLikeAction — 다른 가족 사진에 하트 누르기 / 취소                  */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * 좋아요는 도토리를 움직인다. 그래서 판정과 기록을 화면이나 이 액션이 아니라
+ * **DB 함수(toggle_photo_like) 한 트랜잭션**에 맡긴다 — 두 가족이 같은 사진을
+ * 동시에 누르면, 여기서 세고 넣고 계산하는 사이에 개수가 어긋나 도토리가 새거나
+ * 빈다. 규칙(미션당 3개, 사진당 5개 상한, 내 사진 제외)은 그 안에서 잠근 채 본다.
+ *
+ * 여기서 하는 일은 두 가지뿐이다: 로그인 확인, 그리고 실패 사유를 사람 말로 옮기기.
+ */
+export type TogglePhotoLikeResult =
+  | {
+      ok: true;
+      /** 누른 뒤 상태 — true 면 방금 눌렀고, false 면 취소했다. */
+      liked: boolean;
+      /** 이 사진의 총 좋아요 수. */
+      likeCount: number;
+      /** 이 미션에서 내가 쓴 좋아요 수(남은 개수 계산용). */
+      usedInMission: number;
+      /** 이번에 오간 도토리. 상한을 넘은 구간에서는 0. */
+      acornDelta: number;
+    }
+  | { ok: false; error: string };
+
+export async function togglePhotoLikeAction(
+  submissionId: string,
+  eventId: string
+): Promise<TogglePhotoLikeResult> {
+  try {
+    const user = await requireAppUser();
+    if (!submissionId) return { ok: false, error: "사진을 찾을 수 없어요" };
+
+    // 행사가 사진 나눠보기를 끈 상태면 하트도 없다 — 버튼이 안 보이는 게 정상이지만
+    // 끄는 순간 화면에 남아 있던 버튼이 눌릴 수 있다.
+    if (eventId && !(await isPhotoFeedEnabled(eventId))) {
+      return { ok: false, error: "이 행사는 사진 나눠보기를 쓰지 않아요" };
+    }
+
+    const supabase = await createClient();
+    const { data, error } = (await (
+      supabase as unknown as {
+        rpc: (
+          fn: string,
+          args: Record<string, unknown>
+        ) => Promise<{ data: LikeRpcRow[] | null; error: { message: string } | null }>;
+      }
+    ).rpc("toggle_photo_like", {
+      p_submission_id: submissionId,
+      p_user_id: user.id,
+      p_event_id: eventId || null,
+      p_max_per_mission: LIKES_PER_MISSION,
+      p_acorn_cap: LIKE_ACORN_CAP,
+    })) as {
+      data: LikeRpcRow[] | null;
+      error: { message: string } | null;
+    };
+
+    if (error) {
+      // RPC 의 RAISE EXCEPTION 문구는 그대로 보여줄 수 있게 써 뒀다.
+      console.error("[photo-like] rpc", error);
+      return { ok: false, error: humanizeLikeError(error.message) };
+    }
+
+    const row = data?.[0];
+    if (!row) return { ok: false, error: "좋아요를 저장하지 못했어요" };
+
+    // revalidatePath 를 부르지 않는다 — 부르면 하트 한 번에 페이지가 통째로 다시
+    // 그려지고, 사진 60장이 새로 내려온다. 화면에 필요한 값(하트 수·내가 쓴 개수)은
+    // 아래 반환값으로 정확히 돌아가고, 다른 사람 화면은 realtime 이 맡는다.
+    return {
+      ok: true,
+      liked: row.liked === true,
+      likeCount: row.like_count ?? 0,
+      usedInMission: row.my_likes_in_mission ?? 0,
+      acornDelta: row.acorn_delta ?? 0,
+    };
+  } catch (e) {
+    console.error("[photo-like] threw", e);
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : "좋아요에 실패했어요",
+    };
+  }
+}
+
+type LikeRpcRow = {
+  liked: boolean | null;
+  like_count: number | null;
+  my_likes_in_mission: number | null;
+  acorn_delta: number | null;
+};
+
+/**
+ * DB 함수가 올린 문구는 이미 사람 말이다. 다만 함수가 아직 없는 배포 창(마이그레이션
+ * 미적용)에서는 Postgres 원문이 그대로 나가므로 그때만 갈아 끼운다.
+ */
+function humanizeLikeError(message: string): string {
+  const m = (message ?? "").trim();
+  if (!m) return "좋아요에 실패했어요";
+  if (/toggle_photo_like|does not exist|schema cache/i.test(m)) {
+    return "좋아요 기능이 아직 준비되지 않았어요";
+  }
+  return m;
 }

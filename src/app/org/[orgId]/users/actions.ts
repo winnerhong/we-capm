@@ -51,6 +51,7 @@ async function getOwnedUser(userId: string): Promise<{
   id: string;
   org_id: string;
   parent_name: string;
+  phone: string;
 }> {
   const session = await requireOrg();
   if (!userId) throw new Error("참가자 ID가 없어요");
@@ -62,18 +63,24 @@ async function getOwnedUser(userId: string): Promise<{
       select: (c: string) => {
         eq: (k: string, v: string) => {
           maybeSingle: () => Promise<
-            SbOne<{ id: string; org_id: string; parent_name: string }>
+            SbOne<{
+              id: string;
+              org_id: string;
+              parent_name: string;
+              phone: string;
+            }>
           >;
         };
       };
     }
   )
-    .select("id, org_id, parent_name")
+    .select("id, org_id, parent_name, phone")
     .eq("id", userId)
     .maybeSingle()) as SbOne<{
     id: string;
     org_id: string;
     parent_name: string;
+    phone: string;
   }>;
 
   const user = resp.data;
@@ -89,6 +96,43 @@ async function getOwnedUser(userId: string): Promise<{
     );
   }
   return user;
+}
+
+/**
+ * 이 번호로 들어온 접수 신청서를 전부 취소 상태로 돌린다.
+ *
+ * 계정 삭제와 짝을 이룬다 — 계정이 사라졌는데 신청서가 APPROVED 로 남으면
+ * 신청자 초대장이 "승인됐어요" 라고 계속 거짓말을 한다.
+ *
+ * 실패해도 계정 삭제 자체를 막지는 않는다(컬럼 미적용 배포 창 포함).
+ * 초대장 쪽에도 참가 기록을 직접 확인하는 안전장치가 따로 있다.
+ */
+async function cancelApplicationsByPhone(phone: string): Promise<void> {
+  const digits = (phone ?? "").replace(/D/g, "");
+  if (!digits) return;
+
+  const supabase = await createClient();
+  const resp = (await (
+    supabase.from("org_event_applications" as never) as unknown as {
+      update: (p: unknown) => {
+        eq: (k: string, v: string) => {
+          in: (k: string, v: string[]) => Promise<{ error: SbErr }>;
+        };
+      };
+    }
+  )
+    .update({
+      status: "CANCELED",
+      canceled_at: new Date().toISOString(),
+      cancel_reason: "기관에서 계정을 삭제했어요",
+      approved_user_id: null,
+    })
+    .eq("phone", digits)
+    .in("status", ["PENDING", "APPROVED"])) as { error: SbErr };
+
+  if (resp.error) {
+    console.error("[users/delete] 신청서 정리 실패", resp.error);
+  }
 }
 
 /** 에러 문구용 기관명 — 실패해도 흐름을 막지 않는다. */
@@ -171,7 +215,12 @@ export async function updateAppUserStatusAction(
     return { ok: false, message: "올바르지 않은 상태값이에요" };
   }
 
-  let user: { id: string; org_id: string; parent_name: string };
+  let user: {
+    id: string;
+    org_id: string;
+    parent_name: string;
+    phone: string;
+  };
   try {
     user = await getOwnedUser(userId);
   } catch (err) {
@@ -209,7 +258,12 @@ export async function updateAppUserStatusAction(
 export async function deleteAppUserAction(
   userId: string
 ): Promise<UserActionResult> {
-  let user: { id: string; org_id: string; parent_name: string };
+  let user: {
+    id: string;
+    org_id: string;
+    parent_name: string;
+    phone: string;
+  };
   try {
     user = await getOwnedUser(userId);
   } catch (err) {
@@ -217,6 +271,17 @@ export async function deleteAppUserAction(
   }
 
   const supabase = await createClient();
+
+  // 계정보다 **먼저** 신청서를 정리한다.
+  //
+  //   org_event_applications.approved_user_id 의 FK 는 ON DELETE SET NULL 이다.
+  //   계정만 지우면 그 칸만 조용히 비고 신청서는 APPROVED 로 남아서,
+  //   신청자의 초대장에는 계속 "참가가 승인됐어요 → 입장하기" 가 뜬다.
+  //   눌러도 들어갈 계정이 없으니 연락처 로그인 화면으로 튕긴다.
+  //
+  //   지우지 않고 CANCELED 로 두는 이유는 취소 기능과 같다 — 누가 왜 빠졌는지는
+  //   정원 운영에 그대로 필요한 정보다.
+  await cancelApplicationsByPhone(user.phone);
 
   const del = (await (
     supabase.from("app_users" as never) as unknown as {

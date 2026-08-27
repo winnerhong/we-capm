@@ -921,3 +921,40 @@ export async function unlinkFmSessionFromEventAction(
 
   revalidateEvents(org.orgId, eventId);
 }
+
+/**
+ * 사진 나눠보기 스위치 — 참가 가족끼리 미션 사진을 볼 수 있게 할지.
+ *
+ * 이걸 켠다고 사진이 바로 공개되지는 않는다. 보호자가 사진마다 따로 켜야
+ * 하고, 기관 확인이 끝난 사진만 오른다. 이 스위치는 **그 선택지를 열어주는**
+ * 것이고, 끄면 이미 켜둔 사진까지 전부 화면에서 사라진다(원상복구 가능).
+ */
+export async function updateEventPhotoFeedAction(
+  eventId: string,
+  enabled: boolean
+): Promise<void> {
+  const org = await requireOrg();
+  if (!eventId) throw new Error("행사를 찾을 수 없어요");
+
+  await assertEventOwned(eventId, org.orgId);
+
+  const supabase = await createClient();
+  const resp = (await (
+    supabase.from("org_events" as never) as unknown as {
+      update: (p: Row) => {
+        eq: (k: string, v: string) => Promise<{ error: SbErr }>;
+      };
+    }
+  )
+    .update({ photo_feed_enabled: enabled } satisfies Row)
+    .eq("id", eventId)) as { error: SbErr };
+
+  if (resp.error) {
+    console.error("[org-events/updatePhotoFeed] error", {
+      code: resp.error.code,
+    });
+    throw new Error("사진 나눠보기 설정 변경에 실패했어요");
+  }
+
+  revalidateEvents(org.orgId, eventId);
+}

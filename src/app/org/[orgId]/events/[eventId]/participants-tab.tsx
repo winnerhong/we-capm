@@ -27,6 +27,7 @@ import { AcornAdjuster } from "@/app/org/[orgId]/users/acorn-adjuster";
 import { UserRowActions } from "@/app/org/[orgId]/users/user-row-actions";
 import { AcornIcon } from "@/components/acorn-icon";
 import { RemoveFromEventButton } from "./users/remove-from-event-button";
+import { PartyCountEditor } from "./party-count-editor";
 import { RemoveFromOrgButton } from "./users/remove-from-org-button";
 import { SelfRegisterToggle } from "./self-register-toggle";
 import { fmtFullDateKst } from "@/lib/datetime/kst";
@@ -91,18 +92,6 @@ function acornTitle(
     return `이 행사에서 모은 도토리 ${eventAcorns}개`;
   }
   return `이 행사 ${eventAcorns}개 · 전체 누적 ${global}개 (다른 기관 행사 포함)`;
-}
-
-/** "👶2·🧑3·👴1" — 구성을 모르면(직접 등록분) null 이라 배지를 렌더하지 않는다. */
-function partyBadge(pc: EventPartyCount | undefined): string | null {
-  if (!pc) return null;
-  const senior = pc.senior_count ?? 0;
-  if (pc.adult_count === 0 && pc.child_count === 0 && senior === 0) {
-    return null;
-  }
-  const parts = [`👶${pc.child_count}`, `🧑${pc.adult_count}`];
-  if (senior > 0) parts.push(`👴${senior}`);
-  return parts.join("·");
 }
 
 /**
@@ -589,25 +578,14 @@ export function ParticipantsTab({
                           </span>
                         </td>
                         <td className="px-2 py-2 text-center">
-                          {(() => {
-                            const pc = partyCounts[r.id];
-                            const badge = partyBadge(pc);
-                            if (!badge || !pc) {
-                              return (
-                                <span className="text-[10px] text-[#C4BBB2]">
-                                  -
-                                </span>
-                              );
-                            }
-                            return (
-                              <span
-                                title={`총 ${pc.party_size}명`}
-                                className="inline-flex items-center gap-0.5 rounded-full bg-[#E8F0E4] px-2 py-0.5 text-[10px] font-bold tabular-nums text-[#2D5A3D]"
-                              >
-                                {badge}
-                              </span>
-                            );
-                          })()}
+                          {/* 인원은 신청 후에도 바뀐다 — 배지를 눌러 바로 고친다. */}
+                          <PartyCountEditor
+                            orgId={orgId}
+                            eventId={eventId}
+                            userId={r.id}
+                            displayName={r.parent_name}
+                            current={partyCounts[r.id]}
+                          />
                         </td>
                         <td
                           className="px-2 py-2 text-center"
@@ -741,14 +719,21 @@ export function ParticipantsTab({
                         👫 {r.children_count}명
                       </div>
                     </div>
-                    {partyBadge(partyCounts[r.id]) && (
-                      <div className="rounded-lg bg-[#E8F0E4] p-2">
-                        <div className="text-[10px] text-[#2D5A3D]">참석</div>
-                        <div className="text-sm font-bold tabular-nums text-[#2D5A3D]">
-                          {partyBadge(partyCounts[r.id])}
-                        </div>
+                    {/* 구성을 모르는 행(직접 등록분)도 눌러서 채울 수 있게
+                        조건 없이 띄운다. */}
+                    <div className="rounded-lg bg-[#E8F0E4] p-2">
+                      <div className="text-[10px] text-[#2D5A3D]">참석</div>
+                      <div className="mt-0.5">
+                        <PartyCountEditor
+                          orgId={orgId}
+                          eventId={eventId}
+                          userId={r.id}
+                          displayName={r.parent_name}
+                          current={partyCounts[r.id]}
+                          variant="card"
+                        />
                       </div>
-                    )}
+                    </div>
                     <div
                       className="rounded-lg bg-[#F4EFE8] p-2"
                       title={acornTitle(r.acorn_balance, globalAcorns[r.id])}

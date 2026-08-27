@@ -39,6 +39,13 @@ export interface OrgEventRow {
    * 이유: 행사 시각이 바뀌어도 자동으로 따라오게.
    */
   invitation_entry_lead_min: number | null;
+  /**
+   * 사진 나눠보기 — 참가 가족끼리 미션 사진을 볼 수 있게 할지.
+   * 켜도 곧바로 공개되지 않는다. 보호자가 사진마다 따로 켜야 한다.
+   * optional 인 이유: 컬럼 미적용 배포 창에서는 select("*") 가 이 키를
+   * 돌려주지 않는다. undefined 는 "꺼짐" 으로 읽는다(공개는 기본이 잠김).
+   */
+  photo_feed_enabled?: boolean | null;
   /** 초대장 주차장 — 최대 5개. */
   invitation_parkings: ParkingItem[] | null;
   /** 초대장 주최 (자유 입력). 예: "구미혜당학교". 비우면 줄 자체 숨김. */

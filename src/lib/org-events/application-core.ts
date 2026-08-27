@@ -12,6 +12,7 @@ import {
   type ApplicationChild,
   type ApplicationCompanion,
   type CompanionKind,
+  type OrgEventApplicationStatus,
 } from "./types";
 
 /** 이름 한 개의 길이 상한 — app_children 입력들과 동일 규약. */
@@ -351,5 +352,109 @@ export function resolveApplicationGate(args: {
     approvedPeople: args.approvedPeople,
     closeAt: effectiveClose,
     closeIsImplicit: implicit,
+  };
+}
+
+/* -------------------------------------------------------------------------- */
+/* 신청 내용 수정                                                              */
+/* -------------------------------------------------------------------------- */
+
+export type ApplicationEdit =
+  | { canEdit: true }
+  | { canEdit: false; reason: string };
+
+/**
+ * 신청자가 지금 자기 신청서를 고칠 수 있는가.
+ *
+ * 행사 인원은 자주 바뀐다 — 당일 아침에 할머니가 같이 가시거나 아빠가 못 오시거나.
+ * 그때마다 기관에 전화해서 숫자를 대신 고치게 하면 간식·버스 인원이 어긋난다.
+ *
+ * 승인된 뒤에 고치면 **다시 대기 상태로 돌아간다**(기관 정책). 인원이 바뀌었다는
+ * 사실 자체를 기관이 알아야 하기 때문이고, 그래서 이 함수는 승인 여부를
+ * 가리지 않는다 — 둘 다 "고칠 수 있다" 이고, 그 대가는 화면이 알린다.
+ *
+ * 화면과 서버가 같은 함수로 판단해 "버튼은 있는데 눌러도 안 되는" 상태를 막는다
+ * (resolveApplicationGate · resolveEntryTime 과 같은 규약).
+ */
+export function resolveApplicationEdit(args: {
+  status: OrgEventApplicationStatus;
+  /** resolveApplicationGate 의 판정. 마감 여부가 여기서 온다. */
+  gateKind: ApplicationGate["kind"];
+}): ApplicationEdit {
+  // 거절·취소는 애초에 폼이 다시 뜬다. "수정" 이라는 개념 자체가 없다.
+  if (args.status !== "PENDING" && args.status !== "APPROVED") {
+    return { canEdit: false, reason: "아래에서 새로 신청하실 수 있어요" };
+  }
+
+  if (args.gateKind === "CLOSED") {
+    return {
+      canEdit: false,
+      reason:
+        "접수가 마감돼 신청 내용을 바꿀 수 없어요. 기관 담당자에게 문의해 주세요",
+    };
+  }
+
+  if (args.gateKind === "DISABLED") {
+    return { canEdit: false, reason: "이 행사는 신청서를 받지 않아요" };
+  }
+
+  return { canEdit: true };
+}
+
+/* -------------------------------------------------------------------------- */
+/* 참석 인원 직접 조정 (관리자)                                                */
+/* -------------------------------------------------------------------------- */
+
+/** 한 가족의 참석 인원 하한 — DB CHECK(party_size BETWEEN 1 AND 20) 과 같은 값. */
+export const MIN_PARTY_SIZE = 1;
+
+export type PartyCounts = {
+  childCount: number;
+  adultCount: number;
+  seniorCount: number;
+  partySize: number;
+};
+
+export type PartyCountsResult =
+  | { ok: true; value: PartyCounts }
+  | { ok: false; message: string };
+
+/**
+ * 관리자가 손으로 넣은 참석 구성 → 저장 가능한 값.
+ *
+ * 신청서를 거치지 않는 조정 경로다. "한 명 더 가요" 라고 전화가 왔을 때
+ * 보호자에게 신청서를 다시 내게 하는 대신 기관이 바로 고칠 수 있어야 한다.
+ *
+ * partySize 를 입력받지 않고 **합으로만 계산하는 이유**는 computeHeadcount 와
+ * 같다 — 구성과 총원이 어긋난 행을 애초에 만들 수 없게 한다.
+ */
+export function normalizePartyCounts(input: {
+  childCount: number;
+  adultCount: number;
+  seniorCount: number;
+}): PartyCountsResult {
+  const nums = [input.childCount, input.adultCount, input.seniorCount].map(
+    (n) => Math.trunc(Number(n))
+  );
+  if (nums.some((n) => !Number.isFinite(n) || n < 0)) {
+    return { ok: false, message: "인원은 0 이상의 숫자로 입력해 주세요" };
+  }
+
+  const [childCount, adultCount, seniorCount] = nums;
+  const partySize = childCount + adultCount + seniorCount;
+
+  if (partySize < MIN_PARTY_SIZE) {
+    return { ok: false, message: "참석 인원은 최소 1명이에요" };
+  }
+  if (partySize > MAX_APPLICATION_PARTY_SIZE) {
+    return {
+      ok: false,
+      message: `참석 인원은 최대 ${MAX_APPLICATION_PARTY_SIZE}명까지예요`,
+    };
+  }
+
+  return {
+    ok: true,
+    value: { childCount, adultCount, seniorCount, partySize },
   };
 }

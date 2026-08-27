@@ -15,6 +15,8 @@ import {
   approveEventApplicationAction,
   approveEventApplicationsBulkAction,
   cancelEventApplicationAction,
+  deleteEventApplicationAction,
+  loadApplicationConsentAction,
   rejectEventApplicationAction,
   revertEventApplicationAction,
 } from "@/lib/org-events/application-actions";
@@ -24,6 +26,7 @@ import {
   formatPhoneDisplay,
 } from "@/lib/org-events/application-core";
 import { fmtDateTimeKst } from "@/lib/datetime/kst";
+import type { ConsentSnapshot } from "@/lib/org-events/consent-core";
 import {
   COMPANION_KIND_META,
   ORG_EVENT_APPLICATION_STATUS_META,
@@ -209,6 +212,25 @@ export function ApplicationsTab({
     );
   }
 
+  /** 취소된 신청서 영구 삭제 — 되돌릴 수 없어 한 번 더 확인한다. */
+  function purge(a: OrgEventApplicationRow) {
+    const who = a.children.map((c) => c.name).join(", ") || "이 신청";
+    if (
+      !window.confirm(
+        `[${who}] 신청서를 완전히 삭제할까요?\n\n` +
+          "취소 목록에서도 사라지고 되돌릴 수 없어요.\n" +
+          "누가 왜 빠졌는지 기록이 필요하면 그대로 두시는 편이 좋아요."
+      )
+    ) {
+      return;
+    }
+    run(
+      a.id,
+      () => deleteEventApplicationAction(orgId, eventId, a.id),
+      "완전히 삭제했어요"
+    );
+  }
+
   function revert(a: OrgEventApplicationRow) {
     const warn =
       a.status === "APPROVED"
@@ -374,6 +396,9 @@ export function ApplicationsTab({
               onReject={() => reject(a)}
               onRevert={() => revert(a)}
               onCancel={() => cancel(a)}
+              onPurge={() => purge(a)}
+              orgId={orgId}
+              eventId={eventId}
             />
           ))}
         </ul>
@@ -395,6 +420,9 @@ function ApplicationRow({
   onReject,
   onRevert,
   onCancel,
+  onPurge,
+  orgId,
+  eventId,
 }: {
   application: OrgEventApplicationRow;
   selected: boolean;
@@ -406,10 +434,43 @@ function ApplicationRow({
   onReject: () => void;
   onRevert: () => void;
   onCancel: () => void;
+  onPurge: () => void;
+  orgId: string;
+  eventId: string;
 }) {
   const meta = ORG_EVENT_APPLICATION_STATUS_META[a.status];
   const isPending = a.status === "PENDING";
-  const [openConsent, setOpenConsent] = useState(false);
+  // updated_at 은 트리거로 자동 갱신된다. 5초 여유를 두는 이유는 최초 insert 와
+  // 같은 트랜잭션에서 두 값이 밀리초 단위로 어긋날 수 있어서다.
+  const isEdited =
+    isPending &&
+    !a.reviewed_by &&
+    new Date(a.updated_at).getTime() - new Date(a.created_at).getTime() > 5_000;
+  // 전문은 목록 응답에 실리지 않는다(용량). 누른 순간 한 건만 가져온다.
+  const [proof, setProof] = useState<ConsentSnapshot | null>(null);
+  const [proofState, setProofState] = useState<
+    "closed" | "loading" | "open" | "error"
+  >("closed");
+
+  function toggleConsent() {
+    if (proofState === "open" || proofState === "error") {
+      setProofState("closed");
+      return;
+    }
+    if (proof) {
+      setProofState("open");
+      return;
+    }
+    setProofState("loading");
+    void loadApplicationConsentAction(orgId, eventId, a.id).then((res) => {
+      if (!res.ok) {
+        setProofState("error");
+        return;
+      }
+      setProof(res.snapshot);
+      setProofState("open");
+    });
+  }
 
   return (
     <li className="rounded-2xl border border-[#D4E4BC] bg-white p-3 shadow-sm">
@@ -445,6 +506,14 @@ function ApplicationRow({
             >
               {meta.icon} {meta.label}
             </span>
+            {/* 새로 들어온 신청과 "고쳐서 다시 온" 신청은 다르게 봐야 한다.
+                신청자가 인원을 바꾸면 승인이 풀리고 이 목록으로 되돌아온다.
+                reviewed_by 가 비어 있어야 관리자가 되돌린 건과 구분된다. */}
+            {isEdited && (
+              <span className="inline-flex items-center rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-800">
+                ✏️ 수정된 신청
+              </span>
+            )}
           </div>
 
           <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-[#6B6560]">
@@ -462,27 +531,33 @@ function ApplicationRow({
             </span>
             <ConsentBadge
               application={a}
-              open={openConsent}
-              onToggle={() => setOpenConsent((v) => !v)}
+              open={proofState === "open"}
+              loading={proofState === "loading"}
+              onToggle={toggleConsent}
             />
           </p>
 
-          {openConsent && a.consent_snapshot && (
+          {proofState === "error" && (
+            <p className="mt-2 text-[11px] font-semibold text-rose-700">
+              동의 기록을 불러오지 못했어요
+            </p>
+          )}
+          {proofState === "open" && proof && (
             <div className="mt-2 space-y-2">
               <ConsentProof
                 label="[필수] 개인정보 수집·이용"
                 at={a.consent_agreed_at}
-                body={a.consent_snapshot.required}
+                body={proof.required}
               />
-              {a.consent_snapshot.optional ? (
+              {proof.optional ? (
                 <ConsentProof
-                  label="[선택] 계열사 공동이용"
+                  label="[선택] 계열사 제3자 제공"
                   at={a.consent_optional_agreed_at}
-                  body={a.consent_snapshot.optional}
+                  body={proof.optional}
                 />
               ) : (
                 <p className="text-[10px] text-[#8B7F75]">
-                  [선택] 계열사 공동이용 — 동의하지 않으셨어요 (참가에는 영향 없음)
+                  [선택] 계열사 제3자 제공 — 동의하지 않으셨어요 (참가에는 영향 없음)
                 </p>
               )}
             </div>
@@ -563,6 +638,18 @@ function ApplicationRow({
                   : "대기로"}
             </button>
           )}
+          {/* 취소된 건만 최종 정리를 열어준다 — 삭제는 2단계(취소 → 삭제)다. */}
+          {a.status === "CANCELED" && (
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={onPurge}
+              title="취소 목록에서도 완전히 지웁니다 (되돌릴 수 없어요)"
+              className="rounded-xl border border-rose-300 bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 disabled:opacity-40"
+            >
+              🗑 완전 삭제
+            </button>
+          )}
           {/* 전화로 취소 통보를 받는 경우가 잦아 관리자도 대행할 수 있게. */}
           {(a.status === "PENDING" || a.status === "APPROVED") && (
             <button
@@ -593,13 +680,16 @@ function ApplicationRow({
 function ConsentBadge({
   application: a,
   open,
+  loading,
   onToggle,
 }: {
   application: OrgEventApplicationRow;
   open: boolean;
+  loading: boolean;
   onToggle: () => void;
 }) {
-  if (!a.consent_agreed_at || !a.consent_snapshot) {
+  // 전문 없이 시각만으로 판단한다 — 목록에는 시각만 실려 온다.
+  if (!a.consent_agreed_at) {
     return (
       <span className="rounded-full bg-[#F5F1E8] px-2 py-0.5 text-[10px] font-semibold text-[#8B7F75]">
         📜 동의 기록 없음 (도입 전)
@@ -616,7 +706,7 @@ function ConsentBadge({
     >
       📜 동의{a.consent_optional_agreed_at ? " · 계열사 ✓" : ""}
       <span className="ml-1 font-semibold opacity-70">
-        {open ? "접기" : "보기"}
+        {loading ? "여는 중" : open ? "접기" : "보기"}
       </span>
     </button>
   );

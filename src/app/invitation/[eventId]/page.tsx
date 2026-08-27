@@ -6,13 +6,11 @@ import {
   loadOrgEventById,
   isEventParticipant,
 } from "@/lib/org-events/queries";
-import {
-  loadOrgNameById,
-  loadPartnerDisplayNameForOrg,
-} from "@/lib/org-partner";
+import { loadPartnerDisplayNameForOrg } from "@/lib/org-partner";
 import {
   resolveOrgConsent,
   type OrgConsent,
+  type OrgConsentContext,
 } from "@/lib/org-events/consent-core";
 import { loadTimelineSlots } from "@/lib/event-timeline/queries";
 import { TimelineCollapsible } from "./timeline-collapsible";
@@ -41,10 +39,8 @@ import type {
   OrgEventApplicationRow,
 } from "@/lib/org-events/types";
 import { ApplicationForm } from "./application-form";
-import {
-  ApplicationClosedCard,
-  ApplicationStatusCard,
-} from "./application-status-card";
+import { ApplicationStatusSection } from "./application-status-section";
+import { ApplicationClosedCard } from "./application-status-card";
 
 export const dynamic = "force-dynamic";
 
@@ -228,33 +224,65 @@ export default async function EventInvitationPage({
     return <PendingState eventName={event.name} />;
   }
 
-  // CTA 분기용 — 이 행사에 이미 참가 중인지. 미로그인이면 조회 자체를 건너뛴다.
-  const joined = session
-    ? await isEventParticipant(eventId, session.id).catch(() => false)
-    : false;
+  // ── 여기부터는 서로를 필요로 하지 않는 조회다. 한 번에 띄운다.
+  //
+  //    예전에는 7개를 줄줄이 await 해서, Supabase 왕복 하나(수십 ms)가 그대로
+  //    7배로 쌓였다. 초대장은 QR 로 열리는 첫 화면이라 그 지연이 전부 체감된다.
+  //
+  //    접수 관련 3종은 event.applications_enabled 만 보고 미리 띄운다.
+  //    "이미 참가 중이면 필요 없다"는 판단(joined)은 그 자체가 조회라, 기다렸다
+  //    시작하면 직렬화가 되살아난다. 같은 물결에서 받아두고 아래에서 버린다.
+  const wantsApplications = !!event.applications_enabled;
 
-  const orgName = await loadPartnerDisplayNameForOrg(event.org_id).catch(
-    () => null
-  );
+  const [
+    joined,
+    orgName,
+    slots,
+    applicationCounts,
+    myApplication,
+    consentRow,
+  ] = await Promise.all([
+    session
+      ? isEventParticipant(eventId, session.id).catch(() => false)
+      : Promise.resolve(false),
+    loadPartnerDisplayNameForOrg(event.org_id).catch(() => null),
+    loadTimelineSlots(eventId).catch(() => []),
+    wantsApplications
+      ? loadEventApplicationCounts(eventId).catch(() => null)
+      : Promise.resolve(null),
+    wantsApplications
+      ? loadMyApplication(eventId).catch(() => null)
+      : Promise.resolve(null),
+    wantsApplications
+      ? loadOrgApplicationConsent(event.org_id).catch(
+          (): OrgConsentContext => ({ org_name: "소속 기관" })
+        )
+      : Promise.resolve(null),
+  ]);
 
-  // 타임테이블 — 행사 전체 흐름을 모두 노출 (참가자가 미리 보고 준비할 수 있도록)
-  const slots = await loadTimelineSlots(eventId).catch(() => []);
+  const applicationsOn = wantsApplications && !joined;
 
-  // 참가 접수 — 접수제를 쓰는 행사에서만 조회한다(기존 행사는 쿼리 0회 추가).
-  const applicationsOn = !!event.applications_enabled && !joined;
-  const applicationCounts = applicationsOn
-    ? await loadEventApplicationCounts(eventId).catch(() => null)
-    : null;
-  const myApplication = applicationsOn
-    ? await loadMyApplication(eventId).catch(() => null)
-    : null;
-  // 동의 문구 — 기관 단위. {기관명} 은 지사명(orgName)이 아니라 기관명이다.
-  const applicationConsent: OrgConsent | null = applicationsOn
-    ? resolveOrgConsent(
-        await loadOrgApplicationConsent(event.org_id).catch(() => ({})),
-        await loadOrgNameById(event.org_id).catch(() => "소속 기관")
-      )
-    : null;
+  // "승인됐어요 → 입장하기" 는 **지금 들어갈 수 있다**는 약속이다.
+  // 승인 뒤에 관리자가 계정을 지우거나 행사에서 제외하면 그 약속이 거짓이 되고,
+  // 입장 버튼은 연락처 로그인 화면으로 튕긴다("승인됐다면서 왜 또?").
+  // 참가 기록을 직접 확인해 약속을 지킬 수 있을 때만 카드를 띄운다.
+  //   이 하나만 위 물결에 못 넣는다 — myApplication 이 나와야 대상을 안다.
+  const approvedEntryReady =
+    applicationsOn &&
+    myApplication?.status === "APPROVED" &&
+    myApplication.approved_user_id
+      ? await isEventParticipant(
+          eventId,
+          myApplication.approved_user_id
+        ).catch(() => false)
+      : false;
+
+  // 동의 문구 — 기관 단위. {기관명} 은 지사명(orgName)이 아니라 기관명이라
+  // consentRow 안의 org_name 을 쓴다(같은 행에서 함께 온다).
+  const applicationConsent: OrgConsent | null =
+    applicationsOn && consentRow
+      ? resolveOrgConsent(consentRow, consentRow.org_name)
+      : null;
   const applicationGate = resolveApplicationGate({
     enabled: applicationsOn,
     closeAt: event.applications_close_at,
@@ -634,6 +662,7 @@ export default async function EventInvitationPage({
         myApplication={myApplication}
         counts={applicationCounts}
         consent={applicationConsent}
+        approvedEntryReady={approvedEntryReady}
       />
 
     </div>
@@ -685,6 +714,7 @@ function InvitationFooter({
   myApplication,
   counts,
   consent,
+  approvedEntryReady,
 }: {
   eventId: string;
   eventStatus: string;
@@ -695,6 +725,8 @@ function InvitationFooter({
   counts: OrgEventApplicationCounts | null;
   /** 접수를 쓰지 않는 행사면 null — 신청 폼 자체가 뜨지 않는다. */
   consent: OrgConsent | null;
+  /** APPROVED 신청서의 참가 기록이 실제로 살아 있는가. */
+  approvedEntryReady: boolean;
 }) {
   if (gate.kind === "DISABLED") {
     return (
@@ -707,14 +739,33 @@ function InvitationFooter({
     );
   }
 
+  // 마감 안내 문구 — 기관이 지정한 마감과 "행사 1시간 전" 기본값을 구분해 적는다.
+  const closeLabel =
+    gate.kind === "OPEN" && gate.closeAt
+      ? gate.closeIsImplicit
+        ? `${fmtDateTimeKst(gate.closeAt)} 까지 접수 (행사 시작 1시간 전)`
+        : `${fmtDateTimeKst(gate.closeAt)} 까지 접수`
+      : null;
+
   // 대기/승인 중인 내 신청서가 있으면 마감보다 상태 카드가 우선.
   // 거절·취소는 재신청을 허용하므로 카드 대신 폼을 다시 띄운다.
   const live =
     myApplication?.status === "PENDING" ||
-    myApplication?.status === "APPROVED";
+    (myApplication?.status === "APPROVED" && approvedEntryReady);
   if (myApplication && live) {
+    // 카드에서 [수정] 을 누르면 같은 자리에 폼이 뜬다 — 그래서 카드가 폼에
+    // 필요한 값(동의 문구·정원·마감)까지 함께 들고 있어야 한다.
     return (
-      <ApplicationStatusCard eventId={eventId} application={myApplication} />
+      <ApplicationStatusSection
+        eventId={eventId}
+        application={myApplication}
+        gate={gate}
+        consent={consent ?? resolveOrgConsent(null, "소속 기관")}
+        atCapacity={gate.kind === "OPEN" ? gate.atCapacity : false}
+        capacity={gate.kind === "OPEN" ? gate.capacity : null}
+        approvedPeople={counts?.approved_people ?? 0}
+        closeLabel={closeLabel}
+      />
     );
   }
 
@@ -724,15 +775,17 @@ function InvitationFooter({
     );
   }
 
-  // 마감 안내 문구 — 기관이 지정한 마감과 "행사 1시간 전" 기본값을 구분해 적는다.
-  const closeLabel = gate.closeAt
-    ? gate.closeIsImplicit
-      ? `${fmtDateTimeKst(gate.closeAt)} 까지 접수 (행사 시작 1시간 전)`
-      : `${fmtDateTimeKst(gate.closeAt)} 까지 접수`
-    : null;
-
   return (
     <>
+      {myApplication?.status === "APPROVED" && !approvedEntryReady && (
+        <div className="mx-auto max-w-md px-6 pt-2">
+          <p className="rounded-2xl border border-amber-200 bg-amber-50/80 px-4 py-3 text-xs leading-relaxed text-amber-900">
+            ⚠️ 승인 기록은 있는데 참가자 명단에서 확인되지 않아요. 기관에서 참가
+            정보를 정리했을 수 있어요. 번거로우시겠지만 아래에서 다시 신청해
+            주세요.
+          </p>
+        </div>
+      )}
       {myApplication?.status === "REJECTED" && (
         <div className="mx-auto max-w-md px-6 pt-2">
           <p className="rounded-2xl border border-[#E8DDC8] bg-[#F5F1E8]/70 px-4 py-3 text-xs leading-relaxed text-[#6B4423]">

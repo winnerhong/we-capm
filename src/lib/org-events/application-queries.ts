@@ -16,7 +16,8 @@ import {
 } from "./application-core";
 import {
   parseConsentSnapshot,
-  type OrgConsentSettings,
+  type ConsentSnapshot,
+  type OrgConsentContext,
 } from "./consent-core";
 import type {
   OrgEventApplicationCounts,
@@ -110,7 +111,28 @@ export async function loadEventApplications(
     logUnlessMissing("loadEventApplications", resp.error);
     return [];
   }
-  return (resp.data ?? []).map(normalizeRow);
+
+  // 동의 전문은 목록에 실어 보내지 않는다.
+  //
+  //   한 건당 필수+선택 전문이 2KB 남짓이라 20건이면 40KB, 200건이면 400KB 가
+  //   그대로 브라우저로 넘어간다. 정작 화면에는 [보기] 를 눌렀을 때만 쓰인다.
+  //   배지는 동의 **시각**만 있으면 그릴 수 있으므로 그것만 남기고, 전문은
+  //   눌렀을 때 loadApplicationConsentProof 로 한 건씩 가져온다.
+  return (resp.data ?? []).map((raw) => ({
+    ...normalizeRow(raw),
+    consent_snapshot: null,
+  }));
+}
+
+/**
+ * 신청서 한 건의 동의 전문. 목록에서 [보기] 를 눌렀을 때만 부른다.
+ * 관리자 화면 전용이라 호출부(서버 액션)에서 기관 권한을 먼저 확인한다.
+ */
+export async function loadApplicationConsentProof(
+  applicationId: string
+): Promise<ConsentSnapshot | null> {
+  const row = await loadApplicationById(applicationId);
+  return row?.consent_snapshot ?? null;
 }
 
 /**
@@ -351,8 +373,8 @@ export async function loadMyApplication(
  */
 export async function loadOrgApplicationConsent(
   orgId: string
-): Promise<OrgConsentSettings> {
-  if (!orgId) return {};
+): Promise<OrgConsentContext> {
+  if (!orgId) return { org_name: "소속 기관" };
   const supabase = await createClient();
 
   const resp = (await (
@@ -372,11 +394,13 @@ export async function loadOrgApplicationConsent(
 
   if (resp.error || !resp.data) {
     logUnlessMissing("loadOrgApplicationConsent", resp.error);
-    return {};
+    return { org_name: "소속 기관" };
   }
 
   const raw = resp.data;
   return {
+    // 같은 행에 있으므로 이름 조회를 위해 한 번 더 왕복하지 않는다.
+    org_name: (raw.org_name as string | null)?.trim() || "소속 기관",
     application_consent_body:
       (raw.application_consent_body as string | null) ?? null,
     application_consent_optional_body:

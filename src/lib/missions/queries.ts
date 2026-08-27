@@ -1,4 +1,5 @@
 // server-only: @/lib/supabase/server를 참조하므로 클라이언트 번들에 포함 불가
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import type {
   PartnerMissionRow,
@@ -175,7 +176,7 @@ export async function loadAvailableMissionsForOrg(
 /* Org quest packs                                                            */
 /* -------------------------------------------------------------------------- */
 
-export async function loadOrgQuestPacks(
+export const loadOrgQuestPacks = cache(async function loadOrgQuestPacks(
   orgId: string
 ): Promise<OrgQuestPackRow[]> {
   if (!orgId) return [];
@@ -198,7 +199,7 @@ export async function loadOrgQuestPacks(
     .order("updated_at", { ascending: false })) as SbResp<OrgQuestPackRow>;
 
   return resp.data ?? [];
-}
+});
 
 export async function loadOrgQuestPackById(
   id: string

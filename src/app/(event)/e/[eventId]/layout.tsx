@@ -38,6 +38,12 @@ export default async function EventLayout({
   // 행사가 시작돼야(LIVE) 스탬프·라디오·선물이 의미가 있다.
   const isLive = ctx.event.status === "LIVE";
 
+  // 하단은 다섯 칸까지다. 360px 폰에서 여섯 칸부터 글자가 눌리기 시작한다.
+  //
+  //  · 사진 — 행사홈의 [📸 우리 행사 사진] 카드로 들어간다. 작은 아이콘보다
+  //    사진 석 장이 깔린 카드가 잘 보이고, 미션 화면 피드에도 "전체 보기" 가 있다.
+  //  · 내 행사 — 상단 "토리로" 로고가 그 자리다(홈 로고 = 앱 홈, 흔한 규약).
+  //    행사 안에서 행사홈은 첫 번째 탭이 이미 맡고 있어 로고와 겹쳤었다.
   const tabs: ShellTab[] = [
     { href: ctx.href(), label: "행사홈", icon: "🎪" },
     { href: ctx.href("/schedule"), label: "일정", icon: "📅" },
@@ -52,7 +58,6 @@ export default async function EventLayout({
           { href: ctx.href("/gifts"), label: "선물함", icon: "🎁" },
         ]
       : []),
-    { href: "/home", label: "내 행사", icon: "🏠" },
   ];
 
   // 이 행사에서 모은 도토리만. 다른 행사 도토리는 여기 뜨지 않는다.
@@ -70,7 +75,8 @@ export default async function EventLayout({
       acornBalance={acornBalance}
       acornLabel={`${ctx.event.name} 도토리`}
       invitationEventId={ctx.event.invitation_published_at ? eventId : null}
-      homeHref={ctx.href()}
+      // 로고 = 내 행사 목록. 행사홈은 첫 번째 탭이 맡는다.
+      homeHref="/home"
     >
       {children}
     </ParticipantShell>

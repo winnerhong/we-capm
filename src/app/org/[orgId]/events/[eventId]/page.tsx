@@ -52,14 +52,14 @@ import {
 import {
   DEFAULT_CONSENT_BODY,
   DEFAULT_CONSENT_OPTIONAL_BODY,
-  type OrgConsentSettings,
+  type OrgConsentContext,
 } from "@/lib/org-events/consent-core";
-import { loadOrgNameById } from "@/lib/org-partner";
 import type { OrgEventApplicationCounts } from "@/lib/org-events/types";
 import { computeEffectiveCloseAt } from "@/lib/org-events/application-core";
 import { loadEventChildrenByUser } from "@/lib/app-user/event-children";
 import { loadEventAcornBalances } from "@/lib/app-user/event-acorns";
 import { InvitationCardShare } from "./invitation-card-share";
+import { PhotoFeedToggle } from "./photo-feed-toggle";
 
 export const dynamic = "force-dynamic";
 
@@ -163,9 +163,18 @@ export default async function OrgEventDetailPage({
 }) {
   const { orgId, eventId } = await params;
   const sp = await searchParams;
-  await requireOrg();
+  // 넷 다 서로를 필요로 하지 않는다. 줄줄이 await 하면 Supabase 왕복이 그대로
+  // 4배로 쌓여, 탭을 옮길 때마다 그 지연을 다시 문다.
+  //   · summary / applicationCounts 는 eventId 만 있으면 되고
+  //   · 소유권 검사(event.org_id !== orgId)는 받은 뒤에 해도 늦지 않다
+  //     (권한 없는 요청이면 어차피 notFound 로 끝난다)
+  const [, event, summary, applicationCounts] = await Promise.all([
+    requireOrg(),
+    loadOrgEventById(eventId),
+    loadOrgEventSummaryById(eventId),
+    loadEventApplicationCounts(eventId),
+  ]);
 
-  const event = await loadOrgEventById(eventId);
   if (!event || event.org_id !== orgId) {
     notFound();
   }
@@ -173,11 +182,6 @@ export default async function OrgEventDetailPage({
   const tab = parseTab(sp.tab);
   const saved = sp.saved === "1";
 
-  // 개요 탭에서만 카운트 표시 — view_org_event_summary 에서 단건 조회
-  const summary = await loadOrgEventSummaryById(eventId);
-
-  // 접수 현황 — 탭 배지와 개요 배너에 쓰므로 어느 탭에서든 필요하다(단건 뷰 조회).
-  const applicationCounts = await loadEventApplicationCounts(eventId);
   const pendingApplications = applicationCounts.pending_count;
 
   const statusMeta = ORG_EVENT_STATUS_META[event.status];
@@ -440,6 +444,11 @@ export default async function OrgEventDetailPage({
               eventId={eventId}
               eventName={event.name}
               publishedAt={event.invitation_published_at ?? null}
+            />
+            <div className="h-4" />
+            <PhotoFeedToggle
+              eventId={eventId}
+              initialEnabled={event.photo_feed_enabled === true}
             />
             <div className="h-4" />
             <OverviewPanel
@@ -967,18 +976,19 @@ async function ApplicationsTabPanel({
   counts: OrgEventApplicationCounts;
   defaultCloseLabel: string | null;
 }) {
-  const [applications, participantPhones, consentRow, orgName] =
-    await Promise.all([
-      loadEventApplications(eventId),
-      loadEventParticipantPhones(eventId),
-      loadOrgApplicationConsent(orgId).catch((): OrgConsentSettings => ({})),
-      loadOrgNameById(orgId).catch(() => "소속 기관"),
-    ]);
+  const [applications, participantPhones, consentRow] = await Promise.all([
+    loadEventApplications(eventId),
+    loadEventParticipantPhones(eventId),
+    // 기관명도 같은 행에서 함께 온다 — 이름 때문에 한 번 더 왕복하지 않는다.
+    loadOrgApplicationConsent(orgId).catch(
+      (): OrgConsentContext => ({ org_name: "소속 기관" })
+    ),
+  ]);
 
   // 편집 화면에는 **치환 전 원본**을 넘긴다 — 관리자가 {기관명} 토큰을
   // 그대로 보고 고칠 수 있어야 하기 때문. 치환은 미리보기에서만 한다.
   const consent = {
-    orgName,
+    orgName: consentRow.org_name,
     body: consentRow.application_consent_body?.trim() || DEFAULT_CONSENT_BODY,
     optionalBody:
       consentRow.application_consent_optional_body?.trim() ||

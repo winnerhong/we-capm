@@ -15,9 +15,14 @@ import type { OrgEventApplicationRow } from "@/lib/org-events/types";
 export function ApplicationStatusCard({
   eventId,
   application,
+  onEdit,
+  editBlockedReason,
 }: {
   eventId: string;
   application: OrgEventApplicationRow;
+  /** 수정 가능할 때만 넘어온다. 없으면 버튼 대신 사유를 안내한다. */
+  onEdit?: () => void;
+  editBlockedReason?: string;
 }) {
   const approved = application.status === "APPROVED";
   const names = application.children.map((c) =>
@@ -77,11 +82,27 @@ export function ApplicationStatusCard({
             <span>행사 입장하기</span>
             <span aria-hidden>→</span>
           </Link>
+        ) : null}
+
+        {/* 인원은 자주 바뀐다 — 고칠 수단이 없으면 기관에 전화가 온다.
+            예전에는 "같은 연락처로 다시 신청하세요" 라고 안내했는데, 정작 이
+            화면에는 폼이 렌더되지 않아 따를 수 없는 안내였다. */}
+        {onEdit ? (
+          <button
+            type="button"
+            onClick={onEdit}
+            className={`w-full rounded-2xl border-2 border-[#D4E4BC] bg-white px-4 py-3 text-sm font-bold text-[#2D5A3D] transition hover:bg-[#F5F1E8] ${
+              approved ? "mt-3" : "mt-4"
+            }`}
+          >
+            ✏️ {approved ? "인원 수정" : "신청 내용 수정"}
+          </button>
         ) : (
-          <p className="mt-4 text-[11px] text-[#8B7F75]">
-            신청 내용을 바꾸시려면 같은 연락처로 다시 신청해 주세요. 마지막에
-            보낸 내용으로 덮어써집니다.
-          </p>
+          editBlockedReason && (
+            <p className="mt-4 text-[11px] leading-relaxed text-[#8B7F75]">
+              {editBlockedReason}
+            </p>
+          )
         )}
 
         {/* 못 가게 됐을 때 스스로 뺄 수 있어야 한다. 취소해도 기록은

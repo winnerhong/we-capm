@@ -22,6 +22,12 @@ interface Props {
   mission: OrgMissionRow;
   config: PhotoApprovalMissionConfig;
   existing?: MissionSubmissionRow | null;
+  /**
+   * 이미 제출한 사진 — **서버에서 재서명한** URL.
+   * payload_json 의 값을 그대로 쓰면 안 된다. 사설 버킷 signed URL 은 24시간이면
+   * 만료돼서, 다음 날 들어온 보호자에게는 깨진 이미지만 남는다.
+   */
+  existingUrls?: string[];
 }
 
 
@@ -33,7 +39,12 @@ function formatDateTime(iso: string): string {
   }
 }
 
-export function PhotoApprovalRunner({ mission, config, existing }: Props) {
+export function PhotoApprovalRunner({
+  mission,
+  config,
+  existing,
+  existingUrls: resignedUrls,
+}: Props) {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
   const [photos, setPhotos] = useState<string[]>([]);
@@ -141,7 +152,10 @@ export function PhotoApprovalRunner({ mission, config, existing }: Props) {
   const existingPayload = (existing?.payload_json ?? {}) as Partial<
     PhotoApprovalSubmissionPayload
   >;
-  const existingUrls = Array.isArray(existingPayload.photo_urls)
+  // 재서명본이 있으면 그쪽. payload 값은 만료된 URL 일 수 있어 폴백으로만 쓴다.
+  const existingUrls = resignedUrls?.length
+    ? resignedUrls
+    : Array.isArray(existingPayload.photo_urls)
     ? existingPayload.photo_urls
     : [];
   const existingCaption =
@@ -209,8 +223,10 @@ export function PhotoApprovalRunner({ mission, config, existing }: Props) {
             </div>
           </div>
 
-          {/* 기존 제출 사진 */}
-          {existingUrls.length > 0 && (
+          {/* 제출한 사진과 "다시 찍기" 는 이 패널 아래 SubmittedPhotos 카드가
+              맡는다(PHOTO 결과 화면과 같은 카드). 반려 상태에서는 그 카드가 뜨지
+              않으니 — 아래 재제출 폼이 그 자리를 쓴다 — 여기서 냈던 사진을 보여준다. */}
+          {isRejected && existingUrls.length > 0 && (
             <ul className="mt-3 grid grid-cols-3 gap-2">
               {existingUrls.map((url, i) => (
                 <li
@@ -227,7 +243,7 @@ export function PhotoApprovalRunner({ mission, config, existing }: Props) {
               ))}
             </ul>
           )}
-          {existingCaption && (
+          {isRejected && existingCaption && (
             <p className="mt-2 rounded-2xl bg-white/60 px-3 py-2 text-[12px]">
               💬 {existingCaption}
             </p>

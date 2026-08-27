@@ -8,6 +8,7 @@ import {
 } from "@/lib/app-user/event-acorns";
 import { loadChildrenForEvent } from "@/lib/app-user/event-children";
 import { AcornTopBoard } from "@/components/acorn-top-board";
+import { loadAcornGuide } from "@/lib/missions/acorn-guide-queries";
 import { OnboardingWizard } from "./onboarding-wizard";
 import {
   loadOrgMissionsByQuestPack,
@@ -26,6 +27,8 @@ import type { PackProgress } from "@/lib/missions/progress";
 import { ToriFmCard } from "./tori-fm-card";
 import { BroadcastCard } from "./broadcast-card";
 import { NextUpCard } from "./next-up-card";
+import { Suspense } from "react";
+import { PhotoFeedCard } from "@/components/photo-feed/photo-feed-card";
 import { BingoCard } from "./bingo-card";
 import { loadTimelineSlots } from "@/lib/event-timeline/queries";
 import { loadOrgNameById } from "@/lib/org-partner";
@@ -117,7 +120,11 @@ export default async function EventHomePage({
   ]);
 
   const freshOrgName = ctx.orgName;
-  const topFamilies = await loadTopAcornFamiliesForEvent(eventId, 5);
+  // "어떻게 저만큼 모았지" 에 답하는 목록 — 이 행사 미션 설정에서 만들어진다.
+  const [topFamilies, acornGuide] = await Promise.all([
+    loadTopAcornFamiliesForEvent(eventId, 5),
+    loadAcornGuide(eventId),
+  ]);
 
   const primaryPack = await pickPrimaryLivePackForEvent(
     user.id,
@@ -263,6 +270,7 @@ export default async function EventHomePage({
         families={topFamilies}
         myUserId={user.id}
         orgName={freshOrgName}
+        guide={acornGuide}
       />
 
       {/* 온보딩 위저드 — 최상단 노출(미완 시 배너). 첫 입장 시 자동 오픈, 미완 시 상단 배너 유지. */}
@@ -342,6 +350,17 @@ export default async function EventHomePage({
 
       {/* 🎯 토리 빙고 — LIVE 보드 있을 때만 자동 노출. 사진 등록 진입 카드 역할. */}
       <BingoCard orgId={ctxOrgId} userId={user.id} />
+
+      {/* 📸 사진 피드 입구 — 하단 탭에서 내리고 이 카드가 그 자리를 대신한다.
+          기관이 켜고 사진이 한 장이라도 있을 때만 나타난다.
+
+          Suspense 로 감싸는 이유: 이 카드는 사진 3장을 고르려고 스탬프북·미션·
+          제출물을 훑는다. 행사홈에서 제일 먼저 보고 싶은 건 스탬프 진행도지
+          사진 카드가 아닌데, 감싸지 않으면 이 조회가 끝날 때까지 화면 전체가
+          비어 있게 된다. 늦게 오는 것은 늦게 채우면 된다. */}
+      <Suspense fallback={null}>
+        <PhotoFeedCard eventId={selectedEvent.id} viewerId={user.id} />
+      </Suspense>
 
       {/* 토리FM 라이브 (선택된 행사의 LIVE 세션만, 행사 없으면 org fallback) */}
       <ToriFmCard

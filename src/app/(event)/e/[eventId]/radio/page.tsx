@@ -13,6 +13,7 @@ import {
   loadPrimaryClassByUserIds,
 } from "@/lib/app-user/queries";
 import { AcornTopBoard } from "@/components/acorn-top-board";
+import { loadAcornGuide } from "@/lib/missions/acorn-guide-queries";
 import { loadOrgNameById } from "@/lib/org-partner";
 import {
   loadLiveFmSessionForOrg,
@@ -64,6 +65,7 @@ export default async function ToriFmPage({
     children,
     acornBalance,
     topFamilies,
+    acornGuide,
     freshOrgName,
   ] = await Promise.all([
     loadLiveFmSessionForOrg(ctx.orgId),
@@ -73,6 +75,7 @@ export default async function ToriFmPage({
     loadChildrenForEvent(user.id, eventId),
     getEventAcornBalance(user.id, eventId),
     loadTopAcornFamiliesForEvent(eventId, 5),
+    loadAcornGuide(eventId),
     loadOrgNameById(ctx.orgId, ctx.orgName),
   ]);
 
@@ -194,6 +197,7 @@ export default async function ToriFmPage({
         families={topFamilies}
         myUserId={user.id}
         orgName={freshOrgName}
+        guide={acornGuide}
       />
 
       {/* Realtime 구독 — 라이브 상태/곡 변화 자동 반영 */}

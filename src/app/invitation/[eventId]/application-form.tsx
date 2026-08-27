@@ -51,6 +51,24 @@ type Props = {
    * optional 이 null 이면 기관이 선택 동의를 꺼둔 것이라 그 줄을 띄우지 않는다.
    */
   consent: OrgConsent;
+  /**
+   * "new" = 새 신청, "edit" = 이미 낸 신청서 고치기.
+   * 폼 로직은 같다 — 제출이 곧 덮어쓰기라 수정 전용 경로가 따로 없다.
+   */
+  mode?: "new" | "edit";
+  /** edit 모드 초기값. 연락처는 신원 키라 읽기 전용으로 표시한다. */
+  initial?: {
+    phone: string;
+    children: ChildRow[];
+    companions: ApplicationCompanion[];
+    /** 승인된 상태에서 고치는 중인가 — 재승인 경고를 띄운다. */
+    wasApproved: boolean;
+    /** 이미 같은 문구에 동의했는가. 같으면 체크를 미리 채운다. */
+    consentAlreadyAgreed: boolean;
+    optionalAlreadyAgreed: boolean;
+  };
+  /** edit 모드에서 [돌아가기]. */
+  onCancelEdit?: () => void;
 };
 
 /** 010-1234-5678 자동 하이픈 — join-event-form 과 같은 규칙. */
@@ -71,19 +89,35 @@ export function ApplicationForm({
   approvedPeople,
   closeLabel,
   consent,
+  mode = "new",
+  initial,
+  onCancelEdit,
 }: Props) {
   const router = useRouter();
-  const [children, setChildren] = useState<ChildRow[]>([
-    { name: "", className: "" },
-  ]);
-  const [phone, setPhone] = useState("");
+  const editing = mode === "edit";
+  const [children, setChildren] = useState<ChildRow[]>(
+    initial?.children?.length ? initial.children : [{ name: "", className: "" }]
+  );
+  // edit 모드에서는 바꿀 수 없다 — UNIQUE(event_id, phone) 의 키이고 쿠키가
+  // 가리키는 신원이라, 번호를 바꾸는 건 수정이 아니라 남의 신청서가 된다.
+  const [phone, setPhone] = useState(
+    initial?.phone ? formatPhone(initial.phone) : ""
+  );
   // 함께 오시는 분. 총 인원은 여기서 계산되므로 인원 state 를 따로 두지 않는다
   // (자녀를 추가했는데 숫자가 안 따라오는 어긋남이 생길 수 없게).
-  const [companions, setCompanions] = useState<ApplicationCompanion[]>([]);
+  const [companions, setCompanions] = useState<ApplicationCompanion[]>(
+    initial?.companions ?? []
+  );
   // 개인정보 동의. 필수는 제출 조건, 선택(계열사 공동이용)은 아니다 —
   // 선택 미동의를 이유로 참가를 막으면 개인정보보호법 제22조 제5항 위반이다.
-  const [consentAgreed, setConsentAgreed] = useState(false);
-  const [optionalAgreed, setOptionalAgreed] = useState(false);
+  // 이미 같은 문구에 동의한 사람에게 같은 글을 다시 읽히는 건 마찰일 뿐이다.
+  // 문구가 바뀌었으면 부모가 false 로 내려주고, 서버 지문 대조도 따로 잡는다.
+  const [consentAgreed, setConsentAgreed] = useState(
+    initial?.consentAlreadyAgreed ?? false
+  );
+  const [optionalAgreed, setOptionalAgreed] = useState(
+    initial?.optionalAlreadyAgreed ?? false
+  );
   // 동의 항목 목록의 접힘. 폼이 길어서 기본은 접어둔다.
   // 펼치면 전문까지 한 번에 보인다 — 항목 이름만 보고 체크하지 않도록.
   const [consentOpen, setConsentOpen] = useState(false);
@@ -195,7 +229,9 @@ export function ApplicationForm({
             {done.updated ? "신청서를 수정했어요" : "신청서를 보냈어요"}
           </h2>
           <p className="mt-2 text-sm leading-relaxed text-[#6B6560]">
-            기관에서 확인 후 승인하면 참가가 확정돼요.
+            {initial?.wasApproved
+              ? "바뀐 인원을 기관이 확인하고 수락하면 다시 입장하실 수 있어요."
+              : "기관에서 확인 후 승인하면 참가가 확정돼요."}
             <br />
             이 초대장을 다시 열면 진행 상태를 볼 수 있어요.
           </p>
@@ -241,11 +277,15 @@ export function ApplicationForm({
       <div className="rounded-3xl border-2 border-[#D4E4BC] bg-white p-6 shadow-sm">
         <div className="text-center">
           <p className="text-3xl" aria-hidden>
-            🌱
+            {editing ? "✏️" : "🌱"}
           </p>
-          <h2 className="mt-2 text-lg font-bold text-[#2D5A3D]">참가 신청</h2>
+          <h2 className="mt-2 text-lg font-bold text-[#2D5A3D]">
+            {editing ? "신청 내용 수정" : "참가 신청"}
+          </h2>
           <p className="mt-1 text-xs text-[#6B6560]">
-            아래 내용을 적어주시면 기관에서 확인 후 승인해 드려요.
+            {editing
+              ? "인원이나 아이 정보를 바꾸고 아래 버튼을 눌러주세요."
+              : "아래 내용을 적어주시면 기관에서 확인 후 승인해 드려요."}
           </p>
           {closeLabel && (
             <p className="mt-2 inline-block rounded-full bg-[#F5F1E8] px-3 py-1 text-[11px] font-semibold text-[#6B4423]">
@@ -253,6 +293,15 @@ export function ApplicationForm({
             </p>
           )}
         </div>
+
+        {/* 이 화면에서 가장 중요한 문구 — 고치면 입장 자격을 일시적으로 잃는다. */}
+        {editing && initial?.wasApproved && (
+          <p className="mt-4 rounded-2xl border-2 border-amber-300 bg-amber-50 px-4 py-3 text-xs font-semibold leading-relaxed text-amber-900">
+            ⚠️ 수정하시면 <b>다시 승인 대기 상태</b>가 돼요.
+            <br />
+            기관이 바뀐 인원을 확인하고 수락하면 다시 입장하실 수 있어요.
+          </p>
+        )}
 
         {atCapacity && (
           <p className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-semibold leading-relaxed text-amber-900">
@@ -357,11 +406,15 @@ export function ApplicationForm({
               onChange={(e) => setPhone(formatPhone(e.target.value))}
               placeholder="010-1234-5678"
               required
+              // 번호를 바꾸는 건 수정이 아니라 다른 사람의 신청서가 된다.
+              readOnly={editing}
               disabled={pending}
-              className={INPUT_CLS}
+              className={`${INPUT_CLS} ${editing ? "bg-[#F5F1E8] text-[#8B7F75]" : ""}`}
             />
             <span className="mt-1 block text-[11px] text-[#6B6560]">
-              🌿 승인 후 이 번호로 로그인하면 바로 입장돼요.
+              {editing
+                ? "🔒 연락처는 바꿀 수 없어요. 번호가 바뀌셨다면 참가를 취소하고 새로 신청해 주세요."
+                : "🌿 승인 후 이 번호로 로그인하면 바로 입장돼요."}
             </span>
           </label>
 
@@ -484,14 +537,28 @@ export function ApplicationForm({
           >
             {pending
               ? "보내는 중..."
-              : consentAgreed
-                ? "🌲 신청서 보내기"
-                : "개인정보 동의(필수)에 체크해 주세요"}
+              : !consentAgreed
+                ? "개인정보 동의(필수)에 체크해 주세요"
+                : editing
+                  ? "✏️ 수정한 내용 보내기"
+                  : "🌲 신청서 보내기"}
           </button>
+
+          {editing && onCancelEdit && (
+            <button
+              type="button"
+              onClick={onCancelEdit}
+              disabled={pending}
+              className="w-full text-center text-xs font-semibold text-[#8B7F75] underline underline-offset-2 hover:text-[#2D5A3D] disabled:opacity-50"
+            >
+              ← 수정하지 않고 돌아가기
+            </button>
+          )}
         </form>
       </div>
 
-      <ApplicationLookup eventId={eventId} />
+      {/* 수정 중에는 "내 신청 조회" 가 의미 없다 — 이미 내 신청서를 보고 있다. */}
+      {!editing && <ApplicationLookup eventId={eventId} />}
     </section>
   );
 }

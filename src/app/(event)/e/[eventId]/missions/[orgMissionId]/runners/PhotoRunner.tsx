@@ -13,9 +13,18 @@ import { AcornIcon } from "@/components/acorn-icon";
 interface Props {
   mission: OrgMissionRow;
   config: PhotoMissionConfig;
+  /**
+   * 기관이 이 행사에서 사진 나눠보기를 켰는가. 켜져 있으면 이 사진이 다른
+   * 참가 가족에게도 보인다는 사실을 **찍기 전에** 알려준다.
+   */
+  photoFeedEnabled?: boolean;
 }
 
-export function PhotoRunner({ mission, config }: Props) {
+export function PhotoRunner({
+  mission,
+  config,
+  photoFeedEnabled = false,
+}: Props) {
   const router = useRouter();
   const [photos, setPhotos] = useState<string[]>([]);
   const [caption, setCaption] = useState("");
@@ -253,6 +262,19 @@ export function PhotoRunner({ mission, config }: Props) {
         >
           ⚠️ {errorMsg}
         </div>
+      )}
+
+      {/* 사진 나눠보기 — 기관이 켠 행사에서만. 고를 수 없어도 미리 알려준다. */}
+      {photoFeedEnabled && (
+        <p className="rounded-2xl border border-[#D4E4BC] bg-[#F5F1E8]/60 px-4 py-3 text-[11px] leading-relaxed text-[#6B6560]">
+          <span className="block text-sm font-bold text-[#2D5A3D]">
+            📸 함께 보는 행사예요
+          </span>
+          <span className="mt-0.5 block">
+            이 행사는 참가 가족들이 서로의 미션 사진을 봐요. 올린 사진은 기관
+            확인이 끝나면 하단 [📸 사진] 탭에 함께 올라갑니다.
+          </span>
+        </p>
       )}
 
       {/* Submit button */}

@@ -370,25 +370,43 @@ export async function submitEventApplicationAction(
       return { ok: false, kind: "CLOSED", message: "접수가 마감됐어요" };
     }
 
-    // 4) 이미 참가자면 신청이 아니라 입장 안내
-    const participantId = await findParticipantUserIdByPhone(eventId, phone);
-    if (participantId) {
-      return {
-        ok: false,
-        kind: "ALREADY_PARTICIPANT",
-        message: "이미 이 행사에 참가 중인 연락처예요. 바로 입장하실 수 있어요",
-      };
+    // 4) 기존 신청서 + 본인 여부
+    //
+    //    쿠키가 그 신청서를 가리키면 본인이 자기 신청을 고치는 것이고,
+    //    쿠키가 없으면 같은 번호를 아는 제3자가 남의 참가를 건드리는 것이다.
+    //    본인 확인 근거로 쿠키를 쓰는 것은 cancelMyApplicationAction 과 같다.
+    const existing = await loadApplicationByPhone(eventId, phone);
+    const store = await cookies();
+    const ownedId = store.get(applicationCookieName(eventId))?.value;
+    const isOwner = !!existing && !!ownedId && ownedId === existing.id;
+
+    // 5) 이미 참가자면 신청이 아니라 입장 안내.
+    //    단, **본인이 자기 신청서를 고치는 중이면 건너뛴다** — 승인된 사람은
+    //    당연히 참가자이므로, 이 검사를 그대로 두면 인원 수정이 영영 막힌다.
+    if (!isOwner) {
+      const participantId = await findParticipantUserIdByPhone(eventId, phone);
+      if (participantId) {
+        return {
+          ok: false,
+          kind: "ALREADY_PARTICIPANT",
+          message:
+            "이미 이 행사에 참가 중인 연락처예요. 바로 입장하실 수 있어요",
+        };
+      }
     }
 
-    // 5) 기존 신청서 확인 → 수정 / 신규
-    const existing = await loadApplicationByPhone(eventId, phone);
-    if (existing?.status === "APPROVED") {
+    // 6) 승인된 신청서 덮어쓰기는 본인만.
+    //    인원이 바뀌면 기관이 다시 확인해야 한다(정책) — 참가를 풀고 PENDING 으로
+    //    되돌린다. 실제 해제는 아래 검증을 모두 통과한 뒤에 한다(반쪽 상태 방지).
+    if (existing?.status === "APPROVED" && !isOwner) {
       return {
         ok: false,
         kind: "ALREADY_APPROVED",
         message: "이미 승인된 신청서가 있어요",
       };
     }
+    const releaseUserId =
+      existing?.status === "APPROVED" ? existing.approved_user_id : null;
 
     // 동의 스냅샷은 **서버가 다시 읽어서** 만든다. 클라이언트가 보낸 문구를
     // 그대로 저장하면 아무 글에나 동의한 기록을 만들 수 있다.
@@ -428,6 +446,9 @@ export async function submitEventApplicationAction(
       // 파생값 — 클라이언트가 보낸 숫자가 아니라 children/companions 로 계산된 값.
       party_size: partySize,
       status: "PENDING" as OrgEventApplicationStatus,
+      // 승인이 풀렸으므로 계정 연결도 끊는다. 재승인 때 다시 채워진다.
+      // (빠져 있으면 죽은 계정 참조가 남아 초대장이 "승인됨" 으로 오인한다)
+      approved_user_id: null,
       // 재신청 시 이전 거절 사유·검토 기록·취소 흔적은 지운다 (새 신청서로 취급).
       note: null,
       reviewed_by: null,
@@ -443,6 +464,20 @@ export async function submitEventApplicationAction(
       consent_optional_agreed_at: snapshot.optional ? agreedAt : null,
       consent_snapshot: snapshot,
     };
+
+    // 검증이 모두 끝난 뒤에 참가를 푼다. 앞에서 풀어버리면 아래 검증에 걸렸을 때
+    // "승인은 풀렸는데 신청서는 그대로" 인 반쪽 상태가 남는다.
+    if (releaseUserId) {
+      const relErr = await releaseParticipation(eventId, releaseUserId);
+      if (relErr) {
+        console.error("[applications/submit] 참가 해제 실패", relErr);
+        return {
+          ok: false,
+          kind: "ERROR",
+          message: "수정 중 오류가 발생했어요. 잠시 후 다시 시도해 주세요",
+        };
+      }
+    }
 
     const written = await writeApplicationRow(
       existing?.id ?? null,
@@ -462,7 +497,6 @@ export async function submitEventApplicationAction(
     const applicationId = written.id;
 
     // 6) 상태 카드용 쿠키 — 문자를 보내지 않으므로 신청자의 주 확인 수단.
-    const store = await cookies();
     store.set(applicationCookieName(eventId), applicationId, {
       httpOnly: true,
       sameSite: "lax",
@@ -1159,4 +1193,107 @@ export async function updateOrgApplicationConsentAction(
 
   // 기관의 모든 행사 신청 폼이 이 문구를 쓴다.
   revalidatePath(`/org/${orgId}`, "layout");
+}
+
+/* ========================================================================== */
+/* 관리자 — 취소된 신청서 영구 삭제                                            */
+/* ========================================================================== */
+
+/**
+ * 취소된 신청서를 DB 에서 지운다. 되돌릴 수 없다.
+ *
+ * **CANCELED 만 허용한다.** 취소는 "지우지 않고 남긴다" 가 원칙이고 그 이유도
+ * 분명하지만(누가 왜 빠졌는지는 정원 운영에 필요하다), 테스트로 만든 행이나
+ * 잘못 들어온 접수까지 영원히 이고 갈 이유는 없다. 관리자가 이미 한 번 취소로
+ * 걸러낸 건에 한해 최종 정리를 열어준다.
+ *
+ * 대기·승인·거절을 여기서 막는 이유:
+ *   · APPROVED — 참가자 명단은 남는데 근거 신청서만 사라져 어긋난다
+ *                (빼려면 먼저 취소해야 참가도 함께 정리된다)
+ *   · PENDING  — 아직 판단하지 않은 건이다. 실수로 지우면 신청자만 기다린다
+ *   · REJECTED — 거절 사유가 유일한 기록이다
+ *   필요하면 먼저 [취소 처리] 를 거치게 해서, 삭제가 두 단계가 되도록 둔다.
+ */
+export async function deleteEventApplicationAction(
+  orgId: string,
+  eventId: string,
+  applicationId: string
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  try {
+    const session = await requireOrg();
+    if (!orgId || orgId !== session.orgId) {
+      return { ok: false, message: "이 기관의 접수를 처리할 권한이 없어요" };
+    }
+    await assertEventOwned(eventId, orgId);
+
+    const app = await loadApplicationById(applicationId);
+    if (!app || app.event_id !== eventId) {
+      return { ok: false, message: "신청서를 찾을 수 없어요" };
+    }
+    if (app.status !== "CANCELED") {
+      return {
+        ok: false,
+        message:
+          "취소된 신청서만 삭제할 수 있어요. 먼저 [취소 처리]를 해주세요",
+      };
+    }
+
+    const supabase = await createClient();
+    const del = (await (
+      supabase.from("org_event_applications" as never) as unknown as {
+        delete: () => {
+          eq: (k: string, v: string) => Promise<{ error: SbErr }>;
+        };
+      }
+    )
+      .delete()
+      .eq("id", applicationId)) as { error: SbErr };
+
+    if (del.error) {
+      console.error("[applications/delete] error", del.error);
+      return { ok: false, message: `삭제 실패: ${del.error.message}` };
+    }
+
+    revalidatePath(`/org/${orgId}/events/${eventId}`);
+    return { ok: true };
+  } catch (err) {
+    console.error("[applications/delete] threw", err);
+    return { ok: false, message: "삭제 중 오류가 발생했어요" };
+  }
+}
+
+/* ========================================================================== */
+/* 관리자 — 동의 전문 열람 (목록에서 [보기])                                    */
+/* ========================================================================== */
+
+/**
+ * 신청서 한 건의 동의 전문.
+ *
+ * 목록 응답에 실어 보내지 않는 이유: 한 건당 2KB 남짓이라 신청서가 쌓이면
+ * 접수 탭을 열 때마다 수백 KB 를 브라우저로 넘기게 된다. 정작 쓰이는 건
+ * [보기] 를 눌렀을 때뿐이라, 그때 한 건만 가져온다.
+ */
+export async function loadApplicationConsentAction(
+  orgId: string,
+  eventId: string,
+  applicationId: string
+): Promise<
+  { ok: true; snapshot: ConsentSnapshot | null } | { ok: false; message: string }
+> {
+  try {
+    const session = await requireOrg();
+    if (!orgId || orgId !== session.orgId) {
+      return { ok: false, message: "이 기관의 접수를 볼 권한이 없어요" };
+    }
+    await assertEventOwned(eventId, orgId);
+
+    const app = await loadApplicationById(applicationId);
+    if (!app || app.event_id !== eventId) {
+      return { ok: false, message: "신청서를 찾을 수 없어요" };
+    }
+    return { ok: true, snapshot: app.consent_snapshot };
+  } catch (err) {
+    console.error("[applications/consentProof] threw", err);
+    return { ok: false, message: "동의 기록을 불러오지 못했어요" };
+  }
 }

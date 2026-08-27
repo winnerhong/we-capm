@@ -13,6 +13,11 @@ import {
   replaceMissionPhotosAction,
   uploadMissionPhotoAction,
 } from "../actions";
+import { PhotoShareNotice } from "@/components/photo-feed/share-notice";
+import { LIKE_ACORN_CAP } from "@/lib/missions/photo-feed-core";
+
+/** 이름 칩을 늘어놓을 최대 개수. 넘으면 "외 N가족" 으로 접는다. */
+const LIKER_CHIP_LIMIT = 12;
 
 type Props = {
   missionId: string;
@@ -20,6 +25,19 @@ type Props = {
   initialCaption: string;
   minPhotos: number;
   maxPhotos: number;
+  /** 기관이 이 행사에서 사진 나눠보기를 켰는가. 꺼져 있으면 줄 자체가 없다. */
+  photoFeedEnabled: boolean;
+  /** 이 제출물의 상태 — 확인이 끝났으면 이미 피드에 올라가 있다. */
+  submissionStatus: string;
+  /**
+   * 사진을 바꾸면 기관 확인을 다시 받아야 하는 미션인가(PHOTO_APPROVAL).
+   * 문구가 달라진다 — "그대로 유지돼요" 라고 해놓고 검토 대기로 돌아가면 거짓말이다.
+   */
+  needsReviewAfterChange?: boolean;
+  /** 다른 가족들이 이 사진에 누른 좋아요 수. */
+  receivedLikes?: number;
+  /** 누른 가족 이름 — 최근 순. "햇살반 홍길동" 꼴(피드 캡션과 같은 이름). */
+  likerNames?: string[];
 };
 
 export function SubmittedPhotos({
@@ -28,6 +46,11 @@ export function SubmittedPhotos({
   initialCaption,
   minPhotos,
   maxPhotos,
+  photoFeedEnabled,
+  submissionStatus,
+  needsReviewAfterChange = false,
+  receivedLikes = 0,
+  likerNames = [],
 }: Props) {
   const router = useRouter();
   const [photos, setPhotos] = useState<string[]>(initialUrls);
@@ -40,6 +63,57 @@ export function SubmittedPhotos({
   >(null);
   const [isPending, startTransition] = useTransition();
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // 바꾼 뒤에 무슨 일이 생기는지 — 버튼 밑과 저장 성공 문구가 같은 말을 해야 한다.
+  const changeHint = needsReviewAfterChange
+    ? "💡 도토리는 그대로예요. 바꾼 사진은 기관이 한 번 더 확인해요."
+    : "💡 사진만 바꿔도 도토리·승인 상태는 그대로 유지돼요.";
+  const changedMsg = needsReviewAfterChange
+    ? "새 사진으로 바꿨어요 · 기관 확인을 기다려요"
+    : "다시 찍은 사진으로 바꿨어요";
+
+  // 고를 수 있는 게 아니라 알려주는 줄이다 — 지금 이 사진이 남에게 보이는지.
+  const shareRow = (
+    <>
+      {photoFeedEnabled && receivedLikes > 0 && (
+        <div className="mt-3 rounded-2xl border border-rose-200 bg-rose-50/70 px-3 py-3">
+          <p className="text-center text-xs font-bold text-rose-700">
+            ❤️ 좋아요 {receivedLikes}개를 받았어요
+          </p>
+          <p className="mt-0.5 text-center text-[11px] font-semibold text-rose-500">
+            도토리 +{Math.min(LIKE_ACORN_CAP, receivedLikes)}개
+            {receivedLikes > LIKE_ACORN_CAP &&
+              ` (한 사진당 ${LIKE_ACORN_CAP}개까지)`}
+          </p>
+
+          {/* 누가 눌렀는지 — 숫자만 있으면 "몇 명이 봤나" 로 끝나지만, 이름이 있으면
+              다음에 만났을 때 인사가 된다. 같은 행사에 온 가족들끼리라 서로 아는
+              범위이고, 하트 수보다 이쪽을 더 오래 본다. */}
+          {likerNames.length > 0 && (
+            <ul className="mt-2 flex flex-wrap justify-center gap-1.5">
+              {likerNames.slice(0, LIKER_CHIP_LIMIT).map((name, i) => (
+                <li
+                  key={`${name}-${i}`}
+                  className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-rose-600 shadow-sm"
+                >
+                  ❤️ {name} 가족
+                </li>
+              ))}
+              {likerNames.length > LIKER_CHIP_LIMIT && (
+                <li className="rounded-full bg-white/70 px-2.5 py-1 text-[11px] font-semibold text-rose-400">
+                  외 {likerNames.length - LIKER_CHIP_LIMIT}가족
+                </li>
+              )}
+            </ul>
+          )}
+        </div>
+      )}
+      <PhotoShareNotice
+        feedEnabled={photoFeedEnabled}
+        status={submissionStatus}
+      />
+    </>
+  );
 
   // 1장 미션이면 "다시 찍기" 원샷 플로우 사용.
   const isSinglePhoto = maxPhotos <= 1 || initialUrls.length === 1;
@@ -84,7 +158,7 @@ export function SubmittedPhotos({
     setUploadStatus(null);
     if (result.ok) {
       setPhotos([uploadResult.url]);
-      setMsg({ kind: "ok", text: "다시 찍은 사진으로 바꿨어요" });
+      setMsg({ kind: "ok", text: changedMsg });
       router.refresh();
     } else {
       setMsg({ kind: "error", text: result.error });
@@ -161,7 +235,7 @@ export function SubmittedPhotos({
         caption: caption.trim() || undefined,
       });
       if (result.ok) {
-        setMsg({ kind: "ok", text: "사진을 바꿨어요" });
+        setMsg({ kind: "ok", text: changedMsg });
         setEditing(false);
         router.refresh();
       } else {
@@ -227,8 +301,10 @@ export function SubmittedPhotos({
         </div>
 
         <p className="mt-3 text-center text-[11px] leading-relaxed text-[#8B7F75]">
-          💡 사진만 바꿔도 도토리·승인 상태는 그대로 유지돼요.
+          {changeHint}
         </p>
+
+        {shareRow}
 
         <input
           ref={fileRef}
@@ -320,6 +396,8 @@ export function SubmittedPhotos({
         </p>
       )}
 
+      {!editing && shareRow}
+
       {editing && (
         <div className="mt-4 space-y-3">
           {canAddMore && (
@@ -375,8 +453,7 @@ export function SubmittedPhotos({
           </div>
 
           <p className="rounded-xl border border-amber-200 bg-amber-50/60 px-3 py-2 text-[11px] leading-relaxed text-amber-900">
-            💡 사진만 바꿔도 도토리·승인 상태는 그대로 유지돼요. 더 잘 나온
-            사진으로 바꿔보세요.
+            {changeHint} 더 잘 나온 사진으로 바꿔보세요.
           </p>
 
           <div className="flex gap-2">

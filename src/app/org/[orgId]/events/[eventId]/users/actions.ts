@@ -9,6 +9,7 @@ import { requireOrg } from "@/lib/org-auth-guard";
 import { createClient } from "@/lib/supabase/server";
 import { loadOrgEventById } from "@/lib/org-events/queries";
 import { normalizeUserPhone } from "@/lib/app-user/account";
+import { normalizePartyCounts } from "@/lib/org-events/application-core";
 import {
   upsertParticipantWithChildren,
   linkUsersToEvent,
@@ -471,4 +472,107 @@ export async function removeUserFromOrgAction(
   }
 
   return { ok: true, removedEvents: eventIds.length };
+}
+
+/* ========================================================================== */
+/* 참석 인원 직접 조정                                                         */
+/* ========================================================================== */
+
+/**
+ * 참가자 탭의 [참석] 배지를 관리자가 직접 고친다.
+ *
+ * 왜 필요한가: 인원은 신청 이후에도 계속 바뀐다("한 명 더 가요"). 그때마다
+ * 보호자에게 신청서를 다시 내게 하면 승인이 풀렸다 붙었다 하고, 기관은 그 사이
+ * 간식·버스 수량을 확정하지 못한다. 전화 한 통으로 끝날 일은 기관이 바로 고칠
+ * 수 있어야 한다.
+ *
+ * 신청서까지 함께 고치는 이유:
+ *   정원 게이지(view_org_event_application_counts)는 **신청서의** party_size 합이다.
+ *   참가자 행만 고치면 화면의 두 숫자가 갈라져, 관리자가 인원을 늘렸는데 정원은
+ *   그대로인 상태가 된다. 접수를 거치지 않은 참가자는 신청서가 없으므로 그냥
+ *   건너뛴다(그 경우 정원 집계에 애초에 안 잡힌다).
+ */
+export async function updateEventPartyCountsAction(
+  orgId: string,
+  eventId: string,
+  userId: string,
+  input: { childCount: number; adultCount: number; seniorCount: number }
+): Promise<{ ok: true; partySize: number } | { ok: false; message: string }> {
+  try {
+    const session = await requireOrg();
+    if (!orgId || orgId !== session.orgId) {
+      return { ok: false, message: "이 기관의 참가자를 수정할 권한이 없어요" };
+    }
+    await assertEventOwned(eventId, orgId);
+    if (!userId) return { ok: false, message: "참가자가 없어요" };
+
+    const norm = normalizePartyCounts(input);
+    if (!norm.ok) return { ok: false, message: norm.message };
+    const { childCount, adultCount, seniorCount, partySize } = norm.value;
+
+    const supabase = await createClient();
+    type SbErr = { message: string; code?: string } | null;
+
+    const partResp = (await (
+      supabase.from("org_event_participants" as never) as unknown as {
+        update: (p: unknown) => {
+          eq: (k: string, v: string) => {
+            eq: (k: string, v: string) => Promise<{ error: SbErr }>;
+          };
+        };
+      }
+    )
+      .update({
+        party_size: partySize,
+        child_count: childCount,
+        adult_count: adultCount,
+        senior_count: seniorCount,
+      })
+      .eq("event_id", eventId)
+      .eq("user_id", userId)) as { error: SbErr };
+
+    if (partResp.error) {
+      console.error("[event/party] 참가자 갱신 실패", partResp.error);
+      return {
+        ok: false,
+        message: `참석 인원 저장 실패: ${partResp.error.message}`,
+      };
+    }
+
+    // 승인된 신청서가 있으면 같은 값으로 맞춘다 — 없으면(직접 등록분) 건너뛴다.
+    const appResp = (await (
+      supabase.from("org_event_applications" as never) as unknown as {
+        update: (p: unknown) => {
+          eq: (k: string, v: string) => {
+            eq: (k: string, v: string) => {
+              eq: (k: string, v: string) => Promise<{ error: SbErr }>;
+            };
+          };
+        };
+      }
+    )
+      .update({
+        party_size: partySize,
+        child_count: childCount,
+        adult_count: adultCount,
+        senior_count: seniorCount,
+      })
+      .eq("event_id", eventId)
+      .eq("approved_user_id", userId)
+      .eq("status", "APPROVED")) as { error: SbErr };
+
+    if (appResp.error) {
+      // 신청서 쪽이 실패해도 참가자 값은 이미 맞다. 정원 집계만 잠시 어긋난다.
+      console.error("[event/party] 신청서 동기화 실패", appResp.error);
+    }
+
+    revalidatePath(`/org/${orgId}/events/${eventId}`);
+    return { ok: true, partySize };
+  } catch (err) {
+    console.error("[event/party] threw", err);
+    return {
+      ok: false,
+      message: err instanceof Error ? err.message : "저장에 실패했어요",
+    };
+  }
 }
