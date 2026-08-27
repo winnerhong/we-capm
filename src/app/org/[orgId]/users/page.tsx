@@ -32,6 +32,12 @@ type AppUserWithCount = AppUserListRow & {
   children_count: number;
   enrolled_names: string[];
   class_names: string[];
+  /**
+   * 이 계정의 홈 기관명 — **우리 기관이 아닐 때만** 채운다.
+   * 계정 자체를 건드리는 작업(비활성화·영구삭제)은 홈 기관만 할 수 있어서,
+   * 이 값이 있으면 그 버튼들을 감추고 [기관에서 빼기]를 대신 띄운다.
+   */
+  home_org_name: string | null;
 };
 
 const STATUS_META: Record<
@@ -208,11 +214,42 @@ async function loadUsers(orgId: string): Promise<AppUserWithCount[]> {
     }
   }
 
+  // 타 기관이 홈인 계정만 이름을 조회한다 (대개 0~몇 건).
+  const otherOrgIds = Array.from(
+    new Set(rows.map((r) => r.org_id).filter((id) => id && id !== orgId))
+  );
+  const orgNameById = new Map<string, string>();
+  if (otherOrgIds.length > 0) {
+    const { data: orgs } = (await (
+      supabase.from("partner_orgs" as never) as unknown as {
+        select: (c: string) => {
+          in: (
+            k: string,
+            v: string[]
+          ) => Promise<{
+            data: Array<{ id: string; org_name: string | null }> | null;
+          }>;
+        };
+      }
+    )
+      .select("id, org_name")
+      .in("id", otherOrgIds)) as {
+      data: Array<{ id: string; org_name: string | null }> | null;
+    };
+    for (const o of orgs ?? []) {
+      orgNameById.set(o.id, (o.org_name ?? "").trim() || "다른 기관");
+    }
+  }
+
   return rows.map((r) => ({
     ...r,
     children_count: countByUser.get(r.id) ?? 0,
     enrolled_names: enrolledByUser.get(r.id) ?? [],
     class_names: classByUser.get(r.id) ?? [],
+    home_org_name:
+      r.org_id && r.org_id !== orgId
+        ? (orgNameById.get(r.org_id) ?? "다른 기관")
+        : null,
   }));
 }
 

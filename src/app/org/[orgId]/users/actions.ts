@@ -11,6 +11,28 @@ import {
   getOrgAcornBalance,
 } from "@/lib/app-user/event-acorns";
 
+/**
+ * 서버 액션 결과.
+ *
+ * throw 하지 않고 값으로 돌려주는 이유:
+ *   Next.js 는 **프로덕션 빌드에서 서버 액션이 throw 한 에러 메시지를
+ *   클라이언트에 넘기지 않는다.** 민감정보 유출을 막으려고 전부
+ *   "An error occurred in the Server Components render" 로 바꿔버린다.
+ *   그래서 "이 계정은 ○○어린이집 소속이에요" 같은 안내가 로컬에서는 보이고
+ *   배포하면 영어 한 줄로 바뀐다 — 정작 사용자가 봐야 할 화면에서만 사라진다.
+ *
+ *   예상 가능한 실패(권한 없음 등)는 값으로, 진짜 버그만 throw 한다.
+ */
+export type UserActionResult = { ok: true } | { ok: false; message: string };
+
+/** 예상 가능한 실패를 결과값으로 바꾼다. 예상 못 한 오류는 그대로 던진다. */
+function toFailure(err: unknown): { ok: false; message: string } {
+  return {
+    ok: false,
+    message: err instanceof Error ? err.message : "처리에 실패했어요",
+  };
+}
+
 export type UserStatus = "ACTIVE" | "SUSPENDED" | "CLOSED";
 export type AttendanceStatus = "PRESENT" | "LATE" | "ABSENT";
 
@@ -144,12 +166,18 @@ async function getManageableUser(userId: string): Promise<{
 export async function updateAppUserStatusAction(
   userId: string,
   next: UserStatus
-): Promise<void> {
+): Promise<UserActionResult> {
   if (!STATUS_SET.has(next)) {
-    throw new Error("올바르지 않은 상태값이에요");
+    return { ok: false, message: "올바르지 않은 상태값이에요" };
   }
 
-  const user = await getOwnedUser(userId);
+  let user: { id: string; org_id: string; parent_name: string };
+  try {
+    user = await getOwnedUser(userId);
+  } catch (err) {
+    return toFailure(err);
+  }
+
   const supabase = await createClient();
 
   const upd = (await (
@@ -163,12 +191,14 @@ export async function updateAppUserStatusAction(
     .eq("id", userId)) as { error: SbErr };
 
   if (upd.error) {
-    throw new Error(`상태 변경 실패: ${upd.error.message}`);
+    console.error("[users/status] error", upd.error);
+    return { ok: false, message: `상태 변경 실패: ${upd.error.message}` };
   }
 
   revalidatePath(`/org/${user.org_id}/users`);
   revalidatePath(`/org/${user.org_id}/users/${userId}`);
   revalidatePath(`/org/${user.org_id}/users/${userId}/edit`);
+  return { ok: true };
 }
 
 /**
@@ -176,8 +206,16 @@ export async function updateAppUserStatusAction(
  * FK CASCADE 로 app_children, mission_submissions, fm 채팅/리액션 등
  * 연결된 데이터도 함께 정리됨.
  */
-export async function deleteAppUserAction(userId: string): Promise<void> {
-  const user = await getOwnedUser(userId);
+export async function deleteAppUserAction(
+  userId: string
+): Promise<UserActionResult> {
+  let user: { id: string; org_id: string; parent_name: string };
+  try {
+    user = await getOwnedUser(userId);
+  } catch (err) {
+    return toFailure(err);
+  }
+
   const supabase = await createClient();
 
   const del = (await (
@@ -191,10 +229,12 @@ export async function deleteAppUserAction(userId: string): Promise<void> {
     .eq("id", userId)) as { error: SbErr };
 
   if (del.error) {
-    throw new Error(`참가자 삭제 실패: ${del.error.message}`);
+    console.error("[users/delete] error", del.error);
+    return { ok: false, message: `참가자 삭제 실패: ${del.error.message}` };
   }
 
   revalidatePath(`/org/${user.org_id}/users`);
+  return { ok: true };
 }
 
 /** 참가자 기본 정보 업데이트 (parent_name, status) */

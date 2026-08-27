@@ -47,10 +47,16 @@ export function UserRowActions({
   const router = useRouter();
   const [pending, start] = useTransition();
 
+  // 액션은 실패를 값으로 돌려준다 — throw 하면 프로덕션에서 메시지가
+  // 통째로 지워져 사용자가 이유를 알 수 없다.
   const setStatus = (next: UserStatus) => {
     start(async () => {
       try {
-        await updateAppUserStatusAction(userId, next);
+        const res = await updateAppUserStatusAction(userId, next);
+        if (!res.ok) {
+          alert(res.message);
+          return;
+        }
         router.refresh();
       } catch (e) {
         alert(e instanceof Error ? e.message : "상태 변경 실패");
@@ -67,7 +73,11 @@ export function UserRowActions({
       return;
     start(async () => {
       try {
-        await deleteAppUserAction(userId);
+        const res = await deleteAppUserAction(userId);
+        if (!res.ok) {
+          alert(res.message);
+          return;
+        }
         router.refresh();
       } catch (e) {
         alert(e instanceof Error ? e.message : "삭제 실패");

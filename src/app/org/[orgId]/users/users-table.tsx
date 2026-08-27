@@ -24,6 +24,7 @@ import {
 } from "./actions";
 import { linkUsersToEventAction } from "@/app/org/[orgId]/events/[eventId]/users/actions";
 import { UserRowActions } from "./user-row-actions";
+import { RemoveFromOrgButton } from "@/app/org/[orgId]/events/[eventId]/users/remove-from-org-button";
 import { AttendanceToggle } from "./attendance-toggle";
 import { AcornAdjuster } from "./acorn-adjuster";
 import { AcornIcon } from "@/components/acorn-icon";
@@ -45,6 +46,8 @@ type AppUserWithCount = AppUserListRow & {
   children_count: number;
   enrolled_names: string[];
   class_names: string[];
+  /** 우리 기관이 홈이 아닐 때만 채워진다. null 이면 우리 기관 계정. */
+  home_org_name: string | null;
 };
 
 type EventLite = {
@@ -312,12 +315,22 @@ export function UsersTable({ orgId, rows, todayIso, events }: Props) {
     const ids = Array.from(selected);
     startTransition(async () => {
       try {
+        // 한 명이 막혀도 나머지는 처리한다 — 타 기관 계정이 섞여 있을 때
+        // 전부 중단되면 왜 아무 일도 안 일어났는지 알 수 없다.
+        const failed: string[] = [];
         for (const id of ids) {
-          await updateAppUserStatusAction(id, next);
+          const res = await updateAppUserStatusAction(id, next);
+          if (!res.ok) failed.push(res.message);
         }
         clearSelection();
-        showSavedToast();
         router.refresh();
+        if (failed.length > 0) {
+          setError(
+            `${ids.length - failed.length}명 ${label} · ${failed.length}명 실패 — ${failed[0]}`
+          );
+          return;
+        }
+        showSavedToast();
       } catch (err) {
         setError(err instanceof Error ? err.message : `${label} 실패`);
       }
@@ -347,12 +360,20 @@ export function UsersTable({ orgId, rows, todayIso, events }: Props) {
     const ids = Array.from(selected);
     startTransition(async () => {
       try {
+        const failed: string[] = [];
         for (const id of ids) {
-          await deleteAppUserAction(id);
+          const res = await deleteAppUserAction(id);
+          if (!res.ok) failed.push(res.message);
         }
         clearSelection();
-        showSavedToast();
         router.refresh();
+        if (failed.length > 0) {
+          setError(
+            `${ids.length - failed.length}명 삭제 · ${failed.length}명 실패 — ${failed[0]}`
+          );
+          return;
+        }
+        showSavedToast();
       } catch (err) {
         setError(err instanceof Error ? err.message : "삭제 실패");
       }
@@ -612,11 +633,35 @@ export function UsersTable({ orgId, rows, todayIso, events }: Props) {
                       )}
                     </td>
                     <td className="px-2 py-2">
+                      {/* 이름을 누르면 그 가족으로 로그인한 앱 화면이 새 탭에서 열린다.
+                          비활성·해지 계정은 로그인 전환이 403 이라 상세로 보낸다. */}
+                      {r.status === "ACTIVE" ? (
+                        <a
+                          href={`/api/org/impersonate-user?id=${r.id}&org=${orgId}`}
+                          target="_blank"
+                          rel="noopener"
+                          title={`${displayName} 가족의 앱 화면 열기 (새 탭)`}
+                          className="font-semibold text-[#2D5A3D] underline-offset-2 hover:underline"
+                        >
+                          {displayName}
+                        </a>
+                      ) : (
+                        <Link
+                          href={`/org/${orgId}/users/${r.id}`}
+                          className="font-semibold text-[#2D5A3D] underline-offset-2 hover:underline"
+                        >
+                          {displayName}
+                        </Link>
+                      )}
+                      {/* 상세(자녀·도토리 이력)로 가는 길을 남겨둔다 — 이름이
+                          포털로 바뀌면서 이 화면에서 유일한 입구였던 게 사라진다. */}
                       <Link
                         href={`/org/${orgId}/users/${r.id}`}
-                        className="font-semibold text-[#2D5A3D] underline-offset-2 hover:underline"
+                        title="참가자 상세"
+                        aria-label={`${displayName} 상세 보기`}
+                        className="ml-1 text-[11px] text-[#B0A89D] hover:text-[#2D5A3D]"
                       >
-                        {displayName}
+                        ⓘ
                       </Link>
                       {r.enrolled_names.length === 0 && (
                         <span className="ml-1 text-[10px] text-[#8B7F75]">
@@ -657,14 +702,29 @@ export function UsersTable({ orgId, rows, todayIso, events }: Props) {
                       </span>
                     </td>
                     <td className="px-2 py-2">
-                      <UserRowActions
-                        orgId={orgId}
-                        userId={r.id}
-                        userName={displayName}
-                        status={r.status}
-                        variant="table"
-                        iconOnly
-                      />
+                      {/* 타 기관 계정은 비활성화·영구삭제가 홈 기관 전용이라
+                          눌러도 반드시 실패한다. 감추고 [기관에서 빼기]를 준다. */}
+                      <div className="flex items-center justify-end gap-1">
+                        <UserRowActions
+                          orgId={orgId}
+                          userId={r.id}
+                          userName={displayName}
+                          status={r.status}
+                          variant="table"
+                          iconOnly
+                          hideSuspend={!!r.home_org_name}
+                          hideDelete={!!r.home_org_name}
+                        />
+                        {r.home_org_name && (
+                          <RemoveFromOrgButton
+                            orgId={orgId}
+                            userId={r.id}
+                            displayName={displayName}
+                            homeOrgName={r.home_org_name}
+                            iconOnly
+                          />
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );
@@ -756,12 +816,34 @@ export function UsersTable({ orgId, rows, todayIso, events }: Props) {
                       ))}
                     </div>
                   )}
-                  <Link
-                    href={`/org/${orgId}/users/${r.id}`}
-                    className="block text-base font-bold text-[#2D5A3D] hover:underline"
-                  >
-                    🎒 {displayName}
-                  </Link>
+                  <div className="flex items-baseline gap-1.5">
+                    {r.status === "ACTIVE" ? (
+                      <a
+                        href={`/api/org/impersonate-user?id=${r.id}&org=${orgId}`}
+                        target="_blank"
+                        rel="noopener"
+                        title={`${displayName} 가족의 앱 화면 열기 (새 탭)`}
+                        className="text-base font-bold text-[#2D5A3D] hover:underline"
+                      >
+                        🎒 {displayName}
+                      </a>
+                    ) : (
+                      <Link
+                        href={`/org/${orgId}/users/${r.id}`}
+                        className="text-base font-bold text-[#2D5A3D] hover:underline"
+                      >
+                        🎒 {displayName}
+                      </Link>
+                    )}
+                    <Link
+                      href={`/org/${orgId}/users/${r.id}`}
+                      title="참가자 상세"
+                      aria-label={`${displayName} 상세 보기`}
+                      className="text-xs text-[#B0A89D] hover:text-[#2D5A3D]"
+                    >
+                      ⓘ
+                    </Link>
+                  </div>
                   <a
                     href={`tel:${phoneDigits}`}
                     className="mt-1 inline-flex items-center gap-1 font-mono text-xs text-[#2D5A3D] underline-offset-2 hover:underline"
@@ -805,7 +887,20 @@ export function UsersTable({ orgId, rows, todayIso, events }: Props) {
                 userName={displayName}
                 status={r.status}
                 variant="card"
+                hideSuspend={!!r.home_org_name}
+                hideDelete={!!r.home_org_name}
               />
+              {r.home_org_name && (
+                <div className="mt-2 flex">
+                  <RemoveFromOrgButton
+                    orgId={orgId}
+                    userId={r.id}
+                    displayName={displayName}
+                    homeOrgName={r.home_org_name}
+                    variant="card"
+                  />
+                </div>
+              )}
             </li>
           );
         })}
