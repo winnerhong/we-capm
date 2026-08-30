@@ -474,12 +474,8 @@ export function QuickAddUser({
         </form>
       )}
 
-      <p className="mt-2 text-[10px] leading-relaxed text-[#8B7F75]">
-        🔑 로그인 아이디 = 부모님 연락처. 비밀번호는 없어요. 생년월일·성별은
-        부모님이 앱에서 직접 입력해요.{" "}
-        <span className="text-[#6B4423]">
-          반명 입력 시 토리톡 활성화된 기관은 자동으로 반 채팅방에 참여돼요.
-        </span>
+      <p className="mt-2 text-[10px] text-[#8B7F75]">
+        🔑 아이디는 부모님 연락처, 비밀번호는 없어요.
       </p>
     </section>
   );

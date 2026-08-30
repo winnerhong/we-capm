@@ -15,7 +15,9 @@
 //    requireOrg/requireEventContext 가 한다.)
 
 import "server-only";
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
+import { reportQueryFailure } from "@/lib/supabase/schema-gap";
 
 export type OrgFeatureFlag = {
   code: string;
@@ -43,12 +45,19 @@ type FlagRow = {
 };
 
 /**
- * 기관 하나의 기능 상태 전부. 왕복 1회.
+ * 기관 하나의 기능 상태 전부. **한 요청에 왕복 한 번.**
  *
- * 화면 하나에서 여러 번 부르지 말 것 — 레이아웃·컨텍스트에서 한 번 받아
- * 아래로 내려보낸다(참가자 쪽은 EventContext.features 가 그 자리다).
+ * cache() 로 감싼 이유 — 여기 달린 옛 주석은 "화면 하나에서 여러 번 부르지 말
+ * 것" 이었는데, 실제로는 그렇게 되지 않았다. 기관 홈 한 장을 계측해 보니 같은
+ * orgId 로 **세 번** 나갔다:
+ *   layout → loadTopMenuTools · OrgSectionTabs · AllToolsCard
+ * 셋은 서로를 모르는 남남이고, 알게 만들면 orgId 옆에 flags 를 끌고 다니는
+ * prop 이 화면마다 늘어난다. 주의로 지킬 수 없는 규칙은 도구로 지킨다.
+ *
+ * 유효 범위는 **요청 하나**다. 요청이 끝나면 같이 버려지므로, 지사가 스위치를
+ * 바꾼 다음 요청은 새 값을 읽는다.
  */
-export async function loadOrgFeatureFlags(
+export const loadOrgFeatureFlags = cache(async function loadOrgFeatureFlags(
   orgId: string
 ): Promise<OrgFeatureMap> {
   if (!orgId) return OPEN_FEATURE_MAP;
@@ -65,7 +74,11 @@ export async function loadOrgFeatureFlags(
     ).rpc("org_feature_flags", { p_org_id: orgId });
 
     if (error || !data) {
-      console.error("[features] org_feature_flags failed", error);
+      reportQueryFailure(
+        "org_feature_flags",
+        "20260831000000_org_feature_switches.sql",
+        error
+      );
       return OPEN_FEATURE_MAP;
     }
 
@@ -80,10 +93,14 @@ export async function loadOrgFeatureFlags(
     }
     return { loaded: true, byCode };
   } catch (e) {
-    console.error("[features] org_feature_flags threw", e);
+    reportQueryFailure(
+      "org_feature_flags",
+      "20260831000000_org_feature_switches.sql",
+      e
+    );
     return OPEN_FEATURE_MAP;
   }
-}
+});
 
 /**
  * 이 기능을 쓸 수 있나.

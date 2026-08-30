@@ -1,6 +1,6 @@
 "use client";
 
-// 초대장 폰 미리보기 — 편집 폼 옆에 붙어서 참가자가 보는 화면을 그대로 띄운다.
+// 초대장 폰 미리보기 — 편집 폼 **왼쪽**에 붙어서 참가자가 보는 화면을 그대로 띄운다.
 //
 // 왜 iframe 인가:
 //   미리보기를 새로 그리면 초대장 화면이 바뀔 때마다 미리보기가 거짓말을 하기
@@ -84,7 +84,11 @@ export function InvitationPhonePreview({
 
   return (
     <>
-      <aside className="sticky top-16 order-2 hidden w-[402px] shrink-0 xl:block">
+      {/* 왼쪽에 선다 — order 를 주지 않으면 DOM 순서(미리보기 → 폼) 그대로다.
+          예전엔 order-2 로 오른쪽에 뒀는데, 초대장 작업에서 눈이 먼저 가야 하는
+          것은 **결과물**이지 입력칸이 아니다. 왼쪽이 먼저 읽히는 자리다.
+          sticky 라 폼을 아무리 내려도 폰은 그 자리에 남는다. */}
+      <aside className="sticky top-16 hidden w-[402px] shrink-0 xl:block">
         <Frame
           eventId={eventId}
           fields={fields}

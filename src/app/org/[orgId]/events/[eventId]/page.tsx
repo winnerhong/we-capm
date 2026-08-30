@@ -245,50 +245,54 @@ export default async function OrgEventDetailPage({
         )}
 
         <div className="space-y-3 bg-white p-5 md:p-6">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <span
-                  className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold ${
-                    isLive
-                      ? "border-emerald-500 bg-emerald-500 text-white"
-                      : statusMeta.color
-                  }`}
-                >
-                  {statusDesc.emoji} {statusDesc.label}
-                </span>
-                <span className="text-[11px] text-[#6B6560]">
-                  📅 {fmtRange(event.starts_at, event.ends_at)}
-                </span>
-              </div>
-              <h1 className="mt-2 text-2xl font-bold text-[#2D5A3D] md:text-3xl">
-                {event.name}
-              </h1>
-              {/* 소개글 — 접어 둔다.
-                  초대장에 실릴 홍보 문구라 길다(이 기관 건 여섯 줄이다). 기관이
-                  직접 쓴 글이라 워크스페이스를 열 때마다 다시 읽을 일이 없는데,
-                  펼쳐두면 화면 첫 장을 이 글이 통째로 먹었다. 실제 모습은 이제
-                  ② 초대장의 폰 미리보기에서 본다. */}
-              {event.description && (
-                <details className="group mt-2">
-                  <summary className="inline-flex cursor-pointer list-none items-center gap-1 text-[11px] font-semibold text-[#8B7F75] transition hover:text-[#2D5A3D] [&::-webkit-details-marker]:hidden">
-                    <span
-                      aria-hidden
-                      className="inline-block transition-transform group-open:rotate-90"
-                    >
-                      ›
-                    </span>
-                    소개글
-                  </summary>
-                  <p className="mt-2 max-w-2xl text-sm text-[#6B6560]">
-                    {event.description}
-                  </p>
-                </details>
-              )}
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <span
+                className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold ${
+                  isLive
+                    ? "border-emerald-500 bg-emerald-500 text-white"
+                    : statusMeta.color
+                }`}
+              >
+                {statusDesc.emoji} {statusDesc.label}
+              </span>
+              <span className="text-[11px] text-[#6B6560]">
+                📅 {fmtRange(event.starts_at, event.ends_at)}
+              </span>
             </div>
+            <h1 className="mt-2 text-2xl font-bold text-[#2D5A3D] md:text-3xl">
+              {event.name}
+            </h1>
+            {/* 소개글 — 접어 둔다.
+                초대장에 실릴 홍보 문구라 길다(이 기관 건 여섯 줄이다). 기관이
+                직접 쓴 글이라 워크스페이스를 열 때마다 다시 읽을 일이 없는데,
+                펼쳐두면 화면 첫 장을 이 글이 통째로 먹었다. 실제 모습은 이제
+                ② 초대장의 폰 미리보기에서 본다. */}
+            {event.description && (
+              <details className="group mt-2">
+                <summary className="inline-flex cursor-pointer list-none items-center gap-1 text-[11px] font-semibold text-[#8B7F75] transition hover:text-[#2D5A3D] [&::-webkit-details-marker]:hidden">
+                  <span
+                    aria-hidden
+                    className="inline-block transition-transform group-open:rotate-90"
+                  >
+                    ›
+                  </span>
+                  소개글
+                </summary>
+                <p className="mt-2 max-w-2xl text-sm text-[#6B6560]">
+                  {event.description}
+                </p>
+              </details>
+            )}
+          </div>
 
-            {/* Right CTA group — 액션 버튼과 상태 칩이 한 줄에서 높이가 맞는다.
-                (상태 칩은 EventStatusToggle 의 inline 변형) */}
+          {/* 아래 한 줄 — 왼쪽은 **할 일**, 오른쪽은 **지금 상태**.
+              예전엔 이 줄이 제목 오른쪽에 붙어 있었다. 버튼 셋에 상태 칩 넷까지
+              700px 가 넘다 보니 wrap 으로 아래로 밀리고, 밀린 뒤에는 왼쪽에 다
+              뭉쳐서 카드 오른쪽 절반이 통째로 비었다 — 넓은 화면일수록 더 비었다.
+              줄을 따로 떼고 양 끝으로 밀면 폭이 남든 모자라든 자리가 정해진다. */}
+          <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3 border-t border-[#F0E9DC] pt-4">
+            {/* 할 일 — 누르면 뭔가 일어나는 것들 */}
             <div className="flex flex-wrap items-center gap-2">
               <Link
                 href={`/org/${orgId}/events/${eventId}?tab=participants`}
@@ -314,22 +318,19 @@ export default async function OrgEventDetailPage({
                 <span aria-hidden>✏️</span>
                 <span>편집</span>
               </Link>
-              {/* 상태 — 4종 전부 직접 고를 수 있게. 예전에는 "다음 단계"
-                  버튼 하나(예정→시작, 진행중→종료…)뿐이라 되돌리거나 건너뛸
-                  수 없었다. 목록 카드와 같은 컨트롤의 inline 변형.
-                  구분선으로 "작업" 과 "상태 전환" 을 눈으로 가른다. */}
-              <span
-                aria-hidden
-                className="mx-1 hidden h-7 w-px shrink-0 bg-[#E5D3B8] sm:block"
-              />
-              <EventStatusToggle
-                eventId={eventId}
-                initialStatus={event.status}
-                startsAt={event.starts_at}
-                endsAt={event.ends_at}
-                variant="inline"
-              />
             </div>
+
+            {/* 지금 상태 — 4종 전부 직접 고를 수 있게. 예전에는 "다음 단계"
+                버튼 하나(예정→시작, 진행중→종료…)뿐이라 되돌리거나 건너뛸 수
+                없었다. 목록 카드와 같은 컨트롤의 inline 변형.
+                구분선은 뺐다 — 양 끝에 갈라 두면 선이 할 일이 없다. */}
+            <EventStatusToggle
+              eventId={eventId}
+              initialStatus={event.status}
+              startsAt={event.starts_at}
+              endsAt={event.ends_at}
+              variant="inline"
+            />
           </div>
         </div>
       </section>
@@ -352,7 +353,7 @@ export default async function OrgEventDetailPage({
                     승인 대기 {pendingApplications}건
                   </p>
                   <p className="mt-0.5 text-xs text-rose-800">
-                    초대장으로 참가 신청이 들어왔어요. 수락해야 참가자가 됩니다.
+                    수락해야 참가자가 돼요
                   </p>
                 </div>
                 <span aria-hidden className="text-lg text-rose-400">
@@ -374,24 +375,20 @@ export default async function OrgEventDetailPage({
               if (!hasLocation) missing.push("📍 장소·주소");
               if (!hasParking) missing.push("🅿 주차장");
               return (
-                <div className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border-2 border-amber-300 bg-amber-50 px-4 py-3 shadow-sm">
-                  <span className="text-2xl" aria-hidden>
-                    ⚠️
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-bold text-amber-900">
-                      초대장 정보가 비어있어요
-                    </p>
-                    <p className="mt-0.5 text-xs text-amber-800">
-                      참가자에게 안내될 <b>{missing.join(", ")}</b> 정보가 아직
-                      입력되지 않았어요. [정보 수정]에서 추가해주세요.
-                    </p>
-                  </div>
+                /* 한 줄이면 된다. 예전엔 큰 이모지 + 제목 + 두 줄 설명 +
+                   버튼이었는데, "[정보 수정]에서 추가해주세요" 는 바로 옆 버튼이
+                   이미 하는 말이고 "참가자에게 안내될" 은 몰라서 못 채운 게
+                   아니다. 무엇이 비었는지와 채우러 가는 길, 둘만 남긴다. */
+                <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-2.5">
+                  <p className="min-w-0 flex-1 text-xs font-semibold text-amber-900">
+                    <span aria-hidden>⚠️</span> {missing.join(" · ")} 가 비어
+                    있어요
+                  </p>
                   <Link
                     href={`/org/${orgId}/events/${eventId}/edit`}
-                    className="shrink-0 rounded-xl bg-amber-500 px-3 py-2 text-xs font-bold text-white shadow-sm hover:bg-amber-600"
+                    className="shrink-0 rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-amber-600"
                   >
-                    ✏️ 정보 수정
+                    채우기
                   </Link>
                 </div>
               );
@@ -1450,10 +1447,6 @@ function DangerZone({
         <span aria-hidden>⚠️</span>
         <span>위험 영역</span>
       </h2>
-      <p className="mt-1 text-xs text-rose-700/80">
-        행사를 삭제하면 연결된 스탬프북·참가자·세션 관계가 모두 풀려요.
-        되돌릴 수 없으니 신중하게 진행하세요.
-      </p>
       <form
         action={async () => {
           "use server";

@@ -203,8 +203,7 @@ export function TrailsTab({
             </span>
           </h2>
           <p className="mt-1 text-xs text-[#6B6560]">
-            이 행사에서 사용할 숲길이에요. 지사가 배포한 숲길에서 골라 연결할 수
-            있어요.
+            지사가 배포한 숲길에서 골라 써요.
           </p>
         </div>
         <Link

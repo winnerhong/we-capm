@@ -78,15 +78,11 @@ export function SelfRegisterToggle({
           <p className="mt-1 text-[11px] leading-relaxed text-[#6B6560]">
             {enabled ? (
               <>
-                <b className="text-amber-700">초대장 링크</b>에 들어온 사람이
-                사전 등록 없이 <b>학부모 연락처 + 보호자 이름</b>만 입력하면
-                바로 입장하며, 명단에 자동으로 추가돼요.
+                초대장 링크로 들어오면 <b>연락처 + 보호자 이름</b>만 적고 바로
+                입장, 명단에 자동 추가돼요.
               </>
             ) : (
-              <>
-                사전 등록된 학부모 연락처만 입장할 수 있어요. 켜면 처음 들어온
-                연락처도 보호자 이름만 적고 바로 입장돼요.
-              </>
+              <>미리 등록한 연락처만 입장할 수 있어요.</>
             )}
           </p>
           {enabled && !isLive && (

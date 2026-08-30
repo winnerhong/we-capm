@@ -7,6 +7,7 @@
 // 참가자에 마우스를 올리면 → 오른쪽 패널에 사진 + 상세 정보 미리보기.
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { fmtAmPmClockKst, fmtCompactDateKst } from "@/lib/datetime/kst";
 import type {
   ControlRoomSnapshot,
   ControlRoomParticipant,
@@ -489,16 +490,19 @@ const STATUS_LABEL: Record<string, string> = {
   CLOSED: "탈퇴",
 };
 
+/**
+ * "5/22(금) 오후 12:00"
+ *
+ * ⚠ toLocaleString 은 쓰지 않는다 — hour 를 주고 hour12 를 안 주면 오전/오후가
+ *   붙는데, 그 글자가 서버(영어 ICU)와 브라우저(한국어)에서 갈려 하이드레이션이
+ *   깨진다. timeZone 도 서버 UTC / 브라우저 KST 로 어긋난다.
+ */
 function fmtDateTime(iso: string | null): string {
   if (!iso) return "-";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "-";
-  return d.toLocaleString("ko-KR", {
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  const date = fmtCompactDateKst(iso);
+  if (!date) return "-";
+  const clock = fmtAmPmClockKst(iso);
+  return clock ? `${date} ${clock}` : date;
 }
 
 const SUB_STATUS: Record<string, { label: string; cls: string }> = {

@@ -9,6 +9,7 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ListenerPresence } from "@/components/tori-fm/ListenerPresence";
+import { fmtAmPmClockKst, fmtCompactDateKst } from "@/lib/datetime/kst";
 
 /**
  * 같은 곡(song_normalized)에 묶인 PLAYING 사연 1건.
@@ -280,7 +281,7 @@ export function LiveStudioPanel({
                             <p className="mt-1 text-[11px] text-amber-200/70">
                               — {it.authorLabel || "익명의 청취자"}
                               <span className="ml-1.5 text-amber-200/50">
-                                · {fmtRelative(it.createdAt)}
+                                · {fmtRelative(it.createdAt, now)}
                               </span>
                             </p>
                           </li>
@@ -352,33 +353,40 @@ function formatHMS(sec: number): string {
   return `${pad(h)}:${pad(m)}:${pad(r)}`;
 }
 
+/**
+ * "8/11(화) 오후 02:36"
+ *
+ * ⚠ toLocaleString("ko-KR", …) 을 쓰면 안 된다. 로케일을 명시해도 **서버 Node 에
+ *   한국어 ICU 데이터가 없으면** 영어로 떨어져서, 서버는 "PM" 브라우저는 "오후" 를
+ *   그린다 → 하이드레이션이 깨진다(실제로 깨졌다). 타임존도 서버(UTC)와
+ *   브라우저(KST)가 갈린다.
+ *   lib/datetime/kst 는 Intl 에 기대지 않고 KST 로 직접 조립해서 양쪽이 같다.
+ */
 function fmtShort(iso: string | null): string {
   if (!iso) return "-";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "-";
-  return d.toLocaleString("ko-KR", {
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  const date = fmtCompactDateKst(iso);
+  if (!date) return "-";
+  const clock = fmtAmPmClockKst(iso);
+  // 자정은 시각을 빈 문자열로 돌려준다(그 함수의 규칙) — 날짜만 남긴다.
+  return clock ? `${date} ${clock}` : date;
 }
 
 /** "5분 전" / "방금 전" — created_at 기준 한국어 상대 시간. */
-function fmtRelative(iso: string): string {
+function fmtRelative(iso: string, nowMs: number | null): string {
   const t = new Date(iso).getTime();
   if (Number.isNaN(t)) return "";
-  const diffSec = Math.max(0, Math.floor((Date.now() - t) / 1000));
+  /* nowMs 가 null = 아직 서버(또는 하이드레이션 전)다. 여기서 Date.now() 를 부르면
+     서버와 브라우저가 서로 다른 순간을 재서 "방금 전" 과 "30초 전" 이 갈린다.
+     시각을 모를 땐 상대 시간을 포기하고 절대 날짜를 쓴다 — 양쪽이 늘 같다. */
+  if (nowMs === null) return fmtCompactDateKst(iso);
+  const diffSec = Math.max(0, Math.floor((nowMs - t) / 1000));
   if (diffSec < 30) return "방금 전";
   if (diffSec < 60) return `${diffSec}초 전`;
   const m = Math.floor(diffSec / 60);
   if (m < 60) return `${m}분 전`;
   const h = Math.floor(m / 60);
   if (h < 24) return `${h}시간 전`;
-  return new Date(iso).toLocaleDateString("ko-KR", {
-    month: "2-digit",
-    day: "2-digit",
-  });
+  return fmtCompactDateKst(iso);
 }
 
 /**

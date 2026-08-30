@@ -205,8 +205,7 @@ export function FmSessionsTab({
               </span>
             </h2>
             <p className="mt-1 text-xs text-[#B8D4E2]">
-              이 행사에 연결된 라디오 세션이에요. 방송은 라이브 스튜디오에서 켜고
-              끌 수 있어요.
+              방송 켜고 끄기는 라이브 스튜디오에서 해요.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -296,8 +295,7 @@ export function FmSessionsTab({
             이 행사에 연결된 FM 세션이 없어요
           </p>
           <p className="mt-1 max-w-sm text-xs text-[#6B6560]">
-            아래에서 미연결 세션을 골라 연결하거나, 라이브 스튜디오에서 새
-            세션을 만들 수 있어요.
+            아래에서 골라 연결하거나, 스튜디오에서 새로 만드세요.
           </p>
         </div>
       ) : (

@@ -6,6 +6,9 @@ import {
   FEATURE_CATEGORY_META,
   PACK_TIER_META,
 } from "@/lib/features/types";
+import { ToolsSection } from "./tools-section";
+import { ScopeIndex } from "./scope-index";
+import { loadScopeOptions } from "@/lib/org-tools/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -14,8 +17,16 @@ function formatKRW(n: number): string {
   return `₩${n.toLocaleString("ko-KR")}`;
 }
 
-export default async function PartnerFeaturesPage() {
+export default async function PartnerFeaturesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ org?: string }>;
+}) {
   const partner = await requirePartner();
+  const sp = await searchParams;
+  const scopes = await loadScopeOptions(partner.id);
+  // 주소창에 남의 기관 id 를 넣어도 내 기관 목록에 없으면 전체로 떨어진다.
+  const current = scopes.find((o) => o.orgId === sp.org) ?? null;
   const features = await listAllFeatures();
 
   const visible = features.filter(
@@ -61,6 +72,38 @@ export default async function PartnerFeaturesPage() {
           </span>
         </div>
       </header>
+
+      <section className="space-y-3">
+        <h2 className="flex items-center gap-2 text-sm font-bold text-[#2D5A3D]">
+          <span aria-hidden>🎛</span>
+          <span>기능 노출 설정</span>
+        </h2>
+
+        {/* 목차는 왼쪽에 붙여 두고 따로 스크롤한다 — 스위치판이 길어도 지금 누구를
+            보고 있는지가 화면에서 안 사라져야 한다. 좁은 화면(<lg)에서는 위아래로
+            쌓이고, 목차가 접힌다(펼쳐 두면 스위치까지 스크롤이 너무 길어진다). */}
+        <div className="lg:flex lg:items-start lg:gap-5">
+          <aside className="lg:sticky lg:top-4 lg:w-64 lg:shrink-0">
+            <details open className="lg:open">
+              <summary className="cursor-pointer list-none rounded-xl border border-[#D4E4BC] bg-white px-3 py-2 text-xs font-bold text-[#2D5A3D] lg:hidden [&::-webkit-details-marker]:hidden">
+                {current ? `🏫 ${current.orgName}` : "🏢 전체 기관"} · 바꾸기
+              </summary>
+              <div className="mt-2 lg:mt-0 lg:max-h-[calc(100dvh-8rem)] lg:overflow-y-auto lg:pr-1">
+                <ScopeIndex options={scopes} current={current?.orgId ?? null} />
+              </div>
+            </details>
+          </aside>
+
+          <div className="mt-4 min-w-0 flex-1 lg:mt-0">
+            <ToolsSection
+              partnerId={partner.id}
+              orgId={current?.orgId ?? null}
+              orgName={current?.orgName}
+              orgCount={scopes.length}
+            />
+          </div>
+        </div>
+      </section>
 
       {/* 보유 기능 */}
       <section>

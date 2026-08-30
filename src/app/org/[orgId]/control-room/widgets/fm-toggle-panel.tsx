@@ -6,6 +6,7 @@
 //   끄기는 LIVE 중일 때 스튜디오 콘솔의 FmSessionControls 에서 처리.
 
 import { useState } from "react";
+import { fmtAmPmClockKst, fmtCompactDateKst } from "@/lib/datetime/kst";
 import { useRouter } from "next/navigation";
 import {
   createFmSessionAction,
@@ -29,17 +30,20 @@ function toLocalInput(d: Date): string {
   )}:${p(d.getMinutes())}`;
 }
 
-/** ISO → "5월 22일 (금) 오후 12:00" 한국어 라벨, KST 고정. */
+/**
+ * ISO → "5/22(금) 오후 12:00", KST 고정.
+ *
+ * ⚠ toLocaleString("ko-KR") 은 timeZone 을 줘도 부족하다. **월 이름·요일·오전/오후**
+ *   가 ICU 로케일 데이터에서 나오는데, 서버 Node 에 한국어 데이터가 없으면 영어로
+ *   떨어져 서버는 "Fri"·"PM", 브라우저는 "금"·"오후" 를 그린다 → 하이드레이션 깨짐.
+ *   lib/datetime/kst 는 Intl 없이 조립해서 양쪽이 언제나 같다.
+ */
 function fmtSchedule(iso: string): string {
   try {
-    return new Date(iso).toLocaleString("ko-KR", {
-      timeZone: "Asia/Seoul",
-      month: "long",
-      day: "numeric",
-      weekday: "short",
-      hour: "numeric",
-      minute: "2-digit",
-    });
+    const date = fmtCompactDateKst(iso);
+    if (!date) return iso;
+    const clock = fmtAmPmClockKst(iso);
+    return clock ? `${date} ${clock}` : date;
   } catch {
     return iso;
   }

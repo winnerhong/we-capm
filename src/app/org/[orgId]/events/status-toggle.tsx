@@ -111,7 +111,7 @@ export function EventStatusToggle({
 
   // inline 은 옆 액션 버튼(px-3.5 py-2 text-xs rounded-xl)과 높이를 맞춘다.
   const chipCls = inline
-    ? "inline-flex shrink-0 items-center justify-center gap-0.5 rounded-xl px-2.5 py-2 text-[11px] font-bold transition disabled:opacity-50"
+    ? "inline-flex shrink-0 items-center justify-center gap-0.5 rounded-xl px-2.5 py-2 text-[11px] leading-4 font-bold transition disabled:opacity-50"
     : "inline-flex min-w-0 items-center justify-center gap-0.5 rounded-lg px-1.5 py-1 text-[10px] font-bold transition disabled:opacity-50";
 
   // 고른 칸은 날짜까지 안아야 하므로 두 몫을 준다. 안 고른 칸은 한 몫.
@@ -156,22 +156,28 @@ export function EventStatusToggle({
     </p>
   );
 
-  const effect = (
-    <p className="text-[10px] leading-relaxed text-[#8B7F75]">
+  const effect = (align: string) => (
+    <p className={`text-[10px] leading-relaxed text-[#8B7F75] ${align}`}>
       {EFFECT[status]}
     </p>
   );
 
   if (inline) {
+    /* 세로 정렬은 items-start 다 — 칩의 **윗변**이 옆 액션 버튼과 맞아야 한 줄로
+       읽힌다. items-end 로 두면 아래 한 줄짜리 안내문에 버튼이 끌려 내려가
+       칩보다 낮게 앉는다.
+       가로는 sm 이상에서 오른쪽 정렬 — 이 블록이 카드 오른쪽 끝에 놓이므로
+       글자도 같은 변에 붙어야 가장자리가 들쭉날쭉하지 않다. 모바일에서는
+       줄이 바뀌어 왼쪽에 서므로 그대로 왼쪽 정렬. */
     return (
-      <div className="flex flex-col items-start gap-1">
+      <div className="flex flex-col items-start gap-1 sm:items-end">
         <div className="flex items-center gap-2">
           <span className="whitespace-nowrap text-[11px] font-semibold text-[#8B7F75]">
             상태
           </span>
           {chips}
         </div>
-        {effect}
+        {effect("sm:text-right")}
         {error}
       </div>
     );
@@ -181,7 +187,7 @@ export function EventStatusToggle({
     <div className="space-y-1">
       <p className="text-[10px] font-semibold text-[#8B7F75]">상태</p>
       {chips}
-      {effect}
+      {effect("")}
       {error}
     </div>
   );

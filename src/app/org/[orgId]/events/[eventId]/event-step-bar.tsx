@@ -65,7 +65,11 @@ export function EventStepBar({
         aria-label="행사 준비 단계"
         className="tab-scroll -mx-4 mt-2 overflow-x-auto border-b border-[#E8DDC8] px-4"
       >
-        <ol className="flex min-w-max gap-1">
+        {/* 가운데 정렬의 관용구: w-max + min-w-full.
+              min-w-max 만 두면 ol 폭이 내용과 똑같아서 justify-center 가 할 일이
+              없다. min-w-full 로 남는 폭까지 차지해야 가운데로 모이고, w-max 는
+              내용이 컨테이너보다 넓을 때(좁은 화면) 넘쳐서 스크롤되게 남겨 둔다. */}
+        <ol className="flex w-max min-w-full justify-center gap-1">
           {EVENT_STEPS.map((s, idx) => {
             const on = s.key === current;
             const st = statuses[s.key];
@@ -118,7 +122,7 @@ export function EventStepBar({
       {step.subs.length > 1 && (
         <nav
           aria-label={`${step.label} 세부`}
-          className="mt-2 flex flex-wrap gap-1"
+          className="mt-2 flex flex-wrap justify-center gap-1"
         >
           {step.subs.map((sub) => {
             const on = sub.key === currentSub;

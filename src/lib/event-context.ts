@@ -18,6 +18,7 @@
 //   보관된 행사 → /event-closed/{eventId} (완전히 닫힘)
 
 import "server-only";
+import { cache } from "react";
 import { notFound, redirect } from "next/navigation";
 import { getAppUser, type AppUserSession } from "@/lib/user-auth-guard";
 import {
@@ -78,8 +79,20 @@ export function eventHref(eventId: string, subpath = ""): string {
  * 행사 컨텍스트 확보. 모든 /e/[eventId] 페이지가 첫 줄에서 호출한다.
  *
  * redirect()/notFound() 는 내부적으로 throw 하므로 try/catch 로 감싸지 말 것.
+ *
+ * ## 요청당 한 번
+ *   레이아웃도 부르고 그 안의 페이지도 부른다 — 즉 참가자 화면 **한 장마다 두
+ *   번** 실행된다(계측으로 확인). 한 번이 행사·참가여부·기관명·기능스위치를
+ *   읽으므로 그냥 두면 매 화면이 왕복 3회를 헛되이 더 낸다. 참가자는 행사장
+ *   와이파이에서 이 앱을 쓴다 — 여기서 아낀 왕복이 체감으로 가장 크게 남는다.
+ *
+ *   레이아웃이 값을 받아 페이지로 내려보내는 방법도 있지만, App Router 에서
+ *   레이아웃은 children 에 prop 을 줄 수 없다. cache() 가 유일하게 깔끔한 길이다.
+ *
+ *   redirect()/notFound() 는 throw 라서 거부된 프라미스가 캐시되는데, 두 번째
+ *   호출도 같은 곳으로 보내야 하므로 그게 맞는 동작이다.
  */
-export async function requireEventContext(
+export const requireEventContext = cache(async function requireEventContext(
   eventId: string
 ): Promise<EventContext> {
   if (!UUID_RE.test(eventId)) notFound();
@@ -128,4 +141,4 @@ export async function requireEventContext(
     features,
     hasFeature: (code: string) => canUse(features, code),
   };
-}
+});

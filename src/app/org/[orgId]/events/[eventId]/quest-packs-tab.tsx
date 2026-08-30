@@ -221,10 +221,6 @@ export function QuestPacksTab({
                 {inEvent.length}
               </span>
             </h2>
-            <p className="mt-1 text-xs text-[#E8F0E4]">
-              이 행사에 연결된 스탬프북이에요. 새로 만들거나 기존 스탬프북을
-              연결할 수 있어요.
-            </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Link
@@ -310,7 +306,7 @@ export function QuestPacksTab({
           </p>
           <p className="mt-1 max-w-sm text-xs text-[#6B6560]">
             {inEvent.length === 0
-              ? "위의 [✨ 프리셋 시작] 또는 [➕ 새 스탬프북]으로 만들거나, 아래에서 기관에 있는 스탬프북을 골라 연결하세요."
+              ? "위에서 새로 만들거나, 아래에서 골라 연결하세요."
               : "다른 상태나 검색어로 시도해 보세요."}
           </p>
         </div>

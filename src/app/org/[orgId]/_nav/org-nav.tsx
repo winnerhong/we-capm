@@ -138,13 +138,30 @@ function Badge({ b }: { b: BadgeSpec }) {
   return null;
 }
 
+/** 지사가 상단으로 올린 도구 한 칸. 목록은 layout 이 서버에서 풀어 준다. */
+export type NavTool = {
+  key: string;
+  label: string;
+  icon: string;
+  href: string;
+  newTab?: boolean;
+};
+
 interface Props {
   orgId: string;
   orgName: string;
   badges: OrgNavBadges;
+  /**
+   * 상단에 고정된 도구들 (lib/org-tools).
+   *
+   * 예전엔 [관제실] 이 코드에 박혀 있었다. 어느 기관이든 무조건 떴고, 관제실을
+   * 안 쓰는 기관에는 평생 안 누르는 칸이었다. 이제 지사가 정한다 —
+   * 마이그레이션이 기존 지사에 control-room 을 고정해 둬서 지금 화면은 그대로다.
+   */
+  tools: NavTool[];
 }
 
-export function OrgNav({ orgId, orgName, badges }: Props) {
+export function OrgNav({ orgId, orgName, badges, tools }: Props) {
   const pathname = usePathname() ?? "";
   const [openKey, setOpenKey] = useState<string | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -156,6 +173,10 @@ export function OrgNav({ orgId, orgName, badges }: Props) {
   );
   const controlRoomHref = `/org/${orgId}/control-room`;
   const controlRoomActive = isActiveHref(controlRoomHref, pathname);
+  // 관제실만 시안 강조 + FM 라이브 점을 갖는다(진행 중 신호라 눈에 띄어야 한다).
+  // 나머지 고정 도구는 일반 칸이다 — 다 강조하면 아무것도 강조가 아니다.
+  const hasControlRoom = tools.some((t) => t.key === "control-room");
+  const otherTools = tools.filter((t) => t.key !== "control-room");
 
   // 첫 번째 매칭 그룹만 active (한 라우트가 여러 그룹의 match 에 들어가도 single source of truth)
   const activeIdx = useMemo(() => {
@@ -297,7 +318,8 @@ export function OrgNav({ orgId, orgName, badges }: Props) {
             );
           })}
 
-          {/* 관제실 단독 강조 */}
+          {/* 관제실 단독 강조 — 지사가 상단에 올려 뒀을 때만 */}
+          {hasControlRoom && (
           <Link
             href={controlRoomHref}
             className={`ml-2 inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl border px-3 py-2 text-xs font-semibold transition ${
@@ -316,6 +338,25 @@ export function OrgNav({ orgId, orgName, badges }: Props) {
               </span>
             )}
           </Link>
+          )}
+
+          {/* 지사가 상단에 올린 나머지 도구들 */}
+          {otherTools.map((t) => (
+            <Link
+              key={t.key}
+              href={t.href}
+              {...(t.newTab ? { target: "_blank", rel: "noopener" } : {})}
+              aria-current={isActiveHref(t.href, pathname) ? "page" : undefined}
+              className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-xl px-2.5 py-2 text-sm font-semibold transition ${
+                isActiveHref(t.href, pathname)
+                  ? "bg-[#E8F0E4] text-[#2D5A3D]"
+                  : "text-[#2D5A3D] hover:bg-[#F5F1E8]"
+              }`}
+            >
+              <span aria-hidden>{t.icon}</span>
+              <span>{t.label}</span>
+            </Link>
+          ))}
 
           {/* 공지사항 빠른 게시 — LIVE FM 세션의 BANNER spotlight 트리거 */}
           <QuickNoticeButton liveFmSessionId={badges.liveFmSessionId} />
@@ -365,6 +406,7 @@ export function OrgNav({ orgId, orgName, badges }: Props) {
                   </ul>
                 </li>
               ))}
+              {hasControlRoom && (
               <li>
                 <Link
                   href={controlRoomHref}
@@ -385,6 +427,20 @@ export function OrgNav({ orgId, orgName, badges }: Props) {
                   )}
                 </Link>
               </li>
+              )}
+              {otherTools.map((t) => (
+                <li key={t.key}>
+                  <Link
+                    href={t.href}
+                    onClick={() => setMobileOpen(false)}
+                    {...(t.newTab ? { target: "_blank", rel: "noopener" } : {})}
+                    className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-bold text-[#2C2C2C] hover:bg-[#FFF8F0] hover:text-[#2D5A3D]"
+                  >
+                    <span aria-hidden>{t.icon}</span>
+                    <span>{t.label}</span>
+                  </Link>
+                </li>
+              ))}
               {/* 공지사항 빠른 게시 — drawer 안에서도 동일 컴포넌트 (palette 만 라이트) */}
               <li>
                 <QuickNoticeButton liveFmSessionId={badges.liveFmSessionId} />

@@ -237,7 +237,9 @@ export default async function OrgDetailPage({
 
       {/* Tab panels */}
       {activeTab === "info" && <InfoTab org={org} />}
-      {activeTab === "features" && <FeaturesTab orgId={org.id} />}
+      {activeTab === "features" && (
+        <FeaturesTab orgId={org.id} partnerId={org.partner_id} />
+      )}
       {activeTab === "events" && <StubTab title="행사 이력" desc="이 기관의 예약·행사 진행 기록이 여기 표시됩니다." icon="🎪" />}
       {activeTab === "billing" && (
         <StubTab
