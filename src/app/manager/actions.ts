@@ -1,5 +1,6 @@
 "use server";
 
+import { seal } from "@/lib/session-cookie";
 import { cookies, headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { findSchoolByUsername } from "@/lib/school-db";
@@ -153,7 +154,7 @@ export async function managerLoginAction(managerId: string, password: string) {
 
 async function setManagerCookie(eventId: string, eventName: string, managerId: string) {
   const cookieStore = await cookies();
-  cookieStore.set("campnic_manager", JSON.stringify({
+  cookieStore.set("campnic_manager", await seal({
     eventId, eventName, managerId, loginAt: new Date().toISOString(),
   }), {
     httpOnly: true, secure: process.env.NODE_ENV === "production",
@@ -164,7 +165,7 @@ async function setManagerCookie(eventId: string, eventName: string, managerId: s
 async function setOrgCookie(orgId: string, orgName: string, managerId: string) {
   const cookieStore = await cookies();
   // 다중 기관 동시 로그인 — 기관별 쿠키 (campnic_org_<orgId>).
-  cookieStore.set(`campnic_org_${orgId}`, JSON.stringify({
+  cookieStore.set(`campnic_org_${orgId}`, await seal({
     orgId, orgName, managerId, loginAt: new Date().toISOString(),
   }), {
     httpOnly: true, secure: process.env.NODE_ENV === "production",

@@ -9,7 +9,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { startOfTodayKstIso } from "@/lib/time/kst";
 import { loadControlRoomSnapshot } from "@/lib/control-room/queries";
-import { loadOrgEvents, loadOrgEventSummaryById } from "@/lib/org-events/queries";
+import { loadOrgEvents } from "@/lib/org-events/queries";
 import { loadOrgQuestPacks } from "@/lib/missions/queries";
 import { loadTrailsAssignedToOrg } from "@/lib/trails/queries";
 import { loadOrgProfileSnapshot } from "@/lib/profile-completeness/queries";
@@ -19,9 +19,7 @@ import { loadPartnerDisplayNameForOrg } from "@/lib/org-partner";
 import type {
   NextActionKind,
   OrgHomeDashboard,
-  OrgHomeLiveEvent,
   OrgHomeNextAction,
-  OrgHomeRecentParticipant,
 } from "./types";
 
 type SbResp<T> = { data: T[] | null; error: unknown };
@@ -36,8 +34,6 @@ type SbRespOne<T> = { data: T | null; error: unknown };
 function sevenDaysAgoIso(): string {
   return new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 }
-
-const APPROVED_STATUSES = ["APPROVED", "AUTO_APPROVED"] as const;
 
 /* -------------------------------------------------------------------------- */
 /* 빈 기본값 (에러 fallback)                                                  */
@@ -55,9 +51,6 @@ function emptyDashboard(orgName: string, managerName: string): OrgHomeDashboard 
     },
     profileCompleteness: { percent: 0, done: 0, total: 0 },
     nextAction: null,
-    liveEvent: null,
-    recentParticipants: [],
-    thisWeekSubmissions: 0,
     controlRoomPreview: { fmLive: false, todayActive: 0, todayStamps: 0 },
     resources: {
       stampbooks: { total: 0, live: 0, draft: 0 },
@@ -110,8 +103,7 @@ export async function loadOrgHomeDashboard(
     questPacks,
     programResources,
     trails,
-    recentParticipantsData,
-    weeklySubmissions,
+    participantsAddedToday,
     documentsInfo,
   ] = await Promise.all([
     loadManagerName(managerId),
@@ -122,8 +114,7 @@ export async function loadOrgHomeDashboard(
     loadOrgQuestPacks(orgId).catch(() => []),
     loadProgramCounts(orgId),
     loadTrailsAssignedToOrg(orgId).catch(() => []),
-    loadRecentParticipantsAndTodayCount(orgId),
-    loadWeeklySubmissionsCount(orgId),
+    loadParticipantsAddedToday(orgId),
     loadDocumentsInfo(orgId),
   ]);
 
@@ -135,12 +126,6 @@ export async function loadOrgHomeDashboard(
 
   // 4) stampbook 집계.
   const stampbooks = reduceStampbookCounts(questPacks);
-
-  // 5) liveEvent — 첫 LIVE 행사 + 요약.
-  const liveEvent = await buildLiveEventFromSnapshot(
-    events,
-    snapshot?.stamps.participantsSubmittedToday ?? 0
-  );
 
   // 6) FM 요약.
   const fm = buildFmSummary(snapshot);
@@ -167,7 +152,7 @@ export async function loadOrgHomeDashboard(
     managerName,
     todayStats: {
       participantsTotal: snapshot?.totalParticipants ?? 0,
-      participantsAddedToday: recentParticipantsData.addedToday,
+      participantsAddedToday,
       stampsToday,
       pendingReview,
     },
@@ -177,9 +162,6 @@ export async function loadOrgHomeDashboard(
       total: profileResult.total,
     },
     nextAction,
-    liveEvent,
-    recentParticipants: recentParticipantsData.recent,
-    thisWeekSubmissions: weeklySubmissions,
     controlRoomPreview: {
       fmLive: snapshot?.fm.session?.isLive === true,
       todayActive: snapshot?.todayActiveParticipants ?? 0,
@@ -355,12 +337,14 @@ async function loadProgramCounts(
 }
 
 /* -------------------------------------------------------------------------- */
-/* 최근 참가자 5명 + 오늘 가입자 수                                             */
+/* 오늘 가입한 가족 수                                                          */
+/*                                                                            */
+/*   예전에는 "최근 5명" 목록까지 같이 만들었다. 그 목록을 쓰던 홈 카드를 뺐는데도  */
+/*   이름을 붙이려고 app_users·app_children 을 매번 더 읽고 있었다 — 아무도       */
+/*   보지 않는 값에 왕복 두 번. 숫자만 남긴다.                                   */
 /* -------------------------------------------------------------------------- */
 
-async function loadRecentParticipantsAndTodayCount(
-  orgId: string
-): Promise<{ recent: OrgHomeRecentParticipant[]; addedToday: number }> {
+async function loadParticipantsAddedToday(orgId: string): Promise<number> {
   try {
     const supabase = await createClient();
 
@@ -376,240 +360,50 @@ async function loadRecentParticipantsAndTodayCount(
       .eq("org_id", orgId)) as SbResp<{ id: string }>;
 
     if (evtResp.error) {
-      console.error(
-        "[org-home/loadRecentParticipants] events error",
-        evtResp.error
-      );
-      return { recent: [], addedToday: 0 };
+      console.error("[org-home/addedToday] events error", evtResp.error);
+      return 0;
     }
     const eventIds = (evtResp.data ?? []).map((r) => r.id);
-    if (eventIds.length === 0) return { recent: [], addedToday: 0 };
+    if (eventIds.length === 0) return 0;
 
-    // 2) 참가자 joined_at DESC
-    const partResp = (await (
-      supabase.from("org_event_participants" as never) as unknown as {
-        select: (c: string) => {
-          in: (k: string, v: string[]) => {
-            order: (
-              c: string,
-              o: { ascending: boolean }
-            ) => Promise<
-              SbResp<{ user_id: string; joined_at: string }>
-            >;
-          };
-        };
-      }
-    )
-      .select("user_id, joined_at")
-      .in("event_id", eventIds)
-      .order("joined_at", { ascending: false })) as SbResp<{
-      user_id: string;
-      joined_at: string;
-    }>;
-
-    if (partResp.error) {
-      console.error(
-        "[org-home/loadRecentParticipants] parts error",
-        partResp.error
-      );
-      return { recent: [], addedToday: 0 };
-    }
-
-    const rows = partResp.data ?? [];
     // 정확한 KST 자정 — 새벽 구간에도 "오늘 가입자" 판정이 정확.
     const todayIso = startOfTodayKstIso();
 
-    const todaySet = new Set<string>();
-    const seen = new Set<string>();
-    const recentCandidates: Array<{ userId: string; joinedAt: string }> = [];
-
-    for (const r of rows) {
-      if (!r.user_id) continue;
-      if (r.joined_at && r.joined_at >= todayIso) todaySet.add(r.user_id);
-      if (!seen.has(r.user_id)) {
-        seen.add(r.user_id);
-        if (recentCandidates.length < 5) {
-          recentCandidates.push({ userId: r.user_id, joinedAt: r.joined_at });
-        }
-      }
-    }
-
-    if (recentCandidates.length === 0) {
-      return { recent: [], addedToday: todaySet.size };
-    }
-
-    // 3) 부모명 + 원생(is_enrolled=true) 자녀 이름 조인
-    const userIds = recentCandidates.map((c) => c.userId);
-
-    const [usersResp, childrenResp] = await Promise.all([
-      (
-        supabase.from("app_users" as never) as unknown as {
-          select: (c: string) => {
-            in: (
-              k: string,
-              v: string[]
-            ) => Promise<
-              SbResp<{ id: string; parent_name: string | null }>
-            >;
-          };
-        }
-      )
-        .select("id, parent_name")
-        .in("id", userIds) as Promise<
-        SbResp<{ id: string; parent_name: string | null }>
-      >,
-      (
-        supabase.from("app_children" as never) as unknown as {
-          select: (c: string) => {
-            in: (
-              k: string,
-              v: string[]
-            ) => {
-              eq: (k: string, v: boolean) => {
-                order: (
-                  c: string,
-                  o: { ascending: boolean }
-                ) => Promise<
-                  SbResp<{
-                    user_id: string;
-                    name: string;
-                    is_enrolled: boolean;
-                  }>
-                >;
-              };
-            };
-          };
-        }
-      )
-        .select("user_id, name, is_enrolled")
-        .in("user_id", userIds)
-        .eq("is_enrolled", true)
-        .order("created_at", { ascending: true }) as Promise<
-        SbResp<{ user_id: string; name: string; is_enrolled: boolean }>
-      >,
-    ]);
-
-    const parentMap = new Map<string, string>();
-    if (!usersResp.error) {
-      for (const u of usersResp.data ?? []) {
-        if (u.parent_name) parentMap.set(u.id, u.parent_name);
-      }
-    } else {
-      console.error(
-        "[org-home/loadRecentParticipants] users error",
-        usersResp.error
-      );
-    }
-
-    // userId → 원생 자녀 이름 배열 (가입 순서 유지)
-    const enrolledMap = new Map<string, string[]>();
-    if (!childrenResp.error) {
-      for (const c of childrenResp.data ?? []) {
-        const trimmed = c.name?.trim();
-        if (!trimmed) continue;
-        const list = enrolledMap.get(c.user_id) ?? [];
-        list.push(trimmed);
-        enrolledMap.set(c.user_id, list);
-      }
-    }
-
-    const recent: OrgHomeRecentParticipant[] = recentCandidates.map((c) => {
-      const enrolled = enrolledMap.get(c.userId) ?? [];
-      const parentName = (parentMap.get(c.userId) ?? "").trim();
-
-      // 원생 자녀가 있으면 자녀 이름 우선, 없으면 부모명 fallback
-      let displayName: string;
-      let avatarInitial: string;
-      if (enrolled.length > 0) {
-        const joined = enrolled.join("·");
-        displayName = `${joined} 가족`;
-        avatarInitial = enrolled[0].charAt(0);
-      } else if (parentName) {
-        displayName = `${parentName} 가족`;
-        avatarInitial = parentName.charAt(0);
-      } else {
-        displayName = "보호자 가족";
-        avatarInitial = "🌱";
-      }
-
-      return {
-        userId: c.userId,
-        displayName,
-        joinedAt: c.joinedAt,
-        avatarInitial,
-      };
-    });
-
-    return { recent, addedToday: todaySet.size };
-  } catch (e) {
-    console.error("[org-home/loadRecentParticipants] throw", e);
-    return { recent: [], addedToday: 0 };
-  }
-}
-
-/* -------------------------------------------------------------------------- */
-/* 최근 7일 승인 제출 건수                                                      */
-/* -------------------------------------------------------------------------- */
-
-async function loadWeeklySubmissionsCount(orgId: string): Promise<number> {
-  try {
-    const supabase = await createClient();
-
-    // 1) org_missions.id 목록
-    const missionsResp = (await (
-      supabase.from("org_missions" as never) as unknown as {
+    // 2) 오늘 가입한 참가자만. 한 사람이 여러 행사에 들어왔을 수 있어
+    //    user_id 로 접는다(중복 계산 방지).
+    const partResp = (await (
+      supabase.from("org_event_participants" as never) as unknown as {
         select: (c: string) => {
-          eq: (k: string, v: string) => Promise<SbResp<{ id: string }>>;
-        };
-      }
-    )
-      .select("id")
-      .eq("org_id", orgId)) as SbResp<{ id: string }>;
-
-    if (missionsResp.error) {
-      console.error(
-        "[org-home/loadWeeklySubmissions] missions error",
-        missionsResp.error
-      );
-      return 0;
-    }
-    const missionIds = (missionsResp.data ?? []).map((r) => r.id);
-    if (missionIds.length === 0) return 0;
-
-    const sevenDays = sevenDaysAgoIso();
-
-    const subResp = (await (
-      supabase.from("mission_submissions" as never) as unknown as {
-        select: (c: string) => {
-          in: (k: string, v: string[]) => {
-            in: (k: string, v: string[]) => {
-              gte: (
-                k: string,
-                v: string
-              ) => Promise<SbResp<{ id: string }>>;
-            };
+          in: (
+            k: string,
+            v: string[]
+          ) => {
+            gte: (
+              k: string,
+              v: string
+            ) => Promise<SbResp<{ user_id: string }>>;
           };
         };
       }
     )
-      .select("id")
-      .in("org_mission_id", missionIds)
-      .in("status", APPROVED_STATUSES as unknown as string[])
-      .gte("submitted_at", sevenDays)) as SbResp<{ id: string }>;
+      .select("user_id")
+      .in("event_id", eventIds)
+      .gte("joined_at", todayIso)) as SbResp<{ user_id: string }>;
 
-    if (subResp.error) {
-      console.error(
-        "[org-home/loadWeeklySubmissions] sub error",
-        subResp.error
-      );
+    if (partResp.error) {
+      console.error("[org-home/addedToday] parts error", partResp.error);
       return 0;
     }
-    return (subResp.data ?? []).length;
+
+    return new Set(
+      (partResp.data ?? []).map((r) => r.user_id).filter(Boolean)
+    ).size;
   } catch (e) {
-    console.error("[org-home/loadWeeklySubmissions] throw", e);
+    console.error("[org-home/addedToday] throw", e);
     return 0;
   }
 }
+
 
 /* -------------------------------------------------------------------------- */
 /* 파트너 미션 카탈로그 카운트 — visibility=ALL OR (SELECTED+assigned to org)  */
@@ -835,65 +629,6 @@ async function loadDocumentsInfo(
   }
 }
 
-/* -------------------------------------------------------------------------- */
-/* liveEvent — events 중 status='LIVE' 첫 1건 + summary                        */
-/* -------------------------------------------------------------------------- */
-
-async function buildLiveEventFromSnapshot(
-  events: Array<{
-    id: string;
-    name: string;
-    status: string;
-    starts_at: string | null;
-    ends_at: string | null;
-  }>,
-  participantsSubmittedToday: number
-): Promise<OrgHomeLiveEvent | null> {
-  const live = events.find((e) => e.status === "LIVE");
-  if (!live) return null;
-
-  try {
-    const summary = await loadOrgEventSummaryById(live.id);
-
-    const participantCount = summary?.participant_count ?? 0;
-    // activityRatePct 근사: 오늘 제출 참가자(org 전체) / 해당 행사 참가자 × 100.
-    //   - snapshot.stamps.participantsSubmittedToday 는 org 범위 전체라 엄밀한
-    //     "해당 행사 참가자" 기준과 다르지만, LIVE 행사 1건 시나리오에서
-    //     근사치로 충분. 참가자 0 → 0% 반환.
-    const activityRatePct =
-      participantCount > 0
-        ? Math.min(
-            100,
-            Math.round((participantsSubmittedToday / participantCount) * 100)
-          )
-        : 0;
-
-    return {
-      id: live.id,
-      name: live.name,
-      startsAt: live.starts_at ?? summary?.starts_at ?? null,
-      endsAt: live.ends_at ?? summary?.ends_at ?? null,
-      participantCount,
-      questPackCount: summary?.quest_pack_count ?? 0,
-      programCount: summary?.program_count ?? 0,
-      fmSessionCount: summary?.fm_session_count ?? 0,
-      activityRatePct,
-    };
-  } catch (e) {
-    console.error("[org-home/buildLiveEvent] throw", e);
-    return {
-      id: live.id,
-      name: live.name,
-      startsAt: live.starts_at,
-      endsAt: live.ends_at,
-      participantCount: 0,
-      questPackCount: 0,
-      programCount: 0,
-      fmSessionCount: 0,
-      activityRatePct: 0,
-    };
-  }
-}
 
 /* -------------------------------------------------------------------------- */
 /* FM 요약 — snapshot.fm 재사용                                                */

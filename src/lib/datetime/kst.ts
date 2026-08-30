@@ -189,3 +189,30 @@ export function toLocalInputFromIsoKst(
   const { year, month, day, hour, minute } = partsKst(d);
   return `${year}-${pad2(month)}-${pad2(day)}T${pad2(hour)}:${pad2(minute)}`;
 }
+
+/**
+ * Asia/Seoul 기준 달력 날짜를 정수 하나로 (1970-01-01 = 0). **날짜 비교 전용.**
+ *
+ * 왜 필요한가: "행사가 지났나" 를 시각으로 재면 09:40 에 시작한 행사가 09:41 에
+ * 지난 행사가 된다. 사람은 **날짜**로 센다 — 그 날이 통째로 지나야 지난 행사다.
+ * 그런데 서버는 UTC 라, 한국 시각 2026-09-12 오전 8시는 UTC 로 아직 09-11 이다.
+ * 두 값을 같은 KST 자로 재야 서버/브라우저가 같은 답을 낸다.
+ */
+export function kstDayIndex(
+  value: string | Date | null | undefined
+): number | null {
+  if (!value) return null;
+  const d = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+  const { year, month, day } = partsKst(d);
+  return Math.floor(Date.UTC(year, month - 1, day) / 86_400_000);
+}
+
+/** "9/12(토)" — 좁은 칸(배지·목록 한 줄)에 날짜를 끼워 넣을 때. */
+export function fmtCompactDateKst(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const { month, day, weekday } = partsKst(d);
+  return `${month}/${day}(${WEEKDAY[weekday]})`;
+}

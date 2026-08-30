@@ -1,5 +1,6 @@
 "use server";
 
+import { seal } from "@/lib/session-cookie";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
@@ -94,7 +95,7 @@ export async function partnerLoginAction(
       const cookieStore = await cookies();
       cookieStore.set(
         "campnic_partner",
-        JSON.stringify({
+        await seal({
           id: partner.id,
           teamMemberId: null,
           name: partner.name,
@@ -208,7 +209,7 @@ export async function partnerLoginAction(
     const cookieStore = await cookies();
     cookieStore.set(
       "campnic_partner",
-      JSON.stringify({
+      await seal({
         id: ownerPartner.id,
         teamMemberId: member.id,
         // 팀원 로그인 시 표시는 소속 지사의 이름을 우선 노출. 본인 이름은 name fallback.

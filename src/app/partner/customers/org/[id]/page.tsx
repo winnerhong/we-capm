@@ -12,12 +12,14 @@ import {
   type OrgRow,
 } from "../meta";
 import { CopyButton } from "./copy-button";
+import { FeaturesTab } from "./features-tab";
 import { WelcomeToast } from "./welcome-toast";
 
 export const dynamic = "force-dynamic";
 
 type TabId =
   | "info"
+  | "features"
   | "events"
   | "billing"
   | "contacts"
@@ -27,6 +29,8 @@ type TabId =
 
 const TABS: Array<{ id: TabId; label: string; icon: string }> = [
   { id: "info", label: "기본정보", icon: "📋" },
+  // 기본정보 바로 옆 — 계약 조건만큼 자주 손대는 값이다.
+  { id: "features", label: "기능", icon: "🎛" },
   { id: "events", label: "행사이력", icon: "🎪" },
   { id: "billing", label: "결제", icon: "💳" },
   { id: "contacts", label: "담당자", icon: "👤" },
@@ -233,6 +237,7 @@ export default async function OrgDetailPage({
 
       {/* Tab panels */}
       {activeTab === "info" && <InfoTab org={org} />}
+      {activeTab === "features" && <FeaturesTab orgId={org.id} />}
       {activeTab === "events" && <StubTab title="행사 이력" desc="이 기관의 예약·행사 진행 기록이 여기 표시됩니다." icon="🎪" />}
       {activeTab === "billing" && (
         <StubTab

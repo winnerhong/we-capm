@@ -8,6 +8,8 @@
 //   3) 동작 후 라인 카운트 재계산 + finished_at 갱신
 
 import { revalidatePath } from "next/cache";
+import { assertOrgFeature } from "@/lib/org-events/event-open-guard";
+import { F } from "@/lib/features/codes";
 import { getAppUser } from "@/lib/user-auth-guard";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -52,6 +54,9 @@ async function requireLiveBoard(boardId: string): Promise<BoardLite> {
   const board = await loadBoardLite(boardId);
   if (!board) throw new Error("빙고 보드를 찾을 수 없어요");
   if (board.status !== "LIVE") throw new Error("이 빙고는 지금 진행 중이 아니에요");
+  // 참가자 빙고 액션 다섯 개가 전부 이 함수를 지난다 — 여기 한 번이면 된다.
+  const gate = await assertOrgFeature(board.org_id, F.BINGO);
+  if (!gate.ok) throw new Error(gate.error);
   return board;
 }
 

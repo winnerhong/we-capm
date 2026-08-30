@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { F } from "@/lib/features/codes";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAppUser, canAccessOrg } from "@/lib/user-auth-guard";
@@ -28,6 +29,10 @@ import {
   LIKE_ACORN_CAP,
 } from "@/lib/missions/photo-feed-core";
 import { isPhotoFeedEnabled } from "@/lib/missions/photo-feed-queries";
+import {
+  assertEventOpen,
+  assertEventOpenForPack,
+} from "@/lib/org-events/event-open-guard";
 import { grantGiftAction } from "@/lib/gifts/actions";
 import type {
   BroadcastMissionConfig,
@@ -95,6 +100,8 @@ export async function uploadMissionPhotoAction(
 
     const mission = await loadOrgMissionById(orgMissionId);
     if (!mission) return fail("미션을 찾을 수 없어요");
+    const openGate = await assertEventOpenForPack(mission.quest_pack_id, F.STAMPBOOK);
+    if (!openGate.ok) return fail(openGate.error);
     if (!(await canAccessOrg(user, mission.org_id))) {
       return fail("다른 기관의 미션에는 업로드할 수 없어요");
     }
@@ -209,6 +216,8 @@ export type SubmitErrorCode =
   | "wrong_answer"
   | "duplicate"
   | "validation"
+  /** 행사가 끝났거나 아직 시작 전 — 다시 눌러도 달라지지 않는다. */
+  | "closed"
   | "unknown";
 
 class SubmitError extends Error {
@@ -263,6 +272,9 @@ async function submitMissionActionInner(
     throw new Error("다른 기관의 미션은 제출할 수 없어요");
   }
   if (!mission.is_active) throw new Error("현재 진행할 수 없는 미션이에요");
+  // 끝난 행사. 화면은 이미 잠겼지만, 행사장에서 켜 둔 탭에는 버튼이 남아 있다.
+  const openGate = await assertEventOpenForPack(mission.quest_pack_id, F.STAMPBOOK);
+  if (!openGate.ok) throw new SubmitError(openGate.error, "closed");
 
   // 이미 승인/대기 상태인 제출이 있으면 재제출 금지
   // 단 BROADCAST 는 broadcast_id 단위로 멱등 → idempotency_key 로 중복 방지하고 여기서는 통과
@@ -739,6 +751,8 @@ export async function replaceMissionPhotosAction(
     if (mission.kind !== "PHOTO" && mission.kind !== "PHOTO_APPROVAL") {
       return { ok: false, error: "사진 교체가 지원되지 않는 미션이에요" };
     }
+    const openGate = await assertEventOpenForPack(mission.quest_pack_id, F.STAMPBOOK);
+    if (!openGate.ok) return { ok: false, error: openGate.error };
 
     const existing = await loadUserSubmissionForMission(user.id, mission.id);
     if (!existing) {
@@ -874,6 +888,8 @@ export async function unlockTreasureStepAction(
     if (mission.kind !== "TREASURE") {
       return fail("보물찾기 미션이 아니에요");
     }
+    const openGate = await assertEventOpenForPack(mission.quest_pack_id, F.STAMPBOOK);
+    if (!openGate.ok) return fail(openGate.error);
     if (!mission.is_active) {
       return fail("현재 진행할 수 없는 미션이에요");
     }
@@ -995,6 +1011,8 @@ export async function issueFinalRewardAction(
   if (!(await canAccessOrg(user, pack.org_id))) {
     throw new Error("다른 기관의 스탬프북이에요");
   }
+  const openGate = await assertEventOpenForPack(mission.quest_pack_id, F.STAMPBOOK);
+  if (!openGate.ok) throw new Error(openGate.error);
 
   const config = (mission.config_json ?? {}) as Partial<FinalRewardMissionConfig>;
   const tiers = Array.isArray(config.tiers) ? config.tiers : [];
@@ -1125,6 +1143,9 @@ export async function togglePhotoLikeAction(
     if (eventId && !(await isPhotoFeedEnabled(eventId))) {
       return { ok: false, error: "이 행사는 사진 나눠보기를 쓰지 않아요" };
     }
+    // 끝난 행사에서는 하트도 멈춘다 — 하트 하나가 도토리 하나라서다.
+    const openGate = await assertEventOpen(eventId, F.PHOTO);
+    if (!openGate.ok) return { ok: false, error: openGate.error };
 
     const supabase = await createClient();
     const { data, error } = (await (

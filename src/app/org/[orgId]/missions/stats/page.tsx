@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { OrgSectionTabs } from "../../_nav/org-section-tabs";
 import type { ReactNode } from "react";
 import { requireOrg } from "@/lib/org-auth-guard";
 import { AcornIcon } from "@/components/acorn-icon";
@@ -87,6 +88,8 @@ export default async function OrgMissionStatsPage({
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 px-4 py-6">
+      <OrgSectionTabs orgId={orgId} active="stats" />
+
       {/* Breadcrumb */}
       <nav aria-label="breadcrumb" className="text-xs text-[#8B7F75]">
         <Link href={`/org/${orgId}`} className="hover:text-[#2D5A3D]">

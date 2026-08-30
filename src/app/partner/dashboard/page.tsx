@@ -1,3 +1,4 @@
+import { loadCurrentEventByOrg } from "@/lib/org-events/org-current-event";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { requirePartner } from "@/lib/auth-guard";
@@ -404,6 +405,12 @@ export default async function PartnerDashboardPage() {
     loadPartnerProfileSnapshot(partner.id),
     loadPartnerCustomersAll(partner.id),
   ]);
+
+  // 기관 한 줄에 "지금 뭘 하고 있는지" 를 붙인다. 기관 id 가 있어야 물어볼 수
+  // 있어 위 묶음에 못 끼운다 — 왕복 한 번 더. 실패해도 빈 Map 이라 목록은 뜬다.
+  const orgActivity = await loadCurrentEventByOrg(
+    customers.orgs.map((o) => o.id)
+  );
   const profileCompleteness = calcCompleteness(
     PARTNER_PROFILE_SCHEMA,
     profileSnap
@@ -629,13 +636,19 @@ export default async function PartnerDashboardPage() {
             title="🏫 기관 고객"
             total={customers.orgsTotal}
             emptyMsg="아직 등록된 기관이 없어요"
-            items={customers.orgs.map<CustomerItem>((o) => ({
-              id: o.id,
-              name: o.org_name,
-              sub: o.auto_username ? `@${o.auto_username}` : null,
-              status: o.status,
-              impersonateHref: `/api/partner/impersonate-org?id=${o.id}`,
-            }))}
+            items={customers.orgs.map<CustomerItem>((o) => {
+              const act = orgActivity.get(o.id);
+              return {
+                id: o.id,
+                name: o.org_name,
+                sub: o.auto_username ? `@${o.auto_username}` : null,
+                status: o.status,
+                impersonateHref: `/api/partner/impersonate-org?id=${o.id}`,
+                activity: act
+                  ? { emoji: act.emoji, label: act.label, title: act.name }
+                  : null,
+              };
+            })}
           />
 
           <CustomerGroupCard

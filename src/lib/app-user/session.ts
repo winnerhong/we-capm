@@ -12,6 +12,7 @@
 //
 // 읽기는 @/lib/user-auth-guard 의 getAppUser / requireAppUser 를 쓸 것.
 
+import { seal } from "@/lib/session-cookie";
 import "server-only";
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
@@ -77,7 +78,7 @@ export async function setAppUserSession(
   const cookieStore = await cookies();
   cookieStore.set(
     USER_COOKIE,
-    JSON.stringify({
+    await seal({
       id: input.id,
       phone: input.phone,
       parentName: input.parentName,

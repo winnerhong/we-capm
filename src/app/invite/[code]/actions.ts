@@ -1,5 +1,6 @@
 "use server";
 
+import { seal } from "@/lib/session-cookie";
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { formatKorean } from "@/lib/phone";
@@ -133,7 +134,7 @@ export async function acceptInviteAction(code: string, rawPhone: string, name: s
   const cookieStore = await cookies();
   cookieStore.set(
     "campnic_participant",
-    JSON.stringify({
+    await seal({
       eventId,
       phone: formatted,
       name: cleanName,

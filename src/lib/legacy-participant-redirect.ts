@@ -12,7 +12,7 @@
 import "server-only";
 import { redirect } from "next/navigation";
 import { getAppUser } from "@/lib/user-auth-guard";
-import { loadActiveAndUpcomingEventsForUser } from "@/lib/org-events/queries";
+import { loadEventsForUser } from "@/lib/org-events/queries";
 import { eventHref } from "@/lib/event-context";
 
 export async function redirectToEventSubpath(subpath: string): Promise<never> {
@@ -21,7 +21,7 @@ export async function redirectToEventSubpath(subpath: string): Promise<never> {
     redirect(`/user-login?return=${encodeURIComponent("/home")}`);
   }
 
-  const events = await loadActiveAndUpcomingEventsForUser(user.id).catch(
+  const events = await loadEventsForUser(user.id).catch(
     () => []
   );
   if (events.length === 0) redirect("/home");

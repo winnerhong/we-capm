@@ -25,7 +25,8 @@ export default async function StampbookDetailPage({
   const ctx = await requireEventContext(eventId);
   const user = ctx.user;
   // 행사 시작 전(DRAFT)에는 스탬프북이 열리지 않는다.
-  if (ctx.event.status !== "LIVE") redirect(ctx.href());
+  // 시작 전에는 볼 게 없다. 끝난 뒤에는 남는다 — 여기가 그 행사의 기록이다.
+  if (ctx.access.phase === "upcoming") redirect(ctx.href());
 
   const pack = await loadOrgQuestPackById(packId);
   if (!pack) notFound();
@@ -68,6 +69,7 @@ export default async function StampbookDetailPage({
       </nav>
 
       <StampbookDetail
+        readOnly={!ctx.access.canPlay}
         base={ctx.href()}
         pack={pack}
         missions={missions}

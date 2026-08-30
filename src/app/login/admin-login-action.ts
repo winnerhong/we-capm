@@ -1,5 +1,6 @@
 "use server";
 
+import { seal } from "@/lib/session-cookie";
 import { cookies, headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { logAccess, getRequestMeta } from "@/lib/audit-log";
@@ -28,7 +29,7 @@ export async function adminLoginAction(id: string, password: string) {
   const cookieStore = await cookies();
   cookieStore.set(
     "campnic_admin",
-    JSON.stringify({ id: ADMIN_ID, role: "ADMIN", loginAt: new Date().toISOString() }),
+    await seal({ id: ADMIN_ID, role: "ADMIN", loginAt: new Date().toISOString() }),
     {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",

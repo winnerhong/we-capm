@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { requireOrg } from "@/lib/org-auth-guard";
 import { loadOrgEvents } from "@/lib/org-events/queries";
+import { countOrgInvitationTemplates } from "@/lib/invitation-templates/queries";
+import { InvitationsHeader } from "./invitations-header";
+import { OrgSectionTabs } from "../_nav/org-section-tabs";
 import { fmtFullDateKst } from "@/lib/datetime/kst";
 import { InvitationCardShare } from "./invitation-card-share";
 import { ParticipantLoginShare } from "./participant-login-share";
@@ -26,35 +29,21 @@ export default async function OrgInvitationsPage({
 }) {
   const { orgId } = await params;
   const session = await requireOrg();
-  const events = await loadOrgEvents(orgId);
+  // 템플릿 개수는 탭에만 쓴다 — 목록 자체는 필요 없으니 세기만 한다.
+  const [events, templateCount] = await Promise.all([
+    loadOrgEvents(orgId),
+    countOrgInvitationTemplates(orgId),
+  ]);
   const visible = events.filter((e) => e.status !== "ARCHIVED");
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 px-4 py-6">
-      <nav aria-label="breadcrumb" className="text-xs text-[#8B7F75]">
-        <Link href={`/org/${orgId}`} className="hover:text-[#2D5A3D]">
-          기관 홈
-        </Link>
-        <span className="mx-2">/</span>
-        <span className="font-semibold text-[#2D5A3D]">초대장</span>
-      </nav>
-
-      <header className="rounded-3xl border border-[#D4E4BC] bg-gradient-to-br from-[#E8F0E4] via-white to-[#FAE7D0] p-5 shadow-sm md:p-7">
-        <div className="flex items-start gap-3">
-          <span className="text-3xl" aria-hidden>
-            💌
-          </span>
-          <div>
-            <h1 className="text-xl font-bold text-[#2D5A3D] md:text-2xl">
-              초대장 모음
-            </h1>
-            <p className="mt-1 text-xs text-[#6B6560] md:text-sm">
-              행사별 초대장을 한 곳에서 발행·공유하세요. 참가자가 받을 링크를
-              바로 복사하거나 카카오톡으로 공유할 수 있어요.
-            </p>
-          </div>
-        </div>
-      </header>
+      <OrgSectionTabs
+        orgId={orgId}
+        active="invitations"
+        templateCount={templateCount}
+      />
+      <InvitationsHeader />
 
       {visible.length === 0 ? (
         <section className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-[#D4E4BC] bg-white px-4 py-16 text-center">
@@ -73,53 +62,78 @@ export default async function OrgInvitationsPage({
           </Link>
         </section>
       ) : (
-        <div className="space-y-4">
-          {visible.map((e) => {
-            const sm = STATUS_META[e.status] ?? STATUS_META.DRAFT;
-            return (
-              <section
-                key={e.id}
-                className="overflow-hidden rounded-3xl border border-[#D4E4BC] bg-white shadow-sm"
-              >
-                <header className="border-b border-[#F0EBE3] bg-[#FFF8F0] px-5 py-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <Link
-                      href={`/org/${orgId}/events/${e.id}`}
-                      className="text-base font-bold text-[#2D5A3D] hover:underline"
-                    >
-                      {e.name || "(이름 없음)"}
-                    </Link>
-                    <span
-                      className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${sm.bg} ${sm.text}`}
-                    >
-                      {sm.label}
-                    </span>
-                  </div>
-                  {(e.starts_at || e.ends_at) && (
-                    <p className="mt-1 text-[11px] text-[#6B6560]">
-                      📅 {fmtFullDate(e.starts_at)}
-                      {e.ends_at && e.ends_at !== e.starts_at
-                        ? ` ~ ${fmtFullDate(e.ends_at)}`
-                        : ""}
-                    </p>
-                  )}
-                </header>
-                <div className="space-y-4 p-5">
-                  <InvitationCardShare
-                    eventId={e.id}
-                    eventName={e.name}
-                    publishedAt={e.invitation_published_at ?? null}
-                  />
-                  {/* 참가자 로그인 공유 — 이 기관 행사만 노출됨 (?org=<orgId>) */}
-                  <ParticipantLoginShare
-                    orgId={orgId}
-                    orgName={session.orgName}
-                  />
-                </div>
-              </section>
-            );
-          })}
-        </div>
+        <>
+          {/* 이 화면의 주인공 — 행사별 초대장. 바로 목록부터 시작한다
+              (제목은 탭[초대장 모음]이 이미 하고 있다). */}
+          <section className="space-y-2">
+            <p className="text-[11px] text-[#8B7F75]">
+              받은 사람이 로그인하면 <b>본인 이름이 들어간 초대장</b>을 봐요
+            </p>
+
+            <ul className="space-y-3">
+              {visible.map((e) => {
+                const sm = STATUS_META[e.status] ?? STATUS_META.DRAFT;
+                const published = !!e.invitation_published_at;
+                return (
+                  <li
+                    key={e.id}
+                    className={`rounded-2xl border bg-white p-4 shadow-sm transition ${
+                      published
+                        ? "border-[#D4E4BC]"
+                        : "border-dashed border-[#E5D3B8] bg-[#FFFDF8]"
+                    }`}
+                  >
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <span aria-hidden className="text-base">
+                        💌
+                      </span>
+                      <Link
+                        href={`/org/${orgId}/events/${e.id}`}
+                        className="min-w-0 flex-1 truncate text-sm font-bold text-[#2D5A3D] hover:underline"
+                      >
+                        {e.name || "(이름 없음)"}
+                      </Link>
+                      {published ? (
+                        <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
+                          발행됨
+                        </span>
+                      ) : (
+                        <span className="shrink-0 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-800">
+                          초안
+                        </span>
+                      )}
+                      <span
+                        className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${sm.bg} ${sm.text}`}
+                      >
+                        {sm.label}
+                      </span>
+                    </div>
+
+                    {(e.starts_at || e.ends_at) && (
+                      <p className="mt-0.5 pl-6 text-[11px] text-[#8B7F75]">
+                        {fmtFullDate(e.starts_at)}
+                        {e.ends_at && e.ends_at !== e.starts_at
+                          ? ` ~ ${fmtFullDate(e.ends_at)}`
+                          : ""}
+                      </p>
+                    )}
+
+                    <div className="mt-2.5 pl-6">
+                      <InvitationCardShare
+                        eventId={e.id}
+                        eventName={e.name}
+                        publishedAt={e.invitation_published_at ?? null}
+                      />
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+
+          {/* 기관 공통 링크 — 초대장이 아니라 성격이 다르다. 맨 아래에 작게. */}
+          <ParticipantLoginShare orgId={orgId} orgName={session.orgName} />
+        </>
       )}
     </div>
   );

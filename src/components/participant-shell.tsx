@@ -59,7 +59,8 @@ export async function ParticipantShell({
   userId: string;
   parentName: string;
   avatarLetter: string;
-  acornBalance: number;
+  /** null = 이 기관이 도토리를 안 쓴다 — 칩을 아예 안 그린다(0 과 다르다). */
+  acornBalance: number | null;
   acornLabel?: string;
   invitationEventId?: string | null;
   homeHref?: string;
@@ -102,14 +103,16 @@ export async function ParticipantShell({
               </Link>
             )}
 
-            <span
-              className="inline-flex items-center gap-1 rounded-full border border-[#D4E4BC] bg-[#E8F0E4] px-3 py-1 text-sm font-bold text-[#2D5A3D]"
-              aria-label={`${acornLabel} ${acornBalance}`}
-              title={acornLabel}
-            >
-              <AcornIcon />
-              <span className="tabular-nums">{acornBalance}</span>
-            </span>
+            {acornBalance !== null && (
+              <span
+                className="inline-flex items-center gap-1 rounded-full border border-[#D4E4BC] bg-[#E8F0E4] px-3 py-1 text-sm font-bold text-[#2D5A3D]"
+                aria-label={`${acornLabel} ${acornBalance}`}
+                title={acornLabel}
+              >
+                <AcornIcon />
+                <span className="tabular-nums">{acornBalance}</span>
+              </span>
+            )}
 
             <Link
               href="/profile"

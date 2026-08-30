@@ -8,6 +8,8 @@
 // /e/[eventId]/radio 와 /org/[orgId]/tori-fm/[sessionId] 양쪽을 찍는다.
 
 import { revalidatePath } from "next/cache";
+import { assertOrgFeature } from "@/lib/org-events/event-open-guard";
+import { F } from "@/lib/features/codes";
 // 도토리는 행사 단위 — 차감도 그 행사에서 번 만큼만.
 import { getEventAcornBalance } from "@/lib/app-user/event-acorns";
 import { createClient } from "@/lib/supabase/server";
@@ -453,6 +455,13 @@ export async function submitSessionRequestAction(
 
   const session = await loadFmSessionById(sessionId);
   if (!session) throw new Error("세션을 찾을 수 없어요");
+
+  /* 세션을 이미 읽은 자리라 기관 확인이 공짜다.
+     ⚠ 채팅(sendChatMessageAction)에는 일부러 안 걸었다 — 거기는 세션을 안 읽어서
+       가드를 넣으려면 메시지마다 조회가 한 번 더 붙는다. 방송이 꺼진 기관에는
+       애초에 들어갈 방송이 없고, 채팅은 초당 여러 번 오는 경로다. */
+  const gate = await assertOrgFeature(session.org_id, F.TORI_FM);
+  if (!gate.ok) throw new Error(gate.error);
   if (session.org_id !== user.orgId) {
     throw new Error("다른 기관의 방송에는 신청할 수 없어요");
   }

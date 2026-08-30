@@ -1,9 +1,9 @@
 import type { OrgHomeDashboard } from "@/lib/org-home/types";
 import { HeroCard } from "./hero-card";
 import { NextActionCard } from "./next-action-card";
-import { LiveEventCard } from "./live-event-card";
-import { RecentParticipantsCard } from "./recent-participants-card";
 import { ControlRoomBanner } from "./control-room-banner";
+import { ToriFmCard } from "./tori-fm-card";
+import { AllToolsCard } from "./all-tools-card";
 import { ResourceFamilyCard } from "./resource-family-card";
 import { PartnerNewCard } from "./partner-new-card";
 import { FooterLinksCard } from "./footer-links-card";
@@ -14,6 +14,11 @@ type Props = {
   orgId: string;
 };
 
+// 「현재 행사」·「최근 가입 가족」 카드는 여기서 뺐다.
+//   현재 행사 = 행사 목록 탭이 같은 걸 더 잘 보여준다(전부, 상태 전환까지).
+//   최근 가입 가족 = 참가자 탭이 그 자리다.
+// 홈에 다시 그려 봐야 "어느 쪽이 진짜지" 만 생기고, 그 두 카드가 조회 세 번을
+// 더 걸어 홈이 그만큼 늦게 떴다.
 export function OrgHomeStack({ snapshot, orgId }: Props) {
   return (
     <div className="mx-auto max-w-xl space-y-4 px-4 py-4 pb-24">
@@ -21,27 +26,17 @@ export function OrgHomeStack({ snapshot, orgId }: Props) {
       <HeroCard dashboard={snapshot} orgId={orgId} />
       <NextActionCard action={snapshot.nextAction} orgId={orgId} />
 
-      {/* 부가 카드 1: 현재 행사 */}
-      <CollapsibleCard storageKey="live-event" title="현재 행사" icon="🌲">
-        <LiveEventCard event={snapshot.liveEvent} orgId={orgId} />
-      </CollapsibleCard>
-
-      {/* 부가 카드 2: 최근 참가자 */}
-      <CollapsibleCard
-        storageKey="recent-participants"
-        title="최근 참가자"
-        icon="👨‍👩‍👧"
-      >
-        <RecentParticipantsCard
-          participants={snapshot.recentParticipants}
-          thisWeekSubmissions={snapshot.thisWeekSubmissions}
-          totalParticipants={snapshot.todayStats.participantsTotal}
-          orgId={orgId}
-        />
-      </CollapsibleCard>
-
       {/* 핵심 카드: 관제실 배너 — 접기 불가 */}
       <ControlRoomBanner preview={snapshot.controlRoomPreview} orgId={orgId} />
+
+      {/* 토리FM — 카드는 진작 만들어져 있었는데 여기 붙지 않아 홈에서 들어갈 길이 없었다.
+          (행사 상세의 운영 도구를 거쳐야만 갈 수 있었다) 방송중이면 빨간 점이 뜬다. */}
+      <ToriFmCard fm={snapshot.fm} orgId={orgId} />
+
+      {/* 모든 기능 목록판 — 행사 상세 안에만 있던 도구들까지 여기서 전부 간다. */}
+      <CollapsibleCard storageKey="all-tools" title="모든 기능" icon="🧭">
+        <AllToolsCard orgId={orgId} />
+      </CollapsibleCard>
 
       {/* 부가 카드 3: 자료실 */}
       <CollapsibleCard

@@ -38,6 +38,11 @@ type Props = {
   receivedLikes?: number;
   /** 누른 가족 이름 — 최근 순. "햇살반 홍길동" 꼴(피드 캡션과 같은 이름). */
   likerNames?: string[];
+  /**
+   * 끝난 행사 — 사진과 좋아요는 그대로 보되 바꾸지는 못한다.
+   * 버튼만 숨기는 게 아니라 서버 액션도 같은 조건으로 막혀 있다.
+   */
+  readOnly?: boolean;
 };
 
 export function SubmittedPhotos({
@@ -51,6 +56,7 @@ export function SubmittedPhotos({
   needsReviewAfterChange = false,
   receivedLikes = 0,
   likerNames = [],
+  readOnly = false,
 }: Props) {
   const router = useRouter();
   const [photos, setPhotos] = useState<string[]>(initialUrls);
@@ -282,6 +288,8 @@ export function SubmittedPhotos({
           </p>
         )}
 
+        {!readOnly && (
+        <>
         <div className="mt-4 flex justify-center">
           <button
             type="button"
@@ -303,6 +311,8 @@ export function SubmittedPhotos({
         <p className="mt-3 text-center text-[11px] leading-relaxed text-[#8B7F75]">
           {changeHint}
         </p>
+        </>
+        )}
 
         {shareRow}
 
@@ -345,7 +355,7 @@ export function SubmittedPhotos({
           <span aria-hidden>🖼</span>
           제출한 사진 ({photos.length}장)
         </h2>
-        {!editing && (
+        {!editing && !readOnly && (
           <button
             type="button"
             onClick={startEdit}

@@ -1,3 +1,4 @@
+import { loadCurrentEventByOrg } from "@/lib/org-events/org-current-event";
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -338,6 +339,9 @@ export default async function AdminPartnerDetailPage({ params }: PageProps) {
     loadPartnerCustomers(id),
   ]);
 
+  // 기관 줄에 대표 행사 한 줄. 숲지기 대시보드와 같은 부품·같은 규칙.
+  const orgActivity = await loadCurrentEventByOrg(customers.orgs.map((o) => o.id));
+
   const completeness = calcCompleteness(PARTNER_PROFILE_SCHEMA, snap);
 
   const tierMeta = TIER_LABEL[partner.tier];
@@ -459,13 +463,19 @@ export default async function AdminPartnerDetailPage({ params }: PageProps) {
             title="🏫 기관 고객"
             total={customers.orgsTotal}
             emptyMsg="등록된 기관이 없어요"
-            items={customers.orgs.map<CustomerItem>((o) => ({
-              id: o.id,
-              name: o.org_name,
-              sub: o.auto_username ? `@${o.auto_username}` : null,
-              status: o.status,
-              impersonateHref: `/api/admin/impersonate?role=org&id=${o.id}`,
-            }))}
+            items={customers.orgs.map<CustomerItem>((o) => {
+              const act = orgActivity.get(o.id);
+              return {
+                id: o.id,
+                name: o.org_name,
+                sub: o.auto_username ? `@${o.auto_username}` : null,
+                status: o.status,
+                impersonateHref: `/api/admin/impersonate?role=org&id=${o.id}`,
+                activity: act
+                  ? { emoji: act.emoji, label: act.label, title: act.name }
+                  : null,
+              };
+            })}
           />
 
           <CustomerGroupCard

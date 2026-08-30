@@ -1,5 +1,17 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import {
+  resolveStep,
+  resolveStepStatuses,
+  stepHref,
+  stepOf,
+  type StepKey,
+} from "@/lib/org-events/event-steps";
+import { EventStepBar } from "./event-step-bar";
+import { InvitationStep } from "./invitation-step";
+import { RunToolsPanel } from "./run-tools-panel";
+import { ImportQuestPack } from "./import-quest-pack";
+import { SurveyPanel } from "./survey-panel";
 import { requireOrg } from "@/lib/org-auth-guard";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -28,6 +40,7 @@ import { loadTrailsAssignedToOrg } from "@/lib/trails/queries";
 import { DeleteEventButton } from "./delete-button";
 // 상태 변경은 목록 카드와 같은 4종 셀렉터를 재사용한다.
 import { EventStatusToggle } from "../status-toggle";
+import { describeEventStatus } from "@/lib/org-events/event-status-label";
 import {
   QuestPacksTab,
   type QuestPackOption,
@@ -63,44 +76,7 @@ import { PhotoFeedToggle } from "./photo-feed-toggle";
 
 export const dynamic = "force-dynamic";
 
-type TabKey =
-  | "overview"
-  | "timeline"
-  | "applications"
-  | "participants"
-  | "questpacks"
-  | "fm"
-  | "programs"
-  | "trails"
-  | "analytics";
-
-const TABS: { key: TabKey; label: string; icon: string }[] = [
-  { key: "overview", label: "개요", icon: "📋" },
-  { key: "timeline", label: "타임테이블", icon: "📅" },
-  // 접수는 참가자 바로 앞 — 신청서를 수락해야 참가자가 되는 순서 그대로.
-  { key: "applications", label: "접수", icon: "📥" },
-  { key: "participants", label: "참가자", icon: "🙋" },
-  { key: "questpacks", label: "스탬프북", icon: "📚" },
-  { key: "fm", label: "토리FM", icon: "🎙" },
-  { key: "programs", label: "프로그램", icon: "🗂" },
-  { key: "trails", label: "숲길", icon: "🗺" },
-  { key: "analytics", label: "성과", icon: "📊" },
-];
-
-function parseTab(v: string | undefined): TabKey {
-  if (
-    v === "timeline" ||
-    v === "applications" ||
-    v === "participants" ||
-    v === "questpacks" ||
-    v === "fm" ||
-    v === "programs" ||
-    v === "trails" ||
-    v === "analytics"
-  )
-    return v;
-  return "overview";
-}
+// 탭 정의·파싱·링크는 event-steps.ts 한 곳에 있다(예전 ?tab= 링크 매핑 포함).
 
 // 시간 포맷은 KST 강제 — 서버/클라이언트 timezone 불일치 방지.
 //   fmtDateWeekday → "2026.05.16(토)"
@@ -159,7 +135,13 @@ export default async function OrgEventDetailPage({
   searchParams,
 }: {
   params: Promise<{ orgId: string; eventId: string }>;
-  searchParams: Promise<{ tab?: string; saved?: string }>;
+  searchParams: Promise<{
+    step?: string;
+    sub?: string;
+    /** 예전 링크 — event-steps 가 새 단계로 옮겨준다. */
+    tab?: string;
+    saved?: string;
+  }>;
 }) {
   const { orgId, eventId } = await params;
   const sp = await searchParams;
@@ -179,33 +161,54 @@ export default async function OrgEventDetailPage({
     notFound();
   }
 
-  const tab = parseTab(sp.tab);
+  const { step, sub } = resolveStep({
+    step: sp.step,
+    sub: sp.sub,
+    tab: sp.tab,
+  });
   const saved = sp.saved === "1";
 
   const pendingApplications = applicationCounts.pending_count;
+  const eventBase = `/org/${orgId}/events/${eventId}`;
+
+  // 단계 막대에 걸 상태 — 설명문 대신 이게 "다음에 뭘 하지" 에 답한다.
+  const stepStatuses = resolveStepStatuses({
+    hasName: Boolean(event.name?.trim()),
+    hasSchedule: Boolean(event.starts_at),
+    invitationReady: Boolean(
+      event.invitation_message?.trim() || event.invitation_body?.trim()
+    ),
+    invitationPublished: Boolean(event.invitation_published_at),
+    pendingApplications,
+    participantCount: summary?.participant_count ?? 0,
+    questPackCount: summary?.quest_pack_count ?? 0,
+    surveyResponseCount: 0,
+    eventEnded: event.status === "ENDED",
+  });
 
   const statusMeta = ORG_EVENT_STATUS_META[event.status];
+  // 배지가 상태만이 아니라 날짜까지 말한다 — "종료" 만 적혀 있으면 어제 끝난
+  // 행사와 작년에 끝난 행사가 같은 글자다.
+  const statusDesc = describeEventStatus({
+    status: event.status,
+    startsAt: event.starts_at,
+    endsAt: event.ends_at,
+  });
   const isLive = event.status === "LIVE";
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 px-4 py-6">
-      {/* Breadcrumb */}
-      <nav aria-label="breadcrumb" className="text-xs text-[#8B7F75]">
-        <Link href={`/org/${orgId}`} className="hover:text-[#2D5A3D]">
-          기관 홈
-        </Link>
-        <span className="mx-2">/</span>
-        <Link
-          href={`/org/${orgId}/events`}
-          className="hover:text-[#2D5A3D]"
-        >
-          행사
-        </Link>
-        <span className="mx-2">/</span>
-        <span className="truncate font-semibold text-[#2D5A3D]">
-          {event.name}
-        </span>
-      </nav>
+      {/* 단계 막대 — 페이지 맨 위. 가려는 곳보다 이동 수단이 위에 있어야 한다.
+          빵부스러기(기관 홈 / 행사 / 행사이름)를 대신한다: 기관 홈은 상단 🌿
+          로고가, 행사 목록은 이 막대의 ← 한 줄이, 행사 이름은 바로 아래 제목이
+          이미 맡고 있었다. */}
+      <EventStepBar
+        base={eventBase}
+        current={step}
+        currentSub={sub}
+        statuses={stepStatuses}
+        backHref={`/org/${orgId}/events`}
+      />
 
       {/* 저장 완료 배너 */}
       {saved && (
@@ -252,7 +255,7 @@ export default async function OrgEventDetailPage({
                       : statusMeta.color
                   }`}
                 >
-                  {isLive ? "🟢 진행중" : statusMeta.label}
+                  {statusDesc.emoji} {statusDesc.label}
                 </span>
                 <span className="text-[11px] text-[#6B6560]">
                   📅 {fmtRange(event.starts_at, event.ends_at)}
@@ -261,10 +264,26 @@ export default async function OrgEventDetailPage({
               <h1 className="mt-2 text-2xl font-bold text-[#2D5A3D] md:text-3xl">
                 {event.name}
               </h1>
+              {/* 소개글 — 접어 둔다.
+                  초대장에 실릴 홍보 문구라 길다(이 기관 건 여섯 줄이다). 기관이
+                  직접 쓴 글이라 워크스페이스를 열 때마다 다시 읽을 일이 없는데,
+                  펼쳐두면 화면 첫 장을 이 글이 통째로 먹었다. 실제 모습은 이제
+                  ② 초대장의 폰 미리보기에서 본다. */}
               {event.description && (
-                <p className="mt-2 max-w-2xl text-sm text-[#6B6560]">
-                  {event.description}
-                </p>
+                <details className="group mt-2">
+                  <summary className="inline-flex cursor-pointer list-none items-center gap-1 text-[11px] font-semibold text-[#8B7F75] transition hover:text-[#2D5A3D] [&::-webkit-details-marker]:hidden">
+                    <span
+                      aria-hidden
+                      className="inline-block transition-transform group-open:rotate-90"
+                    >
+                      ›
+                    </span>
+                    소개글
+                  </summary>
+                  <p className="mt-2 max-w-2xl text-sm text-[#6B6560]">
+                    {event.description}
+                  </p>
+                </details>
               )}
             </div>
 
@@ -306,6 +325,8 @@ export default async function OrgEventDetailPage({
               <EventStatusToggle
                 eventId={eventId}
                 initialStatus={event.status}
+                startsAt={event.starts_at}
+                endsAt={event.ends_at}
                 variant="inline"
               />
             </div>
@@ -313,78 +334,14 @@ export default async function OrgEventDetailPage({
         </div>
       </section>
 
-      {/* Tab bar — 작업 순서 흐름 (steps with > arrows) */}
-      <nav
-        aria-label="행사 섹션 탭"
-        className="overflow-x-auto rounded-2xl border border-[#D4E4BC] bg-gradient-to-r from-white via-[#FFFDF8] to-white px-2 py-2 shadow-sm"
-      >
-        <ol className="flex min-w-max items-center gap-0.5">
-          {TABS.map((t, idx) => {
-            const active = t.key === tab;
-            const activeIdx = TABS.findIndex((tab2) => tab2.key === tab);
-            const isPast = activeIdx >= 0 && idx < activeIdx;
-            const href =
-              t.key === "overview"
-                ? `/org/${orgId}/events/${eventId}`
-                : `/org/${orgId}/events/${eventId}?tab=${t.key}`;
-            return (
-              <li key={t.key} className="flex items-center">
-                <Link
-                  href={href}
-                  aria-current={active ? "page" : undefined}
-                  className={`group inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold transition ${
-                    active
-                      ? "bg-[#2D5A3D] text-white shadow-sm ring-2 ring-[#2D5A3D]/20"
-                      : isPast
-                        ? "text-[#2D5A3D] hover:bg-[#E8F0E4]"
-                        : "text-[#8B7F75] hover:bg-[#F5F1E8] hover:text-[#2D5A3D]"
-                  }`}
-                >
-                  <span
-                    className={`inline-flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
-                      active
-                        ? "bg-white text-[#2D5A3D]"
-                        : isPast
-                          ? "bg-[#2D5A3D] text-white"
-                          : "bg-[#F4EFE8] text-[#8B7F75] group-hover:bg-white"
-                    }`}
-                    aria-hidden
-                  >
-                    {isPast ? "✓" : idx + 1}
-                  </span>
-                  <span aria-hidden>{t.icon}</span>
-                  <span>{t.label}</span>
-                  {/* 승인 대기 배지 — 놓치면 참가자가 안 늘어나므로 눈에 띄게. */}
-                  {t.key === "applications" && pendingApplications > 0 && (
-                    <span className="ml-0.5 inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-rose-500 px-1.5 py-0.5 text-[10px] font-extrabold tabular-nums text-white">
-                      {pendingApplications}
-                    </span>
-                  )}
-                </Link>
-                {idx < TABS.length - 1 && (
-                  <span
-                    aria-hidden
-                    className={`mx-0.5 select-none text-base font-bold ${
-                      isPast ? "text-[#2D5A3D]" : "text-[#D4C8B8]"
-                    }`}
-                  >
-                    ›
-                  </span>
-                )}
-              </li>
-            );
-          })}
-        </ol>
-      </nav>
-
-      {/* Tab panel */}
+      {/* 단계 화면 */}
       <section>
-        {tab === "overview" ? (
+        {sub === "overview" ? (
           <>
             {/* 승인 대기 알림 — 방치하면 참가자가 안 늘어난다. */}
             {pendingApplications > 0 && (
               <Link
-                href={`/org/${orgId}/events/${eventId}?tab=applications`}
+                href={`${eventBase}?step=people`}
                 className="mb-4 flex items-center gap-3 rounded-2xl border-2 border-rose-300 bg-rose-50 px-4 py-3 shadow-sm transition hover:bg-rose-100"
               >
                 <span className="text-2xl" aria-hidden>
@@ -467,9 +424,16 @@ export default async function OrgEventDetailPage({
               }}
             />
           </>
-        ) : tab === "timeline" ? (
+        ) : sub === "timeline" ? (
           <TimelineTabPanel orgId={orgId} eventId={eventId} />
-        ) : tab === "applications" ? (
+        ) : step === "invite" ? (
+          <InvitationStep
+            orgId={orgId}
+            eventId={eventId}
+            event={event}
+            sub={sub}
+          />
+        ) : sub === "applications" ? (
           <ApplicationsTabPanel
             orgId={orgId}
             eventId={eventId}
@@ -491,30 +455,53 @@ export default async function OrgEventDetailPage({
               return at ? fmtDateTimeKst(at) : null;
             })()}
           />
-        ) : tab === "participants" ? (
+        ) : sub === "roster" ? (
           <ParticipantsTabPanel
             orgId={orgId}
             eventId={eventId}
             allowSelfRegister={event.allow_self_register ?? false}
             eventStatus={event.status}
           />
-        ) : tab === "questpacks" ? (
+        ) : sub === "questpacks" ? (
           <QuestPacksTabPanel orgId={orgId} eventId={eventId} />
-        ) : tab === "programs" ? (
+        ) : sub === "programs" ? (
           <ProgramsTabPanel orgId={orgId} eventId={eventId} />
-        ) : tab === "trails" ? (
+        ) : sub === "trails" ? (
           <TrailsTabPanel orgId={orgId} eventId={eventId} />
-        ) : tab === "fm" ? (
+        ) : sub === "fm" ? (
           <FmSessionsTabPanel orgId={orgId} eventId={eventId} />
-        ) : tab === "analytics" ? (
+        ) : sub === "tools" ? (
+          <RunToolsPanel orgId={orgId} />
+        ) : sub === "analytics" ? (
           <AnalyticsTabPanel orgId={orgId} eventId={eventId} />
+        ) : sub === "survey" ? (
+          <SurveyPanel
+            orgId={orgId}
+            eventId={eventId}
+            surveyEnabled={
+              (event as unknown as { survey_enabled?: boolean })
+                .survey_enabled ?? false
+            }
+            endsAt={event.ends_at}
+            openLeadMin={
+              (event as unknown as { survey_open_lead_min?: number | null })
+                .survey_open_lead_min
+            }
+            // 응답률의 분모. 이미 위에서 읽은 값이라 조회가 늘지 않는다.
+            participantCount={summary?.participant_count ?? 0}
+          />
         ) : (
-          <Phase2Placeholder tab={tab} />
+          <StepComingSoon step={step} sub={sub} />
         )}
       </section>
 
-      {/* 위험 영역 */}
-      <DangerZone eventId={eventId} eventName={event.name} />
+      {/* 위험 영역 — ① 내 행사 에서만.
+          예전엔 모든 단계 아래에 붙어 있었다. 설문 결과를 보다가도, 숲길을
+          고치다가도 화면 끝에 빨간 "영구 삭제" 경고문 세 줄이 나왔다.
+          행사를 지우는 일은 행사 자체를 다루는 자리에 있으면 된다. */}
+      {step === "event" && (
+        <DangerZone eventId={eventId} eventName={event.name} />
+      )}
     </div>
   );
 }
@@ -546,7 +533,8 @@ function OverviewPanel({
     icon: string;
     label: string;
     value: number;
-    tab: TabKey;
+    step: StepKey;
+    sub: string;
     /** 강조 카드 — 참가자처럼 "지금 등록해야 할" 핵심 자원 */
     highlight?: boolean;
   }> = [
@@ -554,18 +542,38 @@ function OverviewPanel({
       icon: "🙋",
       label: "참가자",
       value: counts.participant_count,
-      tab: "participants" as TabKey,
+      step: "people",
+      sub: "roster",
       highlight: true,
     },
     {
       icon: "📚",
       label: "스탬프북",
       value: counts.quest_pack_count,
-      tab: "questpacks",
+      step: "run",
+      sub: "questpacks",
     },
-    { icon: "🎙", label: "토리FM 세션", value: counts.fm_session_count, tab: "fm" },
-    { icon: "🗂", label: "프로그램", value: counts.program_count, tab: "programs" },
-    { icon: "🗺", label: "숲길", value: counts.trail_count, tab: "trails" },
+    {
+      icon: "🎙",
+      label: "토리FM 세션",
+      value: counts.fm_session_count,
+      step: "run",
+      sub: "fm",
+    },
+    {
+      icon: "🗂",
+      label: "프로그램",
+      value: counts.program_count,
+      step: "run",
+      sub: "programs",
+    },
+    {
+      icon: "🗺",
+      label: "숲길",
+      value: counts.trail_count,
+      step: "run",
+      sub: "trails",
+    },
   ];
 
   return (
@@ -573,11 +581,15 @@ function OverviewPanel({
       <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
         {items.map((it) => {
           const isZero = it.value === 0;
-          const isParticipants = it.tab === ("participants" as TabKey);
+          const isParticipants = it.sub === "roster";
           return (
             <Link
-              key={it.tab}
-              href={`/org/${orgId}/events/${eventId}?tab=${it.tab}`}
+              key={it.sub}
+              href={stepHref(
+                `/org/${orgId}/events/${eventId}`,
+                it.step,
+                it.sub
+              )}
               className={`rounded-2xl border bg-white p-4 shadow-sm transition hover:shadow-md ${
                 it.highlight && isZero
                   ? "border-amber-400 bg-amber-50 hover:border-amber-500"
@@ -705,7 +717,10 @@ function DraftNextSteps({
       done: counts.quest_pack_count > 0,
       label: "스탬프북 연결",
       hint: "아이들이 찍을 미션 모음이에요.",
-      cta: { label: "스탬프북 탭으로", tab: "questpacks" as TabKey },
+      cta: {
+        label: "스탬프북으로",
+        href: stepHref(`/org/${orgId}/events/${eventId}`, "run", "questpacks"),
+      },
     },
     {
       done: Boolean(startsAt && endsAt),
@@ -717,7 +732,7 @@ function DraftNextSteps({
       done: counts.participant_count > 0,
       label: "참가자 1명 이상",
       hint: "먼저 시작 후 초대 링크로 받아도 괜찮아요.",
-      cta: null as null | { label: string; tab?: TabKey; href?: string },
+      cta: null as null | { label: string; href?: string },
     },
   ];
   const doneCount = checks.filter((c) => c.done).length;
@@ -752,12 +767,9 @@ function DraftNextSteps({
                 <p className="text-[11px] text-[#6B6560]">{c.hint}</p>
               </div>
             </div>
-            {!c.done && c.cta && (
+            {!c.done && c.cta?.href && (
               <Link
-                href={
-                  c.cta.href ??
-                  `/org/${orgId}/events/${eventId}?tab=${c.cta.tab}`
-                }
+                href={c.cta.href}
                 className="shrink-0 rounded-lg border border-[#D4E4BC] bg-[#F5F1E8] px-2.5 py-1.5 text-[11px] font-bold text-[#2D5A3D] hover:border-[#2D5A3D]"
               >
                 {c.cta.label} →
@@ -943,13 +955,29 @@ async function QuestPacksTabPanel({
     loadQuestPackOptionsForOrg(orgId),
     loadEventQuestPackIds(eventId),
   ]);
+
+  // 가져오기 후보 — 이 행사에 아직 안 붙은, 미션이 들어 있는 스탬프북.
+  // 빈 스탬프북을 복사하는 건 아무 도움이 안 되고, 이미 붙은 걸 또 복사하면
+  // 같은 미션이 두 벌 생긴다.
+  const importable = allPacks
+    .filter((p) => !selectedIds.includes(p.id) && p.missionCount > 0)
+    .map((p) => ({
+      id: p.id,
+      name: p.name,
+      missionCount: p.missionCount,
+      usedIn: null as string | null,
+    }));
+
   return (
-    <QuestPacksTab
-      orgId={orgId}
-      eventId={eventId}
-      allPacks={allPacks}
-      initialSelectedIds={selectedIds}
-    />
+    <div className="space-y-3">
+      <ImportQuestPack eventId={eventId} packs={importable} />
+      <QuestPacksTab
+        orgId={orgId}
+        eventId={eventId}
+        allPacks={allPacks}
+        initialSelectedIds={selectedIds}
+      />
+    </div>
   );
 }
 
@@ -1384,64 +1412,25 @@ async function loadFmSessionsForFmTab(
   };
 }
 
-function Phase2Placeholder({ tab }: { tab: TabKey }) {
-  const meta: Record<
-    Exclude<TabKey, "overview">,
-    { icon: string; title: string; empty: string }
-  > = {
-    timeline: {
-      icon: "📅",
-      title: "타임테이블",
-      empty: "아직 슬롯이 없어요.",
-    },
-    applications: {
-      icon: "📥",
-      title: "접수",
-      empty: "아직 접수된 신청서가 없어요.",
-    },
-    participants: {
-      icon: "🙋",
-      title: "참가자",
-      empty: "아직 등록된 참가자가 없어요.",
-    },
-    questpacks: {
-      icon: "📚",
-      title: "스탬프북",
-      empty: "아직 연결된 스탬프북이 없어요.",
-    },
-    fm: {
-      icon: "🎙",
-      title: "토리FM",
-      empty: "아직 예약된 라이브가 없어요.",
-    },
-    programs: {
-      icon: "🗂",
-      title: "프로그램",
-      empty: "아직 연결된 프로그램이 없어요.",
-    },
-    trails: {
-      icon: "🗺",
-      title: "숲길",
-      empty: "아직 연결된 숲길이 없어요.",
-    },
-    analytics: {
-      icon: "📊",
-      title: "성과",
-      empty: "아직 집계할 데이터가 없어요.",
-    },
-  };
-  const m = meta[tab as Exclude<TabKey, "overview">];
+/**
+ * 아직 화면이 없는 하위탭 자리.
+ *
+ * 예전 Phase2Placeholder 는 탭마다 다른 문구를 들고 있었는데, 정작 그 탭들은
+ * 전부 실제 화면이 생겨 한 번도 쓰이지 않는 죽은 표였다. 지금은 새로 추가한
+ * 단계(초대장 내용·설문 등) 중 아직 안 만든 것만 여기로 온다.
+ */
+function StepComingSoon({ step, sub }: { step: StepKey; sub: string }) {
+  const meta = stepOf(step);
+  const label = meta.subs.find((s) => s.key === sub)?.label ?? meta.label;
   return (
-    <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[#D4E4BC] bg-white p-10 text-center">
-      <div className="text-5xl" aria-hidden>
-        {m.icon}
-      </div>
-      <p className="mt-3 text-base font-bold text-[#2D5A3D]">{m.title}</p>
-      <p className="mt-1 text-xs text-[#6B6560]">{m.empty}</p>
-      <p className="mt-3 rounded-full bg-[#F5F1E8] px-3 py-1 text-[10px] font-semibold text-[#8B6F47]">
-        🚧 Phase 2 에서 구현 예정
+    <section className="rounded-2xl border border-dashed border-[#D4E4BC] bg-white/70 p-10 text-center">
+      <p className="text-3xl" aria-hidden>
+        {meta.icon}
       </p>
-    </div>
+      <p className="mt-2 text-sm font-bold text-[#2D5A3D]">
+        {label} — 준비 중이에요
+      </p>
+    </section>
   );
 }
 

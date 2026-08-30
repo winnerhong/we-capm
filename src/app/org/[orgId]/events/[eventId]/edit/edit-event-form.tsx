@@ -3,6 +3,11 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
+import {
+  resolveInvitationMessage,
+  resolveInvitationTitle,
+} from "@/lib/org-events/invitation-copy";
+import { InvitationPhonePreview } from "../invitation-phone-preview";
 // 입장가능시간 미리보기 — 초대장이 쓰는 것과 같은 함수라 저장 전후가 어긋나지 않는다.
 import { resolveEntryTime } from "@/lib/org-events/entry-time";
 import {
@@ -153,12 +158,20 @@ export type VenueLite = {
 export function EditEventForm({
   orgId,
   eventId,
+  mode = "all",
   invitationTemplates = [],
   venues = [],
   initial,
 }: {
   orgId: string;
   eventId: string;
+  /**
+   * 어느 화면에서 쓰는가.
+   *   all        — /edit (예전 그대로)
+   *   basic      — ① 내 행사: 이름·일시·상태
+   *   invitation — ② 초대장: 인사말·내용·장소·주차장
+   */
+  mode?: "all" | "basic" | "invitation";
   /** 초대장 인사말/내용 템플릿 — 셀렉터에서 골라 폼 자동 채움. */
   invitationTemplates?: InvitationTemplateLite[];
   /** 지사 행사장 카탈로그 — 셀렉터에서 골라 장소/주차장 자동 채움. */
@@ -240,6 +253,25 @@ export function EditEventForm({
   };
   const [isDeleting, startDeleteTransition] = useTransition();
   const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  // 저장 후 폰을 다시 불러오기 위한 값. 사진·주차장처럼 구조가 바뀌는 항목은
+  // 글자처럼 즉시 못 보내고 서버가 다시 그려줘야 한다.
+  const [previewReload, setPreviewReload] = useState(0);
+
+  // 폰에 실시간으로 보낼 글자들. 기본 문구(빈 인사말 → "함께 즐거운 시간을
+  // 만들어요")는 초대장 화면과 같은 함수를 쓴다 — 여기서 따로 적으면 언젠가
+  // 한쪽만 바뀌어서 미리보기가 거짓말을 한다.
+  const previewFields = useMemo(
+    () => ({
+      name: resolveInvitationTitle(name),
+      message: resolveInvitationMessage(invMessage),
+      body: invBody.trim(),
+      dress: invDressCode.trim(),
+      location: invLocation.trim(),
+      address: invAddress.trim(),
+    }),
+    [name, invMessage, invBody, invDressCode, invLocation, invAddress]
+  );
 
   const startsAt = useMemo(() => {
     if (!startDate) return "";
@@ -371,8 +403,15 @@ export function EditEventForm({
     startTransition(async () => {
       try {
         await updateOrgEventAction(eventId, fd);
-        router.push(`/org/${orgId}/events/${eventId}?saved=1`);
+        // 초대장을 쓰다가 저장하면 예전에는 ① 개요로 튕겼다. 방금 고친 걸
+        // 확인하려면 다시 ② 초대장으로 들어와야 했다. 쓰던 자리로 돌려놓는다.
+        router.push(
+          mode === "invitation"
+            ? `/org/${orgId}/events/${eventId}?step=invite&sub=content&saved=1`
+            : `/org/${orgId}/events/${eventId}?saved=1`
+        );
         router.refresh();
+        setPreviewReload((v) => v + 1);
       } catch (err) {
         const msg = err instanceof Error ? err.message : "저장 실패";
         if (msg.includes("NEXT_REDIRECT")) return;
@@ -382,7 +421,29 @@ export function EditEventForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+    <div
+      className={
+        mode === "invitation"
+          ? "space-y-3 xl:flex xl:items-start xl:gap-5 xl:space-y-0"
+          : undefined
+      }
+    >
+      {/* 넓은 화면에선 폼 오른쪽에 붙어 스크롤을 따라오고(order-2), 좁은 화면에선
+          폼 위의 버튼 하나로 접힌다. 폰으로 폼을 채우면서 옆에 폰을 또 띄울 순 없다. */}
+      {mode === "invitation" && (
+        <InvitationPhonePreview
+          eventId={eventId}
+          fields={previewFields}
+          reloadKey={previewReload}
+        />
+      )}
+      <form
+        onSubmit={handleSubmit}
+        className={
+          mode === "invitation" ? "min-w-0 flex-1 space-y-5" : "space-y-5"
+        }
+        noValidate
+      >
       {error && (
         <div
           role="alert"
@@ -393,12 +454,16 @@ export function EditEventForm({
       )}
 
       <section className="rounded-2xl border border-[#D4E4BC] bg-white p-5 shadow-sm">
-        <h2 className="mb-4 flex items-center gap-2 text-sm font-bold text-[#2D5A3D]">
-          <span aria-hidden>📝</span>
-          <span>기본 정보</span>
-        </h2>
+        {mode !== "invitation" && (
+          <h2 className="mb-4 flex items-center gap-2 text-sm font-bold text-[#2D5A3D]">
+            <span aria-hidden>📝</span>
+            <span>기본 정보</span>
+          </h2>
+        )}
 
         <div className="space-y-4">
+          {mode !== "invitation" && (
+          <>
           <div>
             <label
               htmlFor="name"
@@ -620,8 +685,12 @@ export function EditEventForm({
             </p>
           </div>
 
-          {/* 📨 초대장 */}
-          <div className="rounded-2xl border-2 border-emerald-200 bg-gradient-to-br from-emerald-50/40 via-white to-[#FAE7D0]/30 p-4">
+          </>
+          )}
+
+          {mode !== "basic" && (
+          /* 📨 초대장 */
+          <div className={mode === "invitation" ? "" : "rounded-2xl border-2 border-emerald-200 bg-gradient-to-br from-emerald-50/40 via-white to-[#FAE7D0]/30 p-4"}>
             <h3 className="mb-3 flex items-center justify-between gap-2 text-sm font-bold text-[#2D5A3D]">
               <span className="flex items-center gap-2">
                 <span aria-hidden>📨</span>
@@ -982,7 +1051,10 @@ export function EditEventForm({
             </div>
           </div>
 
-          {/* 자체 가입 허용 토글 — 초대링크를 받은 미등록 번호의 신규 가입 허용 */}
+          )}
+
+          {mode !== "invitation" && (
+          /* 자체 가입 허용 토글 — 초대링크를 받은 미등록 번호의 신규 가입 허용 */
           <div>
             <label
               className="flex cursor-pointer items-start gap-3 rounded-xl border border-[#D4E4BC] bg-white p-4 transition has-[:checked]:border-[#2D5A3D] has-[:checked]:bg-[#E8F0E4]"
@@ -1005,6 +1077,7 @@ export function EditEventForm({
               </div>
             </label>
           </div>
+          )}
         </div>
       </section>
 
@@ -1025,7 +1098,11 @@ export function EditEventForm({
         </button>
       </div>
 
-      {/* ────────── 위험 영역 — 행사 영구 삭제 ────────── */}
+      {/* ────────── 위험 영역 — 행사 영구 삭제 ──────────
+          초대장 모드에서는 안 그린다. 초대장 글을 쓰는 화면 끝에 "이 행사
+          영구 삭제" 가 있을 이유가 없고, 그 화면에는 행사 페이지가 그리는
+          같은 패널이 하나 더 붙어 둘이 겹쳐 있었다. */}
+      {mode !== "invitation" && (
       <section className="mt-8 rounded-2xl border-2 border-rose-300 bg-rose-50/40 p-5 shadow-sm">
         <h2 className="mb-2 flex items-center gap-2 text-sm font-bold text-rose-800">
           <span aria-hidden>⚠️</span>
@@ -1064,6 +1141,8 @@ export function EditEventForm({
           </button>
         </div>
       </section>
-    </form>
+      )}
+      </form>
+    </div>
   );
 }

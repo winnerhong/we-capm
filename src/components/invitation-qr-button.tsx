@@ -26,7 +26,12 @@ function triggerDownload(href: string, filename: string) {
   document.body.removeChild(a);
 }
 
-export function InvitationQrButton({ url, eventName }: Props) {
+export function InvitationQrButton({
+  url,
+  eventName,
+  /** 곁들이는 자리(기관 공통 링크 등)에서는 아이콘만 — 옆 버튼들과 크기를 맞춘다. */
+  compact = false,
+}: Props & { compact?: boolean }) {
   const [open, setOpen] = useState(false);
   const [svg, setSvg] = useState("");
   const [busy, setBusy] = useState<"svg" | "png" | null>(null);
@@ -96,11 +101,16 @@ export function InvitationQrButton({ url, eventName }: Props) {
         type="button"
         onClick={() => setOpen(true)}
         disabled={!url}
-        className="inline-flex items-center gap-1.5 rounded-xl border border-[#D4E4BC] bg-white px-3 py-2 text-xs font-bold text-[#2D5A3D] hover:bg-[#F5F1E8] disabled:opacity-50"
+        className={`inline-flex items-center rounded-xl border disabled:opacity-50 ${
+          compact
+            ? "border-[#E8DDC8] bg-white/60 px-2 py-1.5 text-[11px] text-[#8B7F75] hover:text-[#2D5A3D]"
+            : "gap-1.5 border-[#D4E4BC] bg-white px-3 py-2 text-xs font-bold text-[#2D5A3D] hover:bg-[#F5F1E8]"
+        }`}
         title="초대장 링크의 QR 코드 보기·다운로드"
+        aria-label={compact ? "QR 코드" : undefined}
       >
         <span aria-hidden>🎫</span>
-        <span>QR 코드</span>
+        {!compact && <span>QR 코드</span>}
       </button>
 
       {open && (

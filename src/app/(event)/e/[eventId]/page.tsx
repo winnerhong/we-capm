@@ -29,9 +29,9 @@ import { BroadcastCard } from "./broadcast-card";
 import { NextUpCard } from "./next-up-card";
 import { Suspense } from "react";
 import { PhotoFeedCard } from "@/components/photo-feed/photo-feed-card";
+import { SurveyCard } from "@/components/survey/survey-card";
 import { BingoCard } from "./bingo-card";
 import { loadTimelineSlots } from "@/lib/event-timeline/queries";
-import { loadOrgNameById } from "@/lib/org-partner";
 import { StampbookDetail } from "@/components/stampbook-detail";
 import { AcornIcon } from "@/components/acorn-icon";
 import { fmtAmPmClockKst, fmtFullDateKst } from "@/lib/datetime/kst";
@@ -112,30 +112,34 @@ export default async function EventHomePage({
   const selectedEvent = ctx.event;
   const ctxOrgId = ctx.orgId;
 
-  // 도토리·자녀 모두 이 행사 기준 — 다른 행사 것이 섞이지 않는다.
-  const [acornBalance, children, userDetail] = await Promise.all([
+  // 여기 있는 것들은 서로를 필요로 하지 않는다 — ctx 만 있으면 된다.
+  //
+  // 예전에는 네 덩어리로 줄줄이 await 했다. 각 덩어리가 Supabase 왕복을 몇 번씩
+  // 하므로, 앞 덩어리가 끝날 때까지 뒤가 시작도 못 한 채 기다렸다. 이 화면은
+  // 보호자가 행사장에서 제일 먼저 여는 화면이라 그 지연이 그대로 체감된다.
+  // 한 번에 띄우면 가장 오래 걸리는 하나만큼만 기다린다.
+  //
+  // 스탬프북 조회(pickPrimaryLivePackForEvent)와 도토리 안내(loadAcornGuide)는
+  // 같은 팩 목록을 본다 — React cache 로 묶여 있어 두 번 나가지 않는다.
+  const [
+    acornBalance,
+    children,
+    userDetail,
+    topFamilies,
+    acornGuide,
+    primaryPack,
+    timelineSlots,
+  ] = await Promise.all([
     getEventAcornBalance(user.id, eventId),
     loadChildrenForEvent(user.id, eventId),
     loadAppUserById(user.id),
+    loadTopAcornFamiliesForEvent(eventId, 5),
+    loadAcornGuide(eventId),
+    pickPrimaryLivePackForEvent(user.id, ctxOrgId, selectedEvent.id),
+    loadTimelineSlots(selectedEvent.id).catch(() => []),
   ]);
 
   const freshOrgName = ctx.orgName;
-  // "어떻게 저만큼 모았지" 에 답하는 목록 — 이 행사 미션 설정에서 만들어진다.
-  const [topFamilies, acornGuide] = await Promise.all([
-    loadTopAcornFamiliesForEvent(eventId, 5),
-    loadAcornGuide(eventId),
-  ]);
-
-  const primaryPack = await pickPrimaryLivePackForEvent(
-    user.id,
-    ctxOrgId,
-    selectedEvent.id
-  );
-
-  // 선택된 행사의 타임라인 슬롯 — 홈 "오늘의 일정" 카드용
-  const timelineSlots = await loadTimelineSlots(selectedEvent.id).catch(
-    () => []
-  );
 
   // 원생 자녀가 있으면 "{원생이름} 가족" 으로 가족 라벨 표기,
   // 없으면 기존 "{부모이름}님" 유지.
@@ -263,9 +267,122 @@ export default async function EventHomePage({
     );
   }
 
+  // 끝난 행사 — "추억" 화면.
+  //
+  // 예전에는 이 자리가 그냥 LIVE 화면이었다. 스탬프북·다음 미션·라디오 카드가
+  // 그대로 떠 있었고, 눌러 보면 활동 화면이 조용히 여기로 돌려보냈다.
+  // 눌리는데 아무 일도 안 일어나는 화면은 고장 난 화면이다.
+  //
+  // 끝난 뒤에 남는 건 셋이다 — 그날 찍은 사진, 우리가 모은 도토리, 하고 싶은
+  // 말(설문). 그 셋만 남긴다. 잠겼다는 안내는 레이아웃이 이미 하고 있어
+  // 여기서 또 말하지 않는다.
+  if (!ctx.access.canPlay) {
+    const stamps = primaryPack?.progress.completedSlots ?? 0;
+    return (
+      <div className="space-y-4">
+        <section className="overflow-hidden rounded-3xl bg-gradient-to-br from-[#6B6560] via-[#7D766E] to-[#8B7F75] p-5 shadow-lg">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold text-white/80">
+                🌲 {freshOrgName}
+              </p>
+              <h1 className="mt-1 truncate text-xl font-bold text-white">
+                {familyLabel}
+              </h1>
+              <p className="mt-1 truncate text-[11px] text-white/70">
+                {selectedEvent.name}
+              </p>
+            </div>
+            <Link
+              href="/profile"
+              className="shrink-0 rounded-full bg-white/15 px-3 py-1.5 text-xs font-bold text-white backdrop-blur-sm transition hover:bg-white/25"
+            >
+              내 정보 →
+            </Link>
+          </div>
+
+          <div className="mt-4 grid grid-cols-3 gap-2">
+            <MiniStat
+              label="모은 도토리"
+              value={`${acornBalance}`}
+              icon={<AcornIcon size={20} />}
+            />
+            <MiniStat label="찍은 스탬프" value={`${stamps}`} icon="🌿" />
+            <MiniStat
+              label="함께한 자녀"
+              value={`${children.length}`}
+              icon="🪴"
+            />
+          </div>
+        </section>
+
+        {/* 📝 설문 — 끝난 뒤가 진짜 자리다. 사진보다 위에 둔다. */}
+        <Suspense fallback={null}>
+          <SurveyCard
+            eventId={selectedEvent.id}
+            userId={user.id}
+            surveyEnabled={
+              (selectedEvent as unknown as { survey_enabled?: boolean })
+                .survey_enabled === true
+            }
+            eventStatus={selectedEvent.status}
+            endsAt={selectedEvent.ends_at}
+            openLeadMin={
+              (
+                selectedEvent as unknown as {
+                  survey_open_lead_min?: number | null;
+                }
+              ).survey_open_lead_min
+            }
+          />
+        </Suspense>
+
+        {/* 📸 그날의 사진 */}
+        <Suspense fallback={null}>
+          <PhotoFeedCard eventId={selectedEvent.id} viewerId={user.id} />
+        </Suspense>
+
+        <div className="grid grid-cols-2 gap-2">
+          <Link
+            href={ctx.href("/stampbook")}
+            className="rounded-2xl border border-[#E5D3B8] bg-white px-4 py-3 text-center text-xs font-bold text-[#6B6560] shadow-sm transition hover:shadow-md"
+          >
+            🌿 스탬프북 다시 보기
+          </Link>
+          <Link
+            href={ctx.href("/acorns")}
+            className="rounded-2xl border border-[#E5D3B8] bg-white px-4 py-3 text-center text-xs font-bold text-[#6B6560] shadow-sm transition hover:shadow-md"
+          >
+            🌰 도토리 기록
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
-      {/* 도토리 TOP 5 가족 — 최상단 노출, 본인 행 강조 */}
+      {/* 📝 설문 — 최상단이다.
+          이 카드는 행사가 끝나기 30분 전에야 나타난다. 그때 화면에서 제일
+          중요한 건 이것 하나다 — 집에 가고 나면 아무도 안 연다. */}
+      <Suspense fallback={null}>
+        <SurveyCard
+          eventId={selectedEvent.id}
+          userId={user.id}
+          surveyEnabled={
+            (selectedEvent as unknown as { survey_enabled?: boolean })
+              .survey_enabled === true
+          }
+          eventStatus={selectedEvent.status}
+          endsAt={selectedEvent.ends_at}
+          openLeadMin={
+            (selectedEvent as unknown as { survey_open_lead_min?: number | null })
+              .survey_open_lead_min
+          }
+        />
+      </Suspense>
+
+      {/* 도토리 TOP 5 가족 — 본인 행 강조 */}
       <AcornTopBoard
         families={topFamilies}
         myUserId={user.id}
@@ -346,10 +463,14 @@ export default async function EventHomePage({
       )}
 
       {/* 돌발 미션 — 시간 임계이므로 FM 보다 위 */}
-      <BroadcastCard orgId={ctxOrgId} />
+      <Suspense fallback={null}>
+        <BroadcastCard orgId={ctxOrgId} />
+      </Suspense>
 
       {/* 🎯 토리 빙고 — LIVE 보드 있을 때만 자동 노출. 사진 등록 진입 카드 역할. */}
-      <BingoCard orgId={ctxOrgId} userId={user.id} />
+      <Suspense fallback={null}>
+        <BingoCard orgId={ctxOrgId} userId={user.id} />
+      </Suspense>
 
       {/* 📸 사진 피드 입구 — 하단 탭에서 내리고 이 카드가 그 자리를 대신한다.
           기관이 켜고 사진이 한 장이라도 있을 때만 나타난다.
@@ -363,10 +484,9 @@ export default async function EventHomePage({
       </Suspense>
 
       {/* 토리FM 라이브 (선택된 행사의 LIVE 세션만, 행사 없으면 org fallback) */}
-      <ToriFmCard
-        orgId={ctxOrgId}
-        eventId={selectedEvent.id}
-      />
+      <Suspense fallback={null}>
+      <ToriFmCard orgId={ctxOrgId} eventId={selectedEvent.id} />
+      </Suspense>
 
       {/* 스탬프북 없음 안내 (primaryPack 있을 땐 위 상단 디테일 뷰에서 이미 렌더됨) */}
       {!primaryPack && (

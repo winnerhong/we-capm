@@ -4,6 +4,30 @@ import {
   resolveActiveOrgPatch,
   ACTIVE_ORG_COOKIE_OPTS,
 } from "@/lib/app-user/active-org-proxy";
+import { seal, unseal } from "@/lib/session-cookie";
+
+/**
+ * 세션 쿠키 서명 검문소 — 요청마다 딱 한 번, 다른 무엇보다 먼저.
+ *
+ * 브라우저에는 서명된 값(<body>.<sig>)이 들어 있다. 여기서 서명을 확인하고
+ * 통과한 것만 평문 JSON 으로 되돌려 request 쿠키에 다시 꽂는다.
+ *   → requireOrg()·requirePartner()·requireAdminOrManager() 등 읽는 코드는
+ *     예전 그대로 JSON.parse 만 하면 된다(40군데를 고치지 않아도 되는 이유).
+ *   → 서명이 없거나 어긋난 쿠키는 아예 지운다. 읽는 쪽에서는 '로그인 안 됨'이 되어
+ *     이미 있는 리다이렉트가 그대로 동작한다.
+ *
+ * ⚠ 이 함수가 안 돌면 로그인이 전부 풀린 것처럼 보인다. proxy() 의 첫 줄에서 유지할 것.
+ * ⚠ 미들웨어 matcher 에서 빠지는 경로는 이 검문을 안 거친다. 지금 빠지는 건
+ *   정적 파일과 /api/auth/send-sms-hook(Supabase 훅, 세션 쿠키를 안 읽는다)뿐이다.
+ */
+async function unsealSessionCookies(request: NextRequest) {
+  for (const c of request.cookies.getAll()) {
+    if (!c.name.startsWith("campnic_")) continue;
+    const plain = await unseal(c.value);
+    if (plain === null) request.cookies.delete(c.name);
+    else request.cookies.set(c.name, plain);
+  }
+}
 
 /**
  * 한 브라우저 다중 기관 로그인 지원.
@@ -50,6 +74,8 @@ function injectOrgSession(request: NextRequest) {
 }
 
 export async function proxy(request: NextRequest) {
+  // 서명 검문이 가장 먼저 — 아래 로직은 전부 '검증된 평문'을 전제로 돈다.
+  await unsealSessionCookies(request);
   injectOrgSession(request);
 
   // 참가자 활성 기관 동기화 — URL 의 event_id 와 세션의 orgId 가 어긋나면 교정.
@@ -60,9 +86,10 @@ export async function proxy(request: NextRequest) {
 
   const response = await updateSession(request);
   if (activeOrgPatch) {
+    // 브라우저로 나가는 값이므로 서명해서 내보낸다(request 쪽은 평문 그대로 둔다).
     response.cookies.set(
       "campnic_user",
-      activeOrgPatch,
+      await seal(JSON.parse(activeOrgPatch)),
       ACTIVE_ORG_COOKIE_OPTS
     );
   }

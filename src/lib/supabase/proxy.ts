@@ -10,7 +10,13 @@ export async function updateSession(request: NextRequest) {
   const isAdminRoute = pathname.startsWith("/admin");
   const isManagerLogin = pathname === "/manager";
   const isManagerRoute = pathname.startsWith("/manager/");
-  const isEventRoute = pathname.startsWith("/event");
+  // 구 참가자 화면(/event/{id}/…) 전용 관문.
+  //
+  // startsWith("/event") 였다. 그러면 **"/event" 로 시작하는 모든 경로**가
+  // 걸린다 — 공개 행사 목록(/events)도, 종료 안내(/event-closed/…)도 로그인
+  // 없는 방문자에게는 /join 으로 튕겨 나갔다. 경계를 슬래시까지 맞춘다.
+  const isEventRoute =
+    pathname === "/event" || pathname.startsWith("/event/");
 
   // 공개 라우트
   if (isApiRoute || isJoinRoute || isLoginRoute || isManagerLogin || pathname === "/offline") return response;

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { OrgSectionTabs } from "../_nav/org-section-tabs";
 import { requireOrg } from "@/lib/org-auth-guard";
 import { createClient } from "@/lib/supabase/server";
 import { listOrgUserIds } from "@/lib/app-user/orgs";
@@ -356,6 +357,8 @@ export default async function OrgUsersPage({
 
       <div className="mx-auto max-w-6xl space-y-6 px-4 py-6">
         {/* Breadcrumb */}
+        <OrgSectionTabs orgId={orgId} active="users" />
+
         <nav aria-label="breadcrumb" className="text-xs text-[#8B7F75]">
           <Link href={`/org/${orgId}`} className="hover:text-[#2D5A3D]">
             기관 홈
@@ -499,6 +502,15 @@ export default async function OrgUsersPage({
                 >
                   <span aria-hidden>📥</span>
                   <span>엑셀 일괄 등록</span>
+                </Link>
+                {/* 가족 명단(자녀·반·연락처) — 기관 홈 카드에서 옮겨왔다.
+                    그 카드를 빼면서 이 화면으로 가는 길이 하나도 안 남았다. */}
+                <Link
+                  href={`/org/${orgId}/members`}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-[#D4E4BC] bg-white px-4 py-2.5 text-sm font-semibold text-[#2D5A3D] hover:bg-[#F5F1E8]"
+                >
+                  <span aria-hidden>👨‍👩‍👧</span>
+                  <span>가족 명단</span>
                 </Link>
               </div>
             </div>

@@ -1,3 +1,4 @@
+import { seal } from "@/lib/session-cookie";
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { requireOrg } from "@/lib/org-auth-guard";
@@ -84,7 +85,7 @@ export async function GET(request: NextRequest) {
   cookieStore.delete("campnic_user");
   cookieStore.set(
     "campnic_user",
-    JSON.stringify({
+    await seal({
       id: user.id,
       phone: user.phone,
       parentName: user.parent_name,

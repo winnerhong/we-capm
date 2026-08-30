@@ -90,6 +90,11 @@ export interface StampbookDetailProps {
     acornBalance: number;
     childrenCount: number;
   };
+  /**
+   * 끝난 행사 — 지나온 기록으로만 본다.
+   * [다음 할 일] 을 남겨두면 눌러도 "행사가 끝났어요" 만 나오는 버튼이 된다.
+   */
+  readOnly?: boolean;
 }
 
 export function StampbookDetail({
@@ -100,6 +105,7 @@ export function StampbookDetail({
   progress: passedProgress,
   familyHeader,
   base,
+  readOnly = false,
 }: StampbookDetailProps) {
   const progress =
     passedProgress ??
@@ -271,7 +277,7 @@ export function StampbookDetail({
       </section>
 
       {/* 다음 할 일 */}
-      {progress.nextMission && (
+      {progress.nextMission && !readOnly && (
         <section className="rounded-3xl border border-[#D4E4BC] bg-gradient-to-br from-[#FAE7D0] to-white p-5 shadow-sm">
           <p className="text-[11px] font-bold uppercase tracking-wide text-[#6B4423]">
             🎯 다음 할 일

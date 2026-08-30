@@ -490,3 +490,19 @@ textarea::placeholder {
     opacity: 1;
   }
 }
+
+/* ────────────────────────────────────────────────────────────── */
+/* 탭 줄 — 가로로 미는 영역의 스크롤 막대를 감춘다.                  */
+/*                                                                */
+/* overflow-x:auto 는 세로축까지 auto 로 만든다(명세). 그래서 활성   */
+/* 밑줄을 1px 내리는 -mb-px 하나 때문에 세로 스크롤 막대가 유령처럼  */
+/* 나타난다 — 화살표까지 달린 채로 탭 줄 오른쪽에 붙어 있었다.       */
+/* 적용:  className="... overflow-x-auto tab-scroll"                */
+/* ────────────────────────────────────────────────────────────── */
+.tab-scroll {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.tab-scroll::-webkit-scrollbar {
+  display: none;
+}

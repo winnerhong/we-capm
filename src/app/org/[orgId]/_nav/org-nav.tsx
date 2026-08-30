@@ -46,51 +46,35 @@ interface NavGroup {
   badge?: BadgeSpec;
 }
 
-function buildGroups(
-  orgId: string,
-  badges: OrgNavBadges,
-  partnerName?: string
-): NavGroup[] {
+function buildGroups(orgId: string, badges: OrgNavBadges): NavGroup[] {
   const base = `/org/${orgId}`;
-  const templateLabel = partnerName ? `${partnerName} 프로그램` : "지사 프로그램";
 
+  // 메뉴가 [내 행사] 하나로 줄면서 배지도 하나만 걸 수 있다. 급한 것부터 건다:
+  //   검수 대기(사람이 기다린다) > 시작 안 한 행사 > FM 라이브(진행 중 표시).
+  // 배지를 없애지 않는 이유 — 검수 대기는 방치하면 참가자 도토리가 안 나간다.
   const draftBadge: BadgeSpec | undefined =
-    badges.draftEvents > 0
-      ? { count: badges.draftEvents, tone: "amber" }
-      : undefined;
-  const unpubBadge: BadgeSpec | undefined =
-    badges.unpublishedPacks > 0
-      ? { count: badges.unpublishedPacks, tone: "amber" }
-      : undefined;
-  const reviewBadge: BadgeSpec | undefined =
     badges.pendingReview > 0
       ? { count: badges.pendingReview, tone: "rose" }
-      : undefined;
-  const fmBadge: BadgeSpec | undefined = badges.fmLive
-    ? { pulse: true, tone: "rose" }
-    : undefined;
+      : badges.draftEvents > 0
+        ? { count: badges.draftEvents, tone: "amber" }
+        : badges.fmLive
+          ? { pulse: true, tone: "rose" }
+          : undefined;
 
   return [
-    // ───── 초대장 ─────
-    {
-      key: "invitations",
-      step: 1,
-      label: "+ 초대장",
-      shortLabel: "+ 초대장",
-      icon: "💌",
-      match: [`${base}/invitations`],
-      items: [
-        {
-          label: "초대장 모음",
-          href: `${base}/invitations`,
-          icon: "💌",
-        },
-      ],
-    },
-    // ───── 1단계 ─────
+    // 상단은 "어느 행사?" 만 고른다.
+    //
+    // 예전에는 여기 6그룹(초대장·내 행사·참가자·콘텐츠·진행·결과)이 있었고,
+    // 행사 상세에도 9탭이 따로 있었다. 참가자·스탬프북·프로그램·숲길·타임테이블·
+    // 성과가 **양쪽에** 있어서 "참가자를 어디서 보지" 를 매번 다시 고민했다.
+    //
+    // 지금은 행사 하나가 워크스페이스다:
+    //   내 행사 → 초대장 → 참가자 → 진행 → 결과   (event-steps.ts)
+    // 행사를 가로지르는 것들(초대장 모음·참가자 관리·전체 통계)은 행사 목록
+    // 화면 위의 바로가기 줄이 맡는다.
     {
       key: "schedule",
-      step: 2,
+      step: 1,
       label: "내 행사",
       shortLabel: "내 행사",
       icon: "📅",
@@ -98,128 +82,10 @@ function buildGroups(
       badge: draftBadge,
       items: [
         {
-          label: "행사 목록 · 타임테이블",
+          label: "행사 목록",
           href: `${base}/events`,
           icon: "📅",
           badge: draftBadge,
-        },
-        {
-          label: "초대장 템플릿",
-          href: `${base}/invitations/templates`,
-          icon: "📨",
-        },
-      ],
-    },
-    // ───── 3단계 ─────
-    {
-      key: "participants",
-      step: 3,
-      label: "+ 참가자",
-      shortLabel: "+ 참가자",
-      icon: "🙋",
-      match: [`${base}/users`],
-      items: [
-        { label: "+ 참가자", href: `${base}/users`, icon: "🙋" },
-      ],
-    },
-    // ───── 4단계 ─────
-    {
-      key: "content",
-      step: 4,
-      label: "콘텐츠",
-      shortLabel: "콘텐츠",
-      icon: "🎁",
-      match: [
-        `${base}/quest-packs`,
-        `${base}/programs`,
-        `${base}/trails`,
-        `${base}/missions/catalog`,
-        `${base}/templates`,
-        `${base}/bingo`,
-      ],
-      badge: unpubBadge,
-      items: [
-        { label: "내 프로그램", href: `${base}/programs`, icon: "🗂" },
-        {
-          label: "스탬프북 관리",
-          href: `${base}/quest-packs`,
-          icon: "🌲",
-          badge: unpubBadge,
-        },
-        { label: "우리 숲길", href: `${base}/trails`, icon: "🗺" },
-        {
-          label: "미션 카탈로그",
-          href: `${base}/missions/catalog`,
-          icon: "🎯",
-        },
-        { label: "토리 빙고", href: `${base}/bingo`, icon: "🎯" },
-        { label: templateLabel, href: `${base}/templates`, icon: "🪜" },
-      ],
-    },
-    // ───── 5단계 ─────
-    {
-      key: "operate",
-      step: 5,
-      label: "진행",
-      shortLabel: "진행",
-      icon: "🎙",
-      match: [
-        `${base}/missions/broadcast`,
-        `${base}/missions/review`,
-        `${base}/missions/radio`,
-        `${base}/gifts`,
-        `${base}/toritalk`,
-      ],
-      badge: fmBadge ?? reviewBadge,
-      items: [
-        {
-          label: "토리톡 관리",
-          href: `${base}/toritalk`,
-          icon: "💬",
-        },
-        {
-          label: "돌발 미션 방송",
-          href: `${base}/missions/broadcast`,
-          icon: "📡",
-        },
-        // 토리FM 라이브 스튜디오 + 신청곡 모더레이션 메뉴 제거됨 —
-        // 관제실(/control-room) 안의 FmStudioEmbed 로 통합되어 별도 페이지 불필요.
-        {
-          label: "미션 제출 검수",
-          href: `${base}/missions/review`,
-          icon: "✅",
-          badge: reviewBadge,
-        },
-        {
-          label: "선물함 모아보기",
-          href: `${base}/gifts`,
-          icon: "🎁",
-        },
-        {
-          label: "쿠폰 만들기",
-          href: `${base}/gifts/templates`,
-          icon: "🎟️",
-        },
-        {
-          label: "선물 수령 QR카메라",
-          href: `${base}/gifts/redeem`,
-          icon: "🏪",
-        },
-      ],
-    },
-    // ───── 6단계 ─────
-    {
-      key: "result",
-      step: 6,
-      label: "결과",
-      shortLabel: "결과",
-      icon: "📊",
-      match: [`${base}/missions/stats`],
-      items: [
-        {
-          label: "미션 통계",
-          href: `${base}/missions/stats`,
-          icon: "📊",
         },
       ],
     },
@@ -276,19 +142,17 @@ interface Props {
   orgId: string;
   orgName: string;
   badges: OrgNavBadges;
-  /** 소속 지사 표시명 — "기본 템플릿" 메뉴를 "{지사명} 프로그램" 으로 라벨링. */
-  partnerName?: string;
 }
 
-export function OrgNav({ orgId, orgName, badges, partnerName }: Props) {
+export function OrgNav({ orgId, orgName, badges }: Props) {
   const pathname = usePathname() ?? "";
   const [openKey, setOpenKey] = useState<string | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
 
   const groups = useMemo(
-    () => buildGroups(orgId, badges, partnerName),
-    [orgId, badges, partnerName]
+    () => buildGroups(orgId, badges),
+    [orgId, badges]
   );
   const controlRoomHref = `/org/${orgId}/control-room`;
   const controlRoomActive = isActiveHref(controlRoomHref, pathname);

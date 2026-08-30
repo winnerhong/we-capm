@@ -3,6 +3,8 @@
 // Supabase의 자동 생성 타입에는 toritalk_* 테이블이 아직 없어서
 // `as never` + `as unknown as {...}` 패턴으로 우회 (프로젝트 컨벤션).
 import { createClient } from "@/lib/supabase/server";
+import { loadOrgFeatureFlags, canUse } from "@/lib/features/org-switches";
+import { F } from "@/lib/features/codes";
 import type {
   ToritalkMessageRow,
   ToritalkMessageWithSender,
@@ -23,8 +25,17 @@ async function fromTable(table: string): Promise<AnyTable> {
 }
 
 /**
- * 기관에서 토리톡이 활성화되어 있는지 확인.
- * 마이그레이션 미실행/컬럼 누락 등 어떤 에러도 false 로 silent fail.
+ * 기관에서 토리톡을 쓸 수 있는지 — **열쇠 두 개가 다 맞아야 한다.**
+ *
+ *   지사 스위치 (org_feature_switches / TORITALK)  "이 기관에 토리톡을 준다"
+ *   기관 토글   (partner_orgs.toritalk_enabled)    "우리 기관이 지금 켰다"
+ *
+ * 둘은 서로 다른 사람이 누르는 서로 다른 결정이라 하나로 합치지 않는다.
+ * 지사가 껐는데 기관 토글만 보고 열어 주면 스위치가 무의미해지고, 반대로 기관이
+ * 아직 안 켰는데 지사 스위치만 보고 열면 준비 안 된 방이 보호자에게 뜬다.
+ *
+ * 어떤 에러도 false — 토리톡은 보호자 단체방이라, 애매하면 안 여는 쪽이 맞다
+ * (기능 스위치의 기본 원칙인 fail-open 과 반대인 유일한 자리다).
  */
 export async function isToritalkEnabled(orgId: string): Promise<boolean> {
   try {
@@ -37,7 +48,10 @@ export async function isToritalkEnabled(orgId: string): Promise<boolean> {
       .maybeSingle();
     if (error) return false;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return Boolean((data as any)?.toritalk_enabled);
+    if (!(data as any)?.toritalk_enabled) return false;
+
+    const flags = await loadOrgFeatureFlags(orgId);
+    return canUse(flags, F.TORITALK);
   } catch {
     return false;
   }

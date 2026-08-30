@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { OrgSectionTabs } from "../_nav/org-section-tabs";
 import { requireOrg } from "@/lib/org-auth-guard";
 import { loadOrgEventSummaries } from "@/lib/org-events/queries";
 import {
@@ -105,6 +106,8 @@ export default async function OrgEventsPage({
   return (
     <div className="mx-auto max-w-5xl space-y-6 px-4 py-6">
       {/* Breadcrumb */}
+      <OrgSectionTabs orgId={orgId} active="events" />
+
       <nav aria-label="breadcrumb" className="text-xs text-[#8B7F75]">
         <Link href={`/org/${orgId}`} className="hover:text-[#2D5A3D]">
           기관 홈
@@ -125,14 +128,7 @@ export default async function OrgEventsPage({
               <span>내 행사 관리</span>
             </h1>
             <p className="mt-2 max-w-xl text-sm text-[#E8F0E4]">
-              캠프·체험·축제 같은 행사를 만들어 스탬프북·참가자·토리FM을 한
-              곳에 묶어 운영하세요.
-            </p>
-            <p className="mt-1 max-w-xl text-[11px] text-[#D4E4BC]">
-              💡 참가자는 <b className="text-white">행사별로 따로</b> 등록해요.
-              아래 행사 카드의{" "}
-              <span className="font-bold text-emerald-200">🙋 참가자 등록</span>{" "}
-              버튼을 눌러 해당 행사의 참가자를 추가하세요.
+              행사를 고르면 초대장 · 참가자 · 진행 · 결과까지 그 안에서 끝나요.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -324,10 +320,13 @@ function EventCard({
       </div>
 
       <div className="space-y-3 p-5">
-        {/* 상태 토글 — 진행중 / 예정 / 종료 / 보관 즉시 전환 */}
+        {/* 상태 토글 — 예정 / 진행중 / 종료 / 보관 즉시 전환.
+            고른 칸이 날짜까지 말해 준다("5/16(토) 종료"). */}
         <EventStatusToggle
           eventId={event.event_id}
           initialStatus={event.status}
+          startsAt={event.starts_at}
+          endsAt={event.ends_at}
         />
 
         {/* 리소스 카운트 칩 */}

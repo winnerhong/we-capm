@@ -1,7 +1,8 @@
 // 참가자 선물함 — SSR. user_gifts 를 그대로 보여주고, QR 보기는 클라이언트 모달이 담당.
 
-import { redirect } from "next/navigation";
 import { requireEventContext } from "@/lib/event-context";
+import { EventLocked } from "@/components/event-locked";
+import { F } from "@/lib/features/codes";
 import { loadUserGifts } from "@/lib/gifts/queries";
 import {
   GIFT_SOURCE_LABELS,
@@ -46,9 +47,35 @@ export default async function UserGiftsPage({
 }) {
   const { eventId } = await params;
   const ctx = await requireEventContext(eventId);
+
+  // 기관이 안 쓰는 기능. 메뉴·탭에서는 이미 빠져 있지만 북마크·옛 링크로
+  // 직접 들어올 수 있다 — 빈 화면 대신 사실을 말하고 돌려보낸다.
+  if (!ctx.hasFeature(F.GIFT)) {
+    return (
+      <EventLocked
+        icon="🎁"
+        title="선물함"
+        notice="이 행사에서는 사용하지 않는 기능이에요"
+        homeHref={ctx.href()}
+      />
+    );
+  }
+
   const user = ctx.user;
   // 행사 시작 전에는 선물함이 열리지 않는다.
-  if (ctx.event.status !== "LIVE") redirect(ctx.href());
+  // 활동 화면 — 끝난 행사에서는 열지 않는다. 판단은 resolveEventAccess 한 곳.
+  /* 말없이 행사홈으로 되돌리지 않는다 — 하단 탭이 늘 다섯 칸이라, 되돌리기만 하면
+     참가자에겐 '눌러도 아무 일 없는 탭' 이 된다. 왜 못 쓰는지 말하고 돌아갈 길을 준다. */
+  if (!ctx.access.canPlay) {
+    return (
+      <EventLocked
+        icon={"🎁"}
+        title="선물함"
+        notice={ctx.access.notice ?? "행사 중에만 쓸 수 있어요"}
+        homeHref={ctx.href()}
+      />
+    );
+  }
   // 이 행사에서 받은 선물만.
   const gifts = await loadUserGifts(user.id, eventId);
   const now = new Date();

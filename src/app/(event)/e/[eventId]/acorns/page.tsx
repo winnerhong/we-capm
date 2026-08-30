@@ -1,8 +1,9 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { redirect } from "next/navigation";
 import { requireEventContext } from "@/lib/event-context";
-import { loadActiveAndUpcomingEventsForUser } from "@/lib/org-events/queries";
+import { EventLocked } from "@/components/event-locked";
+import { F } from "@/lib/features/codes";
+import { loadEventsForUser } from "@/lib/org-events/queries";
 import {
   getEventAcornBalance,
   loadEventAcornTransactions,
@@ -43,13 +44,38 @@ export default async function AcornsPage({
 }) {
   const { eventId } = await params;
   const ctx = await requireEventContext(eventId);
+
+  // 기관이 안 쓰는 기능. 메뉴·탭에서는 이미 빠져 있지만 북마크·옛 링크로
+  // 직접 들어올 수 있다 — 빈 화면 대신 사실을 말하고 돌려보낸다.
+  if (!ctx.hasFeature(F.ACORN)) {
+    return (
+      <EventLocked
+        icon="🌰"
+        title="도토리"
+        notice="이 행사에서는 사용하지 않는 기능이에요"
+        homeHref={ctx.href()}
+      />
+    );
+  }
+
   const user = ctx.user;
-  // 행사 시작 전에는 도토리 내역이 의미가 없다.
-  if (ctx.event.status !== "LIVE") redirect(ctx.href());
+  // 행사 시작 전에는 도토리 내역이 의미가 없다. 끝난 뒤에는 남는다.
+  /* 말없이 행사홈으로 되돌리지 않는다 — 하단 탭이 늘 다섯 칸이라, 되돌리기만 하면
+     참가자에겐 '눌러도 아무 일 없는 탭' 이 된다. 왜 못 쓰는지 말하고 돌아갈 길을 준다. */
+  if (ctx.access.phase === "upcoming") {
+    return (
+      <EventLocked
+        icon={"🌰"}
+        title="도토리"
+        notice={ctx.access.notice ?? "행사가 시작되면 열려요"}
+        homeHref={ctx.href()}
+      />
+    );
+  }
   const [balance, txs, myEvents] = await Promise.all([
     getEventAcornBalance(user.id, eventId),
     loadEventAcornTransactions(user.id, eventId, 20),
-    loadActiveAndUpcomingEventsForUser(user.id).catch(() => []),
+    loadEventsForUser(user.id).catch(() => []),
   ]);
 
   // 도토리가 행사별로 나뉘면서, 여러 행사에 다니는 가족은 "내 도토리가

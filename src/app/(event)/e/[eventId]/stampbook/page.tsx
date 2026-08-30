@@ -2,6 +2,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireEventContext } from "@/lib/event-context";
+import { EventLocked } from "@/components/event-locked";
+import { F } from "@/lib/features/codes";
 import { loadLiveQuestPacksForEvent } from "@/lib/org-events/queries";
 import {
   loadOrgQuestPacks,
@@ -76,9 +78,46 @@ export default async function StampbookListPage({
 }) {
   const { eventId } = await params;
   const ctx = await requireEventContext(eventId);
+
+  // 기관이 안 쓰는 기능. 메뉴·탭에서는 이미 빠져 있지만 북마크·옛 링크로
+
+  // 직접 들어올 수 있다 — 빈 화면 대신 사실을 말하고 돌려보낸다.
+
+  if (!ctx.hasFeature(F.STAMPBOOK)) {
+
+    return (
+
+      <EventLocked
+
+        icon="🌿"
+
+        title="스탬프북"
+
+        notice="이 행사에서는 사용하지 않는 기능이에요"
+
+        homeHref={ctx.href()}
+
+      />
+
+    );
+
+  }
+
   const user = ctx.user;
   // 행사 시작 전(DRAFT)에는 스탬프북이 열리지 않는다.
-  if (ctx.event.status !== "LIVE") redirect(ctx.href());
+  // 시작 전에는 볼 게 없다. 끝난 뒤에는 남는다 — 여기가 그 행사의 기록이다.
+  /* 말없이 행사홈으로 되돌리지 않는다 — 하단 탭이 늘 다섯 칸이라, 되돌리기만 하면
+     참가자에겐 '눌러도 아무 일 없는 탭' 이 된다. 왜 못 쓰는지 말하고 돌아갈 길을 준다. */
+  if (ctx.access.phase === "upcoming") {
+    return (
+      <EventLocked
+        icon={"🌿"}
+        title="스탬프북"
+        notice={ctx.access.notice ?? "행사가 시작되면 열려요"}
+        homeHref={ctx.href()}
+      />
+    );
+  }
   const { filter: rawFilter } = await searchParams;
   const filter: FilterKey =
     rawFilter === "done" ||

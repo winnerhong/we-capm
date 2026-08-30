@@ -5,6 +5,7 @@ import { loadOrgEventById } from "@/lib/org-events/queries";
 import { loadOrgInvitationTemplates } from "@/lib/invitation-templates/queries";
 import { loadVenuesForOrg } from "@/lib/partner-venues/queries";
 import { EditEventForm } from "./edit-event-form";
+import { buildEditFormInitial } from "./form-initial";
 
 export const dynamic = "force-dynamic";
 
@@ -89,39 +90,11 @@ export default async function EditOrgEventPage({
       <EditEventForm
         orgId={orgId}
         eventId={eventId}
+        // 초대장 내용은 ② 초대장 단계로 옮겼다 — 여기서는 기본 정보만.
+        mode="basic"
         invitationTemplates={invitationTemplatesLite}
         venues={venuesLite}
-        initial={{
-          name: event.name ?? "",
-          description: event.description ?? "",
-          starts_at: event.starts_at,
-          ends_at: event.ends_at,
-          cover_image_url: event.cover_image_url ?? "",
-          status: event.status,
-          // allow_self_register 는 backend migration 후 추가된 컬럼 — 타입에는
-          // 아직 없을 수 있으므로 안전하게 캐스팅.
-          allow_self_register:
-            (event as unknown as { allow_self_register?: boolean })
-              .allow_self_register ?? false,
-          invitation_message: event.invitation_message ?? "",
-          invitation_body: event.invitation_body ?? "",
-          invitation_location: event.invitation_location ?? "",
-          invitation_address: event.invitation_address ?? "",
-          invitation_location_image_url:
-            event.invitation_location_image_url ?? "",
-          invitation_dress_code: event.invitation_dress_code ?? "",
-          // null 이면 빈 문자열 = 입장 안내 숨김. 컬럼 미적용(undefined) 이면
-          // 기본 20 을 채워 지금과 같은 화면을 유지한다.
-          invitation_entry_lead_min:
-            event.invitation_entry_lead_min === undefined
-              ? "20"
-              : event.invitation_entry_lead_min == null
-                ? ""
-                : String(event.invitation_entry_lead_min),
-          invitation_parkings: event.invitation_parkings ?? [],
-          invitation_host: event.invitation_host ?? "",
-          invitation_organizer: event.invitation_organizer ?? "",
-        }}
+        initial={buildEditFormInitial(event)}
       />
     </div>
   );

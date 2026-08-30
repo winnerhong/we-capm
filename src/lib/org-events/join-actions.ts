@@ -17,6 +17,8 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { resolveEventAccess } from "@/lib/org-events/event-access";
+import { isEventParticipant } from "@/lib/org-events/queries";
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { switchActiveOrg } from "@/lib/app-user/session";
@@ -27,6 +29,8 @@ type OrgEventLite = {
   id: string;
   org_id: string;
   status: string;
+  starts_at: string | null;
+  ends_at: string | null;
   /** 접수·승인제. true 면 신청서를 거치지 않은 자가 참가를 막는다. */
   applications_enabled: boolean | null;
 };
@@ -98,6 +102,21 @@ export async function joinOrgEventAction(eventId: string): Promise<void> {
   }
   const evt = eventResp.data;
   if (!evt) throw new Error("행사를 찾을 수 없어요");
+
+  // 2-a) 기관이 종료·보관한 행사에는 새로 들어올 수 없다.
+  //      이미 참가자면 멱등 upsert 라 아무 일도 안 일어나므로 통과시킨다 —
+  //      끝난 행사 링크를 다시 눌러도 사진·설문으로 이어져야 한다.
+  const access = resolveEventAccess({
+    status: evt.status,
+    startsAt: evt.starts_at,
+    endsAt: evt.ends_at,
+  });
+  if (!access.canJoin) {
+    const joined = await isEventParticipant(eventId, session.id).catch(
+      () => false
+    );
+    if (!joined) throw new Error("참가 신청이 마감된 행사예요");
+  }
 
   // 2-b) 접수·승인제가 켜진 행사 — 신청서를 거치지 않은 자가 참가는 막는다.
   //      이미 참가자면(= 기관이 수락했거나 명단에 올렸으면) 그대로 통과.

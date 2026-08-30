@@ -10,13 +10,6 @@ export type NextActionKind =
   | "BROADCAST_READY"
   | "NONE";
 
-export interface OrgHomeRecentParticipant {
-  userId: string;
-  displayName: string; // "{parent_name} 가족" or "보호자 가족"
-  joinedAt: string;
-  avatarInitial: string; // parent_name 첫 글자 또는 "🌱"
-}
-
 export interface OrgHomeNextAction {
   kind: NextActionKind;
   title: string;
@@ -25,18 +18,6 @@ export interface OrgHomeNextAction {
   ctaHref: string; // /org/{orgId}/... 등
   accent: "amber" | "pink" | "green" | "violet" | "zinc" | "cyan";
   progressPct?: number; // 프로필 완성도용
-}
-
-export interface OrgHomeLiveEvent {
-  id: string;
-  name: string;
-  startsAt: string | null;
-  endsAt: string | null;
-  participantCount: number;
-  questPackCount: number;
-  programCount: number;
-  fmSessionCount: number;
-  activityRatePct: number; // 오늘 제출한 참가자 / 전체 × 100, 정수
 }
 
 export interface OrgHomeDashboard {
@@ -50,9 +31,6 @@ export interface OrgHomeDashboard {
   };
   profileCompleteness: { percent: number; done: number; total: number };
   nextAction: OrgHomeNextAction | null;
-  liveEvent: OrgHomeLiveEvent | null;
-  recentParticipants: OrgHomeRecentParticipant[]; // 최신 5명
-  thisWeekSubmissions: number;
   controlRoomPreview: {
     fmLive: boolean;
     todayActive: number;

@@ -1,3 +1,4 @@
+import { seal } from "@/lib/session-cookie";
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
@@ -54,7 +55,7 @@ export async function GET(request: NextRequest) {
   cookieStore.delete("campnic_partner");
 
   if (role === "admin") {
-    cookieStore.set("campnic_admin", JSON.stringify({
+    cookieStore.set("campnic_admin", await seal({
       id: "admin", role: "ADMIN", loginAt: new Date().toISOString(),
     }), cookieOpts);
     return htmlRedirect("/admin", "👨‍💼 관리자로 로그인 중...");
@@ -88,13 +89,13 @@ export async function GET(request: NextRequest) {
       .maybeSingle();
 
     if (org) {
-      cookieStore.set(`campnic_org_${org.id}`, JSON.stringify({
+      cookieStore.set(`campnic_org_${org.id}`, await seal({
         orgId: org.id,
         orgName: org.org_name,
         managerId: org.auto_username ?? "dev-org",
         loginAt: new Date().toISOString(),
       }), cookieOpts);
-      cookieStore.set("campnic_manager", JSON.stringify({
+      cookieStore.set("campnic_manager", await seal({
         eventId: EVENT_ID,
         eventName: "테스트 토리로",
         managerId: org.auto_username ?? "dev-org",
@@ -107,7 +108,7 @@ export async function GET(request: NextRequest) {
     }
 
     // 폴백: partner_orgs가 아직 없으면 기존 manager 쿠키로 /manager 경로 진입
-    cookieStore.set("campnic_manager", JSON.stringify({
+    cookieStore.set("campnic_manager", await seal({
       eventId: EVENT_ID,
       eventName: "테스트 토리로",
       managerId: "테스트기관",
@@ -147,7 +148,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    cookieStore.set("campnic_partner", JSON.stringify({
+    cookieStore.set("campnic_partner", await seal({
       id: partner.id,
       name: partner.name,
       username: partner.username,
@@ -174,7 +175,7 @@ export async function GET(request: NextRequest) {
 
     const name = reg?.name?.replace(/^\[.+?\]\s*/, "") ?? "테스트가족";
 
-    cookieStore.set("campnic_participant", JSON.stringify({
+    cookieStore.set("campnic_participant", await seal({
       eventId: EVENT_ID,
       phone: TEST_PHONE,
       name,

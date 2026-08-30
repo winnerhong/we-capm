@@ -1,3 +1,4 @@
+import { seal } from "@/lib/session-cookie";
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth-guard";
@@ -65,7 +66,7 @@ export async function GET(request: NextRequest) {
     cookieStore.delete("campnic_partner");
     cookieStore.set(
       "campnic_partner",
-      JSON.stringify({
+      await seal({
         id: partner.id,
         name: partner.name,
         username: partner.username,
@@ -112,7 +113,7 @@ export async function GET(request: NextRequest) {
     cookieStore.delete("campnic_manager");
     cookieStore.set(
       `campnic_org_${org.id}`,
-      JSON.stringify({
+      await seal({
         orgId: org.id,
         orgName: org.org_name,
         managerId: org.auto_username ?? "admin-impersonate",
@@ -174,7 +175,7 @@ export async function GET(request: NextRequest) {
     cookieStore.delete("campnic_user");
     cookieStore.set(
       "campnic_user",
-      JSON.stringify({
+      await seal({
         id: user.id,
         phone: user.phone,
         parentName: user.parent_name,

@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { requireEventContext } from "@/lib/event-context";
+import { EventLocked } from "@/components/event-locked";
+import { F } from "@/lib/features/codes";
 import { loadLiveBoardsForOrg } from "@/lib/bingo/queries";
 
 export const dynamic = "force-dynamic";
@@ -11,6 +13,19 @@ export default async function BingoListPage({
 }) {
   const { eventId } = await params;
   const ctx = await requireEventContext(eventId);
+
+  // 기관이 안 쓰는 기능. 메뉴·탭에서는 이미 빠져 있지만 북마크·옛 링크로
+  // 직접 들어올 수 있다 — 빈 화면 대신 사실을 말하고 돌려보낸다.
+  if (!ctx.hasFeature(F.BINGO)) {
+    return (
+      <EventLocked
+        icon="🎱"
+        title="빙고"
+        notice="이 행사에서는 사용하지 않는 기능이에요"
+        homeHref={ctx.href()}
+      />
+    );
+  }
 
   const boards = await loadLiveBoardsForOrg(ctx.orgId);
 

@@ -1,5 +1,6 @@
 "use server";
 
+import { seal } from "@/lib/session-cookie";
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -35,7 +36,7 @@ async function refreshCookie(partner: {
   const cookieStore = await cookies();
   cookieStore.set(
     "campnic_partner",
-    JSON.stringify({
+    await seal({
       id: partner.id,
       name: partner.name,
       username: partner.username,

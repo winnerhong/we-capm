@@ -15,6 +15,7 @@
 //   미로그인   → /user-login?return=/e/{eventId}
 //   행사 없음  → notFound()
 //   미참가     → /join/event/{eventId} (참가 유도 — 초대장 링크와 같은 흐름)
+//   보관된 행사 → /event-closed/{eventId} (완전히 닫힘)
 
 import "server-only";
 import { notFound, redirect } from "next/navigation";
@@ -25,6 +26,15 @@ import {
 } from "@/lib/org-events/queries";
 import { loadOrgNameById } from "@/lib/org-partner";
 import type { OrgEventRow } from "@/lib/org-events/types";
+import {
+  resolveEventAccess,
+  type EventAccess,
+} from "@/lib/org-events/event-access";
+import {
+  loadOrgFeatureFlags,
+  canUse,
+  type OrgFeatureMap,
+} from "@/lib/features/org-switches";
 
 export interface EventContext {
   user: AppUserSession;
@@ -34,6 +44,26 @@ export interface EventContext {
   orgName: string;
   /** 행사 하위 경로 빌더 — `href(\"/stampbook\")` → `/e/{id}/stampbook` */
   href: (subpath?: string) => string;
+  /**
+   * 지금 이 행사가 열려 있는지 — 회색·잠금 판단 전부.
+   *
+   * 화면마다 `event.status === "LIVE"` 를 각자 쓰면 한쪽만 고쳐지는 버그가
+   * 난다(화면은 잠겼는데 서버 액션은 계속 받아준다든가). 여기서 한 번 풀어
+   * 내려보내고, 페이지·레이아웃은 access 만 읽는다.
+   */
+  access: EventAccess;
+  /**
+   * 이 행사를 주최한 기관이 켜 둔 기능.
+   *
+   * access 와 성격이 다르다 —
+   *   access  = "지금은" 못 쓴다(행사가 끝났다)      → 회색 + 이유
+   *   features= "여기서는" 안 쓴다(기관이 안 산다)   → 아예 안 보인다
+   * 보호자에게 지사 계약 사정은 알 필요 없는 정보고, 회색으로 남겨 두면
+   * "우리 유치원은 왜 없어요" 만 만든다.
+   */
+  features: OrgFeatureMap;
+  /** 이 기능이 이 행사에서 쓰이는가. 모르는 코드는 켜진 것으로 본다. */
+  hasFeature: (code: string) => boolean;
 }
 
 const UUID_RE =
@@ -68,7 +98,25 @@ export async function requireEventContext(
     redirect(`/join/event/${eventId}`);
   }
 
-  const orgName = await loadOrgNameById(event.org_id, "소속 기관");
+  // 문을 잠그는 판단은 여기 한 곳에서만 한다. /e/{id}/** 전부가 이 함수를
+  // 첫 줄에서 부르므로, 여기서 막으면 하위 화면을 하나하나 손댈 필요가 없다.
+  const access = resolveEventAccess({
+    status: event.status,
+    startsAt: event.starts_at,
+    endsAt: event.ends_at,
+  });
+  if (!access.canEnter) {
+    // 잠금 화면은 행사 그룹 **밖**에 둔다. 안에 두면 이 레이아웃이 다시
+    // requireEventContext 를 불러 무한 리다이렉트가 된다.
+    redirect(`/event-closed/${eventId}`);
+  }
+
+  // 기관 이름과 기능 스위치는 서로를 필요로 하지 않는다 — 줄줄이 기다리면
+  // 참가자의 **모든** 화면이 그만큼 늦게 뜬다.
+  const [orgName, features] = await Promise.all([
+    loadOrgNameById(event.org_id, "소속 기관"),
+    loadOrgFeatureFlags(event.org_id),
+  ]);
 
   return {
     user,
@@ -76,5 +124,8 @@ export async function requireEventContext(
     orgId: event.org_id,
     orgName,
     href: (subpath = "") => eventHref(eventId, subpath),
+    access,
+    features,
+    hasFeature: (code: string) => canUse(features, code),
   };
 }

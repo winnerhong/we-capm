@@ -1031,11 +1031,17 @@ export async function userHasAnyLiveEvent(userId: string): Promise<boolean> {
 }
 
 /**
- * 참가자가 참여 중인 LIVE + DRAFT(예정) 행사 목록.
- * - DRAFT 행사는 참가자 포털에서 "초대장만" 노출하기 위해 필요.
- * - 참가자가 본인 등록을 확인하고 D-day 카운트다운을 볼 수 있게 함.
+ * 참가자가 참여 중인 행사 목록 — 보관(ARCHIVED)만 뺀 전부.
+ *
+ * 종료(ENDED)가 여기 들어 있는 이유: 예전에는 종료를 누르면 목록에서 통째로
+ * 사라졌다. 그런데 사라진다고 잠기는 건 아니어서, 북마크·QR 로는 그대로
+ * 들어가졌다 — 숨기기만 하고 잠그지는 않은 셈이었다. 이제는 거꾸로다.
+ * 끝난 행사도 목록에 회색으로 남겨 사진·설문을 다시 찾아갈 수 있게 하고,
+ * 잠그는 일은 resolveEventAccess 가 한 곳에서 맡는다.
+ *
+ * 보관(ARCHIVED)은 "이제 그만 보기" 라서 여기서 빠진다.
  */
-export async function loadActiveAndUpcomingEventsForUser(
+export async function loadEventsForUser(
   userId: string
 ): Promise<OrgEventRow[]> {
   if (!userId) return [];
@@ -1053,7 +1059,7 @@ export async function loadActiveAndUpcomingEventsForUser(
 
   if (partResp.error) {
     console.error(
-      "[org-events/loadActiveAndUpcomingEventsForUser] part error",
+      "[org-events/loadEventsForUser] part error",
       partResp.error
     );
     return [];
@@ -1079,12 +1085,12 @@ export async function loadActiveAndUpcomingEventsForUser(
   )
     .select("*")
     .in("id", eventIds)
-    .in("status", ["LIVE", "DRAFT"])
+    .in("status", ["LIVE", "DRAFT", "ENDED"])
     .order("created_at", { ascending: false })) as SbResp<OrgEventRow>;
 
   if (evtResp.error) {
     console.error(
-      "[org-events/loadActiveAndUpcomingEventsForUser] evt error",
+      "[org-events/loadEventsForUser] evt error",
       evtResp.error
     );
     return [];

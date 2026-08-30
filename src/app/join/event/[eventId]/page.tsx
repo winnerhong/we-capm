@@ -17,6 +17,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getAppUser } from "@/lib/user-auth-guard";
 import { isEventParticipant } from "@/lib/org-events/queries";
+import { resolveEventAccess } from "@/lib/org-events/event-access";
 import { joinOrgEventAction } from "@/lib/org-events/join-actions";
 import { JoinEventForm } from "./join-event-form";
 // 시간 표시는 KST 강제 — 서버(UTC) SSR 에서 getHours() 를 쓰면 초대장/홈보다
@@ -172,18 +173,39 @@ export default async function JoinEventPage({
   //    로그인해도 참가자가 아니면 아래에서 신청 안내로 보낸다. 미등록 번호는
   //    self-register 가 이미 차단돼 있어 계정이 새로 생기지도 않는다.
   const applicationsOn = !!evt.applications_enabled;
-  const alreadyParticipant =
-    applicationsOn && session
-      ? await isEventParticipant(eventId, session.id).catch(() => false)
-      : false;
+  const alreadyParticipant = session
+    ? await isEventParticipant(eventId, session.id).catch(() => false)
+    : false;
   const needsApplication = applicationsOn && isLoggedIn && !alreadyParticipant;
+
+  // 4) 기관이 종료한 행사 — 새로 들어올 수는 없다.
+  //    이미 참가자인 사람은 통과시킨다. 그 가족에게는 사진·설문이 남아 있고,
+  //    카톡에 뿌려진 링크가 이 페이지인 경우가 많다.
+  const access = resolveEventAccess({
+    status: evt.status,
+    startsAt: evt.starts_at,
+    endsAt: evt.ends_at,
+  });
+  const closedToNewcomers = !access.canJoin && isLoggedIn && !alreadyParticipant;
 
   return (
     <main className="min-h-dvh bg-gradient-to-b from-[#FFF8F0] via-[#F5F1E8] to-[#E8F0E4] px-4 py-8">
       <div className="mx-auto max-w-md space-y-4">
         <EventPreviewCard event={evt} orgName={orgName} />
 
-        {needsApplication ? (
+        {closedToNewcomers ? (
+          <section className="rounded-3xl border border-[#E8E4DE] bg-[#FAF8F5] p-6 text-center shadow-sm">
+            <p className="text-4xl" aria-hidden>
+              {access.badgeEmoji}
+            </p>
+            <p className="mt-3 text-sm font-bold text-[#6B6560]">
+              참가 신청이 마감됐어요
+            </p>
+            <p className="mt-1 text-xs text-[#8B7F75]">
+              {orgName}에 문의해 주세요.
+            </p>
+          </section>
+        ) : needsApplication ? (
           <ApplyFirstPanel eventId={eventId} orgName={orgName} />
         ) : isLoggedIn ? (
           <AutoJoinPanel eventId={eventId} loggedInName={loggedInName} />

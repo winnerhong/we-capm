@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 import { requireOrg } from "@/lib/org-auth-guard";
 import { createClient } from "@/lib/supabase/server";
 import { loadOrgNavBadges } from "@/lib/org-nav/badges";
-import { loadPartnerDisplayNameForOrg } from "@/lib/org-partner";
 import { OrgNav } from "./_nav/org-nav";
 
 type OrgRow = { id: string; org_name: string };
@@ -37,11 +36,9 @@ export default async function OrgLayout({
 
   const orgName: string = orgRow?.org_name ?? org.orgName ?? "기관";
 
-  // 5 그룹 dropdown 의 실시간 신호 배지 (검수 대기 / FM LIVE / 서류 미완료)
-  const [badges, partnerName] = await Promise.all([
-    loadOrgNavBadges(orgId),
-    loadPartnerDisplayNameForOrg(orgId).catch(() => "지사"),
-  ]);
+  // [내 행사] 하나에 걸 신호 배지 (검수 대기 / 시작 안 한 행사 / FM LIVE).
+  // 지사 표시명은 더 안 쓴다 — 그 라벨을 달던 메뉴가 행사 ④ 진행으로 들어갔다.
+  const badges = await loadOrgNavBadges(orgId);
 
   return (
     <div className="min-h-dvh bg-[#FFF8F0]">
@@ -49,7 +46,6 @@ export default async function OrgLayout({
         orgId={orgId}
         orgName={orgName}
         badges={badges}
-        partnerName={partnerName}
       />
       <main>{children}</main>
     </div>

@@ -24,6 +24,13 @@ import {
 import { CopyButton } from "./copy-button";
 // 입장가능시간 계산·문구는 한 곳에서 — 히어로 배지와 상세 행이 같은 값을 쓴다.
 import { resolveEntryTime } from "@/lib/org-events/entry-time";
+import { resolveEventAccess } from "@/lib/org-events/event-access";
+import { getOrg } from "@/lib/org-auth-guard";
+import {
+  resolveInvitationMessage,
+  resolveInvitationTitle,
+} from "@/lib/org-events/invitation-copy";
+import { InvitationPreviewBridge } from "./preview-bridge";
 // 참가 접수(승인제) — 켜져 있으면 하단 CTA 자리가 신청 폼/상태 카드로 바뀐다.
 import {
   loadEventApplicationCounts,
@@ -43,6 +50,15 @@ import { ApplicationStatusSection } from "./application-status-section";
 import { ApplicationClosedCard } from "./application-status-card";
 
 export const dynamic = "force-dynamic";
+
+/** 미리보기 전용 — 참가자가 받는 화면에는 들어가지 않는다. */
+const PREVIEW_SCROLLBAR_CSS = [
+  "html{scrollbar-width:thin;scrollbar-color:rgba(45,90,61,.28) transparent}",
+  "html::-webkit-scrollbar{width:6px}",
+  "html::-webkit-scrollbar-track{background:transparent;margin:14px 0}",
+  "html::-webkit-scrollbar-thumb{background:rgba(45,90,61,.28);border-radius:999px}",
+  "html::-webkit-scrollbar-thumb:hover{background:rgba(45,90,61,.45)}",
+].join("");
 
 const fmtFullDate = fmtKoreanLongDateKst;
 const fmtClock = fmtAmPmClockKst;
@@ -200,10 +216,13 @@ export async function generateMetadata({
 
 export default async function EventInvitationPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ eventId: string }>;
+  searchParams: Promise<{ [k: string]: string | string[] | undefined }>;
 }) {
   const { eventId } = await params;
+  const wantsPreview = (await searchParams)?.preview === "1";
 
   // 열람 정책 — 링크(UUID)가 곧 자격(credential).
   //  - 로그인 여부와 무관하게 누구나 열람. 이 페이지는 개인정보를 렌더하지 않는다
@@ -219,8 +238,16 @@ export default async function EventInvitationPage({
 
   if (!event) notFound();
 
+  // 미리보기 — 기관이 초대장을 쓰는 동안 결과를 보는 통로.
+  //
+  //   위 열람 정책의 **유일한 비공개 조건이 미발행**이다. 그 선을 그냥 열면
+  //   링크(UUID)만 아는 사람이 남의 초안을 읽는다. 그래서 그 행사를 가진
+  //   기관으로 로그인했을 때만 통과시킨다. 아니면 아무 일 없던 것처럼
+  //   평소대로 — 미발행이면 초안 안내가 뜬다(존재 여부도 더 알려주지 않는다).
+  const preview = wantsPreview && (await getOrg())?.orgId === event.org_id;
+
   // 행사 미발행 — 초안 안내
-  if (!event.invitation_published_at) {
+  if (!event.invitation_published_at && !preview) {
     return <PendingState eventName={event.name} />;
   }
 
@@ -308,8 +335,7 @@ export default async function EventInvitationPage({
       ? `${startClock}${startClock && endClock ? " ~ " : ""}${endClock}${dur ? ` (${dur})` : ""}`
       : "";
 
-  const message =
-    event.invitation_message?.trim() || "함께 즐거운 시간을 만들어요";
+  const message = resolveInvitationMessage(event.invitation_message);
   const body = event.invitation_body?.trim() ?? "";
   const location = event.invitation_location?.trim();
   const address = event.invitation_address?.trim();
@@ -322,6 +348,19 @@ export default async function EventInvitationPage({
   // 지도 검색은 주소가 있으면 주소로, 없으면 장소명으로
   const mapQuery = address || location;
   const mapUrls = mapQuery ? buildMapUrls(mapQuery) : null;
+  // 미리보기에선 장소가 비어 있어도 오시는 길 자리를 만들어 둔다(숨긴 채로).
+  // 타이핑하면 바로 나타나야 하니까. 링크는 미리보기에서 어차피 안 눌린다.
+  const mapUrlsForRender = mapUrls ?? (preview ? buildMapUrls(" ") : null);
+
+  // 미리보기 표시 — 편집 폼이 보낸 글자를 이 자리에 갈아끼운다(preview-bridge).
+  //   pv     이 요소의 글자를 바꾼다
+  //   pvIf   값이 비면 숨긴다. 비어 있어도 자리는 만들어 둔다.
+  // 미리보기가 아니면 둘 다 빈 객체 — 참가자가 받는 HTML 은 예전 그대로다.
+  const pv = (field: string) => (preview ? { "data-inv": field } : {});
+  const pvIf = (expr: string, on: boolean) =>
+    preview
+      ? { "data-inv-if": expr, style: on ? undefined : { display: "none" } }
+      : {};
 
   return (
     <div className="min-h-dvh bg-[#FFFDF8]">
@@ -370,8 +409,11 @@ export default async function EventInvitationPage({
               🌲 {orgName}
             </p>
           )}
-          <h1 className="text-3xl font-extrabold leading-tight drop-shadow-md sm:text-4xl">
-            {event.name || "(이름 없음)"}
+          <h1
+            className="text-3xl font-extrabold leading-tight drop-shadow-md sm:text-4xl"
+            {...pv("name")}
+          >
+            {resolveInvitationTitle(event.name)}
           </h1>
           {dateLabel !== "-" && (
             <p className="mt-6 text-base font-semibold drop-shadow">
@@ -408,12 +450,35 @@ export default async function EventInvitationPage({
               )}
             </div>
           )}
-          {(location || address) && (
-            <div className="mt-1 inline-flex flex-wrap items-center justify-center gap-1.5 text-xs text-white/90 drop-shadow">
+          {(preview || location || address) && (
+            <div
+              className="mt-1 inline-flex flex-wrap items-center justify-center gap-1.5 text-xs text-white/90 drop-shadow"
+              {...pvIf("location|address", !!(location || address))}
+            >
               <span aria-hidden>📍</span>
-              {location && <span className="font-bold">{location}</span>}
-              {location && address && <span>:</span>}
-              {address && <span className="text-white/80">{address}</span>}
+              {(preview || location) && (
+                <span
+                  className="font-bold"
+                  {...pv("location")}
+                  {...pvIf("location", !!location)}
+                >
+                  {location}
+                </span>
+              )}
+              {(preview || (location && address)) && (
+                <span {...pvIf("location&address", !!(location && address))}>
+                  :
+                </span>
+              )}
+              {(preview || address) && (
+                <span
+                  className="text-white/80"
+                  {...pv("address")}
+                  {...pvIf("address", !!address)}
+                >
+                  {address}
+                </span>
+              )}
               {(address || location) && (
                 <CopyButton
                   text={address || location || ""}
@@ -440,19 +505,28 @@ export default async function EventInvitationPage({
           <p className="text-3xl" aria-hidden>
             💬
           </p>
-          <p className="mt-3 whitespace-pre-line break-words text-lg font-bold leading-relaxed text-[#2D5A3D] sm:text-xl">
+          <p
+            className="mt-3 whitespace-pre-line break-words text-lg font-bold leading-relaxed text-[#2D5A3D] sm:text-xl"
+            {...pv("message")}
+          >
             {message}
           </p>
         </div>
 
         {/* 안내문 (본문) */}
-        {body && (
-          <div className="mb-6 rounded-2xl border border-[#E5D3B8] bg-[#FFF8F0] p-5 shadow-sm">
+        {(preview || body) && (
+          <div
+            className="mb-6 rounded-2xl border border-[#E5D3B8] bg-[#FFF8F0] p-5 shadow-sm"
+            {...pvIf("body", !!body)}
+          >
             <h2 className="mb-3 flex items-center gap-2 text-sm font-bold text-[#6B4423]">
               <span aria-hidden>📋</span>
               <span>안내문</span>
             </h2>
-            <p className="whitespace-pre-line break-words text-sm leading-relaxed text-[#3D3A36]">
+            <p
+              className="whitespace-pre-line break-words text-sm leading-relaxed text-[#3D3A36]"
+              {...pv("body")}
+            >
               {body}
             </p>
           </div>
@@ -461,20 +535,31 @@ export default async function EventInvitationPage({
         {/* 준비물만 — 날짜·일시·입장·장소는 상단 히어로에 이미 있고,
             장소는 아래 '오시는 길' 에서 한 번 더 다룬다. 같은 정보를 세 번
             읽게 하지 않는다. 안내문 카드와 같은 톤으로 맞춰 한 덩어리로 읽히게. */}
-        {dressCode && (
+        {/* 미리보기에선 구분선과 카드에 각각 표시를 단다 — 둘을 감싸는 div 를
+            새로 만들면 실제 화면의 여백이 달라질 수 있다. */}
+        {(preview || dressCode) && (
           <>
-            <div className="mx-auto my-6 flex items-center justify-center gap-2 text-[#D4C8B8]">
+            <div
+              className="mx-auto my-6 flex items-center justify-center gap-2 text-[#D4C8B8]"
+              {...pvIf("dress", !!dressCode)}
+            >
               <span className="h-px w-10 bg-current" />
               <span aria-hidden>◇</span>
               <span className="h-px w-10 bg-current" />
             </div>
 
-            <div className="rounded-2xl border border-[#E5D3B8] bg-[#FFF8F0] p-5 shadow-sm">
+            <div
+              className="rounded-2xl border border-[#E5D3B8] bg-[#FFF8F0] p-5 shadow-sm"
+              {...pvIf("dress", !!dressCode)}
+            >
               <h2 className="mb-3 flex items-center gap-2 text-sm font-bold text-[#6B4423]">
                 <span aria-hidden>🎒</span>
                 <span>준비물</span>
               </h2>
-              <p className="whitespace-pre-line break-words text-sm leading-relaxed text-[#3D3A36]">
+              <p
+                className="whitespace-pre-line break-words text-sm leading-relaxed text-[#3D3A36]"
+                {...pv("dress")}
+              >
                 {dressCode}
               </p>
             </div>
@@ -483,8 +568,11 @@ export default async function EventInvitationPage({
       </section>
 
       {/* ─── 오시는 길 (장소 또는 주소가 있을 때만) ─── */}
-      {(location || address) && mapUrls && (
-        <section className="mx-auto max-w-md space-y-4 px-6 py-6">
+      {(preview || location || address) && mapUrlsForRender && (
+        <section
+          className="mx-auto max-w-md space-y-4 px-6 py-6"
+          {...pvIf("location|address", !!(location || address))}
+        >
           {/* 메인 장소 카드 */}
           <div className="rounded-2xl border border-[#D4E4BC] bg-white p-5 shadow-sm">
             <h2 className="flex items-center gap-2 text-sm font-bold text-[#2D5A3D]">
@@ -494,13 +582,21 @@ export default async function EventInvitationPage({
 
             <div className="mt-3 flex items-start justify-between gap-2">
               <div className="min-w-0 flex-1">
-                {location && (
-                  <p className="break-words text-base font-bold text-[#2C2C2C]">
+                {(preview || location) && (
+                  <p
+                    className="break-words text-base font-bold text-[#2C2C2C]"
+                    {...pv("location")}
+                    {...pvIf("location", !!location)}
+                  >
                     {location}
                   </p>
                 )}
-                {address && (
-                  <p className="mt-0.5 break-words text-xs text-[#6B6560]">
+                {(preview || address) && (
+                  <p
+                    className="mt-0.5 break-words text-xs text-[#6B6560]"
+                    {...pv("address")}
+                    {...pvIf("address", !!address)}
+                  >
                     {address}
                   </p>
                 )}
@@ -515,7 +611,7 @@ export default async function EventInvitationPage({
 
             <div className="mt-4 grid grid-cols-2 gap-2">
               <a
-                href={mapUrls.kakao}
+                href={mapUrlsForRender.kakao}
                 target="_blank"
                 rel="noreferrer"
                 className="inline-flex items-center justify-center gap-1 rounded-xl bg-yellow-400 px-3 py-2.5 text-xs font-bold text-yellow-900 shadow-sm hover:bg-yellow-500"
@@ -524,7 +620,7 @@ export default async function EventInvitationPage({
                 <span>카카오지도</span>
               </a>
               <a
-                href={mapUrls.naver}
+                href={mapUrlsForRender.naver}
                 target="_blank"
                 rel="noreferrer"
                 className="inline-flex items-center justify-center gap-1 rounded-xl bg-emerald-500 px-3 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-emerald-600"
@@ -665,6 +761,23 @@ export default async function EventInvitationPage({
         approvedEntryReady={approvedEntryReady}
       />
 
+      {preview && (
+        <>
+          {/*
+            미리보기 안의 스크롤 막대 — 없애지 않고 얇게 다듬는다.
+
+            윈도우 기본 막대는 폭을 15px 쯤 먹는다. 그만큼 본문이 390 이 아니라
+            375 로 접혀서 **글줄이 실제와 다른 데서 끊긴다** — 미리보기를 만든
+            목적이 바로 그 글줄이다. 6px 으로 줄이면 384 라 거의 차이가 없다.
+            통째로 숨기지 않는 이유는 스크롤이 되는 화면이라는 걸 알려야 해서다.
+
+            위아래를 14px 씩 띄운다. 폰 모서리가 둥글어서, 안 띄우면 막대 끝이
+            그 곡선을 파고든다.
+          */}
+          <style>{PREVIEW_SCROLLBAR_CSS}</style>
+          <InvitationPreviewBridge />
+        </>
+      )}
     </div>
   );
 }
@@ -728,6 +841,31 @@ function InvitationFooter({
   /** APPROVED 신청서의 참가 기록이 실제로 살아 있는가. */
   approvedEntryReady: boolean;
 }) {
+  // 기관이 종료·보관한 행사 — 접수 마감 시각과 무관하게 신청을 받지 않는다.
+  // 이미 참가한 가족은 그대로 들어간다(사진·설문이 남아 있다).
+  const orgClosed = !resolveEventAccess({
+    status: eventStatus,
+    startsAt: null,
+    endsAt: null,
+  }).canJoin;
+  if (orgClosed && !joined) {
+    return (
+      <section className="mx-auto max-w-md px-6 pb-14 pt-2">
+        <div className="rounded-2xl border border-[#E8E4DE] bg-[#FAF8F5] px-5 py-6 text-center">
+          <p className="text-3xl" aria-hidden>
+            🏁
+          </p>
+          <p className="mt-2 text-sm font-bold text-[#6B6560]">
+            마감된 행사예요
+          </p>
+          <p className="mt-1 text-[11px] text-[#8B7F75]">
+            다음 행사에서 만나요!
+          </p>
+        </div>
+      </section>
+    );
+  }
+
   if (gate.kind === "DISABLED") {
     return (
       <InvitationCta
@@ -846,14 +984,19 @@ function InvitationCta({
   const href = joined
     ? `/api/user/enter-event?event_id=${eventId}`
     : `/join/event/${eventId}`;
-  const icon = joined ? (isLive ? "🎪" : "🏠") : "🌲";
+  const ended = eventStatus === "ENDED" || eventStatus === "ARCHIVED";
+  const icon = joined ? (isLive ? "🎪" : ended ? "🏁" : "🏠") : "🌲";
   const label = joined
     ? isLive
       ? "행사 입장하기"
-      : "토리로 앱 홈으로"
+      : ended
+        ? "추억 보기"
+        : "토리로 앱 홈으로"
     : "이 행사 참가하기";
   const hint = joined
-    ? "미션·스탬프북·토리FM 라이브를 앱에서 즐겨보세요"
+    ? ended
+      ? "그날의 사진과 기록이 남아 있어요"
+      : "미션·스탬프북·토리FM 라이브를 앱에서 즐겨보세요"
     : loggedIn
       ? "참가하면 스탬프북·프로그램을 바로 시작할 수 있어요"
       : "연락처만 입력하면 바로 참가할 수 있어요";

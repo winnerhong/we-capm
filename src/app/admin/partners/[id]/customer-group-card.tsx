@@ -9,7 +9,32 @@ export type CustomerItem = {
   status: string | null;
   impersonateHref: string | null;
   disabledReason?: string;
+  /**
+   * "지금 이 고객이 뭘 하고 있는지" 한 줄. 기관 고객에만 붙는다.
+   *
+   * 이름과 계정 상태만 있던 줄에 이걸 더한다 — 계정이 살아 있다는 사실보다
+   * "다음 주에 행사가 있다" 가 숲지기에게 훨씬 쓸모 있는 정보다.
+   */
+  activity?: { emoji: string; label: string; title?: string } | null;
 };
+
+/**
+ * 계정 상태를 사람 말로. **정상(ACTIVE)은 아예 안 적는다** — 모든 줄에 "활성"
+ * 이 붙으면 그 글자는 아무 뜻도 없는 배경이 되고, 정작 눈에 띄어야 할 정지·해지가
+ * 묻힌다. 모르는 값은 그대로 보여준다(조용히 감추면 상태를 놓친다).
+ */
+const ACCOUNT_LABEL: Record<string, string> = {
+  ACTIVE: "",
+  INACTIVE: "휴면",
+  SUSPENDED: "정지",
+  CLOSED: "해지",
+  PENDING: "대기",
+};
+
+function accountLabel(raw: string | null): string {
+  if (!raw) return "";
+  return raw in ACCOUNT_LABEL ? ACCOUNT_LABEL[raw] : raw;
+}
 
 type Props = {
   title: string;
@@ -155,6 +180,7 @@ export function CustomerGroupCard({ title, total, emptyMsg, items }: Props) {
 }
 
 function CustomerRow({ item }: { item: CustomerItem }) {
+  const account = accountLabel(item.status);
   return (
     <li className="flex items-center justify-between gap-2 rounded-xl border border-[#F5F1E8] bg-[#FFF8F0] px-2.5 py-2">
       <div className="min-w-0 flex-1">
@@ -162,16 +188,34 @@ function CustomerRow({ item }: { item: CustomerItem }) {
           <span className="truncate text-xs font-bold text-[#2D5A3D]">
             {item.name}
           </span>
-          {item.status && (
-            <span className="shrink-0 rounded-full bg-white px-1.5 py-0.5 text-[9px] font-semibold text-[#6B6560]">
-              {item.status}
+          {account && (
+            <span className="shrink-0 rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold text-amber-800">
+              {account}
             </span>
           )}
         </div>
-        {item.sub && (
-          <p className="mt-0.5 truncate font-mono text-[10px] text-[#8B7F75]">
-            {item.sub}
+        {item.activity ? (
+          // 행사가 있으면 그게 이 줄의 주인공이다. 연락처는 뒤로 물린다.
+          <p
+            className="mt-0.5 truncate text-[10px] font-semibold text-[#3A7A52]"
+            title={item.activity.title}
+          >
+            <span aria-hidden className="mr-0.5">
+              {item.activity.emoji}
+            </span>
+            {item.activity.label}
+            {item.sub && (
+              <span className="ml-1.5 font-mono font-normal text-[#B0A79E]">
+                {item.sub}
+              </span>
+            )}
           </p>
+        ) : (
+          item.sub && (
+            <p className="mt-0.5 truncate font-mono text-[10px] text-[#8B7F75]">
+              {item.sub}
+            </p>
+          )
         )}
       </div>
       {item.impersonateHref ? (

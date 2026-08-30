@@ -86,8 +86,10 @@ export default async function MissionRunnerPage({
   const { eventId, orgMissionId } = await params;
   const ctx = await requireEventContext(eventId);
   const user = ctx.user;
-  // 행사 시작 전(DRAFT)에는 미션이 열리지 않는다.
-  if (ctx.event.status !== "LIVE") redirect(ctx.href());
+  // 행사 시작 전(예정)에는 미션이 열리지 않는다.
+  // 끝난 행사는 통과시킨다 — 이미 해낸 미션의 결과 화면(사진·도토리)이
+  // 그 가족의 기록이라서다. 새로 제출하는 길만 아래에서 막는다.
+  if (ctx.access.phase === "upcoming") redirect(ctx.href());
 
   const mission = await safeQuery(
     "loadOrgMissionById",
@@ -123,7 +125,11 @@ export default async function MissionRunnerPage({
     mission.kind === "RADIO" ||
     mission.kind === "COOP" ||
     mission.kind === "BROADCAST";
-  const isDone = hasActiveSubmission && !kindRendersOwnStatus;
+  // 끝난 행사에서는 자체 러너도 쓰지 않는다. 러너는 "다시 찍기·재제출" 을
+  // 품고 있어서, 잠긴 행사에서 열면 눌러도 안 되는 버튼이 남는다.
+  // 대신 공통 결과 화면으로 보낸다 — 그게 그 가족이 남긴 기록이다.
+  const isDone =
+    hasActiveSubmission && (!kindRendersOwnStatus || !ctx.access.canPlay);
 
   /* ---------------------------------------------------------------------- */
   /* 사진이 들어가는 미션의 공통 처리                                        */
@@ -240,6 +246,8 @@ export default async function MissionRunnerPage({
         needsReviewAfterChange={mission.kind === "PHOTO_APPROVAL"}
         receivedLikes={existing.like_count ?? 0}
         likerNames={myLikers.map((l) => l.name)}
+        // 끝난 행사 — 사진은 보되 바꾸지는 못한다.
+        readOnly={!ctx.access.canPlay}
       />
     ) : null;
 
@@ -385,6 +393,28 @@ export default async function MissionRunnerPage({
 
         {feedSection}
 
+        {backButton}
+      </div>
+    );
+  }
+
+  // 여기까지 왔다는 건 "아직 안 한 미션" 이라는 뜻이다(해낸 미션은 위에서
+  // 결과 화면으로 끝났다). 끝난 행사에서는 이제 새로 할 수 없다.
+  if (!ctx.access.canPlay) {
+    return (
+      <div className="space-y-4">
+        {header}
+        <section className="rounded-3xl border border-[#E8E4DE] bg-[#FAF8F5] p-6 text-center shadow-sm">
+          <p className="text-5xl" aria-hidden>
+            {ctx.access.badgeEmoji}
+          </p>
+          <h2 className="mt-3 text-base font-bold text-[#6B6560]">
+            행사가 끝났어요
+          </h2>
+          <p className="mt-1 text-sm text-[#8B7F75]">
+            이 미션은 더 이상 참여할 수 없어요.
+          </p>
+        </section>
         {backButton}
       </div>
     );

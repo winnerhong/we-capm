@@ -1,5 +1,6 @@
 "use server";
 
+import { seal } from "@/lib/session-cookie";
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -43,7 +44,7 @@ export async function updateMyInfoAction(eventId: string, formData: FormData) {
   const cookieStore = await cookies();
   cookieStore.set(
     "campnic_participant",
-    JSON.stringify({
+    await seal({
       eventId,
       name,
       phone: session.phone,

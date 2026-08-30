@@ -2,6 +2,7 @@ import { requireOrg } from "@/lib/org-auth-guard";
 import { loadOrgHomeDashboard } from "@/lib/org-home/queries";
 import { createClient } from "@/lib/supabase/server";
 import { OrgHomeStack } from "./_home/org-home-stack";
+import { OrgSectionTabs } from "./_nav/org-section-tabs";
 
 export const dynamic = "force-dynamic";
 
@@ -24,5 +25,12 @@ export default async function OrgDashboardPage({
 
   const snapshot = await loadOrgHomeDashboard(orgId, orgName, org.managerId);
 
-  return <OrgHomeStack snapshot={snapshot} orgId={orgId} />;
+  return (
+    <>
+      <div className="mx-auto max-w-6xl px-4 pt-4">
+        <OrgSectionTabs orgId={orgId} active="home" />
+      </div>
+      <OrgHomeStack snapshot={snapshot} orgId={orgId} />
+    </>
+  );
 }

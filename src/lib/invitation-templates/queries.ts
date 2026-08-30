@@ -38,6 +38,40 @@ export async function loadOrgInvitationTemplates(
   return resp.data ?? [];
 }
 
+/**
+ * 살아있는(보관 아닌) 템플릿 개수 — 초대장 탭 배지용.
+ *
+ * 목록을 불러 length 를 세지 않는 이유: 배지는 숫자 하나면 되는데 본문(인사말·
+ * 초대장 내용)까지 실어오게 된다. count 만 받으면 행이 아예 안 넘어온다.
+ */
+export async function countOrgInvitationTemplates(
+  orgId: string
+): Promise<number> {
+  if (!orgId) return 0;
+  try {
+    const supabase = await createClient();
+    const resp = (await (
+      supabase.from("org_invitation_templates" as never) as unknown as {
+        select: (
+          c: string,
+          o: { count: "exact"; head: true }
+        ) => {
+          eq: (k: string, v: string) => {
+            eq: (k: string, v: boolean) => Promise<{ count: number | null }>;
+          };
+        };
+      }
+    )
+      .select("id", { count: "exact", head: true })
+      .eq("org_id", orgId)
+      .eq("is_archived", false)) as { count: number | null };
+    return resp.count ?? 0;
+  } catch {
+    // 배지가 안 뜨는 건 불편할 뿐이다 — 이걸로 화면이 죽으면 안 된다.
+    return 0;
+  }
+}
+
 export async function loadOrgInvitationTemplateById(
   id: string
 ): Promise<OrgInvitationTemplateRow | null> {

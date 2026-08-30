@@ -1,5 +1,6 @@
 "use server";
 
+import { seal } from "@/lib/session-cookie";
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 
@@ -38,7 +39,7 @@ export async function enterChatByNameAction(
   const cookieStore = await cookies();
   cookieStore.set(
     "campnic_participant",
-    JSON.stringify({
+    await seal({
       eventId,
       registrationId: result.registrationId,
       phone: result.phone,
