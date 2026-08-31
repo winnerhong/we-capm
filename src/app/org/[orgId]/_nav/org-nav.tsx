@@ -48,7 +48,20 @@ interface NavGroup {
   badge?: BadgeSpec;
 }
 
-function buildGroups(orgId: string, badges: OrgNavBadges): NavGroup[] {
+/**
+ * @param showStampbook 지사가 스탬프북 기능을 켰나
+ * @param showStats     지사가 미션 라이브러리(통계) 기능을 켰나
+ *
+ * 꺼진 기능은 **줄에서 사라진다.** 회색으로 남기지 않는 이유 — 이 줄은 이동
+ * 수단이고, 눌리지 않는 이동 수단은 그냥 고장으로 읽힌다. "있는데 꺼져 있다"
+ * 는 사실은 기관 홈의 「모든 기능」 목록판이 자물쇠로 말해 준다.
+ */
+function buildGroups(
+  orgId: string,
+  badges: OrgNavBadges,
+  showStampbook: boolean,
+  showStats: boolean
+): NavGroup[] {
   const base = `/org/${orgId}`;
 
   // 메뉴가 [내 행사] 하나로 줄면서 배지도 하나만 걸 수 있다. 급한 것부터 건다:
@@ -91,6 +104,51 @@ function buildGroups(orgId: string, badges: OrgNavBadges): NavGroup[] {
         },
       ],
     },
+    // 행사를 **가로지르는** 두 화면. 행사 안에도 스탬프북(진행)과 성과(결과)가
+    // 있지만 그건 그 행사 하나의 것이고, 여기 둘은 기관 전체다
+    // ("우리 기관 스탬프북", "우리 기관 미션 통계").
+    //
+    // 예전엔 화면마다 그려지는 탭 한 줄(기관 홈·행사 목록·스탬프북·통계)에
+    // 있었다. 그 줄을 없애면서 이 줄로 옮겼다 — 상단에 줄이 둘이면 어느 쪽이
+    // 위인지 매번 다시 판단하게 된다.
+    ...(showStampbook
+      ? [
+          {
+            key: "quest-packs",
+            step: 2,
+            label: "스탬프북",
+            shortLabel: "스탬프북",
+            icon: "📚",
+            match: [`${base}/quest-packs`],
+            items: [
+              {
+                label: "우리 기관 스탬프북",
+                href: `${base}/quest-packs`,
+                icon: "📚",
+              },
+            ],
+          } satisfies NavGroup,
+        ]
+      : []),
+    ...(showStats
+      ? [
+          {
+            key: "stats",
+            step: 3,
+            label: "통계",
+            shortLabel: "통계",
+            icon: "📊",
+            match: [`${base}/missions/stats`],
+            items: [
+              {
+                label: "우리 기관 미션 통계",
+                href: `${base}/missions/stats`,
+                icon: "📊",
+              },
+            ],
+          } satisfies NavGroup,
+        ]
+      : []),
   ];
 }
 
@@ -161,6 +219,10 @@ interface Props {
    * 마이그레이션이 기존 지사에 control-room 을 고정해 둬서 지금 화면은 그대로다.
    */
   tools: NavTool[];
+  /** 지사가 스탬프북 기능을 켰나 — 꺼져 있으면 상단 줄에서 사라진다. */
+  showStampbook: boolean;
+  /** 지사가 미션 라이브러리(통계) 기능을 켰나. */
+  showStats: boolean;
   /** 상단 [🌰 도토리 배점] 팝오버에 그릴 것. 조회는 레이아웃이 한 번만 한다. */
   acornGuide: AcornScoreGuide;
 }
@@ -171,6 +233,8 @@ export function OrgNav({
   badges,
   tools,
   acornGuide,
+  showStampbook,
+  showStats,
 }: Props) {
   const pathname = usePathname() ?? "";
   const [openKey, setOpenKey] = useState<string | null>(null);
@@ -178,8 +242,8 @@ export function OrgNav({
   const wrapRef = useRef<HTMLDivElement>(null);
 
   const groups = useMemo(
-    () => buildGroups(orgId, badges),
-    [orgId, badges]
+    () => buildGroups(orgId, badges, showStampbook, showStats),
+    [orgId, badges, showStampbook, showStats]
   );
   const controlRoomHref = `/org/${orgId}/control-room`;
   const controlRoomActive = isActiveHref(controlRoomHref, pathname);

@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { OrgSectionTabs } from "../_nav/org-section-tabs";
 import { requireOrg } from "@/lib/org-auth-guard";
 import { loadOrgEventSummaries } from "@/lib/org-events/queries";
 import {
@@ -106,7 +105,6 @@ export default async function OrgEventsPage({
   return (
     <div className="mx-auto max-w-5xl space-y-6 px-4 py-6">
       {/* Breadcrumb */}
-      <OrgSectionTabs orgId={orgId} active="events" />
 
       <nav aria-label="breadcrumb" className="text-xs text-[#8B7F75]">
         <Link href={`/org/${orgId}`} className="hover:text-[#2D5A3D]">

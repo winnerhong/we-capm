@@ -9,7 +9,6 @@
 
 import { requireOrg } from "@/lib/org-auth-guard";
 import { loadOrgInvitationTemplates } from "@/lib/invitation-templates/queries";
-import { OrgSectionTabs } from "../../_nav/org-section-tabs";
 import { InvitationTemplateManager } from "./invitation-template-manager";
 
 export const dynamic = "force-dynamic";
@@ -28,9 +27,6 @@ export default async function OrgInvitationTemplatesPage({
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 px-4 py-6">
-      {/* 탭 줄에 이 화면의 칸은 없다. 밑줄은 아무 데도 안 그어지고, 여기서는
-          빠져나가는 길로만 쓰인다. */}
-      <OrgSectionTabs orgId={orgId} active="templates" />
 
       <header className="flex items-start gap-3">
         <span className="text-3xl" aria-hidden>

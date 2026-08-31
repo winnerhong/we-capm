@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { OrgSectionTabs } from "../_nav/org-section-tabs";
 import { requireOrg } from "@/lib/org-auth-guard";
 import { createClient } from "@/lib/supabase/server";
 import { listOrgUserIds } from "@/lib/app-user/orgs";
@@ -316,10 +315,6 @@ export default async function OrgUsersPage({
 
       <div className="mx-auto max-w-6xl space-y-6 px-4 py-6">
         {/* Breadcrumb */}
-        {/* 탭 줄에 이 화면의 칸은 없다(행사 안 [참가자] 탭과 겹쳐서 뺐다).
-            여기 남은 일은 기관 단위 것들이다 — 전체 명부·CSV 내보내기·참가자
-            로그인 링크·가족 명단. 들어오는 길은 기관 홈 「모든 기능」. */}
-        <OrgSectionTabs orgId={orgId} active="users" />
 
         <nav aria-label="breadcrumb" className="text-xs text-[#8B7F75]">
           <Link href={`/org/${orgId}`} className="hover:text-[#2D5A3D]">

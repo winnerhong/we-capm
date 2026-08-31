@@ -2,7 +2,6 @@ import { requireOrg } from "@/lib/org-auth-guard";
 import { loadOrgHomeDashboard } from "@/lib/org-home/queries";
 import { loadOrgNameById } from "@/lib/org-partner";
 import { OrgHomeStack } from "./_home/org-home-stack";
-import { OrgSectionTabs } from "./_nav/org-section-tabs";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +23,6 @@ export default async function OrgDashboardPage({
   return (
     <>
       <div className="mx-auto max-w-6xl px-4 pt-4">
-        <OrgSectionTabs orgId={orgId} active="home" />
       </div>
       <OrgHomeStack snapshot={snapshot} orgId={orgId} />
     </>
