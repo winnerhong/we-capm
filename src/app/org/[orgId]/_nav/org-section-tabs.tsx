@@ -1,4 +1,4 @@
-// 기관 화면의 탭 한 줄 — 행사 목록 · 템플릿 · 참가자 · 스탬프북 · 통계.
+// 기관 화면의 탭 한 줄 — 행사 목록 · 참가자 · 스탬프북 · 통계.
 //
 // 왜 이렇게 바꿨나:
 //   행사 목록 위에는 테두리 달린 알약 버튼 네 개가, 초대장 화면에는 밑줄 탭 두 개가
@@ -15,6 +15,10 @@ import Link from "next/link";
 import { loadOrgFeatureFlags, canUse } from "@/lib/features/org-switches";
 import { F } from "@/lib/features/codes";
 
+/**
+ * 탭 줄에 없는 화면도 이 타입을 쓴다("templates" 가 그렇다). 그런 화면에서는
+ * 밑줄이 아무 데도 안 그어지고, 탭 줄은 빠져나가는 길로만 쓰인다.
+ */
 export type OrgSection =
   | "home"
   | "events"
@@ -37,13 +41,16 @@ const SECTIONS: {
   // 예전엔 왼쪽 위 로고로만 갈 수 있어서 "다른 기능은 어디 갔지" 가 됐다.
   { key: "home", label: "기관 홈", path: "" },
   { key: "events", label: "행사 목록", path: "/events" },
-  // 「초대장」 칸은 뺐다. 전 행사의 초대장 카드를 늘어놓던 화면이었는데, 같은
-  // 카드가 행사 안에 두 군데 더 있었다. 행사 하나를 준비하는 일은 행사 안에서
-  // 끝난다 — 이 줄은 "어느 행사?" 만 고른다.
+  // 「초대장」·「템플릿」 칸은 뺐다.
   //
-  // 템플릿은 남는다. 기관 단위 자산이라 행사가 하나도 없어도 만들 수 있어야
-  // 하는데, 행사 안에만 두면 그 길이 막힌다.
-  { key: "templates", label: "템플릿", path: "/invitations/templates" },
+  //   초대장 — 전 행사의 초대장 카드를 늘어놓던 화면인데, 같은 카드가 행사 안에
+  //            두 군데 더 있었다.
+  //   템플릿 — 행사 안 [초대장 → 템플릿] 과 **같은 컴포넌트에 같은 옵션**이다.
+  //            글자 하나 다르지 않다.
+  //
+  // 행사 하나를 준비하는 일은 행사 안에서 끝난다 — 이 줄은 "어느 행사?" 만
+  // 고른다. 템플릿 화면 자체는 남겨 뒀다(기관 단위 자산이라 행사가 하나도 없어도
+  // 만들 수 있어야 한다). 기관 홈 「모든 기능」의 [✉️ 초대장 템플릿] 이 그 길이다.
   { key: "users", label: "참가자", path: "/users" },
   { key: "quest-packs", label: "스탬프북", path: "/quest-packs", feature: F.STAMPBOOK },
   { key: "stats", label: "통계", path: "/missions/stats", feature: F.MISSION_LIB },
@@ -52,12 +59,9 @@ const SECTIONS: {
 export async function OrgSectionTabs({
   orgId,
   active,
-  /** 템플릿 칸에 걸 개수 — 만들어 둔 게 있다는 걸 열기 전에 알 수 있다. */
-  templateCount,
 }: {
   orgId: string;
   active: OrgSection;
-  templateCount?: number;
 }) {
   // 왕복 1회. 기관 화면마다 한 번 불린다.
   const flags = await loadOrgFeatureFlags(orgId);
@@ -73,7 +77,6 @@ export async function OrgSectionTabs({
       <ul className="flex min-w-max gap-1">
         {sections.map((s) => {
           const on = s.key === active;
-          const count = s.key === "templates" ? templateCount : undefined;
           return (
             <li key={s.key}>
               <Link
@@ -85,18 +88,10 @@ export async function OrgSectionTabs({
                     : "border-transparent text-[#8B7F75] hover:text-[#2D5A3D]"
                 }`}
               >
+                {/* 개수 배지는 뺐다. 걸던 칸(템플릿)이 줄에서 빠지면서 어떤
+                    칸도 개수를 갖지 않는데, 항상 false 인 분기를 남겨 두면
+                    다음 사람이 "왜 안 나오지" 를 한참 들여다보게 된다. */}
                 {s.label}
-                {typeof count === "number" && count > 0 && (
-                  <span
-                    className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums ${
-                      on
-                        ? "bg-[#E8F0E4] text-[#2D5A3D]"
-                        : "bg-[#F5F1E8] text-[#8B7F75]"
-                    }`}
-                  >
-                    {count}
-                  </span>
-                )}
               </Link>
             </li>
           );

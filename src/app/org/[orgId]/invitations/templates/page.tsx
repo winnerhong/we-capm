@@ -1,5 +1,11 @@
 // 초대장 인사말/내용 템플릿 관리 — 자주 쓰는 문구 미리 저장.
 // 행사 편집 폼의 초대장 섹션에서 셀렉터로 불러옴.
+//
+// 상단 탭에는 없다. 행사 안 [초대장 → 템플릿] 이 같은 화면을 같은 옵션으로
+// 그리므로 탭 줄에 또 걸면 같은 것이 두 번 있는 셈이다. 이 주소를 남겨 둔 이유는
+// 템플릿이 **기관 단위 자산**이라서다 — 행사가 하나도 없는 기관도 미리 만들어
+// 둘 수 있어야 하는데, 행사 안에만 두면 그 길이 막힌다.
+// 들어오는 길: 기관 홈 「모든 기능」 → [✉️ 초대장 템플릿].
 
 import { requireOrg } from "@/lib/org-auth-guard";
 import { loadOrgInvitationTemplates } from "@/lib/invitation-templates/queries";
@@ -20,15 +26,11 @@ export default async function OrgInvitationTemplatesPage({
     includeArchived: true,
   });
 
-  const liveCount = templates.filter((t) => !t.is_archived).length;
-
   return (
     <div className="mx-auto max-w-5xl space-y-6 px-4 py-6">
-      <OrgSectionTabs
-        orgId={orgId}
-        active="templates"
-        templateCount={liveCount}
-      />
+      {/* 탭 줄에 이 화면의 칸은 없다. 밑줄은 아무 데도 안 그어지고, 여기서는
+          빠져나가는 길로만 쓰인다. */}
+      <OrgSectionTabs orgId={orgId} active="templates" />
 
       <header className="flex items-start gap-3">
         <span className="text-3xl" aria-hidden>
