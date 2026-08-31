@@ -1,4 +1,4 @@
-// 기관 화면의 탭 한 줄 — 행사 목록 · 초대장 · 템플릿 · 참가자 · 스탬프북 · 통계.
+// 기관 화면의 탭 한 줄 — 행사 목록 · 템플릿 · 참가자 · 스탬프북 · 통계.
 //
 // 왜 이렇게 바꿨나:
 //   행사 목록 위에는 테두리 달린 알약 버튼 네 개가, 초대장 화면에는 밑줄 탭 두 개가
@@ -18,7 +18,6 @@ import { F } from "@/lib/features/codes";
 export type OrgSection =
   | "home"
   | "events"
-  | "invitations"
   | "templates"
   | "users"
   | "quest-packs"
@@ -38,7 +37,12 @@ const SECTIONS: {
   // 예전엔 왼쪽 위 로고로만 갈 수 있어서 "다른 기능은 어디 갔지" 가 됐다.
   { key: "home", label: "기관 홈", path: "" },
   { key: "events", label: "행사 목록", path: "/events" },
-  { key: "invitations", label: "초대장", path: "/invitations" },
+  // 「초대장」 칸은 뺐다. 전 행사의 초대장 카드를 늘어놓던 화면이었는데, 같은
+  // 카드가 행사 안에 두 군데 더 있었다. 행사 하나를 준비하는 일은 행사 안에서
+  // 끝난다 — 이 줄은 "어느 행사?" 만 고른다.
+  //
+  // 템플릿은 남는다. 기관 단위 자산이라 행사가 하나도 없어도 만들 수 있어야
+  // 하는데, 행사 안에만 두면 그 길이 막힌다.
   { key: "templates", label: "템플릿", path: "/invitations/templates" },
   { key: "users", label: "참가자", path: "/users" },
   { key: "quest-packs", label: "스탬프북", path: "/quest-packs", feature: F.STAMPBOOK },

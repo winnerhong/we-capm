@@ -1,7 +1,11 @@
 // 지사(partner) 측 — 자기 기관들의 "하단 홈페이지 배너" 일괄 관리.
 //
-// 기관 admin 도 같은 기능을 자기 기관 측 /org/[id]/invitations 에서
-// 사용 가능. 지사가 여러 기관을 한 페이지에서 빠르게 설정할 수 있도록 추가.
+// 지사가 여러 기관의 배너를 한 페이지에서 설정한다.
+//
+// ⚠ 예전 주석에 "기관 admin 도 /org/[id]/invitations 에서 같은 기능을 쓴다" 고
+//   적혀 있었는데 사실이 아니었다 — 그 화면에 배너 편집기가 없다. 옆에 걸려
+//   있던 [기관 측에서 보기 →] 링크도 같이 뺐다. 배너를 고칠 수 있는 곳은
+//   지금 이 화면뿐이다.
 
 import Link from "next/link";
 import { requirePartner } from "@/lib/auth-guard";
@@ -98,12 +102,6 @@ export default async function PartnerHomepageBannerPage() {
                 <h2 className="text-base font-bold text-[#2D5A3D]">
                   🏢 {o.org_name || "(이름 없음)"}
                 </h2>
-                <Link
-                  href={`/org/${o.id}/invitations`}
-                  className="text-[11px] text-[#6B6560] hover:text-[#2D5A3D] hover:underline"
-                >
-                  기관 측에서 보기 →
-                </Link>
               </header>
               <div className="p-5">
                 <PartnerHomepageBannerEditor

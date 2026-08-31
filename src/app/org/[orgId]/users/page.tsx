@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { listOrgUserIds } from "@/lib/app-user/orgs";
 import { QuickAddUser } from "./quick-add-user";
 import { UsersTable } from "./users-table";
+import { ParticipantLoginShare } from "@/components/share/participant-login-share";
 import {
   loadEventParticipantIds,
   loadOrgEventSummaries,
@@ -516,6 +517,13 @@ export default async function OrgUsersPage({
             </div>
           </header>
         )}
+
+      {/* 기관 공통 「참가자 로그인 링크」 — 예전 초대장 화면에 있던 것.
+          그 화면을 없애면서 이리 옮겼다. 행사 초대장과 달리 기관에 하나뿐이고
+          행사와 무관하므로, 행사 워크스페이스가 아니라 기관 단위 화면인 여기가
+          제자리다. 명단 위가 아니라 이 자리인 이유는 성격이 달라서다 — 초대장과
+          같은 크기로 나란히 있으면 "어느 링크를 보내지" 가 된다. */}
+      <ParticipantLoginShare orgId={orgId} orgName={org.orgName ?? "기관"} />
 
       {/* Import success banner */}
       {Number.isFinite(importedCount) && importedCount > 0 && (

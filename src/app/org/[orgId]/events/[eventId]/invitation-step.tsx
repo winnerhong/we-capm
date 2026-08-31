@@ -2,8 +2,8 @@
 //
 // 예전에는 초대장 하나가 세 군데 흩어져 있었다:
 //   내용 쓰기  → 행사 편집 폼 안쪽
-//   발행·공유  → /org/{id}/invitations
-//   템플릿     → /org/{id}/invitations/templates
+//   발행·공유  → /org/{id}/invitations  (지금은 없앴다 — 행사 목록으로 보낸다)
+//   템플릿     → /org/{id}/invitations/templates  (기관 단위 자산이라 남아 있다)
 // "초대장을 고치려는데 왜 행사 편집으로 가지?" 가 여기서 나왔다. 셋을 이 단계로
 // 모은다.
 //

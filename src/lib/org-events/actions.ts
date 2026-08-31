@@ -41,7 +41,6 @@ async function assertEventOwned(
 
 function revalidateEvents(orgId: string, eventId?: string): void {
   revalidatePath(`/org/${orgId}/events`);
-  revalidatePath(`/org/${orgId}/invitations`);
   if (eventId) {
     revalidatePath(`/org/${orgId}/events/${eventId}`);
   }

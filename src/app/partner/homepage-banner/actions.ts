@@ -77,7 +77,6 @@ export async function updatePartnerHomepageBannerAction(
     }
 
     revalidatePath("/partner/homepage-banner");
-    revalidatePath(`/org/${orgId}/invitations`);
     revalidatePath("/", "layout"); // 참가자 측 layout/invitation 즉시 반영
     return { ok: true };
   } catch (e) {
