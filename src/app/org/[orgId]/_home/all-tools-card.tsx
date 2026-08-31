@@ -24,6 +24,7 @@ import {
   toolsInGroup,
   toolHref,
 } from "@/lib/org-tools/registry";
+import { sortUsableFirst } from "@/lib/org-tools/order";
 
 export async function AllToolsCard({ orgId }: { orgId: string }) {
   // 여기는 탭 한 줄과 반대로 **감추지 않는다.** 이 카드의 존재 이유가
@@ -53,7 +54,7 @@ export async function AllToolsCard({ orgId }: { orgId: string }) {
                 </span>
               </p>
               <ul className="mt-1.5 flex flex-wrap gap-1.5">
-                {toolsInGroup(g).map((t) => {
+                {sortUsableFirst(toolsInGroup(g), flags).map((t) => {
                   const off = t.featureCode
                     ? !canUse(flags, t.featureCode)
                     : false;

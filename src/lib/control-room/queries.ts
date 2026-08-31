@@ -12,6 +12,7 @@ import {
   loadOrgEventIds,
   loadOrgEventParticipantUserIds,
 } from "@/lib/org-events/org-event-ids";
+import { loadLiveFmSessionForOrg } from "@/lib/missions/queries";
 import type {
   ControlRoomAcorns,
   ControlRoomBroadcastStat,
@@ -642,37 +643,11 @@ async function loadFm(
 
   try {
     // 4-a) LIVE 세션 우선, 없으면 scheduled_start DESC 최신 1건.
-    let session: FmSessionRow | null = null;
-
-    const liveResp = (await (
-      supabase.from("tori_fm_sessions" as never) as unknown as {
-        select: (c: string) => {
-          eq: (k: string, v: string) => {
-            eq: (k: string, v: boolean) => {
-              order: (
-                c: string,
-                o: { ascending: boolean; nullsFirst?: boolean }
-              ) => {
-                limit: (n: number) => Promise<SbResp<FmSessionRow>>;
-              };
-            };
-          };
-        };
-      }
-    )
-      .select(
-        "id, org_id, name, scheduled_start, scheduled_end, is_live, started_at, ended_at"
-      )
-      .eq("org_id", orgId)
-      .eq("is_live", true)
-      .order("started_at", { ascending: false, nullsFirst: false })
-      .limit(1)) as SbResp<FmSessionRow>;
-
-    if (liveResp.error) {
-      console.error("[control-room/loadFm] live session error", liveResp.error);
-    } else {
-      session = (liveResp.data ?? [])[0] ?? null;
-    }
+    //
+    // LIVE 세션은 공용 로더가 같은 필터로 이미 읽는다(cache(), select=*).
+    // 예전엔 여기서 같은 행을 컬럼만 좁혀 한 번 더 물었다 — 상단 배지의
+    // FM 점과 관제실이 한 화면에서 같은 행을 두 번 받아 오고 있었다.
+    let session: FmSessionRow | null = await loadLiveFmSessionForOrg(orgId);
 
     if (!session) {
       // fallback: 가장 최근 scheduled_start (예정/종료 어느쪽이든)

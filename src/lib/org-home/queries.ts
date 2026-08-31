@@ -19,6 +19,8 @@ import { loadTrailsAssignedToOrg } from "@/lib/trails/queries";
 import { loadOrgProfileSnapshot } from "@/lib/profile-completeness/queries";
 import { buildOrgProfileSchema } from "@/lib/profile-completeness/schemas/org";
 import { calcCompleteness } from "@/lib/profile-completeness/calculator";
+import { loadOrgDocumentsRaw } from "@/lib/org-documents/queries";
+import type { ProfileGroupSummary } from "./onboarding";
 import {
   loadPartnerDisplayNameForOrg,
   loadPartnerIdForOrg,
@@ -56,7 +58,8 @@ function emptyDashboard(orgName: string, managerName: string): OrgHomeDashboard 
       stampsToday: 0,
       pendingReview: 0,
     },
-    profileCompleteness: { percent: 0, done: 0, total: 0 },
+    profileCompleteness: { percent: 0, done: 0, total: 0, groups: [] },
+    eventCount: 0,
     nextAction: null,
     controlRoomPreview: { fmLive: false, todayActive: 0, todayStamps: 0 },
     resources: {
@@ -155,9 +158,6 @@ export async function loadOrgHomeDashboard(
     orgId,
     pendingCount: pendingReview,
     pendingOldestWaitingMinutes: snapshot?.pending.oldestWaitingMinutes ?? null,
-    profilePercent: profileResult.percent,
-    profileDone: profileResult.done,
-    profileTotal: profileResult.total,
     draftEvents: events.filter((e) => e.status === "DRAFT"),
     totalParticipants: snapshot?.totalParticipants ?? 0,
     documentsOverdue: documentsInfo.overdue,
@@ -176,7 +176,9 @@ export async function loadOrgHomeDashboard(
       percent: profileResult.percent,
       done: profileResult.done,
       total: profileResult.total,
+      groups: profileResult.groups,
     },
+    eventCount: events.length,
     nextAction,
     controlRoomPreview: {
       fmLive: snapshot?.fm.session?.isLive === true,
@@ -257,9 +259,12 @@ async function loadManagerName(managerId: string): Promise<string> {
 /* 프로필 완성도                                                              */
 /* -------------------------------------------------------------------------- */
 
-async function loadProfileCompleteness(
-  orgId: string
-): Promise<{ percent: number; done: number; total: number }> {
+async function loadProfileCompleteness(orgId: string): Promise<{
+  percent: number;
+  done: number;
+  total: number;
+  groups: ProfileGroupSummary[];
+}> {
   try {
     const snap = await loadOrgProfileSnapshot(orgId);
     const schema = buildOrgProfileSchema(orgId);
@@ -268,10 +273,12 @@ async function loadProfileCompleteness(
       percent: result.percent,
       done: result.completedCount,
       total: result.totalCount,
+      // 여기서 버리던 것 — 무엇이 남았는지는 이 안에만 있다.
+      groups: result.groups,
     };
   } catch (e) {
     console.error("[org-home/loadProfileCompleteness] throw", e);
-    return { percent: 0, done: 0, total: 0 };
+    return { percent: 0, done: 0, total: 0, groups: [] };
   }
 }
 
@@ -561,36 +568,14 @@ async function loadDocumentsInfo(
 ): Promise<{ submitted: number; required: number; overdue: number }> {
   const REQUIRED = 5;
   try {
-    const supabase = await createClient();
-
-    const resp = (await (
-      supabase.from("org_documents" as never) as unknown as {
-        select: (c: string) => {
-          eq: (k: string, v: string) => {
-            in: (
-              k: string,
-              v: string[]
-            ) => Promise<
-              SbResp<{ doc_type: string; status: string }>
-            >;
-          };
-        };
-      }
-    )
-      .select("doc_type, status")
-      .eq("org_id", orgId)
-      .in("status", ["APPROVED", "PENDING"])) as SbResp<{
-      doc_type: string;
-      status: string;
-    }>;
-
-    if (resp.error) {
-      console.error("[org-home/loadDocumentsInfo] error", resp.error);
-      return { submitted: 0, required: REQUIRED, overdue: REQUIRED };
-    }
+    // 목록은 레이아웃 배지가 이미 요청당 한 번 읽어 뒀다(cache()). 예전엔 여기서
+    // 같은 표를 좁은 컬럼으로 한 번 더 물었다 — 한 화면에서 두 왕복이었다.
+    // 가공 전 행을 쓰는 이유는 위 로더 주석에 적어 뒀다(만료 자동 계산).
+    const rows = await loadOrgDocumentsRaw(orgId);
 
     const types = new Set<string>();
-    for (const row of resp.data ?? []) {
+    for (const row of rows) {
+      if (row.status !== "APPROVED" && row.status !== "PENDING") continue;
       if (row.doc_type) types.add(row.doc_type);
     }
     const submitted = types.size;
@@ -631,11 +616,15 @@ function buildFmSummary(
 /* -------------------------------------------------------------------------- */
 /* nextAction 우선순위 로직                                                    */
 /*   1) PENDING_OLD — 검토 대기 > 0 AND oldest >= 10분                          */
-/*   2) PROFILE — 완성도 < 80                                                  */
-/*   3) DRAFT_EVENT — DRAFT 행사 1건 이상                                       */
-/*   4) NO_PARTICIPANTS — 전체 참가자 0                                         */
-/*   5) DOCUMENTS — overdue > 0                                                */
-/*   6) else null                                                              */
+/*   2) DRAFT_EVENT — DRAFT 행사 1건 이상                                       */
+/*   3) NO_PARTICIPANTS — 전체 참가자 0                                         */
+/*   4) DOCUMENTS — overdue > 0                                                */
+/*   5) else null                                                              */
+/*                                                                             */
+/*   PROFILE(완성도 < 80)은 여기서 뺐다. 온보딩 카드가 같은 말을 더 잘 한다 —   */
+/*   이쪽은 "42%" 하고 /settings 로 보내기만 했고, 저쪽은 남은 항목을 각자의    */
+/*   주소로 보낸다. 완성도가 100 이 아닌 동안 온보딩 카드는 **항상** 떠 있으니  */
+/*   (80 미만은 그 안에 들어간다) 이 분기가 맡던 자리는 비지 않는다.            */
 /*   (BROADCAST_READY 는 MVP 에서 생략 — NextActionKind 에만 유지.)             */
 /* -------------------------------------------------------------------------- */
 
@@ -643,9 +632,6 @@ function buildNextAction(ctx: {
   orgId: string;
   pendingCount: number;
   pendingOldestWaitingMinutes: number | null;
-  profilePercent: number;
-  profileDone: number;
-  profileTotal: number;
   draftEvents: Array<{ id: string; name: string }>;
   totalParticipants: number;
   documentsOverdue: number;
@@ -664,18 +650,6 @@ function buildNextAction(ctx: {
       ctaLabel: "검토하기",
       ctaHref: `${base}/missions/review`,
       accent: "amber",
-    };
-  }
-
-  if (ctx.profilePercent < 80) {
-    return {
-      kind: "PROFILE" as NextActionKind,
-      title: `프로필 완성도 ${ctx.profilePercent}%`,
-      description: `${ctx.profileDone}/${ctx.profileTotal} 완료 · 조금만 더!`,
-      ctaLabel: "이어서 완성",
-      ctaHref: `${base}/settings`,
-      accent: "pink",
-      progressPct: ctx.profilePercent,
     };
   }
 

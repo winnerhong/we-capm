@@ -2,6 +2,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { loadLatestPartnerDocuments } from "@/lib/documents/queries";
 import { loadLatestOrgDocuments } from "@/lib/org-documents/queries";
+import { loadOrgRowFull, type OrgRowFull } from "@/lib/org-partner";
 import type { ProfileSnapshot } from "./types";
 
 type PartnerRow = {
@@ -72,40 +73,16 @@ export async function loadPartnerProfileSnapshot(
 
 /* ---------- 기관(Org) ---------- */
 
-type OrgRow = {
-  org_name: string | null;
-  representative_name: string | null;
-  representative_phone: string | null;
-  email: string | null;
-  address: string | null;
-  business_number: string | null;
-  org_type: string | null;
-};
-
 /**
  * 기관(org) 프로필 완성도 계산용 스냅샷 로드.
+ *
+ * partner_orgs 행은 **직접 읽지 않는다.** 같은 행을 org-partner 의 cache() 가
+ * 이미 요청당 한 번 읽고 있어서, 여기서 또 물으면 한 행에 두 번 다녀오게 된다.
  */
 export async function loadOrgProfileSnapshot(
   orgId: string
 ): Promise<ProfileSnapshot> {
-  const supabase = await createClient();
-
-  const { data: row } = (await (
-    supabase.from("partner_orgs" as never) as unknown as {
-      select: (c: string) => {
-        eq: (k: string, v: string) => {
-          maybeSingle: () => Promise<SbRespOne<OrgRow>>;
-        };
-      };
-    }
-  )
-    .select(
-      "org_name,representative_name,representative_phone,email,address,business_number,org_type"
-    )
-    .eq("id", orgId)
-    .maybeSingle()) as SbRespOne<OrgRow>;
-
-  const o = row ?? ({} as OrgRow);
+  const o = (await loadOrgRowFull(orgId)) ?? ({} as OrgRowFull);
   const db: ProfileSnapshot["db"] = {
     org_name: o.org_name ?? null,
     representative_name: o.representative_name ?? null,

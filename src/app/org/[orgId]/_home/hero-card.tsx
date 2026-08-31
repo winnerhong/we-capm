@@ -7,7 +7,47 @@ type Props = {
 };
 
 export function HeroCard({ dashboard, orgId }: Props) {
-  const { orgName, todayStats } = dashboard;
+  const { orgName, todayStats, eventCount, profileCompleteness } = dashboard;
+
+  // 행사를 한 번도 안 연 기관에게는 이 세 칸이 전부 0 이다. 화면에서 눈이 제일
+  // 먼저 가는 자리를 "아직 아무것도 없음" 을 알리는 데 쓰게 된다. 그동안은
+  // 진행률 한 줄로 바꾼다 — 아래 세 걸음 카드가 이어받는다.
+  if (eventCount === 0) {
+    const pct = Math.max(0, Math.min(100, profileCompleteness.percent));
+    return (
+      <section className="overflow-hidden rounded-3xl bg-gradient-to-br from-[#2D5A3D] via-[#3A7A52] to-[#4A7C59] p-5 shadow-lg">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="truncate text-lg font-bold text-white sm:text-xl">
+              🌲 {orgName}
+            </h1>
+            <p className="mt-0.5 text-xs font-semibold text-[#D4E4BC]">
+              문 열 준비 중
+            </p>
+          </div>
+          <Link
+            href={`/org/${orgId}/settings`}
+            className="shrink-0 rounded-full bg-white/15 px-3 py-1.5 text-xs font-bold text-white backdrop-blur-sm transition hover:bg-white/25"
+          >
+            설정 →
+          </Link>
+        </div>
+        <div
+          className="mt-3 h-2 w-full overflow-hidden rounded-full bg-white/25"
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={pct}
+          aria-label="기관 준비 진행도"
+        >
+          <div
+            className="h-full rounded-full bg-[#D4E4BC] transition-all"
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="overflow-hidden rounded-3xl bg-gradient-to-br from-[#2D5A3D] via-[#3A7A52] to-[#4A7C59] p-5 shadow-lg">

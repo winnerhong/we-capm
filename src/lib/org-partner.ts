@@ -10,12 +10,29 @@ import { createClient } from "@/lib/supabase/server";
  *   org-home 의 loadPartnerIdForOrg 가 또 한 번. 기관 홈 한 장을 계측하니 같은
  *   행을 세 번 읽고 있었다(레이아웃과 페이지가 각자 부르는 것까지 더하면 더).
  *
- *   행이 하나면 질의도 하나여야 한다. 두 컬럼을 같이 읽고 cache() 로 감싼다.
+ *   행이 하나면 질의도 하나여야 한다. 필요한 컬럼을 같이 읽고 cache() 로 감싼다.
  *   유효 범위는 요청 하나라, 기관명을 바꾸면 다음 요청부터 새 이름이 나온다.
+ *
+ * 프로필 완성도 스냅샷(profile-completeness)도 **같은 행**을 자기 컬럼 목록으로
+ * 따로 읽고 있었다. 한 행에 두 번 다녀오는 셈이라 여기로 합쳤다 — 단일 행이라
+ * 컬럼이 늘어도 비용은 사실상 그대로다.
  */
+export type OrgRowFull = {
+  org_name: string | null;
+  partner_id: string | null;
+  representative_name: string | null;
+  representative_phone: string | null;
+  email: string | null;
+  address: string | null;
+  business_number: string | null;
+  org_type: string | null;
+};
+
+const ORG_ROW_COLUMNS =
+  "org_name, partner_id, representative_name, representative_phone, email, address, business_number, org_type";
 const orgRow = cache(async function orgRow(
   orgId: string
-): Promise<{ org_name: string | null; partner_id: string | null } | null> {
+): Promise<OrgRowFull | null> {
   if (!orgId) return null;
   try {
     const supabase = await createClient();
@@ -23,26 +40,26 @@ const orgRow = cache(async function orgRow(
       supabase.from("partner_orgs" as never) as unknown as {
         select: (c: string) => {
           eq: (k: string, v: string) => {
-            maybeSingle: () => Promise<{
-              data: {
-                org_name: string | null;
-                partner_id: string | null;
-              } | null;
-            }>;
+            maybeSingle: () => Promise<{ data: OrgRowFull | null }>;
           };
         };
       }
     )
-      .select("org_name, partner_id")
+      .select(ORG_ROW_COLUMNS)
       .eq("id", orgId)
-      .maybeSingle()) as {
-      data: { org_name: string | null; partner_id: string | null } | null;
-    };
+      .maybeSingle()) as { data: OrgRowFull | null };
     return resp.data ?? null;
   } catch {
     return null;
   }
 });
+
+/** 이 기관 행 전체 — 프로필 완성도 계산이 쓴다. 위 cache() 를 그대로 탄다. */
+export async function loadOrgRowFull(
+  orgId: string
+): Promise<OrgRowFull | null> {
+  return orgRow(orgId);
+}
 
 /**
  * 기관(org) 의 현재 org_name 을 DB 에서 읽어 반환.

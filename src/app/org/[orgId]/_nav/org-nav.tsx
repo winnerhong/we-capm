@@ -18,6 +18,7 @@ import { usePathname } from "next/navigation";
 import { OrgAccountMenu } from "../org-account-menu";
 import { QuickNoticeButton } from "./QuickNoticeButton";
 import { AcornGuideButton } from "./AcornGuideButton";
+import { AllToolsButton, type DrawerGroup } from "./all-tools-button";
 import type { AcornScoreGuide } from "@/lib/scoring/guide-core";
 import type { OrgNavBadges } from "@/lib/org-nav/badges";
 
@@ -225,6 +226,11 @@ interface Props {
   showStats: boolean;
   /** 상단 [🌰 도토리 배점] 팝오버에 그릴 것. 조회는 레이아웃이 한 번만 한다. */
   acornGuide: AcornScoreGuide;
+  /**
+   * 「⋯ 전체」 서랍에 그릴 도구 전부 — 기관 홈 「모든 기능」 과 **같은 원본**
+   * (lib/org-tools/registry.ts)에서 레이아웃이 서버에서 풀어 준다.
+   */
+  allToolGroups: DrawerGroup[];
 }
 
 export function OrgNav({
@@ -235,6 +241,7 @@ export function OrgNav({
   acornGuide,
   showStampbook,
   showStats,
+  allToolGroups,
 }: Props) {
   const pathname = usePathname() ?? "";
   const [openKey, setOpenKey] = useState<string | null>(null);
@@ -440,12 +447,18 @@ export function OrgNav({
           <QuickNoticeButton liveFmSessionId={badges.liveFmSessionId} />
         </nav>
 
-        {/* 우: 영구 액션 — 알림 + 계정 */}
-        <OrgAccountMenu
-          orgId={orgId}
-          orgName={orgName}
-          hasUnreadNotification={badges.missingDocs > 0}
-        />
+        {/* 우: 영구 액션 — 전체 목록 + 알림 + 계정.
+            서랍이 여기 있는 이유 — 가운데 <nav> 는 lg 미만에서 사라진다.
+            도구를 못 찾는 일은 좁은 화면에서 더 자주 생기므로, 이 문만은
+            폭에 상관없이 늘 같은 자리에 있어야 한다. */}
+        <div className="flex shrink-0 items-center gap-2">
+          <AllToolsButton groups={allToolGroups} />
+          <OrgAccountMenu
+            orgId={orgId}
+            orgName={orgName}
+            hasUnreadNotification={badges.missingDocs > 0}
+          />
+        </div>
       </div>
 
       {/* 모바일 drawer (<lg) */}

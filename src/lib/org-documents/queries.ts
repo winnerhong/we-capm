@@ -35,6 +35,19 @@ export function applyOrgDocExpiryStatus(row: OrgDocumentRow): OrgDocumentRow {
 export const loadOrgDocuments = cache(async function loadOrgDocuments(
   orgId: string
 ): Promise<OrgDocumentRow[]> {
+  return (await loadOrgDocumentsRaw(orgId)).map(applyOrgDocExpiryStatus);
+});
+
+/**
+ * 같은 목록의 **가공 전** 모습 — DB 에 적힌 status 그대로.
+ *
+ * 만료 계산(APPROVED → EXPIRED)을 하지 않은 값이 필요한 집계가 하나 있다
+ * (기관 홈의 「제출 n / 필수 5」). 조회는 여기 하나뿐이고 loadOrgDocuments 도
+ * 이걸 타므로, 둘을 다 불러도 왕복은 한 번이다.
+ */
+export const loadOrgDocumentsRaw = cache(async function loadOrgDocumentsRaw(
+  orgId: string
+): Promise<OrgDocumentRow[]> {
   if (!orgId) return [];
   const supabase = await createClient();
 
@@ -54,7 +67,7 @@ export const loadOrgDocuments = cache(async function loadOrgDocuments(
     .eq("org_id", orgId)
     .order("submitted_at", { ascending: false })) as SbResp<OrgDocumentRow>;
 
-  return (resp.data ?? []).map(applyOrgDocExpiryStatus);
+  return resp.data ?? [];
 });
 
 /**
