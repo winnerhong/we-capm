@@ -82,7 +82,9 @@ export const ORG_TOOLS: OrgTool[] = [
 
   // ── 관리 ──────────────────────────────────────────────────
   { key: "users", label: "참가자", icon: "👨‍👩‍👧", path: "/users", group: "manage" },
-  { key: "members", label: "담당자", icon: "🧑‍💼", path: "/members", group: "manage" },
+  // 라벨이 「담당자」였는데 이 화면은 "가입한 보호자와 자녀" 명단이다. 담당자를
+  // 찾아 누른 사람이 엉뚱한 화면을 보게 돼 있었다.
+  { key: "members", label: "가족 명단", icon: "👨‍👩‍👧", path: "/members", group: "manage" },
   { key: "documents", label: "서류", icon: "📄", path: "/documents", group: "manage" },
   { key: "mission-stats", label: "미션 통계", icon: "📊", path: "/missions/stats", featureCode: "MISSION_LIB", group: "manage" },
   // 토리FM 표시명(우리 기관 라디오 이름)도 여기 있다.

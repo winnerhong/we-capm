@@ -42,50 +42,8 @@ type AppUserWithCount = AppUserListRow & {
   home_org_name: string | null;
 };
 
-const STATUS_META: Record<
-  UserStatus,
-  { label: string; chip: string }
-> = {
-  ACTIVE: {
-    label: "활성화",
-    chip: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  },
-  SUSPENDED: {
-    label: "비활성화",
-    chip: "bg-amber-50 text-amber-700 border-amber-200",
-  },
-  CLOSED: {
-    label: "해지",
-    chip: "bg-zinc-100 text-zinc-600 border-zinc-200",
-  },
-};
-
-function formatPhone(raw: string): string {
-  const digits = (raw ?? "").replace(/\D/g, "");
-  if (digits.length === 11) {
-    return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
-  }
-  if (digits.length === 10) {
-    return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
-  }
-  return raw;
-}
-
 function todayIsoDate(): string {
   return new Date().toISOString().slice(0, 10);
-}
-
-function formatDateTime(iso: string | null): string {
-  if (!iso) return "-";
-  try {
-    return new Date(iso).toLocaleDateString("ko-KR", {
-      year: "2-digit",
-      month: "2-digit",
-      day: "2-digit",
-    });
-  } catch {
-    return "-";
-  }
 }
 
 /* ─────────── 행사 hero 용 일정 포맷 헬퍼 (events/page.tsx 와 동일 톤) ─────────── */
@@ -358,6 +316,9 @@ export default async function OrgUsersPage({
 
       <div className="mx-auto max-w-6xl space-y-6 px-4 py-6">
         {/* Breadcrumb */}
+        {/* 탭 줄에 이 화면의 칸은 없다(행사 안 [참가자] 탭과 겹쳐서 뺐다).
+            여기 남은 일은 기관 단위 것들이다 — 전체 명부·CSV 내보내기·참가자
+            로그인 링크·가족 명단. 들어오는 길은 기관 홈 「모든 기능」. */}
         <OrgSectionTabs orgId={orgId} active="users" />
 
         <nav aria-label="breadcrumb" className="text-xs text-[#8B7F75]">
