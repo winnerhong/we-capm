@@ -4,9 +4,14 @@
 // 실패 정책: 6개 서브쿼리를 Promise.all 로 병렬 실행하되, 각각 try/catch 로 감싸
 // 어느 하나가 실패해도 나머지 필드는 정상값을 유지한다. 에러는 console.error 로만.
 
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { startOfTodayKstIso } from "@/lib/time/kst";
+import {
+  loadOrgEventIds,
+  loadOrgEventParticipantUserIds,
+} from "@/lib/org-events/org-event-ids";
 import type {
   ControlRoomAcorns,
   ControlRoomBroadcastStat,
@@ -254,6 +259,72 @@ const EMPTY_SNAPSHOT_BASE = {
 const APPROVED_STATUSES = ["APPROVED", "AUTO_APPROVED"] as const;
 
 /* -------------------------------------------------------------------------- */
+/* 가벼운 진입점 — 기관 홈 전용                                                */
+/* -------------------------------------------------------------------------- */
+
+/** 기관 홈이 관제실에서 실제로 쓰는 것 전부. */
+export type ControlRoomHomePreview = {
+  totalParticipants: number;
+  todayActiveParticipants: number;
+  fm: ControlRoomSnapshot["fm"];
+  pending: ControlRoomSnapshot["pending"];
+  stamps: ControlRoomSnapshot["stamps"];
+};
+
+/**
+ * 기관 홈(`/org/[orgId]`)의 관제실 미리보기.
+ *
+ * 예전엔 홈이 loadControlRoomSnapshot() 을 통째로 불렀다. 스냅샷은 서브로더가
+ * 16개인데 홈이 꺼내 쓰는 건 다섯 값뿐이다 — 리더보드·도토리·채팅·협동·히트맵·
+ * 사진벽·참가자 명단은 조회해서 그대로 버렸다. 계측해 보니 홈 한 장이 쏘는
+ * 질의 78건 중 스냅샷이 40건 가까이였고, 그중 대부분이 화면에 닿지 않았다.
+ *
+ * 관제실 화면은 그대로 loadControlRoomSnapshot() 을 쓴다 — 거기선 전부 그린다.
+ *
+ * 요청당 한 번. 홈은 한 번만 부르지만, 나중에 다른 조각이 같은 값을 찾더라도
+ * 왕복이 늘지 않게 해 둔다.
+ */
+export const loadControlRoomHomePreview = cache(
+  async function loadControlRoomHomePreview(
+    orgId: string
+  ): Promise<ControlRoomHomePreview> {
+    const empty: ControlRoomHomePreview = {
+      totalParticipants: 0,
+      todayActiveParticipants: 0,
+      fm: EMPTY_SNAPSHOT_BASE.fm,
+      pending: EMPTY_SNAPSHOT_BASE.pending,
+      stamps: EMPTY_SNAPSHOT_BASE.stamps,
+    };
+    if (!orgId) return empty;
+
+    try {
+      const supabase = await createClient();
+      const todayIso = startOfTodayKstIso();
+
+      const [participants, fm, pending, stamps] = await Promise.all([
+        loadParticipants(supabase, orgId, todayIso),
+        loadFm(supabase, orgId, todayIso, true),
+        loadPending(supabase, orgId),
+        // 참가자 수는 avgPackCompletePct 분모로만 쓰인다. 홈은 그 값을 안
+        // 그리므로, 그것 하나 때문에 참가자 id 전체를 다시 훑지 않는다.
+        loadStamps(supabase, orgId, todayIso, 0),
+      ]);
+
+      return {
+        totalParticipants: participants.total,
+        todayActiveParticipants: participants.todayActive,
+        fm,
+        pending,
+        stamps,
+      };
+    } catch (e) {
+      console.error("[control-room/homePreview] throw", e);
+      return empty;
+    }
+  }
+);
+
+/* -------------------------------------------------------------------------- */
 /* 메인 진입점                                                                */
 /* -------------------------------------------------------------------------- */
 
@@ -413,51 +484,8 @@ async function loadParticipantUserIds(
   orgId: string
 ): Promise<string[]> {
   try {
-    const evtResp = (await (
-      supabase.from("org_events" as never) as unknown as {
-        select: (c: string) => {
-          eq: (k: string, v: string) => Promise<SbResp<{ id: string }>>;
-        };
-      }
-    )
-      .select("id")
-      .eq("org_id", orgId)) as SbResp<{ id: string }>;
-
-    if (evtResp.error) {
-      console.error(
-        "[control-room/loadParticipantUserIds] events error",
-        evtResp.error
-      );
-      return [];
-    }
-    const eventIds = (evtResp.data ?? []).map((r) => r.id);
-    if (eventIds.length === 0) return [];
-
-    const partResp = (await (
-      supabase.from("org_event_participants" as never) as unknown as {
-        select: (c: string) => {
-          in: (
-            k: string,
-            v: string[]
-          ) => Promise<SbResp<{ user_id: string }>>;
-        };
-      }
-    )
-      .select("user_id")
-      .in("event_id", eventIds)) as SbResp<{ user_id: string }>;
-
-    if (partResp.error) {
-      console.error(
-        "[control-room/loadParticipantUserIds] part error",
-        partResp.error
-      );
-      return [];
-    }
-    const set = new Set<string>();
-    for (const r of partResp.data ?? []) {
-      if (r.user_id) set.add(r.user_id);
-    }
-    const ids = Array.from(set);
+    // 행사 id → 참가자 두 단계는 공용 로더가 요청당 한 번만 밟는다.
+    const ids = await loadOrgEventParticipantUserIds(orgId);
     if (ids.length === 0) return [];
 
     // 홈 기관(app_users.org_id) 이 이 기관과 일치하는 사용자만 — 다른 기관
@@ -543,22 +571,8 @@ async function loadParticipants(
   todayIso: string
 ): Promise<{ todayActive: number; total: number }> {
   try {
-    // 1단계: org 에 속한 event_id 목록 (status 무관)
-    const evtResp = (await (
-      supabase.from("org_events" as never) as unknown as {
-        select: (c: string) => {
-          eq: (k: string, v: string) => Promise<SbResp<{ id: string }>>;
-        };
-      }
-    )
-      .select("id")
-      .eq("org_id", orgId)) as SbResp<{ id: string }>;
-
-    if (evtResp.error) {
-      console.error("[control-room/loadParticipants] events error", evtResp.error);
-      return { todayActive: 0, total: 0 };
-    }
-    const eventIds = (evtResp.data ?? []).map((r) => r.id);
+    // 1단계: org 에 속한 event_id 목록 (status 무관) — 요청당 한 번만 읽힌다.
+    const eventIds = await loadOrgEventIds(orgId);
     if (eventIds.length === 0) return { todayActive: 0, total: 0 };
 
     // 2단계: 참가자 전체 로드 (joined_at 까지) — event 필터는 in().
@@ -607,10 +621,17 @@ async function loadParticipants(
 /* 4) 토리FM 세션 + 신청곡 + 오늘 하트 수                                       */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * @param sessionOnly 세션 요약만 필요하면 true. 기관 홈은 "지금 방송 중인가"
+ *   한 줄만 그리는데, 예전엔 신청곡 8개와 오늘 하트까지 읽었다. 게다가 그 둘은
+ *   세션 id 가 나온 **뒤에야** 출발하는 2단 사슬이라 홈에서 가장 늦게 끝나는
+ *   질의였다. 관제실은 셋 다 그리므로 기본값은 false 다.
+ */
 async function loadFm(
   supabase: Awaited<ReturnType<typeof createClient>>,
   orgId: string,
-  todayIso: string
+  todayIso: string,
+  sessionOnly = false
 ): Promise<ControlRoomSnapshot["fm"]> {
   const empty: ControlRoomSnapshot["fm"] = {
     session: null,
@@ -695,6 +716,10 @@ async function loadFm(
       scheduledStart: session.scheduled_start,
       scheduledEnd: session.scheduled_end,
     };
+
+    if (sessionOnly) {
+      return { ...empty, session: sessionSummary };
+    }
 
     // 4-b) 신청곡 최신 8개
     let recentRequests: ControlRoomFmRequest[] = [];

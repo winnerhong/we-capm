@@ -1,6 +1,7 @@
 // server-only: @/lib/supabase/server 참조 → 클라이언트 번들 금지.
 // tori-fm interactive layer 데이터 로더들.
 
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import type {
   FmChatMessageRow,
@@ -126,6 +127,21 @@ export async function loadChatMessages(
 /**
  * HIDDEN 제외 모든 신청곡 — created_at DESC.
  */
+/**
+ * 한 세션의 신청곡 — 숨김 제외 **전부**를 한 번에.
+ *
+ * 스튜디오와 라디오 화면은 같은 세션의 신청곡을 네 번 읽고 있었다:
+ * PENDING · QUEUED · PLAYING · "숨김 아닌 전부". 앞의 셋은 마지막 하나의
+ * 부분집합이고 정렬만 다르다. 한 번 읽어 request-split 로 나눈다.
+ *
+ * 요청당 한 번 — 한 화면에서 여러 조각이 불러도 왕복은 하나다.
+ */
+export const loadFmSessionRequests = cache(async function loadFmSessionRequests(
+  sessionId: string
+): Promise<FmRequestRow[]> {
+  return loadOpenSessionRequests(sessionId);
+});
+
 export async function loadOpenSessionRequests(
   sessionId: string
 ): Promise<FmRequestRow[]> {

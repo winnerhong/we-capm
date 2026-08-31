@@ -14,6 +14,7 @@
 //   · hasOrgMembership 은 "소속인가" 만 본다 (명단 구분용).
 
 import { createClient } from "@/lib/supabase/server";
+import { loadOrgEventParticipantUserIds } from "@/lib/org-events/org-event-ids";
 
 /** 소속이 생긴 경로 = 기관이 명단에 올린 방식. 권한 판단에는 쓰지 않는다. */
 export type OrgMembershipSource =
@@ -267,40 +268,7 @@ export async function listOrgEventParticipantUserIds(
   orgId: string
 ): Promise<string[]> {
   if (!orgId) return [];
-  const supabase = await createClient();
-
-  const evResp = (await (
-    supabase.from("org_events" as never) as unknown as {
-      select: (c: string) => {
-        eq: (k: string, v: string) => Promise<SbResp<{ id: string }>>;
-      };
-    }
-  )
-    .select("id")
-    .eq("org_id", orgId)) as SbResp<{ id: string }>;
-  const eventIds = (evResp.data ?? []).map((e) => e.id);
-  if (eventIds.length === 0) return [];
-
-  const partResp = (await (
-    supabase.from("org_event_participants" as never) as unknown as {
-      select: (c: string) => {
-        in: (
-          k: string,
-          v: string[]
-        ) => Promise<SbResp<{ user_id: string }>>;
-      };
-    }
-  )
-    .select("user_id")
-    .in("event_id", eventIds)) as SbResp<{ user_id: string }>;
-
-  if (partResp.error) {
-    console.error("[app-user/orgs] listOrgEventParticipantUserIds", partResp.error);
-    return [];
-  }
-  return Array.from(
-    new Set((partResp.data ?? []).map((r) => r.user_id).filter(Boolean))
-  );
+  return loadOrgEventParticipantUserIds(orgId);
 }
 
 /**

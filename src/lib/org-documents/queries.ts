@@ -1,4 +1,5 @@
 // server-only: @/lib/supabase/server를 참조하므로 클라이언트 번들에 포함 불가
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import {
   ORG_DOC_META,
@@ -27,8 +28,11 @@ export function applyOrgDocExpiryStatus(row: OrgDocumentRow): OrgDocumentRow {
 
 /**
  * 특정 기관의 모든 서류 (모든 버전, 최신 제출 순)
+ *
+ * 요청당 한 번. 한 화면에서 서류 통계(상단 배지)와 프로필 완성도가 같은 목록을
+ * 각자 읽고 있었다 — 같은 응답을 두 번 받아 오는 셈이었다.
  */
-export async function loadOrgDocuments(
+export const loadOrgDocuments = cache(async function loadOrgDocuments(
   orgId: string
 ): Promise<OrgDocumentRow[]> {
   if (!orgId) return [];
@@ -51,7 +55,7 @@ export async function loadOrgDocuments(
     .order("submitted_at", { ascending: false })) as SbResp<OrgDocumentRow>;
 
   return (resp.data ?? []).map(applyOrgDocExpiryStatus);
-}
+});
 
 /**
  * 최신 버전만 — doc_type당 version 최고값의 row를 반환

@@ -8,7 +8,11 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { startOfTodayKstIso } from "@/lib/time/kst";
-import { loadControlRoomSnapshot } from "@/lib/control-room/queries";
+import { loadOrgEventIds } from "@/lib/org-events/org-event-ids";
+import {
+  loadControlRoomHomePreview,
+  type ControlRoomHomePreview,
+} from "@/lib/control-room/queries";
 import { loadOrgEvents } from "@/lib/org-events/queries";
 import { loadOrgQuestPacks } from "@/lib/missions/queries";
 import { loadTrailsAssignedToOrg } from "@/lib/trails/queries";
@@ -89,6 +93,11 @@ export async function loadOrgHomeDashboard(
 
   // 화면 한 장을 그리는 데 필요한 것을 **한 번에** 출발시킨다.
   //
+  // 관제실은 **미리보기만** 부른다. 예전엔 스냅샷을 통째로 불렀는데, 스냅샷의
+  // 서브로더 16개 중 홈이 꺼내 쓰는 건 다섯 값뿐이었다 — 리더보드·도토리·채팅·
+  // 협동·히트맵·사진벽·참가자 명단을 다 조회해 놓고 그대로 버렸다.
+  // (관제실 화면은 그대로 스냅샷 전체를 쓴다.)
+  //
   // 예전엔 물결이 셋이었다:
   //   ① 관제실 스냅샷 하나만 await  ② 나머지 10개  ③ partner_id 가 나온 뒤 2개
   // ①이 끝나기 전엔 ②가 한 줄도 시작하지 않았다. 계측해 보니 기관 홈 한 장이
@@ -113,9 +122,9 @@ export async function loadOrgHomeDashboard(
     catalogCounts,
     presetCounts,
   ] = await Promise.all([
-    // 스냅샷이 터져도 홈 전체가 빈 화면이 되면 안 된다 — null 로 떨어뜨린다.
-    loadControlRoomSnapshot(orgId, orgName).catch((e) => {
-      console.error("[org-home/loadOrgHomeDashboard] snapshot throw", e);
+    // 미리보기가 터져도 홈 전체가 빈 화면이 되면 안 된다 — null 로 떨어뜨린다.
+    loadControlRoomHomePreview(orgId).catch((e) => {
+      console.error("[org-home/loadOrgHomeDashboard] preview throw", e);
       return null;
     }),
     loadManagerName(managerId),
@@ -326,22 +335,8 @@ async function loadParticipantsAddedToday(orgId: string): Promise<number> {
   try {
     const supabase = await createClient();
 
-    // 1) org 의 event_id 목록
-    const evtResp = (await (
-      supabase.from("org_events" as never) as unknown as {
-        select: (c: string) => {
-          eq: (k: string, v: string) => Promise<SbResp<{ id: string }>>;
-        };
-      }
-    )
-      .select("id")
-      .eq("org_id", orgId)) as SbResp<{ id: string }>;
-
-    if (evtResp.error) {
-      console.error("[org-home/addedToday] events error", evtResp.error);
-      return 0;
-    }
-    const eventIds = (evtResp.data ?? []).map((r) => r.id);
+    // 1) org 의 event_id 목록 — 요청당 한 번만 읽힌다.
+    const eventIds = await loadOrgEventIds(orgId);
     if (eventIds.length === 0) return 0;
 
     // 정확한 KST 자정 — 새벽 구간에도 "오늘 가입자" 판정이 정확.
@@ -613,7 +608,7 @@ async function loadDocumentsInfo(
 /* -------------------------------------------------------------------------- */
 
 function buildFmSummary(
-  snapshot: Awaited<ReturnType<typeof loadControlRoomSnapshot>> | null
+  snapshot: ControlRoomHomePreview | null
 ): OrgHomeDashboard["fm"] {
   const session = snapshot?.fm.session ?? null;
   if (!session) {

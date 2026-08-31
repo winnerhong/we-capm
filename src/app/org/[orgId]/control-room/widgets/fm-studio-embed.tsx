@@ -8,13 +8,13 @@ import {
   loadLiveFmSessionForOrg,
   loadRadioQueueItemWithSubmission,
 } from "@/lib/missions/queries";
+import { loadChatMessages, loadFmSessionRequests } from "@/lib/tori-fm/queries";
 import {
-  loadChatMessages,
-  loadOpenSessionRequests,
-  loadPendingRequests,
-  loadPlayingGroup,
-  loadQueuedRequests,
-} from "@/lib/tori-fm/queries";
+  pickOpen,
+  pickPending,
+  pickPlaying,
+  pickQueued,
+} from "@/lib/tori-fm/request-split";
 import { anonLabelFromUserId } from "@/lib/tori-fm/types";
 import { loadActiveRpsRoomForFmSession } from "@/lib/rps/queries";
 import { FmSessionControls } from "../../tori-fm/FmSessionControls";
@@ -40,25 +40,23 @@ export async function FmStudioEmbed({ orgId }: { orgId: string }) {
   }
 
   // LIVE 세션 데이터 로드 — tori-fm/page.tsx 와 동일
-  const [
-    nowPlaying,
-    chatMessages,
-    pendingRequests,
-    queuedRequests,
-    playingGroup,
-    initialRpsRoom,
-    liveAllRequests,
-  ] = await Promise.all([
-    liveSession.current_queue_id
-      ? loadRadioQueueItemWithSubmission(liveSession.current_queue_id)
-      : Promise.resolve(null),
-    loadChatMessages(liveSession.id, 200),
-    loadPendingRequests(liveSession.id),
-    loadQueuedRequests(liveSession.id),
-    loadPlayingGroup(liveSession.id),
-    loadActiveRpsRoomForFmSession(liveSession.id),
-    loadOpenSessionRequests(liveSession.id),
-  ]);
+  //
+  // 신청곡은 **한 번만** 읽는다. 예전엔 PENDING·QUEUED·PLAYING·전체를 각각
+  // 읽었는데 앞의 셋은 전체의 부분집합이라, 같은 응답을 네 번 받아 온 셈이었다.
+  const [nowPlaying, chatMessages, allRequests, initialRpsRoom] =
+    await Promise.all([
+      liveSession.current_queue_id
+        ? loadRadioQueueItemWithSubmission(liveSession.current_queue_id)
+        : Promise.resolve(null),
+      loadChatMessages(liveSession.id, 200),
+      loadFmSessionRequests(liveSession.id),
+      loadActiveRpsRoomForFmSession(liveSession.id),
+    ]);
+
+  const pendingRequests = pickPending(allRequests);
+  const queuedRequests = pickQueued(allRequests);
+  const playingGroup = pickPlaying(allRequests);
+  const liveAllRequests = pickOpen(allRequests);
 
   const playingRequest = playingGroup[0] ?? null;
 

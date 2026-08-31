@@ -70,7 +70,10 @@ export const loadOrgAcornGuide = cache(async function loadOrgAcornGuide(
   try {
     const supabase = await createClient();
 
-    const evResp = (await (
+    // 행사와 미션은 서로를 필요로 하지 않는다. 예전엔 행사를 먼저 기다린 뒤
+    // 미션을 읽었는데, 이 로더는 레이아웃에 있어서 기관 화면 **전부**가 그
+    // 두 왕복을 줄 세워 기다렸다. 계측하면 홈에서만 300ms 였다.
+    const evP = (
       supabase.from("org_events" as never) as unknown as {
         select: (c: string) => {
           eq: (k: string, v: string) => Promise<{
@@ -81,13 +84,14 @@ export const loadOrgAcornGuide = cache(async function loadOrgAcornGuide(
       }
     )
       .select("id, name, status, starts_at")
-      .eq("org_id", orgId)) as { data: EventRow[] | null; error: unknown };
-
-    const current = pickCurrent(evResp.data ?? []);
+      .eq("org_id", orgId) as Promise<{
+      data: EventRow[] | null;
+      error: unknown;
+    }>;
 
     // 미션은 기관 단위로 읽는다. 행사↔스탬프북↔미션을 타고 들어가면 왕복이
     // 세 번인데, 배점표에 필요한 건 "이 기관이 켜 둔 미션의 종류와 도토리" 뿐이다.
-    const mResp = (await (
+    const mP = (
       supabase.from("org_missions" as never) as unknown as {
         select: (c: string) => {
           eq: (k: string, v: string) => Promise<{
@@ -98,11 +102,14 @@ export const loadOrgAcornGuide = cache(async function loadOrgAcornGuide(
       }
     )
       .select("kind, acorns, quest_pack_id, is_active, config_json")
-      .eq("org_id", orgId)) as {
+      .eq("org_id", orgId) as Promise<{
       data: MissionRow[] | null;
       error: unknown;
-    };
+    }>;
 
+    const [evResp, mResp] = await Promise.all([evP, mP]);
+
+    const current = pickCurrent(evResp.data ?? []);
     const missions = (mResp.data ?? []).filter((m) => m.is_active !== false);
 
     // 최종 보상 문턱 — 있으면 "얼마 모으면 무엇" 이 마지막 줄에 붙는다.

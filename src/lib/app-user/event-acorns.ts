@@ -13,6 +13,7 @@
 
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
+import { loadOrgEventIds } from "@/lib/org-events/org-event-ids";
 import { loadEventScoreRanking } from "@/lib/scoring/queries";
 import { getAcornBalance } from "@/lib/app-user/queries";
 import type {
@@ -122,21 +123,7 @@ export async function loadOrgAcornBalances(
   if (!orgId || ids.length === 0) return {};
   const supabase = await createClient();
 
-  const evResp = (await (
-    supabase.from("org_events" as never) as unknown as {
-      select: (c: string) => {
-        eq: (k: string, v: string) => Promise<SbResp<{ id: string }>>;
-      };
-    }
-  )
-    .select("id")
-    .eq("org_id", orgId)) as SbResp<{ id: string }>;
-
-  if (evResp.error) {
-    console.error("[event-acorns] org events error", evResp.error);
-    return {};
-  }
-  const eventIds = (evResp.data ?? []).map((e) => e.id);
+  const eventIds = await loadOrgEventIds(orgId);
   if (eventIds.length === 0) return {};
 
   const txResp = (await (

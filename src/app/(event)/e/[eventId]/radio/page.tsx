@@ -28,12 +28,14 @@ import {
 } from "@/lib/missions/types";
 import {
   loadChatMessages,
-  loadOpenSessionRequests,
-  loadPlayingGroup,
-  loadQueuedRequests,
-  loadTopHeartedRequests,
+  loadFmSessionRequests,
   loadTopSongs,
 } from "@/lib/tori-fm/queries";
+import {
+  pickOpen,
+  pickPlaying,
+  pickQueued,
+} from "@/lib/tori-fm/request-split";
 import {
   getCheerCountAction,
   getMyCheerSentCountAction,
@@ -127,23 +129,21 @@ export default async function ToriFmPage({
   const sessionLive = !!session?.is_live;
   const sessionId = session?.id ?? "";
 
-  const [
-    chatMessages,
-    requests,
-    topSongs,
-    userHearted,
-    playingGroup,
-    topHearted,
-    queuedRequests,
-  ] = await Promise.all([
+  // 신청곡은 **한 번만** 읽고 화면이 쓰는 모양으로 나눈다. 예전엔 전체·PLAYING·
+  // 큐·인기 를 각각 읽었는데 넷 다 같은 세션의 같은 표에서 나온다. 행사 중
+  // 가족들 손에 들린 화면이라 왕복 하나가 그대로 체감으로 온다.
+  const [chatMessages, allRequests, topSongs, userHearted] = await Promise.all([
     session ? loadChatMessages(session.id, 30) : Promise.resolve([]),
-    session ? loadOpenSessionRequests(session.id) : Promise.resolve([]),
+    session ? loadFmSessionRequests(session.id) : Promise.resolve([]),
     session ? loadTopSongs(session.id, 5) : Promise.resolve([]),
     Promise.resolve([] as string[]),
-    session ? loadPlayingGroup(session.id) : Promise.resolve([]),
-    session ? loadTopHeartedRequests(session.id, 5) : Promise.resolve([]),
-    session ? loadQueuedRequests(session.id) : Promise.resolve([]),
   ]);
+
+  const requests = pickOpen(allRequests);
+  const playingGroup = pickPlaying(allRequests);
+  const queuedRequests = pickQueued(allRequests);
+  // 인기 신청곡(topHearted)은 만들지 않는다 — 이 화면 어디에서도 그리지 않는다.
+  // 예전엔 조회까지 해 놓고 버렸다.
 
   // 작성자(반) prefix 표시용 — 등장한 모든 user_id 에 대해 한 번에 반 이름 조회.
   // 신청곡 + 큐 + PLAYING 묶음 + 채팅 메시지 사용자까지 합쳐 1회만 조회.

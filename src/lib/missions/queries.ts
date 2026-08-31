@@ -900,9 +900,10 @@ export async function loadRadioQueueItemWithSubmission(
 /**
  * 기관에서 현재 LIVE 중인 FM 세션 — 여러 개면 가장 최근 started_at 1건.
  */
-export async function loadLiveFmSessionForOrg(
-  orgId: string
-): Promise<ToriFmSessionRow | null> {
+export const loadLiveFmSessionForOrg = cache(
+  async function loadLiveFmSessionForOrg(
+    orgId: string
+  ): Promise<ToriFmSessionRow | null> {
   if (!orgId) return null;
   const supabase = await createClient();
 
@@ -930,7 +931,7 @@ export async function loadLiveFmSessionForOrg(
 
   const rows = resp.data ?? [];
   return rows[0] ?? null;
-}
+});
 
 /**
  * 기관의 모든 FM 세션 — scheduled_start DESC
