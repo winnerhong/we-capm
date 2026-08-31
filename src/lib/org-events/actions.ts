@@ -269,6 +269,10 @@ export async function createOrgEventAction(
       starts_at: fields.starts_at ?? null,
       ends_at: fields.ends_at ?? null,
       cover_image_url: fields.cover_image_url,
+      // 입장가능시간 — 새 행사 폼도 이제 이걸 받는다. 예전엔 폼에 칸이 없어
+      // 만들고 나서 편집으로 다시 들어가야 했다. 비어 있으면 null 이고,
+      // 초대장은 null 일 때 입장 안내를 아예 띄우지 않는다.
+      invitation_entry_lead_min: fields.invitation_entry_lead_min,
       status: "DRAFT",
     } satisfies Row)
     .select("id")
