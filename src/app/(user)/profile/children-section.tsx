@@ -368,7 +368,7 @@ function ChildForm({
           autoComplete="off"
           className={INPUT_CLS}
         />
-        <p className="mt-1 text-[10px] text-[#8B7F75]">
+        <p className="mt-1 text-[10px] text-[#6B6560]">
           기관이 토리톡을 활성화한 경우 해당 반 채팅방에 자동으로 참여돼요.
         </p>
       </div>

@@ -98,7 +98,7 @@ export function BoardForm({ action, initial }: Props) {
               }`}
             >
               {s}×{s}
-              <span className="ml-1 text-[10px] font-normal text-[#8B7F75]">
+              <span className="ml-1 text-[10px] font-normal text-[#6B6560]">
                 ({s * s}칸)
               </span>
             </button>

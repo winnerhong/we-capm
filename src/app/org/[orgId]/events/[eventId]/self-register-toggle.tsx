@@ -72,7 +72,7 @@ export function SelfRegisterToggle({
               {enabled ? "ON" : "OFF"}
             </span>
             {pending && (
-              <span className="text-[10px] text-[#8B7F75]">저장 중…</span>
+              <span className="text-[10px] text-[#6B6560]">저장 중…</span>
             )}
           </div>
           <p className="mt-1 text-[11px] leading-relaxed text-[#6B6560]">

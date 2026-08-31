@@ -67,7 +67,7 @@ export default async function OrgOwnTrailQrPage({
           <p className="mt-1 text-xs text-[#6B6560]">
             {trail.name} · 스캔 시 코스 안내 페이지가 열려요
           </p>
-          <p className="mt-1 break-all text-[10px] text-[#8B7F75]">
+          <p className="mt-1 break-all text-[10px] text-[#6B6560]">
             🔗 {scanUrl}
           </p>
         </div>

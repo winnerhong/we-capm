@@ -135,7 +135,7 @@ export default async function PartnerFeaturesPage({
                         ✅ 보유
                       </span>
                     </div>
-                    <p className="mt-0.5 text-[10px] text-[#8B7F75]">
+                    <p className="mt-0.5 text-[10px] text-[#6B6560]">
                       {FEATURE_CATEGORY_META[f.category]}
                     </p>
                     {f.short_desc && (
@@ -183,7 +183,7 @@ export default async function PartnerFeaturesPage({
                           🔒 미보유
                         </span>
                       </div>
-                      <p className="mt-0.5 text-[10px] text-[#8B7F75]">
+                      <p className="mt-0.5 text-[10px] text-[#6B6560]">
                         {FEATURE_CATEGORY_META[f.category]} · {tier.emoji}{" "}
                         {tier.label}
                       </p>

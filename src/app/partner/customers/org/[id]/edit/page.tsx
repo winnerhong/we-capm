@@ -422,7 +422,7 @@ export default async function EditOrgPage({
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             {/* 아이디 */}
             <div className="rounded-xl border border-[#D4E4BC] bg-white p-3">
-              <p className="text-[10px] font-semibold text-[#8B7F75]">아이디</p>
+              <p className="text-[10px] font-semibold text-[#6B6560]">아이디</p>
               <p className="mt-1 break-all font-mono text-sm font-bold text-[#2D5A3D]">
                 {org.auto_username ?? (
                   usernamePreview ? (
@@ -432,14 +432,14 @@ export default async function EditOrgPage({
                   )
                 )}
               </p>
-              <p className="mt-1 text-[10px] text-[#8B7F75]">
+              <p className="mt-1 text-[10px] text-[#6B6560]">
                 🏢 기관 전화번호 (숫자만 추출)
               </p>
             </div>
 
             {/* 비밀번호 */}
             <div className="rounded-xl border border-[#D4E4BC] bg-white p-3">
-              <p className="text-[10px] font-semibold text-[#8B7F75]">초기 비밀번호</p>
+              <p className="text-[10px] font-semibold text-[#6B6560]">초기 비밀번호</p>
               <p className="mt-1 font-mono text-sm font-bold text-[#2D5A3D]">
                 {passwordPreview ? (
                   <span className="rounded bg-[#FFF0D9] px-2 py-0.5">
@@ -449,7 +449,7 @@ export default async function EditOrgPage({
                   <span className="text-rose-600">담당자 핸드폰 필요</span>
                 )}
               </p>
-              <p className="mt-1 text-[10px] text-[#8B7F75]">
+              <p className="mt-1 text-[10px] text-[#6B6560]">
                 📱 담당자 핸드폰 뒷 4자리 (초기 셋팅)
               </p>
             </div>

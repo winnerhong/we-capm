@@ -361,12 +361,12 @@ function DocCard({ type, row }: { type: DocType; row: DocumentRow | null }) {
 
       <div className="grid grid-cols-2 gap-2 text-[11px] text-[#6B6560]">
         <div>
-          <dt className="text-[10px] text-[#8B7F75]">제출</dt>
+          <dt className="text-[10px] text-[#6B6560]">제출</dt>
           <dd>{fmtDate(row.submitted_at)}</dd>
         </div>
         {row.expires_at && (
           <div>
-            <dt className="text-[10px] text-[#8B7F75]">만료</dt>
+            <dt className="text-[10px] text-[#6B6560]">만료</dt>
             <dd
               className={
                 typeof expDays === "number" && expDays <= 30
@@ -383,7 +383,7 @@ function DocCard({ type, row }: { type: DocType; row: DocumentRow | null }) {
         )}
         {row.version > 1 && (
           <div>
-            <dt className="text-[10px] text-[#8B7F75]">버전</dt>
+            <dt className="text-[10px] text-[#6B6560]">버전</dt>
             <dd>v{row.version}</dd>
           </div>
         )}

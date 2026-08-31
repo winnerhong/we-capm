@@ -171,7 +171,7 @@ export default async function OrgToriFmSessionEditPage({
                           {story}
                         </p>
                       )}
-                      <p className="mt-1 text-[10px] text-[#8B7F75]">
+                      <p className="mt-1 text-[10px] text-[#6B6560]">
                         {q.user_parent_name || "신청자 미표시"}
                         {q.played_at && ` · 방송 ${fmtDateTime(q.played_at)}`}
                       </p>
@@ -233,7 +233,7 @@ export default async function OrgToriFmSessionEditPage({
                           {story}
                         </p>
                       )}
-                      <p className="mt-1 text-[10px] text-[#8B7F75]">
+                      <p className="mt-1 text-[10px] text-[#6B6560]">
                         {q.user_parent_name || "신청자 미표시"}
                       </p>
                     </div>

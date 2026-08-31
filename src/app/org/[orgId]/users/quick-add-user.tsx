@@ -474,7 +474,7 @@ export function QuickAddUser({
         </form>
       )}
 
-      <p className="mt-2 text-[10px] text-[#8B7F75]">
+      <p className="mt-2 text-[10px] text-[#6B6560]">
         🔑 아이디는 부모님 연락처, 비밀번호는 없어요.
       </p>
     </section>

@@ -218,7 +218,7 @@ function PresetCard({
             {preset.description}
           </p>
         )}
-        <p className="text-[10px] text-[#8B7F75]">
+        <p className="text-[10px] text-[#6B6560]">
           수정: {fmtDate(preset.updated_at)}
         </p>
         <div className="mt-1 pt-2">

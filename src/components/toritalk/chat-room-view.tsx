@@ -381,7 +381,7 @@ export function ChatRoomView({
             <div key={g.dayKey} className="space-y-2">
               <div className="my-2 flex items-center gap-2">
                 <span className="h-px flex-1 bg-[#D4E4BC]" />
-                <span className="rounded-full bg-white px-3 py-0.5 text-[10px] font-bold text-[#8B7F75]">
+                <span className="rounded-full bg-white px-3 py-0.5 text-[10px] font-bold text-[#6B6560]">
                   {g.dayLabel}
                 </span>
                 <span className="h-px flex-1 bg-[#D4E4BC]" />
@@ -853,7 +853,7 @@ function MessageBubble({
 
 function Time({ iso }: { iso: string }) {
   return (
-    <span className="shrink-0 text-[10px] text-[#8B7F75] tabular-nums">
+    <span className="shrink-0 text-[10px] text-[#6B6560] tabular-nums">
       {fmtClockKstAlways(iso)}
     </span>
   );

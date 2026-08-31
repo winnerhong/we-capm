@@ -417,7 +417,7 @@ export default function NewCouponWizardPage() {
                     >
                       <div className="text-xl font-bold text-[#8B5E3C]">{d.icon}</div>
                       <div className="mt-1 text-xs font-bold text-[#2D5A3D]">{d.label}</div>
-                      <div className="mt-0.5 text-[10px] text-[#8B7F75]">{d.hint}</div>
+                      <div className="mt-0.5 text-[10px] text-[#6B6560]">{d.hint}</div>
                     </button>
                   );
                 })}

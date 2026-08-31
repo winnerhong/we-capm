@@ -259,7 +259,7 @@ export function TimelineEditor({
                       <span className="text-sm font-bold text-[#2D5A3D]">
                         {tpl.name}
                       </span>
-                      <span className="text-[10px] text-[#8B7F75]">
+                      <span className="text-[10px] text-[#6B6560]">
                         슬롯 {tpl.slots.length}개 · 누적 {fmtDuration(totalMin)}
                       </span>
                     </div>

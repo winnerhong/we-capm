@@ -178,7 +178,7 @@ export function ConsentEditor({
               <span className="text-[11px] font-bold text-[#6B4423]">
                 [필수] 개인정보 수집·이용
               </span>
-              <span className="text-[10px] tabular-nums text-[#8B7F75]">
+              <span className="text-[10px] tabular-nums text-[#6B6560]">
                 {body.length} / {MAX_CONSENT_BODY_LENGTH}
               </span>
             </label>
@@ -198,7 +198,7 @@ export function ConsentEditor({
                 className={TEXTAREA_CLS}
               />
             )}
-            <p className="mt-1 text-[10px] leading-relaxed text-[#8B7F75]">
+            <p className="mt-1 text-[10px] leading-relaxed text-[#6B6560]">
               이 항목은 끌 수 없어요 — 동의 없이 개인정보를 받을 수 없습니다.
             </p>
           </div>
@@ -253,7 +253,7 @@ export function ConsentEditor({
                     className={TEXTAREA_CLS}
                   />
                 )}
-                <p className="mt-1 text-[10px] leading-relaxed text-[#8B7F75]">
+                <p className="mt-1 text-[10px] leading-relaxed text-[#6B6560]">
                   선택 항목이라 체크하지 않아도 참가 신청은 접수돼요. 참가 조건으로
                   걸 수 없습니다 (개인정보보호법 제22조 제5항).
                 </p>
@@ -275,7 +275,7 @@ export function ConsentEditor({
             >
               기본 문구로 되돌리기
             </button>
-            <span className="text-[10px] text-[#8B7F75]">
+            <span className="text-[10px] text-[#6B6560]">
               칸 밖을 누르면 저장돼요
             </span>
           </div>

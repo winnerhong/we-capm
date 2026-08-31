@@ -71,7 +71,7 @@ export function QueueAssignButton({
             : "✖ 해제"}
       </button>
       {isDisabled && disabledReason && !isPending && (
-        <span className="max-w-[140px] text-right text-[10px] text-[#8B7F75]">
+        <span className="max-w-[140px] text-right text-[10px] text-[#6B6560]">
           {disabledReason}
         </span>
       )}

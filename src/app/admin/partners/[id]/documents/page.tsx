@@ -320,7 +320,7 @@ function DocReviewCard({
             <h3 className="truncate text-sm font-bold text-[#2D5A3D] md:text-base">
               {meta.label}
             </h3>
-            <span className="text-[10px] text-[#8B7F75]">v{doc.version}</span>
+            <span className="text-[10px] text-[#6B6560]">v{doc.version}</span>
           </div>
           <p className="mt-0.5 text-[11px] text-[#6B6560]">
             제출: {fmtDateTime(doc.submitted_at)}

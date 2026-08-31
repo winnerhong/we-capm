@@ -78,7 +78,7 @@ export default async function OrgToritalkRoomDetailPage({
                 🔍 노출
               </span>
             ) : (
-              <span className="rounded-full bg-[#FFF8F0] px-2 py-0.5 text-[10px] font-bold text-[#8B7F75]">
+              <span className="rounded-full bg-[#FFF8F0] px-2 py-0.5 text-[10px] font-bold text-[#6B6560]">
                 🔒 비공개
               </span>
             )}
@@ -140,7 +140,7 @@ export default async function OrgToritalkRoomDetailPage({
             <h2 className="text-sm font-bold text-[#6B4FB2]">
               📢 채팅·공지 보내기
             </h2>
-            <span className="text-[10px] text-[#8B7F75]">
+            <span className="text-[10px] text-[#6B6560]">
               메시지는 모든 멤버에게 실시간 전달돼요
             </span>
           </div>

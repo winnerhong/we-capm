@@ -630,7 +630,7 @@ export function QrQuizMissionEditor({ mission }: Props) {
                     </ul>
                   )}
                   {hint && (
-                    <p className="mt-2 text-[10px] text-[#8B7F75]">💡 {hint}</p>
+                    <p className="mt-2 text-[10px] text-[#6B6560]">💡 {hint}</p>
                   )}
                 </div>
               )}

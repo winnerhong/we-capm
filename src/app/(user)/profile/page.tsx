@@ -81,7 +81,7 @@ export default async function UserProfilePage() {
               <AcornIcon size={24} />
             </span>
             <span
-              className="text-[10px] font-bold text-[#8B7F75] transition group-hover:text-[#2D5A3D]"
+              className="text-[10px] font-bold text-[#6B6560] transition group-hover:text-[#2D5A3D]"
               aria-hidden
             >
               →
@@ -94,7 +94,7 @@ export default async function UserProfilePage() {
             {acornBalance}
             <span className="text-[11px] font-bold text-[#8B7F75]">개</span>
           </p>
-          <p className="mt-1 text-[10px] text-[#8B7F75]">행사 선택 →</p>
+          <p className="mt-1 text-[10px] text-[#6B6560]">행사 선택 →</p>
         </Link>
 
         <Link
@@ -109,7 +109,7 @@ export default async function UserProfilePage() {
               🎁
             </span>
             <span
-              className="text-[10px] font-bold text-[#8B7F75] transition group-hover:text-[#2D5A3D]"
+              className="text-[10px] font-bold text-[#6B6560] transition group-hover:text-[#2D5A3D]"
               aria-hidden
             >
               →
@@ -121,7 +121,7 @@ export default async function UserProfilePage() {
           <p className="mt-0.5 text-base font-bold text-[#2D5A3D]">
             받은 선물 모아보기
           </p>
-          <p className="mt-1 text-[10px] text-[#8B7F75]">QR 수령 →</p>
+          <p className="mt-1 text-[10px] text-[#6B6560]">QR 수령 →</p>
         </Link>
       </section>
 

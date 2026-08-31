@@ -102,7 +102,7 @@ export function CompletenessCard({
             >
               <span aria-hidden>{g.icon}</span>
               <span>{g.label}</span>
-              <span className="text-[10px] text-[#8B7F75]">
+              <span className="text-[10px] text-[#6B6560]">
                 {g.completed}/{g.total}
               </span>
             </span>

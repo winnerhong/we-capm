@@ -394,7 +394,7 @@ export default async function PartnerMissionsListPage({
                           {m.description}
                         </p>
                       )}
-                      <p className="mt-1 text-[10px] text-[#8B7F75]">
+                      <p className="mt-1 text-[10px] text-[#6B6560]">
                         최종 수정: {fmtDate(m.updated_at)}
                       </p>
                     </div>

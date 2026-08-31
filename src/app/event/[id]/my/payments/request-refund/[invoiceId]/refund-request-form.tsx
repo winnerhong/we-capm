@@ -99,7 +99,7 @@ export function RefundRequestForm({
           className="mb-1 block text-xs font-semibold text-[#2D5A3D]"
         >
           상세 사유 <span className="text-rose-500">*</span>{" "}
-          <span className="text-[10px] font-normal text-[#8B7F75]">
+          <span className="text-[10px] font-normal text-[#6B6560]">
             (5자 이상, 200자 이내)
           </span>
         </label>

@@ -258,7 +258,7 @@ function QueueCard({
             {meta.icon}
           </span>
           <h3 className="text-sm font-bold text-[#2D5A3D]">{meta.label}</h3>
-          <span className="text-[10px] text-[#8B7F75]">v{doc.version}</span>
+          <span className="text-[10px] text-[#6B6560]">v{doc.version}</span>
         </div>
         <span
           className={`rounded-lg border px-2 py-0.5 text-[11px] font-semibold ${

@@ -102,7 +102,7 @@ export function CustomerGroupCard({ title, total, emptyMsg, items }: Props) {
             </button>
           )}
           {!hasMore && total > visible.length && (
-            <p className="mt-2 text-right text-[10px] text-[#8B7F75]">
+            <p className="mt-2 text-right text-[10px] text-[#6B6560]">
               {visible.length}/{total}
             </p>
           )}
@@ -167,7 +167,7 @@ export function CustomerGroupCard({ title, total, emptyMsg, items }: Props) {
             </div>
 
             {total > items.length && (
-              <footer className="border-t border-[#F5F1E8] bg-[#FFF8F0] px-4 py-2.5 text-[10px] text-[#8B7F75]">
+              <footer className="border-t border-[#F5F1E8] bg-[#FFF8F0] px-4 py-2.5 text-[10px] text-[#6B6560]">
                 ℹ️ 최근 {items.length}명만 로드됨 · 더 오래된 고객은
                 &lsquo;고객 관리&rsquo; 페이지에서 조회하세요
               </footer>
@@ -212,7 +212,7 @@ function CustomerRow({ item }: { item: CustomerItem }) {
           </p>
         ) : (
           item.sub && (
-            <p className="mt-0.5 truncate font-mono text-[10px] text-[#8B7F75]">
+            <p className="mt-0.5 truncate font-mono text-[10px] text-[#6B6560]">
               {item.sub}
             </p>
           )

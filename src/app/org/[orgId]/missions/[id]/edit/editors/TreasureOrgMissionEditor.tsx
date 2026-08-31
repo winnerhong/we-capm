@@ -611,7 +611,7 @@ export function TreasureOrgMissionEditor({ mission, siblings }: Props) {
                     <p className="font-semibold text-[#2D5A3D]">
                       {idx + 1}. {s.hint_text || "(힌트 입력 전)"}
                     </p>
-                    <p className="text-[10px] text-[#8B7F75]">
+                    <p className="text-[10px] text-[#6B6560]">
                       해금:{" "}
                       {s.unlock_rule === "AUTO"
                         ? "자동"

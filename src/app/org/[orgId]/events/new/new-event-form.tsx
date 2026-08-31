@@ -253,7 +253,7 @@ export function NewEventForm({ orgId }: { orgId: string }) {
                     onChange={(e) => setDurationMin(Number(e.target.value))}
                     className="w-full accent-[#2D5A3D]"
                   />
-                  <div className="flex justify-between text-[10px] text-[#8B7F75]">
+                  <div className="flex justify-between text-[10px] text-[#6B6560]">
                     <span>5분</span>
                     <span>10시간</span>
                   </div>

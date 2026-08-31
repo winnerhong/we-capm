@@ -297,7 +297,7 @@ function MissionCard({
               {mission.description}
             </p>
           )}
-          <p className="mt-1 text-[10px] text-[#8B7F75]">
+          <p className="mt-1 text-[10px] text-[#6B6560]">
             🏢 지사: {partnerName ?? "(미상)"}
           </p>
         </div>

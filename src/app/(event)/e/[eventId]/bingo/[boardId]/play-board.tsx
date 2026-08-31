@@ -869,7 +869,7 @@ export function PlayBoard({
             })}
           </div>
         )}
-        <p className="mt-2 text-[10px] text-[#8B7F75]">
+        <p className="mt-2 text-[10px] text-[#6B6560]">
           {myEntry
             ? "📌 피드 사진을 내 판 칸에 배치하세요. 진행자가 그림을 호명하면 그 칸이 ✓ 체크돼요. 체크된 칸으로 줄을 완성하면 빙고!"
             : "📌 먼저 위에서 우리 가족 사진+키워드를 등록해야 빙고가 시작돼요."}

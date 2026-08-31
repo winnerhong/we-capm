@@ -439,7 +439,7 @@ export function BoostModal({
           )}
         </div>
 
-        <p className="mt-3 text-[10px] leading-relaxed text-[#8B7F75]">
+        <p className="mt-3 text-[10px] leading-relaxed text-[#6B6560]">
           💡 점수 = 하트 + 끌어올리기 누적. 신청이 거절되면 자동 환불됩니다.
         </p>
 

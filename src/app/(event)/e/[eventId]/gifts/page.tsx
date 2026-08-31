@@ -173,7 +173,7 @@ function GiftCard({
             {displayStatus === "pending" ? (
               <GiftCardClient gift={gift} userId={gift.user_id} />
             ) : displayStatus === "redeemed" ? (
-              <span className="text-[10px] text-[#8B7F75]">
+              <span className="text-[10px] text-[#6B6560]">
                 {formatRedeemedAt(gift.redeemed_at)}
               </span>
             ) : null}

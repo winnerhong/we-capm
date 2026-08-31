@@ -81,7 +81,7 @@ export default async function PartnerTimetableTemplatesPage() {
                     {t.description}
                   </p>
                 )}
-                <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[10px] text-[#8B7F75]">
+                <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[10px] text-[#6B6560]">
                   <span className="rounded-full bg-[#E8F0E4] px-2 py-0.5 font-semibold text-[#2D5A3D]">
                     슬롯 {t.slots.length}개
                   </span>
@@ -119,7 +119,7 @@ export default async function PartnerTimetableTemplatesPage() {
               >
                 <span className="flex-1 truncate text-[#6B6560]">
                   {t.name}
-                  <span className="ml-1 text-[10px] text-[#8B7F75]">
+                  <span className="ml-1 text-[10px] text-[#6B6560]">
                     · 슬롯 {t.slots.length}개
                   </span>
                 </span>

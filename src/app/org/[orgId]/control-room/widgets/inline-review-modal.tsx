@@ -418,7 +418,7 @@ export function InlineReviewModal({
                     ⚠ {actionMsg}
                   </p>
                 )}
-                <p className="text-[10px] text-[#8B7F75]">
+                <p className="text-[10px] text-[#6B6560]">
                   💡 ← / → 키로 이동 · ESC 로 닫기
                 </p>
               </div>

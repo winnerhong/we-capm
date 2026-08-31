@@ -290,7 +290,7 @@ export function InvitationTemplateManager({
                         {t.label}
                       </h4>
                       {t.is_archived && (
-                        <span className="rounded-full bg-[#F5F1E8] px-1.5 py-0.5 text-[10px] font-bold text-[#8B7F75]">
+                        <span className="rounded-full bg-[#F5F1E8] px-1.5 py-0.5 text-[10px] font-bold text-[#6B6560]">
                           보관됨
                         </span>
                       )}
@@ -414,7 +414,7 @@ function DraftFields({
           disabled={disabled}
           className="mt-1 w-full rounded-lg border border-[#D4E4BC] bg-white px-3 py-2 text-sm text-[#2D5A3D] outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400/30 disabled:opacity-50"
         />
-        <p className="mt-1 text-[10px] text-[#8B7F75]">
+        <p className="mt-1 text-[10px] text-[#6B6560]">
           줄바꿈은 그대로 보존돼서 초대장에 반영돼요
         </p>
       </label>

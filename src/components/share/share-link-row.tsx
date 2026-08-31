@@ -77,7 +77,7 @@ export function ShareLinkRow({
       >
         <span
           className={`min-w-0 flex-1 truncate font-mono ${
-            muted ? "text-[10px] text-[#8B7F75]" : "text-[11px] text-[#6B6560]"
+            muted ? "text-[10px] text-[#6B6560]" : "text-[11px] text-[#6B6560]"
           }`}
         >
           {display(url)}

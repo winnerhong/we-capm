@@ -152,7 +152,7 @@ export function MissionEditorModal({ initial, onClose }: Props) {
               placeholder="예: 지금 이 순간을 사진 1장으로 남겨주세요!"
               className="w-full rounded-lg border border-[#D4E4BC] bg-[#FEFCF8] px-3 py-2 text-sm"
             />
-            <span className="mt-0.5 block text-right text-[10px] text-[#8B7F75]">
+            <span className="mt-0.5 block text-right text-[10px] text-[#6B6560]">
               {prompt.length} / 400
             </span>
           </label>
@@ -186,7 +186,7 @@ export function MissionEditorModal({ initial, onClose }: Props) {
                 max={60}
                 className="w-full rounded-lg border border-[#D4E4BC] bg-[#FEFCF8] px-3 py-2 text-sm"
               />
-              <span className="mt-0.5 block text-[10px] text-[#8B7F75]">
+              <span className="mt-0.5 block text-[10px] text-[#6B6560]">
                 1~60분
               </span>
             </label>
@@ -205,7 +205,7 @@ export function MissionEditorModal({ initial, onClose }: Props) {
                 max={99}
                 className="w-full rounded-lg border border-[#D4E4BC] bg-[#FEFCF8] px-3 py-2 text-sm"
               />
-              <span className="mt-0.5 block text-[10px] text-[#8B7F75]">
+              <span className="mt-0.5 block text-[10px] text-[#6B6560]">
                 0~99
               </span>
             </label>

@@ -81,7 +81,7 @@ export function OrgAccountMenu({
           <span className="max-w-[10rem] truncate text-xs font-bold text-[#2D5A3D]">
             {shortName}
           </span>
-          <span className="text-[10px] font-semibold text-[#8B7F75]">
+          <span className="text-[10px] font-semibold text-[#6B6560]">
             {subtitle}
           </span>
         </span>

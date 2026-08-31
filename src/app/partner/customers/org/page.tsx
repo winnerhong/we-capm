@@ -492,7 +492,7 @@ export default async function OrgListPage({
                     </div>
                     <div className="mt-3 grid grid-cols-3 gap-2 text-[11px]">
                       <div className="rounded-lg bg-[#FFF8F0] px-2 py-1.5 text-center">
-                        <div className="text-[10px] text-[#8B7F75]">아동</div>
+                        <div className="text-[10px] text-[#6B6560]">아동</div>
                         <div className="font-bold text-[#2D5A3D]">
                           {(childCountByOrg.get(o.id) ?? 0).toLocaleString(
                             "ko-KR"
@@ -501,13 +501,13 @@ export default async function OrgListPage({
                         </div>
                       </div>
                       <div className="rounded-lg bg-[#FFF8F0] px-2 py-1.5 text-center">
-                        <div className="text-[10px] text-[#8B7F75]">반</div>
+                        <div className="text-[10px] text-[#6B6560]">반</div>
                         <div className="font-bold text-[#2D5A3D]">
                           {o.class_count}
                         </div>
                       </div>
                       <div className="rounded-lg bg-[#FFF8F0] px-2 py-1.5 text-center">
-                        <div className="text-[10px] text-[#8B7F75]">교사</div>
+                        <div className="text-[10px] text-[#6B6560]">교사</div>
                         <div className="font-bold text-[#2D5A3D]">
                           {o.teacher_count}
                         </div>
@@ -604,7 +604,7 @@ export default async function OrgListPage({
                           {(childCountByOrg.get(o.id) ?? 0).toLocaleString(
                             "ko-KR"
                           )}
-                          <span className="ml-0.5 text-[10px] text-[#8B7F75]">
+                          <span className="ml-0.5 text-[10px] text-[#6B6560]">
                             명
                           </span>
                         </td>

@@ -398,7 +398,7 @@ function FamilyList({
                     )}
                     <span>{c.name}</span>
                     {c.birthDate && (
-                      <span className="text-[10px] text-[#8B7F75]">
+                      <span className="text-[10px] text-[#6B6560]">
                         {calcAge(c.birthDate)}
                       </span>
                     )}

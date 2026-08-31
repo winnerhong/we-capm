@@ -91,7 +91,7 @@ export default async function PartnerVenuesPage() {
                     {v.address}
                   </p>
                 )}
-                <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px] text-[#8B7F75]">
+                <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px] text-[#6B6560]">
                   <span>🅿 주차장 {v.parking_lots.length}개</span>
                 </div>
                 <div className="mt-2 flex flex-wrap gap-1.5">
@@ -124,7 +124,7 @@ export default async function PartnerVenuesPage() {
                 <span className="flex-1 truncate text-[#6B6560]">
                   {v.name}
                   {v.address && (
-                    <span className="ml-1 text-[10px] text-[#8B7F75]">
+                    <span className="ml-1 text-[10px] text-[#6B6560]">
                       · {v.address}
                     </span>
                   )}

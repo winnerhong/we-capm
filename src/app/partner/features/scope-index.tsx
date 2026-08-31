@@ -91,7 +91,7 @@ export function ScopeIndex({
         const meta = ORG_PHASE_META[g.phase];
         return (
           <section key={g.phase}>
-            <p className="mt-3 mb-1 flex items-center gap-1.5 px-1 text-[10px] font-bold text-[#8B7F75]">
+            <p className="mt-3 mb-1 flex items-center gap-1.5 px-1 text-[10px] font-bold text-[#6B6560]">
               <span
                 aria-hidden
                 className={`h-1.5 w-1.5 rounded-full ${meta.dot}`}

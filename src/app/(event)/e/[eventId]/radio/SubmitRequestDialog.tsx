@@ -213,7 +213,7 @@ export function SubmitRequestDialog({
               <p className="text-[11px] font-bold text-[#2D5A3D]">
                 🔥 오늘 많이 신청된 곡
               </p>
-              <p className="mt-0.5 text-[10px] text-[#8B7F75]">
+              <p className="mt-0.5 text-[10px] text-[#6B6560]">
                 👇 클릭하면 &ldquo;나도 듣고 싶어요&rdquo; +1 신청이 들어가요
               </p>
               <div className="mt-1.5 flex flex-wrap gap-1.5">

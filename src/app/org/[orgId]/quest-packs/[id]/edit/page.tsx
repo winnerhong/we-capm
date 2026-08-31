@@ -173,7 +173,7 @@ export default async function EditOrgQuestPackPage({
                   🌲 {pack.name || "(이름 없음)"}
                 </p>
                 <StampBookPreview missions={missions} />
-                <p className="mt-3 text-center text-[10px] text-[#8B7F75]">
+                <p className="mt-3 text-center text-[10px] text-[#6B6560]">
                   총 {missions.length}칸 · 레이아웃: {layoutLabel(pack.layout_mode)}
                 </p>
               </div>

@@ -121,7 +121,7 @@ export default async function EditOrgMissionPage({
                 <p className="font-bold text-[#2D5A3D]">
                   {sourcePartnerMission.title}
                 </p>
-                <p className="text-[10px] text-[#8B7F75]">
+                <p className="text-[10px] text-[#6B6560]">
                   ID: {sourcePartnerMission.id}
                 </p>
               </div>

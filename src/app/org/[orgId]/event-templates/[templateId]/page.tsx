@@ -234,7 +234,7 @@ export default async function OrgEventTemplateDetail({ params }: PageProps) {
             maxLength={120}
             className="w-full rounded-xl border border-[#E5DDD0] bg-white px-3 py-2 text-sm focus:border-[#2D5A3D] focus:outline-none"
           />
-          <p className="text-[10px] text-[#8B7F75]">
+          <p className="text-[10px] text-[#6B6560]">
             템플릿명 그대로 두거나 우리 행사에 맞게 수정하세요.
           </p>
         </div>

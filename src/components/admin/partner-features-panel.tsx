@@ -107,7 +107,7 @@ export async function PartnerFeaturesPanel({
                     <div className="text-sm font-bold text-[#2D5A3D]">
                       {f.name}
                     </div>
-                    <div className="font-mono text-[10px] text-[#8B7F75]">
+                    <div className="font-mono text-[10px] text-[#6B6560]">
                       {f.code} · {FEATURE_CATEGORY_META[f.category]} ·{" "}
                       {tier.emoji} {tier.label}
                     </div>

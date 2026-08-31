@@ -342,7 +342,7 @@ function TopMissions({
                     {m.title}
                   </p>
                   {m.kind && (
-                    <p className="text-[10px] font-semibold uppercase text-[#8B7F75]">
+                    <p className="text-[10px] font-semibold uppercase text-[#6B6560]">
                       {m.kind}
                     </p>
                   )}

@@ -304,7 +304,7 @@ export async function DashboardParticipantsSection({
                           {displayName}
                         </Link>
                         {r.enrolled_names.length === 0 && (
-                          <span className="ml-1 text-[10px] text-[#8B7F75]">
+                          <span className="ml-1 text-[10px] text-[#6B6560]">
                             (원생 미지정)
                           </span>
                         )}

@@ -35,7 +35,7 @@ export function CollapsibleSection({
         <span aria-hidden>{icon}</span>
         <span>{title}</span>
         {hint && (
-          <span className="text-[10px] font-normal text-[#8B7F75]">
+          <span className="text-[10px] font-normal text-[#6B6560]">
             {hint}
           </span>
         )}

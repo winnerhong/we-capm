@@ -494,7 +494,7 @@ function ApplicationRow({
                 className="inline-flex items-center gap-1 rounded-full bg-[#F5F1E8] px-2 py-0.5 text-xs font-bold text-[#2D5A3D]"
               >
                 {c.class_name && (
-                  <span className="text-[10px] font-semibold text-[#8B7F75]">
+                  <span className="text-[10px] font-semibold text-[#6B6560]">
                     {c.class_name}
                   </span>
                 )}
@@ -556,7 +556,7 @@ function ApplicationRow({
                   body={proof.optional}
                 />
               ) : (
-                <p className="text-[10px] text-[#8B7F75]">
+                <p className="text-[10px] text-[#6B6560]">
                   [선택] 계열사 제3자 제공 — 동의하지 않으셨어요 (참가에는 영향 없음)
                 </p>
               )}
@@ -691,7 +691,7 @@ function ConsentBadge({
   // 전문 없이 시각만으로 판단한다 — 목록에는 시각만 실려 온다.
   if (!a.consent_agreed_at) {
     return (
-      <span className="rounded-full bg-[#F5F1E8] px-2 py-0.5 text-[10px] font-semibold text-[#8B7F75]">
+      <span className="rounded-full bg-[#F5F1E8] px-2 py-0.5 text-[10px] font-semibold text-[#6B6560]">
         📜 동의 기록 없음 (도입 전)
       </span>
     );

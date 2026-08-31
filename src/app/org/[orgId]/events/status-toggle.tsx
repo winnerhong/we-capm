@@ -157,7 +157,7 @@ export function EventStatusToggle({
   );
 
   const effect = (align: string) => (
-    <p className={`text-[10px] leading-relaxed text-[#8B7F75] ${align}`}>
+    <p className={`text-[10px] leading-relaxed text-[#6B6560] ${align}`}>
       {EFFECT[status]}
     </p>
   );
@@ -185,7 +185,7 @@ export function EventStatusToggle({
 
   return (
     <div className="space-y-1">
-      <p className="text-[10px] font-semibold text-[#8B7F75]">상태</p>
+      <p className="text-[10px] font-semibold text-[#6B6560]">상태</p>
       {chips}
       {effect("")}
       {error}

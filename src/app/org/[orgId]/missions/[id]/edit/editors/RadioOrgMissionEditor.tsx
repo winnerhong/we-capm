@@ -378,7 +378,7 @@ export function RadioOrgMissionEditor({ mission, siblings }: Props) {
                 />
               </Field>
             </div>
-            <p className="mt-2 text-[10px] text-[#8B7F75]">
+            <p className="mt-2 text-[10px] text-[#6B6560]">
               예: 신청곡 1 + 사연 보너스 2 → 사연 함께 보내면 총 🌰 3 지급.
             </p>
           </div>
@@ -441,7 +441,7 @@ export function RadioOrgMissionEditor({ mission, siblings }: Props) {
                   ✏️ {promptStory}
                 </p>
               )}
-              <p className="mt-2 text-[10px] text-[#8B7F75]">
+              <p className="mt-2 text-[10px] text-[#6B6560]">
                 최대 {maxLength || 300}자
               </p>
             </div>

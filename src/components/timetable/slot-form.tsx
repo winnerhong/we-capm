@@ -101,7 +101,7 @@ export function SlotForm({
         <div className="mb-1 flex items-baseline justify-between gap-2">
           <span className={LABEL_CLASS}>
             📏 소요 시간{" "}
-            <span className="text-[10px] font-normal text-[#8B7F75]">
+            <span className="text-[10px] font-normal text-[#6B6560]">
               (5분 단위)
             </span>
           </span>
@@ -139,7 +139,7 @@ export function SlotForm({
             <option key={v} value={v} label={`${v}분`} />
           ))}
         </datalist>
-        <div className="mb-2 flex justify-between px-0.5 text-[10px] text-[#8B7F75]">
+        <div className="mb-2 flex justify-between px-0.5 text-[10px] text-[#6B6560]">
           {Array.from(
             { length: (DURATION_MAX - DURATION_MIN) / DURATION_STEP + 1 },
             (_, i) => DURATION_MIN + i * DURATION_STEP

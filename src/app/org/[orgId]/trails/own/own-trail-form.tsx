@@ -140,7 +140,7 @@ export function OwnTrailForm({ orgId, trail }: Props) {
               }
               className={INPUT_CLS}
             />
-            <p className="mt-1 text-[10px] text-[#8B7F75]">
+            <p className="mt-1 text-[10px] text-[#6B6560]">
               💡 줄바꿈 그대로 표시됩니다.
             </p>
           </div>
@@ -154,7 +154,7 @@ export function OwnTrailForm({ orgId, trail }: Props) {
               onChange={(url) => setCoverUrl(url)}
               pathPrefix="org-trails"
             />
-            <p className="mt-1 text-[10px] text-[#8B7F75]">
+            <p className="mt-1 text-[10px] text-[#6B6560]">
               💡 코스 안내도/지도/사진 등을 올리면 카드에 표시됩니다.
             </p>
           </div>

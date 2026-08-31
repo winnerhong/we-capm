@@ -165,7 +165,7 @@ export function TemplateSectionEditor({
               <span className="text-xs font-semibold text-[#6B6560]">
                 👁 실시간 프리뷰
               </span>
-              <span className="text-[10px] text-[#8B7F75]">
+              <span className="text-[10px] text-[#6B6560]">
                 (기관명·주소는 예시값)
               </span>
             </div>
@@ -359,7 +359,7 @@ export function TemplateSectionEditor({
 
                 <div className="grid grid-cols-[80px_1fr] gap-2">
                   <div>
-                    <label className="mb-0.5 block text-[10px] text-[#8B7F75]">
+                    <label className="mb-0.5 block text-[10px] text-[#6B6560]">
                       번호
                     </label>
                     <input
@@ -372,7 +372,7 @@ export function TemplateSectionEditor({
                     />
                   </div>
                   <div>
-                    <label className="mb-0.5 block text-[10px] text-[#8B7F75]">
+                    <label className="mb-0.5 block text-[10px] text-[#6B6560]">
                       제목
                     </label>
                     <input
@@ -388,7 +388,7 @@ export function TemplateSectionEditor({
                 </div>
 
                 <div>
-                  <label className="mb-0.5 flex items-center justify-between text-[10px] text-[#8B7F75]">
+                  <label className="mb-0.5 flex items-center justify-between text-[10px] text-[#6B6560]">
                     <span>본문</span>
                     <span className="font-mono">
                       {a.body.length}자
@@ -487,7 +487,7 @@ function InsertArticleBtn({
       <button
         type="button"
         onClick={onClick}
-        className="relative z-10 inline-flex items-center gap-1 rounded-full border border-dashed border-[#D4E4BC] bg-white/70 px-3 py-1 text-[10px] font-semibold text-[#8B7F75] opacity-60 transition hover:border-violet-400 hover:bg-violet-50 hover:text-violet-700 hover:opacity-100"
+        className="relative z-10 inline-flex items-center gap-1 rounded-full border border-dashed border-[#D4E4BC] bg-white/70 px-3 py-1 text-[10px] font-semibold text-[#6B6560] opacity-60 transition hover:border-violet-400 hover:bg-violet-50 hover:text-violet-700 hover:opacity-100"
       >
         <span aria-hidden>➕</span>
         <span>{label}</span>

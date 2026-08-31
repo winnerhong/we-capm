@@ -139,7 +139,7 @@ export default async function OrgToritalkPage({
                             <span>아직 대화가 없어요</span>
                           )}
                         </div>
-                        <p className="mt-2 text-[10px] text-[#8B7F75]">
+                        <p className="mt-2 text-[10px] text-[#6B6560]">
                           생성: {fmtFullDateKst(r.created_at)}
                         </p>
                       </Link>

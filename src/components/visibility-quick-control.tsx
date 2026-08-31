@@ -170,7 +170,7 @@ export function VisibilityQuickControl({
   return (
     <div className="rounded-xl border border-[#D4E4BC] bg-[#FFF8F0]/50 p-3">
       <div className="mb-2 flex items-center justify-between">
-        <p className="text-[10px] font-semibold text-[#8B7F75]">
+        <p className="text-[10px] font-semibold text-[#6B6560]">
           📡 배포 대상
           {visStatus === "saving" && (
             <span className="ml-1 text-[9px] text-[#8B6B3F]">⏳</span>
@@ -281,7 +281,7 @@ export function VisibilityQuickControl({
           </div>
 
           <div className="flex items-center justify-between border-t border-[#D4E4BC] pt-1.5">
-            <span className="text-[10px] text-[#8B7F75]">
+            <span className="text-[10px] text-[#6B6560]">
               {assignStatus === "saving" && "⏳ 저장 중..."}
               {assignStatus === "saved" && "✅ 저장됨"}
               {assignStatus === "idle" && `${assignedIds.size}개 선택됨`}

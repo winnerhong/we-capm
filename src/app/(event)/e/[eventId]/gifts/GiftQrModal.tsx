@@ -283,7 +283,7 @@ function MetaItem({
 }) {
   return (
     <div className="rounded-xl border border-[#E8E0D0] bg-white px-3 py-2">
-      <dt className="text-[10px] font-bold text-[#8B7F75]">{label}</dt>
+      <dt className="text-[10px] font-bold text-[#6B6560]">{label}</dt>
       <dd
         className={`mt-0.5 font-semibold ${
           tone === "warn" ? "text-rose-600" : "text-[#2D5A3D]"

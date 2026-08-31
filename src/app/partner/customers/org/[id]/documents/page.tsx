@@ -370,7 +370,7 @@ export default async function PartnerOrgDocumentsPage({
 function InfoChip({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl border border-[#D4E4BC] bg-white px-3 py-2">
-      <p className="text-[10px] font-semibold text-[#8B7F75]">{label}</p>
+      <p className="text-[10px] font-semibold text-[#6B6560]">{label}</p>
       <p className="mt-0.5 truncate text-sm font-semibold text-[#2D5A3D]">
         {value}
       </p>
@@ -523,12 +523,12 @@ function PartnerDocCard({
 
       <div className="grid grid-cols-2 gap-2 text-[11px] text-[#6B6560]">
         <div>
-          <dt className="text-[10px] text-[#8B7F75]">제출</dt>
+          <dt className="text-[10px] text-[#6B6560]">제출</dt>
           <dd>{fmtDate(row.submitted_at)}</dd>
         </div>
         {row.expires_at && (
           <div>
-            <dt className="text-[10px] text-[#8B7F75]">만료</dt>
+            <dt className="text-[10px] text-[#6B6560]">만료</dt>
             <dd
               className={
                 typeof expDays === "number" && expDays <= 30
@@ -545,7 +545,7 @@ function PartnerDocCard({
         )}
         {row.version > 1 && (
           <div>
-            <dt className="text-[10px] text-[#8B7F75]">버전</dt>
+            <dt className="text-[10px] text-[#6B6560]">버전</dt>
             <dd>v{row.version}</dd>
           </div>
         )}

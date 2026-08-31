@@ -43,7 +43,7 @@ export function WelcomeToast({ username, password }: Props) {
           <div className="mt-3 space-y-1.5 rounded-xl border border-[#D4E4BC] bg-[#FFF8F0] p-3">
             <div className="flex items-center justify-between gap-2">
               <div className="min-w-0">
-                <p className="text-[10px] font-semibold text-[#8B7F75]">
+                <p className="text-[10px] font-semibold text-[#6B6560]">
                   아이디
                 </p>
                 <p className="truncate font-mono text-xs font-bold text-[#2D5A3D]">
@@ -54,7 +54,7 @@ export function WelcomeToast({ username, password }: Props) {
             </div>
             <div className="flex items-center justify-between gap-2">
               <div className="min-w-0">
-                <p className="text-[10px] font-semibold text-[#8B7F75]">
+                <p className="text-[10px] font-semibold text-[#6B6560]">
                   임시 비밀번호
                 </p>
                 <p className="truncate font-mono text-xs font-bold text-[#2D5A3D]">

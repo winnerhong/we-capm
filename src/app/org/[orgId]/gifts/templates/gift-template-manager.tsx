@@ -314,11 +314,11 @@ export function GiftTemplateManager({ orgId, initialTemplates }: Props) {
                           {t.label}
                         </h4>
                         {t.is_archived && (
-                          <span className="rounded-full bg-[#F5F1E8] px-1.5 py-0.5 text-[10px] font-bold text-[#8B7F75]">
+                          <span className="rounded-full bg-[#F5F1E8] px-1.5 py-0.5 text-[10px] font-bold text-[#6B6560]">
                             보관됨
                           </span>
                         )}
-                        <span className="text-[10px] text-[#8B7F75]">
+                        <span className="text-[10px] text-[#6B6560]">
                           만료 {t.default_expires_days === 0
                             ? "없음"
                             : `${t.default_expires_days}일`}

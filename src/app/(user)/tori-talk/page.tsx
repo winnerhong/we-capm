@@ -135,7 +135,7 @@ export default async function ToriTalkHubPage() {
                     )}
                   </div>
                   {r.last_message_at && (
-                    <p className="mt-1 text-[10px] text-[#8B7F75]">
+                    <p className="mt-1 text-[10px] text-[#6B6560]">
                       {fmtFullDateKst(r.last_message_at)}
                     </p>
                   )}
@@ -169,7 +169,7 @@ export default async function ToriTalkHubPage() {
                       </p>
                     )}
                   </div>
-                  <span className="shrink-0 rounded-full bg-[#FFF8F0] px-2 py-0.5 text-[10px] font-bold text-[#8B7F75]">
+                  <span className="shrink-0 rounded-full bg-[#FFF8F0] px-2 py-0.5 text-[10px] font-bold text-[#6B6560]">
                     {r.member_count}/{r.max_members}명
                   </span>
                 </div>

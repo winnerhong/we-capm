@@ -271,7 +271,7 @@ export function PhotoGrid({
                   size="sm"
                 />
               </div>
-              <p className="mt-1 truncate text-[10px] leading-tight text-[#8B7F75]">
+              <p className="mt-1 truncate text-[10px] leading-tight text-[#6B6560]">
                 {p.meta}
               </p>
               {showMissionChip && (

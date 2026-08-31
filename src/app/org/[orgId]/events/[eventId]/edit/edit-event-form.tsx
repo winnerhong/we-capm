@@ -572,7 +572,7 @@ export function EditEventForm({
                     onChange={(e) => setDurationMin(Number(e.target.value))}
                     className="w-full accent-[#2D5A3D]"
                   />
-                  <div className="flex justify-between text-[10px] text-[#8B7F75]">
+                  <div className="flex justify-between text-[10px] text-[#6B6560]">
                     <span>5분</span>
                     <span>10시간</span>
                   </div>
@@ -639,7 +639,7 @@ export function EditEventForm({
                       분 전부터
                     </span>
                   </div>
-                  <p className="mt-1 text-[10px] leading-relaxed text-[#8B7F75]">
+                  <p className="mt-1 text-[10px] leading-relaxed text-[#6B6560]">
                     {!startsAt
                       ? "행사 시작 일시를 정하면 입장시간이 계산돼요."
                       : entryPreview
@@ -697,7 +697,7 @@ export function EditEventForm({
               <span className="flex items-center gap-2">
                 <span aria-hidden>📨</span>
                 <span>초대장</span>
-                <span className="text-[10px] font-normal text-[#8B7F75]">
+                <span className="text-[10px] font-normal text-[#6B6560]">
                   (선택 — 비워도 기본 초대장이 만들어져요)
                 </span>
               </span>
@@ -800,7 +800,7 @@ export function EditEventForm({
                   }
                   className={INPUT_CLS}
                 />
-                <p className="mt-1 text-[10px] text-[#8B7F75]">
+                <p className="mt-1 text-[10px] text-[#6B6560]">
                   💡 줄바꿈 그대로 보입니다. 인사말 아래 안내문 카드에 표시돼요.
                 </p>
               </div>
@@ -881,7 +881,7 @@ export function EditEventForm({
                   placeholder="예) 대구 북구 침산동 1344-1"
                   className={INPUT_CLS}
                 />
-                <p className="mt-1 text-[10px] text-[#8B7F75]">
+                <p className="mt-1 text-[10px] text-[#6B6560]">
                   💡 입력하면 초대장에 카카오/네이버 지도 버튼이 자동으로 생겨요.
                 </p>
               </div>
@@ -897,7 +897,7 @@ export function EditEventForm({
                   pathPrefix={`events/${eventId}/location`}
                   compact
                 />
-                <p className="mt-1 text-[10px] text-[#8B7F75]">
+                <p className="mt-1 text-[10px] text-[#6B6560]">
                   💡 입구/간판 사진을 올리면 초대장 &quot;오시는 길&quot; 카드 아래에 노출됩니다.
                 </p>
               </div>
@@ -920,7 +920,7 @@ export function EditEventForm({
                   }
                   className={INPUT_CLS}
                 />
-                <p className="mt-1 text-[10px] text-[#8B7F75]">
+                <p className="mt-1 text-[10px] text-[#6B6560]">
                   💡 줄바꿈이 그대로 초대장에 표시돼요.
                 </p>
               </div>

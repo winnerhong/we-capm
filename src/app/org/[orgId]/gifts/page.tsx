@@ -453,7 +453,7 @@ function StatCard({
         {value}
       </p>
       {hint && (
-        <p className="mt-0.5 text-[10px] font-semibold text-[#8B7F75]">
+        <p className="mt-0.5 text-[10px] font-semibold text-[#6B6560]">
           {hint}
         </p>
       )}

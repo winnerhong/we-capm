@@ -190,7 +190,7 @@ export function DurationRangePicker({
               onChange={(e) => setDuration(Number(e.target.value))}
               className="w-full accent-[#2D5A3D]"
             />
-            <div className="flex justify-between text-[10px] text-[#8B7F75]">
+            <div className="flex justify-between text-[10px] text-[#6B6560]">
               <span>{cfg.minLabel}</span>
               <span>{cfg.maxLabel}</span>
             </div>

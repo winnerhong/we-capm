@@ -304,7 +304,7 @@ export default async function EditTemplatePage({ params }: PageProps) {
               변경
             </button>
           </div>
-          <p className="mt-1 text-[10px] text-[#8B7F75]">
+          <p className="mt-1 text-[10px] text-[#6B6560]">
             기관에 보이려면 PUBLISHED 로 변경
           </p>
         </form>
@@ -335,7 +335,7 @@ export default async function EditTemplatePage({ params }: PageProps) {
               변경
             </button>
           </div>
-          <p className="mt-1 text-[10px] text-[#8B7F75]">{vm.desc}</p>
+          <p className="mt-1 text-[10px] text-[#6B6560]">{vm.desc}</p>
         </form>
       </section>
 
@@ -466,7 +466,7 @@ export default async function EditTemplatePage({ params }: PageProps) {
                         <div className="text-sm font-bold text-[#2D5A3D]">
                           {it.item_name_snapshot ?? "(이름 없음)"}
                         </div>
-                        <div className="font-mono text-[10px] text-[#8B7F75]">
+                        <div className="font-mono text-[10px] text-[#6B6560]">
                           {meta.label} · {it.item_id.slice(0, 8)}…
                         </div>
                         {it.required_feature_code && (
@@ -542,7 +542,7 @@ export default async function EditTemplatePage({ params }: PageProps) {
             <span aria-hidden>🕒</span>
             <span>권장 타임테이블 ({slots.length})</span>
           </h2>
-          <p className="hidden text-[10px] text-[#8B7F75] md:block">
+          <p className="hidden text-[10px] text-[#6B6560] md:block">
             기관이 가져갈 때 행사 시작시각 기준으로 자동 환산
           </p>
         </div>
@@ -574,7 +574,7 @@ export default async function EditTemplatePage({ params }: PageProps) {
                         <div className="text-sm font-bold text-[#2D5A3D]">
                           {s.title}
                         </div>
-                        <div className="font-mono text-[10px] text-[#8B7F75]">
+                        <div className="font-mono text-[10px] text-[#6B6560]">
                           ⏱️ {startTxt}
                           {endTxt ? ` ${endTxt}` : ""} · {km.label}
                           {s.location ? ` · 📍 ${s.location}` : ""}
@@ -849,7 +849,7 @@ function FmSessionPicker({
           </span>
         )}
       </div>
-      <p className="mt-1 text-[10px] text-[#8B7F75]">
+      <p className="mt-1 text-[10px] text-[#6B6560]">
         세션 이름·노트만 입력. 가져오기 시 행사에 빈 세션 1개가 자동 생성돼요.
       </p>
       <div className="mt-2 grid gap-2 md:grid-cols-2">

@@ -198,7 +198,7 @@ export function PartyCountEditor({
           </p>
         )}
         {!known && (
-          <p className="mt-1.5 text-[10px] text-[#8B7F75]">
+          <p className="mt-1.5 text-[10px] text-[#6B6560]">
             최소 1명이어야 저장할 수 있어요.
           </p>
         )}

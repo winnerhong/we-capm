@@ -152,7 +152,7 @@ export function ApplicationSettings({
                     className="w-full rounded-xl border border-[#D4E4BC] bg-white px-3 py-2 text-sm text-[#2D5A3D] outline-none focus:border-[#3A7A52] disabled:opacity-50"
                   />
                   {/* 비워둬도 무기한이 아니다 — 행사 시작 1시간 전에 자동으로 닫힌다. */}
-                  <span className="mt-1 block text-[10px] leading-relaxed text-[#8B7F75]">
+                  <span className="mt-1 block text-[10px] leading-relaxed text-[#6B6560]">
                     {closeAt
                       ? "이 시각에 신청 폼이 닫혀요."
                       : defaultCloseLabel

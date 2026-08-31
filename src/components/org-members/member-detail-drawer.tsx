@@ -266,7 +266,7 @@ export function MemberDetailDrawer({
                           <p className="truncate text-xs font-bold text-[#3D3A36]">
                             {e.name}
                           </p>
-                          <p className="text-[10px] text-[#8B7F75]">
+                          <p className="text-[10px] text-[#6B6560]">
                             {formatDate(e.startsAt)}
                             {e.endsAt && ` ~ ${formatDate(e.endsAt)}`}
                           </p>
@@ -316,7 +316,7 @@ export function MemberDetailDrawer({
                           >
                             {badge.label}
                           </span>
-                          <span className="text-[10px] text-[#8B7F75]">
+                          <span className="text-[10px] text-[#6B6560]">
                             {formatDateTime(s.submittedAt)}
                           </span>
                         </li>
@@ -369,7 +369,7 @@ export function MemberDetailDrawer({
           )}
         </div>
 
-        <footer className="border-t border-[#D4E4BC] bg-white px-4 py-2 text-center text-[10px] text-[#8B7F75]">
+        <footer className="border-t border-[#D4E4BC] bg-white px-4 py-2 text-center text-[10px] text-[#6B6560]">
           ESC · 백드롭 클릭으로 닫기 · 페이지 경로: {basePath}/members
         </footer>
       </aside>

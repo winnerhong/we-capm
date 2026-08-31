@@ -683,7 +683,7 @@ function StatCard({
       <div className="mt-1 truncate text-xl font-bold text-[#2D5A3D]">
         {value}
       </div>
-      {sub && <div className="mt-0.5 text-[10px] text-[#8B7F75]">{sub}</div>}
+      {sub && <div className="mt-0.5 text-[10px] text-[#6B6560]">{sub}</div>}
     </div>
   );
 }

@@ -153,7 +153,7 @@ export function VenueForm({ initial }: Props) {
         <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-[#2D5A3D]">
           <span aria-hidden>🅿</span>
           <span>주차장 정보</span>
-          <span className="text-[10px] font-normal text-[#8B7F75]">
+          <span className="text-[10px] font-normal text-[#6B6560]">
             (선택 · 최대 10개)
           </span>
         </h3>

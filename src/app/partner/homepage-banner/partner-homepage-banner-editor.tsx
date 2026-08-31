@@ -129,7 +129,7 @@ export function PartnerHomepageBannerEditor({ orgId, initial }: Props) {
           hint="PNG / JPG / WEBP · 720 x 120px 권장"
           compact
         />
-        <p className="mt-1 text-[10px] text-[#8B7F75]">
+        <p className="mt-1 text-[10px] text-[#6B6560]">
           이미지가 없으면 기본 그라데이션 배너로 표시됩니다.
         </p>
       </div>
@@ -165,7 +165,7 @@ export function PartnerHomepageBannerEditor({ orgId, initial }: Props) {
               placeholder={"예)\n위너키즈스포츠 · 1800-7581\n(주) 위너그룹"}
               className="w-full rounded-xl border border-[#D4E4BC] bg-white px-3 py-2.5 text-sm text-[#2C2C2C] focus:border-[#3A7A52] focus:outline-none focus:ring-2 focus:ring-[#3A7A52]/30"
             />
-            <p className="mt-1 text-[10px] text-[#8B7F75]">
+            <p className="mt-1 text-[10px] text-[#6B6560]">
               💡 줄바꿈이 그대로 표시됩니다.
             </p>
           </div>
