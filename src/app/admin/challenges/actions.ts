@@ -50,13 +50,14 @@ function parseForm(formData: FormData) {
     starts_at: new Date(starts_at_raw).toISOString(),
     ends_at: new Date(ends_at_raw).toISOString(),
     event_id,
-    status: "ACTIVE",
   };
 }
 
 export async function createChallengeAction(formData: FormData) {
   await requireAdmin();
-  const data = parseForm(formData);
+  // status 는 **생성할 때만** 넣는다. 수정에 끼워 넣으면 종료된 챌린지가
+  // 저장 한 번에 되살아난다.
+  const data = { ...parseForm(formData), status: "ACTIVE" };
 
   try {
     const table = await challengesTable();

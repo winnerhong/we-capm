@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { createChallengeAction } from "../actions";
+import { createChallengeAction, updateChallengeAction } from "./actions";
 import { AcornIcon } from "@/components/acorn-icon";
 
 // 챌린지 아이콘 선택지. 도토리는 별도 AcornIcon 컴포넌트로 처리하므로 제외.
@@ -22,25 +22,62 @@ function toLocalInput(d: Date) {
   )}:${pad(d.getMinutes())}`;
 }
 
-export function NewChallengeForm({
+/** 수정 화면이 채워 넣는 기존 값. 없으면 새로 만드는 화면이다. */
+export type ChallengeInitial = {
+  id: string;
+  title: string;
+  description: string | null;
+  icon: string | null;
+  goal_type: string | null;
+  goal_value: number | null;
+  reward_acorns: number | null;
+  reward_badge: string | null;
+  starts_at: string | null;
+  ends_at: string | null;
+  event_id: string | null;
+};
+
+/** ISO 문자열을 datetime-local 이 읽는 모양으로. 값이 없으면 빈 문자열. */
+function isoToLocalInput(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? "" : toLocalInput(d);
+}
+
+export function ChallengeForm({
   events,
+  initial,
 }: {
   events: { id: string; name: string }[];
+  /** 있으면 수정, 없으면 생성. 화면 두 개가 같은 폼을 쓴다. */
+  initial?: ChallengeInitial;
 }) {
   const now = new Date();
   const weekLater = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+  const editing = Boolean(initial);
 
-  const [icon, setIcon] = useState<string>("🎯");
-  const [goalType, setGoalType] = useState<string>("MISSION_COUNT");
-  const [startsAt, setStartsAt] = useState<string>(toLocalInput(now));
-  const [endsAt, setEndsAt] = useState<string>(toLocalInput(weekLater));
+  const [icon, setIcon] = useState<string>(initial?.icon || "🎯");
+  const [goalType, setGoalType] = useState<string>(
+    initial?.goal_type || "MISSION_COUNT"
+  );
+  const [startsAt, setStartsAt] = useState<string>(
+    isoToLocalInput(initial?.starts_at) || toLocalInput(now)
+  );
+  const [endsAt, setEndsAt] = useState<string>(
+    isoToLocalInput(initial?.ends_at) || toLocalInput(weekLater)
+  );
+
+  // 수정일 때는 id 를 먼저 묶어 둔다 — 서버 액션의 첫 인자다.
+  const action = initial
+    ? updateChallengeAction.bind(null, initial.id)
+    : createChallengeAction;
 
   const currentUnit =
     GOAL_TYPES.find((g) => g.value === goalType)?.unit ?? "개";
 
   return (
     <form
-      action={createChallengeAction}
+      action={action}
       className="space-y-4 rounded-2xl border border-[#D4E4BC] bg-white p-6"
     >
       <input type="hidden" name="icon" value={icon} />
@@ -78,6 +115,7 @@ export function NewChallengeForm({
           id="challenge-title"
           name="title"
           required
+          defaultValue={initial?.title ?? ""}
           placeholder="예) 4월 벚꽃 도토리 모으기"
           autoComplete="off"
           className="w-full rounded-xl border border-[#D4E4BC] px-3 py-2 outline-none focus:ring-2 focus:ring-[#2D5A3D]"
@@ -93,6 +131,7 @@ export function NewChallengeForm({
           id="challenge-desc"
           name="description"
           rows={3}
+          defaultValue={initial?.description ?? ""}
           placeholder="참가자에게 보여줄 챌린지 소개 문구를 입력하세요"
           className="w-full rounded-xl border border-[#D4E4BC] px-3 py-2 outline-none focus:ring-2 focus:ring-[#2D5A3D]"
         />
@@ -127,7 +166,7 @@ export function NewChallengeForm({
             name="goal_value"
             type="number"
             min={1}
-            defaultValue={10}
+            defaultValue={initial?.goal_value ?? 10}
             required
             inputMode="numeric"
             className="w-full rounded-xl border border-[#D4E4BC] px-3 py-2 outline-none focus:ring-2 focus:ring-[#2D5A3D]"
@@ -146,7 +185,7 @@ export function NewChallengeForm({
             name="reward_acorns"
             type="number"
             min={0}
-            defaultValue={10}
+            defaultValue={initial?.reward_acorns ?? 10}
             inputMode="numeric"
             className="w-full rounded-xl border border-[#D4E4BC] px-3 py-2 outline-none focus:ring-2 focus:ring-[#2D5A3D]"
           />
@@ -158,6 +197,7 @@ export function NewChallengeForm({
           <input
             id="reward-badge"
             name="reward_badge"
+            defaultValue={initial?.reward_badge ?? ""}
             placeholder="예) 벚꽃 탐험가"
             autoComplete="off"
             className="w-full rounded-xl border border-[#D4E4BC] px-3 py-2 outline-none focus:ring-2 focus:ring-[#2D5A3D]"
@@ -205,7 +245,7 @@ export function NewChallengeForm({
         <select
           id="event-id"
           name="event_id"
-          defaultValue=""
+          defaultValue={initial?.event_id ?? ""}
           className="w-full rounded-xl border border-[#D4E4BC] px-3 py-2 outline-none focus:ring-2 focus:ring-[#2D5A3D] bg-white"
         >
           <option value="">전체 행사 (특정 행사 없이 진행)</option>
@@ -232,7 +272,7 @@ export function NewChallengeForm({
           type="submit"
           className="flex-1 rounded-xl bg-[#2D5A3D] text-white px-4 py-2.5 text-sm font-bold hover:bg-[#3A7A52] transition-colors"
         >
-          🌱 챌린지 만들기
+          {editing ? "💾 수정 저장" : "🌱 챌린지 만들기"}
         </button>
       </div>
     </form>

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { NewChallengeForm } from "./new-challenge-form";
+import { ChallengeForm } from "../challenge-form";
 
 export const dynamic = "force-dynamic";
 
@@ -40,7 +40,7 @@ export default async function NewChallengePage() {
         </p>
       </div>
 
-      <NewChallengeForm events={events ?? []} />
+      <ChallengeForm events={events ?? []} />
     </div>
   );
 }
