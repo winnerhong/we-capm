@@ -1,4 +1,4 @@
-// ② 초대장 단계 — 내용 쓰기 / 발행·공유 / 템플릿.
+// ② 초대장 단계 — 템플릿 / 내용 쓰기 / 발행·공유.
 //
 // 예전에는 초대장 하나가 세 군데 흩어져 있었다:
 //   내용 쓰기  → 행사 편집 폼 안쪽
@@ -81,7 +81,7 @@ export async function InvitationStep({
     );
   }
 
-  // 기본 — 내용 쓰기
+  // 내용 쓰기 — 이 단계의 기본 화면(event-steps 의 defaultSub).
   const [templates, venues] = await Promise.all([
     loadOrgInvitationTemplates(orgId),
     loadVenuesForOrg(orgId),

@@ -27,7 +27,25 @@ export type Step = {
   label: string;
   icon: string;
   subs: SubTab[];
+  /**
+   * 하위탭 없이 이 단계로 들어왔을 때 그릴 것. 없으면 첫 하위탭.
+   *
+   * **탭 순서와 기본 화면은 다른 이야기다.** 초대장이 그 예다 — 준비는
+   * 템플릿부터 고르는 게 순서라 템플릿이 왼쪽에 있지만, 단계 막대에서
+   * "초대장" 을 누르는 사람은 대개 자기 초대장을 보러 온 것이지 템플릿을
+   * 관리하러 온 게 아니다. 순서를 바꿨다고 도착지까지 따라 바뀌면
+   * 발행까지 끝낸 행사를 열 때마다 템플릿 관리 화면이 뜬다.
+   */
+  defaultSub?: string;
 };
+
+/** 하위탭 없이 들어왔을 때 그릴 하위탭 키. */
+export function defaultSubOf(s: Step): string {
+  const named = s.defaultSub
+    ? s.subs.find((x) => x.key === s.defaultSub)
+    : undefined;
+  return (named ?? s.subs[0]).key;
+}
 
 export const EVENT_STEPS: Step[] = [
   {
@@ -43,11 +61,14 @@ export const EVENT_STEPS: Step[] = [
     key: "invite",
     label: "초대장",
     icon: "💌",
+    // 준비 순서대로 왼쪽부터: 템플릿을 고르고 → 내용을 채우고 → 발행한다.
     subs: [
+      { key: "templates", label: "템플릿" },
       { key: "content", label: "내용 쓰기" },
       { key: "share", label: "발행·공유" },
-      { key: "templates", label: "템플릿" },
     ],
+    // 도착지는 내용 쓰기 그대로. 위 defaultSub 주석 참고.
+    defaultSub: "content",
   },
   {
     key: "people",
@@ -105,9 +126,9 @@ export type Resolved = { step: StepKey; sub: string };
  * 주소창의 step/sub/tab 을 실제로 그릴 단계와 하위탭으로 정리한다.
  *
  * 규칙:
- *   1) step 이 유효하면 그걸 쓴다. sub 가 그 단계에 없는 값이면 첫 하위탭.
+ *   1) step 이 유효하면 그걸 쓴다. sub 가 그 단계에 없는 값이면 기본 하위탭.
  *   2) step 이 없고 예전 tab 이 있으면 매핑해서 쓴다.
- *   3) 둘 다 없거나 모르는 값이면 첫 단계의 첫 하위탭.
+ *   3) 둘 다 없거나 모르는 값이면 첫 단계의 기본 하위탭.
  */
 export function resolveStep(params: {
   step?: string | null;
@@ -117,13 +138,13 @@ export function resolveStep(params: {
   const step = EVENT_STEPS.find((s) => s.key === params.step);
   if (step) {
     const sub = step.subs.find((x) => x.key === params.sub);
-    return { step: step.key, sub: (sub ?? step.subs[0]).key };
+    return { step: step.key, sub: sub ? sub.key : defaultSubOf(step) };
   }
 
   const legacy = params.tab ? LEGACY_TAB[params.tab] : undefined;
   if (legacy) return legacy;
 
-  return { step: EVENT_STEPS[0].key, sub: EVENT_STEPS[0].subs[0].key };
+  return { step: EVENT_STEPS[0].key, sub: defaultSubOf(EVENT_STEPS[0]) };
 }
 
 /** 이 단계의 정의. 모르는 키면 첫 단계. */
@@ -131,17 +152,20 @@ export function stepOf(key: StepKey): Step {
   return EVENT_STEPS.find((s) => s.key === key) ?? EVENT_STEPS[0];
 }
 
-/** 행사 화면 링크. 첫 단계·첫 하위탭이면 쿼리 없이 깔끔한 주소로. */
+/** 행사 화면 링크. 첫 단계·기본 하위탭이면 쿼리 없이 깔끔한 주소로. */
 export function stepHref(
   base: string,
   step: StepKey,
   sub?: string
 ): string {
   const s = stepOf(step);
-  const subKey = s.subs.find((x) => x.key === sub)?.key ?? s.subs[0].key;
-  const isFirst = step === EVENT_STEPS[0].key && subKey === s.subs[0].key;
+  const fallback = defaultSubOf(s);
+  const subKey = s.subs.find((x) => x.key === sub)?.key ?? fallback;
+  const isFirst = step === EVENT_STEPS[0].key && subKey === fallback;
   if (isFirst) return base;
-  const needSub = subKey !== s.subs[0].key;
+  // sub 를 빼도 되는 건 **기본** 하위탭일 때다. 첫 하위탭 기준으로 빼면
+  // 주소는 짧아지는데 열리는 화면이 달라진다.
+  const needSub = subKey !== fallback;
   return needSub
     ? `${base}?step=${step}&sub=${subKey}`
     : `${base}?step=${step}`;

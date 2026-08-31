@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  defaultSubOf,
   EVENT_STEPS,
   resolveStep,
   resolveStepStatuses,
@@ -9,7 +10,7 @@ import {
 const BASE = "/org/o1/events/e1";
 
 describe("resolveStep", () => {
-  it("step 만 있으면 그 단계의 첫 하위탭", () => {
+  it("step 만 있으면 그 단계의 기본 하위탭", () => {
     expect(resolveStep({ step: "people" })).toEqual({
       step: "people",
       sub: "applications",
@@ -70,13 +71,14 @@ describe("stepHref", () => {
     expect(stepHref(BASE, "people")).toBe(`${BASE}?step=people`);
   });
 
-  it("하위탭이 첫 번째가 아니면 sub 까지", () => {
+  it("하위탭이 기본이 아니면 sub 까지", () => {
     expect(stepHref(BASE, "people", "roster")).toBe(
       `${BASE}?step=people&sub=roster`
     );
   });
 
-  it("모르는 하위탭은 첫 번째로 떨어진다", () => {
+  it("모르는 하위탭은 기본 하위탭으로 떨어진다", () => {
+    // 초대장의 기본은 content 라 sub 가 빠진다(왼쪽 끝인 templates 가 아니다).
     expect(stepHref(BASE, "invite", "nope")).toBe(`${BASE}?step=invite`);
   });
 
@@ -160,5 +162,60 @@ describe("resolveStepStatuses", () => {
       surveyResponseCount: 9,
     });
     expect(s.result.hint).toBe("설문 9");
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* 탭 순서 ≠ 도착지                                                            */
+/*                                                                            */
+/*   초대장은 준비 순서대로 템플릿이 왼쪽 끝에 있지만, 단계 막대에서 "초대장"    */
+/*   을 누르면 내용 쓰기로 간다. 둘이 붙어 버리면 발행까지 끝낸 행사를 열 때마다  */
+/*   템플릿 관리 화면이 뜬다 — 순서를 다시 손대는 사람이 밟기 쉬운 자리라        */
+/*   테스트로 묶어 둔다.                                                       */
+/* -------------------------------------------------------------------------- */
+
+describe("기본 하위탭(defaultSub)", () => {
+  const invite = EVENT_STEPS.find((s) => s.key === "invite")!;
+
+  it("초대장의 왼쪽 끝은 템플릿", () => {
+    expect(invite.subs[0].key).toBe("templates");
+    expect(invite.subs.map((x) => x.key)).toEqual([
+      "templates",
+      "content",
+      "share",
+    ]);
+  });
+
+  it("그래도 도착지는 내용 쓰기", () => {
+    expect(defaultSubOf(invite)).toBe("content");
+    expect(resolveStep({ step: "invite" }).sub).toBe("content");
+  });
+
+  it("defaultSub 가 없는 단계는 첫 하위탭이 도착지", () => {
+    for (const step of EVENT_STEPS) {
+      if (step.defaultSub) continue;
+      expect(defaultSubOf(step)).toBe(step.subs[0].key);
+    }
+  });
+
+  it("defaultSub 가 그 단계에 없는 키면 첫 하위탭으로 떨어진다", () => {
+    expect(
+      defaultSubOf({
+        key: "invite",
+        label: "x",
+        icon: "x",
+        subs: [{ key: "a", label: "A" }],
+        defaultSub: "없는키",
+      })
+    ).toBe("a");
+  });
+
+  it("sub 를 뺀 주소는 도착지와 같은 화면이어야 한다", () => {
+    // ?step=invite 로 짧아지는 건 도착지(content)뿐이다. 템플릿은 왼쪽 끝이지만
+    // 주소에서 빠지면 안 된다 — 빠지면 열리는 화면이 달라진다.
+    expect(stepHref(BASE, "invite", "content")).toBe(`${BASE}?step=invite`);
+    expect(stepHref(BASE, "invite", "templates")).toBe(
+      `${BASE}?step=invite&sub=templates`
+    );
   });
 });
