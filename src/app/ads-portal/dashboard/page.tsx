@@ -20,16 +20,27 @@ const STATS: StatItem[] = [
   { label: "예치금 잔액", value: "1,200,000", unit: "원", icon: <AcornIcon size={24} />, accent: "from-[#F5F9EF] to-[#E8F0E4]", text: "#2D5A3D", href: "/ads-portal/billing" },
 ];
 
+// ⚠ ready:false 는 **아직 만들지 않은 화면**이다. 눌리지 않게 막아 둔다.
+//
+// 예전엔 여덟 칸이 전부 Link 였고 그중 다섯이 404 로 떨어졌다. 눌리는데 아무
+// 일도 안 나는 것이 제일 나쁘다 — 광고주는 자기가 뭘 잘못 눌렀다고 생각한다.
+// 목록에서 아예 빼지 않는 이유는 반대쪽 실수를 피하려는 것이다: 칸이 사라지면
+// "그런 기능이 있는 줄도 몰랐다" 가 되고, 로드맵이 화면에서 통째로 지워진다.
+// (기관 포털 「모든 기능」 의 🔒 칸과 같은 규칙이다)
+//
+// 화면을 만들면 ready:true 로 바꾸기만 하면 된다.
 const MENU = [
-  { href: "/ads-portal/campaigns", icon: "📣", title: "캠페인 관리", sub: "목록 · 수정 · 중지" },
-  { href: "/ads-portal/campaigns/new", icon: "✨", title: "새 캠페인", sub: "6단계 마법사" },
-  { href: "/ads-portal/analytics", icon: "📊", title: "성과 분석", sub: "A/B 테스트" },
-  { href: "/ads-portal/targeting", icon: "🎯", title: "타겟 설정", sub: "연령 · 지역 · 관심사" },
-  { href: "/ads-portal/creatives", icon: "🎨", title: "광고 소재", sub: "이미지 · 카피 라이브러리" },
-  { href: "/ads-portal/billing", icon: "💳", title: "결제·청구", sub: "충전 · 세금계산서" },
-  { href: "/ads-portal/esg", icon: "🌱", title: "ESG 임팩트 구매", sub: "나무심기 · 쓰레기줍기" },
-  { href: "/ads-portal/support", icon: "💬", title: "관리자 문의", sub: "1:1 상담" },
+  { href: "/ads-portal/campaigns", icon: "📣", title: "캠페인 관리", sub: "목록 · 수정 · 중지", ready: true },
+  { href: "/ads-portal/campaigns/new", icon: "✨", title: "새 캠페인", sub: "6단계 마법사", ready: true },
+  { href: "/ads-portal/billing", icon: "💳", title: "결제·청구", sub: "충전 · 세금계산서", ready: true },
+  { href: "/ads-portal/analytics", icon: "📊", title: "성과 분석", sub: "A/B 테스트", ready: false },
+  { href: "/ads-portal/targeting", icon: "🎯", title: "타겟 설정", sub: "연령 · 지역 · 관심사", ready: false },
+  { href: "/ads-portal/creatives", icon: "🎨", title: "광고 소재", sub: "이미지 · 카피 라이브러리", ready: false },
+  { href: "/ads-portal/esg", icon: "🌱", title: "ESG 임팩트 구매", sub: "나무심기 · 쓰레기줍기", ready: false },
+  { href: "/ads-portal/support", icon: "💬", title: "관리자 문의", sub: "1:1 상담", ready: false },
 ];
+
+const READY_COUNT = MENU.filter((m) => m.ready).length;
 
 const TIERS = [
   { name: "새싹", emoji: "🌱", range: "0 ~ 50만원", color: "bg-emerald-50 border-emerald-200 text-emerald-700" },
@@ -139,24 +150,44 @@ export default function AdsPortalDashboardPage() {
             <span aria-hidden>🧰</span>
             <span>정령의 도구</span>
           </h2>
-          <span className="text-[10px] text-[#8B6F47] font-medium">8개 메뉴</span>
+          <span className="text-[10px] text-[#8B6F47] font-medium">
+            지금 쓸 수 있는 {READY_COUNT}개
+          </span>
         </div>
         <div className="grid grid-cols-2 gap-2.5 md:grid-cols-4">
-          {MENU.map((m) => (
-            <Link
-              key={m.href}
-              href={m.href}
-              className="group rounded-2xl border border-[#E5D3B8] bg-white p-4 flex flex-col items-center gap-1.5 hover:border-[#C4956A] hover:shadow-md hover:-translate-y-0.5 transition-all"
-            >
-              <span className="text-3xl transition-transform group-hover:scale-110" aria-hidden>
-                {m.icon}
-              </span>
-              <span className="text-sm font-semibold text-[#6B4423] text-center leading-tight">
-                {m.title}
-              </span>
-              <span className="text-[10px] text-[#8B6F47] text-center">{m.sub}</span>
-            </Link>
-          ))}
+          {MENU.map((m) =>
+            m.ready ? (
+              <Link
+                key={m.href}
+                href={m.href}
+                className="group rounded-2xl border border-[#E5D3B8] bg-white p-4 flex flex-col items-center gap-1.5 hover:border-[#C4956A] hover:shadow-md hover:-translate-y-0.5 transition-all"
+              >
+                <span className="text-3xl transition-transform group-hover:scale-110" aria-hidden>
+                  {m.icon}
+                </span>
+                <span className="text-sm font-semibold text-[#6B4423] text-center leading-tight">
+                  {m.title}
+                </span>
+                <span className="text-[10px] text-[#8B6F47] text-center">{m.sub}</span>
+              </Link>
+            ) : (
+              // Link 가 아니라 div 다 — 누를 수 있게 보이면 안 된다.
+              <div
+                key={m.href}
+                aria-disabled
+                title="아직 준비 중인 기능이에요"
+                className="rounded-2xl border border-dashed border-[#E5D3B8] bg-[#FAF7F2] p-4 flex flex-col items-center gap-1.5 cursor-not-allowed"
+              >
+                <span className="text-3xl opacity-40" aria-hidden>
+                  {m.icon}
+                </span>
+                <span className="text-sm font-semibold text-[#A89178] text-center leading-tight">
+                  {m.title}
+                </span>
+                <span className="text-[10px] text-[#A89178] text-center">준비 중</span>
+              </div>
+            )
+          )}
         </div>
       </section>
 
