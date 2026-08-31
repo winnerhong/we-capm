@@ -18,6 +18,10 @@ import {
   insertAcornTx,
   eventIdForSubmission,
 } from "@/lib/app-user/acorn-ledger";
+import {
+  recordRejectPenalty,
+  recordScoreRevoke,
+} from "@/lib/scoring/ledger";
 import { toIsoKstFromLocalInput } from "@/lib/datetime/kst";
 import {
   loadFmSessionById,
@@ -283,6 +287,31 @@ async function rejectSubmissionActionInner(
     ...(wasApproved ? { awarded_acorns: 0 } : {}),
   });
   if (updErr) throw new Error(`반려 실패: ${updErr.message}`);
+
+  // 3) 등수 점수 — 도토리와 다른 원장이다.
+  //
+  //    승인 취소와 반려를 **한 줄로 합치지 않는 이유**:
+  //      · 이미 승인했던 것을 되돌리는 건 운영자의 정정이다. 가족은 "됐다"는
+  //        말을 이미 들었으므로 벌점까지 얹지 않고, 줬던 점수만 회수한다.
+  //      · 처음부터 반려된 것은 성의 문제다. 여기에 감점이 붙는다.
+  //    합치면 나중에 "왜 깎였나"를 설명할 수 없다.
+  if (wasApproved) {
+    await recordScoreRevoke(supabase, {
+      userId: submission.user_id,
+      orgId: mission.org_id,
+      submissionId: submission.id,
+      orgMissionId: submission.org_mission_id,
+    });
+  } else {
+    await recordRejectPenalty(supabase, {
+      userId: submission.user_id,
+      orgId: mission.org_id,
+      submissionId: submission.id,
+      orgMissionId: submission.org_mission_id,
+      acorns: mission.acorns ?? 0,
+      reason: trimmed.slice(0, 100),
+    });
+  }
 
   revalidatePath(`/org/${org.orgId}/missions/review`);
   return { ok: true };

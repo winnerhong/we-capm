@@ -13,6 +13,7 @@
 
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
+import { loadEventScoreRanking } from "@/lib/scoring/queries";
 import { getAcornBalance } from "@/lib/app-user/queries";
 import type {
   AcornTransactionRow,
@@ -276,10 +277,23 @@ export async function loadTopAcornFamiliesForEvent(
   for (const t of txResp.data ?? []) {
     sums.set(t.user_id, (sums.get(t.user_id) ?? 0) + (t.amount ?? 0));
   }
-  const top = [...sums.entries()]
-    .filter(([, v]) => v > 0)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, n);
+
+  // 줄 세우는 기준은 **점수**다. 도토리는 미션마다 고정 정수라 다 한 집이 전부
+  // 동점이 됐다 — 그게 이 랭킹의 가장 큰 문제였다. 점수는 속도(초)가 섞여 있어
+  // 사실상 갈린다.
+  //
+  // 점수 원장이 아직 없으면(마이그레이션 전) 예전대로 도토리 합계로 줄을 세운다.
+  // 랭킹이 비는 것보다 동점이 낫다.
+  const ranked = await loadEventScoreRanking(eventId, n);
+  const scoreOf = new Map(ranked.map((r) => [r.userId, r.totalPoints]));
+
+  const top: [string, number][] =
+    ranked.length > 0
+      ? ranked.map((r) => [r.userId, sums.get(r.userId) ?? 0])
+      : [...sums.entries()]
+          .filter(([, v]) => v > 0)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, n);
   if (top.length === 0) return [];
 
   const ids = top.map(([id]) => id);
@@ -318,6 +332,7 @@ export async function loadTopAcornFamiliesForEvent(
       familyLabel,
       className: classMap.get(userId) ?? null,
       acorns,
+      score: scoreOf.get(userId) ?? null,
     };
   });
 }

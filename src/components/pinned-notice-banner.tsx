@@ -1,10 +1,10 @@
 "use client";
 
-// PinnedNoticeBanner — 참가자 화면 상단에 고정 노출되는 공지사항 배너.
+// PinnedNoticeBanner — 참가자 화면 상단에 고정 노출되는 LIVE 멘트 배너.
 // (participant-shell 이 렌더. 이전 경로: (user)/PinnedNoticeBanner.tsx)
 //
 // 데이터 흐름:
-//   호스트가 SpotlightTriggerBar 의 "공지사항" input 에 글자 입력 + [게시]
+//   호스트가 SpotlightTriggerBar 의 "LIVE 멘트" input 에 글자 입력 + [게시]
 //   → triggerSpotlightAction(sessionId, "BANNER", { text })
 //   → fm_spotlight_events INSERT
 //   → Supabase Realtime publication
@@ -167,7 +167,7 @@ export function PinnedNoticeBanner({ orgId }: Props) {
   const expiresMs = banner.expires_at ? new Date(banner.expires_at).getTime() : null;
   if (expiresMs !== null && now >= expiresMs) return null;
 
-  // 사용자가 이미 [×] 닫은 공지인지 확인
+  // 사용자가 이미 [×] 닫은 멘트인지 확인
   if (typeof window !== "undefined") {
     try {
       if (window.localStorage.getItem(`${DISMISS_KEY_PREFIX}${banner.id}`)) {
@@ -220,7 +220,7 @@ export function PinnedNoticeBanner({ orgId }: Props) {
         <button
           type="button"
           onClick={handleDismiss}
-          aria-label="공지 닫기"
+          aria-label="LIVE 멘트 닫기"
           className="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold text-[#1B2B3A]/70 transition hover:bg-white/40 hover:text-[#1B2B3A]"
         >
           ✕

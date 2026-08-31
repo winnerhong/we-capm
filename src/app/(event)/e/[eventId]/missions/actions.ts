@@ -18,6 +18,10 @@ import {
   sumAcornsForPack,
 } from "@/lib/missions/queries";
 import { markAttemptCompletedAction } from "@/lib/missions/attempt-actions";
+import {
+  measureElapsedSeconds,
+  recordApprovedScore,
+} from "@/lib/scoring/ledger";
 import { computeTier } from "@/lib/missions/progress";
 import {
   capAcornAmount,
@@ -578,6 +582,15 @@ async function submitMissionActionInner(
 
   const supabase = await createClient();
 
+  // 소요 시간은 **여기서** 잰다. 승인 시점에 재면 검수까지 기다린 시간이 섞여
+  // 수동 검수 미션은 전원이 "너무 느림"이 된다. 못 재면 null — 그 경우 속도
+  // 보너스 없이 기본점만 간다(못 잰 것으로 가족이 손해 보면 안 된다).
+  const elapsedSeconds = await measureElapsedSeconds(
+    supabase,
+    user.id,
+    mission.id
+  );
+
   // Insert submission
   const submissionRow: Row = {
     org_mission_id: mission.id,
@@ -589,24 +602,37 @@ async function submitMissionActionInner(
     idempotency_key: idempotencyKey,
   };
 
-  const insertResp = (await (
-    supabase.from("mission_submissions" as never) as unknown as {
-      insert: (r: Row) => {
-        select: (c: string) => {
-          single: () => Promise<{
-            data: { id: string } | null;
-            error: { message: string } | null;
-          }>;
-        };
-      };
-    }
-  )
-    .insert(submissionRow)
-    .select("id")
-    .single()) as {
+  type InsertResp = {
     data: { id: string } | null;
-    error: { message: string } | null;
+    error: { message: string; code?: string } | null;
   };
+  const doInsert = (row: Row) =>
+    (
+      supabase.from("mission_submissions" as never) as unknown as {
+        insert: (r: Row) => {
+          select: (c: string) => { single: () => Promise<InsertResp> };
+        };
+      }
+    )
+      .insert(row)
+      .select("id")
+      .single() as Promise<InsertResp>;
+
+  // elapsed_seconds 컬럼이 아직 없는 배포 창(마이그레이션 20260902000000 적용
+  // 전)에도 제출은 성공해야 한다. 컬럼 탓이면 빼고 한 번 더 — acorn-ledger 가
+  // event_id 로 쓰던 것과 같은 패턴이다.
+  let insertResp = await doInsert({
+    ...submissionRow,
+    elapsed_seconds: elapsedSeconds,
+  });
+  if (
+    insertResp.error &&
+    (insertResp.error.code === "42703" ||
+      insertResp.error.code === "PGRST204" ||
+      insertResp.error.message?.includes("elapsed_seconds"))
+  ) {
+    insertResp = await doInsert(submissionRow);
+  }
 
   if (insertResp.error || !insertResp.data) {
     console.error("[missions/submit] insert error", insertResp.error);
@@ -620,6 +646,21 @@ async function submitMissionActionInner(
   // 관제 telemetry — mission_attempts 의 해당 가족 row 를 완료로 마킹.
   // silent fail (table 누락이어도 제출은 정상).
   await markAttemptCompletedAction(mission.id, user.id, submissionId);
+
+  // 즉시 승인된 것만 여기서 점수를 준다. 검수를 거치는 것은 승인될 때
+  // review-core 가 같은 일을 한다(제출 시점에 박아 둔 elapsed_seconds 를 읽는다).
+  if (status === "AUTO_APPROVED" && (awardedAcorns ?? 0) > 0) {
+    await recordApprovedScore(supabase, {
+      userId: user.id,
+      orgId: mission.org_id,
+      submissionId,
+      orgMissionId: mission.id,
+      missionKind: mission.kind,
+      missionConfig: mission.config_json as { par_seconds?: unknown } | null,
+      acorns: awardedAcorns ?? 0,
+      elapsedSeconds,
+    });
+  }
 
   // RADIO: 모더레이션 큐에 자동 인큐
   if (mission.kind === "RADIO") {

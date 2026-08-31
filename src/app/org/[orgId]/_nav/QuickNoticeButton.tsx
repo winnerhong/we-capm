@@ -1,6 +1,6 @@
 "use client";
 
-// QuickNoticeButton — 기관 포털 상단 nav 의 [📢 공지사항] 버튼.
+// QuickNoticeButton — 기관 포털 상단 nav 의 [📢 LIVE 멘트] 버튼.
 //
 //   - 클릭하면 인라인 팝오버 노출 → 한 줄 입력 → [게시] → fm_spotlight_events INSERT
 //   - 활성 LIVE FM 세션이 있을 때만 게시 가능 (없으면 버튼 비활성)
@@ -68,7 +68,7 @@ export function QuickNoticeButton({ liveFmSessionId }: Props) {
     if (!liveFmSessionId) return;
     const t = text.trim();
     if (!t) return;
-    fire("공지사항 게시", async () => {
+    fire("LIVE 멘트 게시", async () => {
       await triggerSpotlightAction(liveFmSessionId, "BANNER", { text: t });
       setText("");
     });
@@ -76,7 +76,7 @@ export function QuickNoticeButton({ liveFmSessionId }: Props) {
 
   const onDismiss = () => {
     if (!liveFmSessionId) return;
-    fire("공지사항 끄기", () =>
+    fire("LIVE 멘트 끄기", () =>
       dismissSpotlightAction(liveFmSessionId, "BANNER")
     );
   };
@@ -92,7 +92,7 @@ export function QuickNoticeButton({ liveFmSessionId }: Props) {
         title={
           disabled
             ? "토리FM LIVE 방송 시작 후 사용할 수 있어요"
-            : "참가자 화면 상단에 공지사항을 띄워요"
+            : "참가자 화면 상단에 LIVE 멘트를 띄워요"
         }
         className={`ml-1 inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl border px-3 py-2 text-xs font-semibold transition ${
           disabled
@@ -103,21 +103,24 @@ export function QuickNoticeButton({ liveFmSessionId }: Props) {
         }`}
       >
         <span aria-hidden>📢</span>
-        <span>공지사항</span>
+        <span>LIVE 멘트</span>
       </button>
 
       {open && !disabled && (
         <div
           role="dialog"
-          aria-label="공지사항 빠른 게시"
+          aria-label="LIVE 멘트 빠른 게시"
           className="absolute right-0 top-full z-50 mt-2 w-[22rem] overflow-hidden rounded-2xl border border-amber-300 bg-white shadow-xl"
         >
           <div className="border-b border-amber-200 bg-amber-50 px-4 py-2.5">
             <p className="flex items-center gap-1.5 text-xs font-bold text-amber-900">
               <span aria-hidden>📢</span>
-              <span>참가자 화면 상단 공지사항</span>
+              <span>참가자 화면 상단 LIVE 멘트</span>
             </p>
-            <p className="mt-0.5 text-[10px] text-amber-800/75">
+            {/* 10px + 투명도 75% 였다. 대비 3.94:1 로 AA(4.5) 미달이고, 이
+                문장에서 획이 가장 빽빽한 「끄」(ㄲ)가 제일 먼저 뭉개져 그 두
+                글자만 깨진 것처럼 보였다. 크기를 올리고 투명도를 걷는다. */}
+            <p className="mt-0.5 text-[11px] text-amber-800">
               게시하면 LIVE 종료 또는 [끄기] 누르기 전까지 모든 참가자에게 노출돼요.
             </p>
           </div>
@@ -135,7 +138,7 @@ export function QuickNoticeButton({ liveFmSessionId }: Props) {
               placeholder="예: 5분 후 가위바위보 시작합니다 🎉"
               maxLength={60}
               autoFocus
-              aria-label="공지사항 문구"
+              aria-label="LIVE 멘트 문구"
               className="w-full rounded-xl border border-[#D4E4BC] bg-white px-3 py-2 text-sm text-[#1B2B3A] placeholder:text-[#9A9089] focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
             />
             <div className="flex items-center gap-2">
@@ -151,7 +154,7 @@ export function QuickNoticeButton({ liveFmSessionId }: Props) {
                 type="button"
                 disabled={pending}
                 onClick={onDismiss}
-                title="현재 노출 중인 공지사항을 즉시 종료"
+                title="현재 노출 중인 LIVE 멘트를 즉시 종료"
                 className="rounded-xl border border-[#D4E4BC] bg-white px-3 py-2 text-xs font-bold text-[#6B6560] transition hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700 disabled:opacity-40"
               >
                 끄기
@@ -169,8 +172,8 @@ export function QuickNoticeButton({ liveFmSessionId }: Props) {
                 {feedback}
               </p>
             )}
-            <p className="text-[10px] text-[#8B7F75]">
-              💡 새로 게시하면 기존 공지를 자동으로 덮어써요 · Enter 로 빠르게 게시
+            <p className="text-[11px] text-[#6B6560]">
+              💡 새로 게시하면 기존 멘트를 자동으로 덮어써요 · Enter 로 빠르게 게시
             </p>
           </div>
         </div>

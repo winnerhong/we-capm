@@ -1,4 +1,48 @@
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
+
+/**
+ * partner_orgs 한 행 — **요청당 한 번만** 읽는다.
+ *
+ * 왜 한 곳으로 모았나:
+ *   기관 이름(org_name)과 소속 지사(partner_id)는 같은 행에 있는데, 예전엔 셋이
+ *   따로 물었다 — loadOrgNameById 가 한 번, loadPartnerDisplayNameForOrg 가 한 번,
+ *   org-home 의 loadPartnerIdForOrg 가 또 한 번. 기관 홈 한 장을 계측하니 같은
+ *   행을 세 번 읽고 있었다(레이아웃과 페이지가 각자 부르는 것까지 더하면 더).
+ *
+ *   행이 하나면 질의도 하나여야 한다. 두 컬럼을 같이 읽고 cache() 로 감싼다.
+ *   유효 범위는 요청 하나라, 기관명을 바꾸면 다음 요청부터 새 이름이 나온다.
+ */
+const orgRow = cache(async function orgRow(
+  orgId: string
+): Promise<{ org_name: string | null; partner_id: string | null } | null> {
+  if (!orgId) return null;
+  try {
+    const supabase = await createClient();
+    const resp = (await (
+      supabase.from("partner_orgs" as never) as unknown as {
+        select: (c: string) => {
+          eq: (k: string, v: string) => {
+            maybeSingle: () => Promise<{
+              data: {
+                org_name: string | null;
+                partner_id: string | null;
+              } | null;
+            }>;
+          };
+        };
+      }
+    )
+      .select("org_name, partner_id")
+      .eq("id", orgId)
+      .maybeSingle()) as {
+      data: { org_name: string | null; partner_id: string | null } | null;
+    };
+    return resp.data ?? null;
+  } catch {
+    return null;
+  }
+});
 
 /**
  * 기관(org) 의 현재 org_name 을 DB 에서 읽어 반환.
@@ -11,27 +55,16 @@ export async function loadOrgNameById(
   fallback = "소속 기관"
 ): Promise<string> {
   if (!orgId) return fallback;
-  try {
-    const supabase = await createClient();
-    const resp = (await (
-      supabase.from("partner_orgs" as never) as unknown as {
-        select: (c: string) => {
-          eq: (k: string, v: string) => {
-            maybeSingle: () => Promise<{
-              data: { org_name: string | null } | null;
-            }>;
-          };
-        };
-      }
-    )
-      .select("org_name")
-      .eq("id", orgId)
-      .maybeSingle()) as { data: { org_name: string | null } | null };
-    const name = resp.data?.org_name?.trim();
-    return name && name.length > 0 ? name : fallback;
-  } catch {
-    return fallback;
-  }
+  const name = (await orgRow(orgId))?.org_name?.trim();
+  return name && name.length > 0 ? name : fallback;
+}
+
+/** 이 기관이 속한 지사 id. 없으면 null. */
+export async function loadPartnerIdForOrg(
+  orgId: string
+): Promise<string | null> {
+  if (!orgId) return null;
+  return (await orgRow(orgId))?.partner_id ?? null;
 }
 
 /**
@@ -46,26 +79,11 @@ export async function loadPartnerDisplayNameForOrg(
   orgId: string
 ): Promise<string> {
   if (!orgId) return "지사";
-  const supabase = await createClient();
 
-  const orgResp = (await (
-    supabase.from("partner_orgs" as never) as unknown as {
-      select: (c: string) => {
-        eq: (k: string, v: string) => {
-          maybeSingle: () => Promise<{
-            data: { partner_id: string } | null;
-          }>;
-        };
-      };
-    }
-  )
-    .select("partner_id")
-    .eq("id", orgId)
-    .maybeSingle()) as { data: { partner_id: string } | null };
-
-  const partnerId = orgResp.data?.partner_id;
+  const partnerId = await loadPartnerIdForOrg(orgId);
   if (!partnerId) return "지사";
 
+  const supabase = await createClient();
   const partnerResp = (await (
     supabase.from("partners" as never) as unknown as {
       select: (c: string) => {

@@ -289,9 +289,16 @@ export async function loadControlRoomSnapshot(
 
   // participant user_id 목록은 acorns + leaderboard 가 공유 → 1회만 조회.
   // (stamps 의 avgPackCompletePct 계산 시 분모로도 재사용.)
-  const participantUserIds = await loadParticipantUserIds(supabase, orgId);
+  //
+  // ⚠ await 하지 않고 **프라미스만 만들어 둔다.** 예전엔 여기서 기다렸는데, 이
+  //   함수는 org_events → org_event_participants → app_users 를 줄줄이 세 번
+  //   왕복한다. 그 셋이 끝날 때까지 아래 16개가 전부 손 놓고 있었다.
+  //   실제로 필요한 건 6개뿐이다(아래 idsP.then). 나머지 10개는 기다릴 이유가
+  //   없으므로 곧바로 출발시킨다.
+  const idsP = loadParticipantUserIds(supabase, orgId);
 
-  // 15개 서브쿼리 병렬 실행 — 각각 내부에서 try/catch 로 실패 격리.
+  // 16개 서브쿼리 병렬 실행 — 각각 내부에서 try/catch 로 실패 격리.
+  // 순서는 아래 구조분해와 1:1 이므로 줄을 옮기지 말 것.
   const [
     liveEvents,
     participants,
@@ -315,14 +322,16 @@ export async function loadControlRoomSnapshot(
     loadFm(supabase, orgId, todayIso),
     loadChat(supabase, orgId),
     loadPending(supabase, orgId),
-    loadStamps(supabase, orgId, todayIso, participantUserIds.length),
-    loadAcorns(supabase, participantUserIds, todayIso, last6hIso),
-    loadLeaderboard(supabase, participantUserIds, last30dIso),
-    loadBroadcastStats(supabase, orgId, todayIso, participantUserIds.length),
+    idsP.then((ids) => loadStamps(supabase, orgId, todayIso, ids.length)),
+    idsP.then((ids) => loadAcorns(supabase, ids, todayIso, last6hIso)),
+    idsP.then((ids) => loadLeaderboard(supabase, ids, last30dIso)),
+    idsP.then((ids) =>
+      loadBroadcastStats(supabase, orgId, todayIso, ids.length)
+    ),
     loadHeatmap(supabase, orgId, last24hIso),
     loadPhotoWall(supabase, orgId),
-    loadMissionProgress(supabase, orgId, participantUserIds.length),
-    loadFamilyGrid(supabase, orgId, participantUserIds),
+    idsP.then((ids) => loadMissionProgress(supabase, orgId, ids.length)),
+    idsP.then((ids) => loadFamilyGrid(supabase, orgId, ids)),
     loadLiveAttempts(supabase, orgId),
     loadCoopSessions(supabase, orgId),
     loadParticipantDirectory(orgId),

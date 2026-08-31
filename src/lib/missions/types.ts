@@ -300,6 +300,16 @@ export interface MissionSubmissionRow {
    * 돌려주지 않는다. undefined 는 0 으로 읽는다.
    */
   like_count?: number | null;
+  /**
+   * 미션 페이지 입장부터 제출까지 걸린 초. 등수의 속도 점수가 여기서 나온다.
+   *
+   * optional 인 이유는 like_count 와 같다 — 컬럼이 아직 없는 배포 창에서는
+   * select("*") 가 이 키를 안 준다. null/undefined 면 속도 보너스 없이 기본점만.
+   *
+   * ⚠ **승인 시점에 다시 재면 안 된다.** 수동 검수는 몇 시간 뒤라, 그때 재면
+   *   전원이 "너무 느림"이 된다. 제출하는 순간 박아 두고 승인은 이 값을 읽는다.
+   */
+  elapsed_seconds?: number | null;
 }
 
 export interface MissionFinalRedemptionRow {

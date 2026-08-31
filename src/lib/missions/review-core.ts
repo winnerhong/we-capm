@@ -15,6 +15,7 @@ import {
   loadAcornCapContext,
 } from "@/lib/missions/acorn-cap";
 import type { MissionSubmissionRow } from "@/lib/missions/types";
+import { recordApprovedScore } from "@/lib/scoring/ledger";
 
 type Row = Record<string, unknown>;
 type SbErr = { message: string; code?: string } | null;
@@ -195,6 +196,19 @@ export async function approveSubmissionCore(params: {
     amount,
     submissionId,
     memo: `${mission.kind}:${mission.title}${memoSuffix}`,
+  });
+
+  // 등수용 점수 — 도토리와 별개 원장이다. 소요 시간은 **제출 시점에 박아 둔 값**을
+  // 읽는다(지금 재면 검수까지 걸린 시간이 섞인다). 실패해도 승인은 이미 끝났다.
+  await recordApprovedScore(supabase, {
+    userId: submission.user_id,
+    orgId: mission.org_id,
+    submissionId,
+    orgMissionId: submission.org_mission_id,
+    missionKind: mission.kind,
+    missionConfig: mission.config_json as { par_seconds?: unknown } | null,
+    acorns: amount,
+    elapsedSeconds: submission.elapsed_seconds ?? null,
   });
 
   return { ok: true, acorns: amount };

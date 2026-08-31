@@ -137,7 +137,7 @@ export function SpotlightTriggerBar({
           </button>
         </div>
 
-        {/* 공지사항은 상단 nav 의 [📢 공지사항] 버튼으로 통일 — 여기서는 노출 X.
+        {/* LIVE 멘트는 상단 nav 의 [📢 LIVE 멘트] 버튼으로 통일 — 여기서는 노출 X.
             (구 인풋은 nav 와 중복이라 의도적으로 제거. 액션은 동일 — fm_spotlight_events BANNER) */}
       </div>
     );

@@ -343,10 +343,19 @@ function EventCard({
         </div>
 
         <div className="mt-2 space-y-2 pt-2">
-          {/* Primary CTA — 카드 가로 100% */}
+          {/* Primary CTA — 카드 가로 100%.
+              카드 하나에 링크가 대여섯 개라 "그래서 어디를 누르지" 가 됐다.
+              그래서 파동은 하나만 준다 — 둘이 되는 순간 다시 고르는 일이 된다.
+
+              진행중일 때만 움직이는 이유: 목록에 예정·종료 카드가 함께 있는데
+              전부 반짝이면 아무것도 반짝이지 않는 것과 같다. 지금 손을 대야 하는
+              행사는 진행중인 것 하나뿐이고, 강조는 그 하나가 가져가야 한다.
+              (cta-breathe = 테두리 밖 파동, cta-shine = 버튼 안 빛 — globals.css) */}
           <Link
             href={`/org/${orgId}/events/${event.event_id}`}
-            className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-[#2D5A3D] to-[#3A7A52] px-4 py-3 text-sm font-bold text-white shadow-md transition hover:from-[#234a30] hover:to-[#2D5A3D]"
+            className={`${
+              isLive ? "cta-breathe cta-shine " : ""
+            }flex w-full items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-[#2D5A3D] to-[#3A7A52] px-4 py-3 text-sm font-bold text-white shadow-md transition hover:from-[#234a30] hover:to-[#2D5A3D]`}
           >
             <span aria-hidden className="text-base">🎬</span>
             <span>행사 진행 관리</span>

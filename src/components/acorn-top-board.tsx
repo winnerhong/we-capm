@@ -142,9 +142,27 @@ export function AcornTopBoard({
                     <span className="ml-1 text-[10px] text-[#8B6F47]">(나)</span>
                   )}
                 </span>
-                <span className="flex shrink-0 items-center gap-1 text-sm font-bold tabular-nums text-[#6B4423]">
-                  <AcornIcon size={14} />
-                  {f.acorns}
+                {/* 등수를 가르는 것은 점수(도토리×100 + 속도 − 반려)이고,
+                    도토리는 지갑이다. 둘이 다른 값이라 둘 다 보여준다 —
+                    점수만 보이면 "내 도토리는 5개인데 450은 뭐지"가 되고,
+                    도토리만 보이면 5개끼리 순위가 갈린 이유를 알 수 없다. */}
+                <span className="flex shrink-0 flex-col items-end leading-tight">
+                  {typeof f.score === "number" && (
+                    <span className="text-sm font-bold tabular-nums text-[#6B4423]">
+                      {f.score.toLocaleString("ko-KR")}
+                      <span className="ml-0.5 text-[10px] font-semibold">점</span>
+                    </span>
+                  )}
+                  <span
+                    className={
+                      typeof f.score === "number"
+                        ? "flex items-center gap-1 text-[10px] font-semibold tabular-nums text-[#8B6F47]"
+                        : "flex items-center gap-1 text-sm font-bold tabular-nums text-[#6B4423]"
+                    }
+                  >
+                    <AcornIcon size={typeof f.score === "number" ? 10 : 14} />
+                    {f.acorns}
+                  </span>
                 </span>
               </li>
             );

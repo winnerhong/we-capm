@@ -17,6 +17,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { OrgAccountMenu } from "../org-account-menu";
 import { QuickNoticeButton } from "./QuickNoticeButton";
+import { AcornGuideButton } from "./AcornGuideButton";
+import type { AcornScoreGuide } from "@/lib/scoring/guide-core";
 import type { OrgNavBadges } from "@/lib/org-nav/badges";
 
 type BadgeTone = "rose" | "amber" | "emerald" | "violet";
@@ -159,9 +161,17 @@ interface Props {
    * 마이그레이션이 기존 지사에 control-room 을 고정해 둬서 지금 화면은 그대로다.
    */
   tools: NavTool[];
+  /** 상단 [🌰 도토리 배점] 팝오버에 그릴 것. 조회는 레이아웃이 한 번만 한다. */
+  acornGuide: AcornScoreGuide;
 }
 
-export function OrgNav({ orgId, orgName, badges, tools }: Props) {
+export function OrgNav({
+  orgId,
+  orgName,
+  badges,
+  tools,
+  acornGuide,
+}: Props) {
   const pathname = usePathname() ?? "";
   const [openKey, setOpenKey] = useState<string | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -358,7 +368,11 @@ export function OrgNav({ orgId, orgName, badges, tools }: Props) {
             </Link>
           ))}
 
-          {/* 공지사항 빠른 게시 — LIVE FM 세션의 BANNER spotlight 트리거 */}
+          {/* 도토리 배점표 — 행사장에서 "이거 하면 몇 개예요?" 를 그 자리에서
+              답하기 위한 것이라, 어느 화면에 있든 손이 닿는 상단에 둔다. */}
+          <AcornGuideButton guide={acornGuide} />
+
+          {/* LIVE 멘트 빠른 게시 — LIVE FM 세션의 BANNER spotlight 트리거 */}
           <QuickNoticeButton liveFmSessionId={badges.liveFmSessionId} />
         </nav>
 
@@ -441,7 +455,10 @@ export function OrgNav({ orgId, orgName, badges, tools }: Props) {
                   </Link>
                 </li>
               ))}
-              {/* 공지사항 빠른 게시 — drawer 안에서도 동일 컴포넌트 (palette 만 라이트) */}
+              {/* 배점표·LIVE 멘트 — drawer 안에서도 동일 컴포넌트 */}
+              <li>
+                <AcornGuideButton guide={acornGuide} />
+              </li>
               <li>
                 <QuickNoticeButton liveFmSessionId={badges.liveFmSessionId} />
               </li>

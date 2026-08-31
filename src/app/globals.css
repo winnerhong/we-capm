@@ -77,7 +77,24 @@ html {
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: "Pretendard", "Noto Sans KR", "Apple SD Gothic Neo", -apple-system, BlinkMacSystemFont, sans-serif;
+  /* ⚠ 여기 적힌 이름 중 **앱이 실제로 불러오는 폰트는 하나도 없다.**
+     @font-face 도 next/font 도 없고, layout.tsx 가 부르는 Geist 는
+     subsets:["latin"] 이라 한글 글리프가 0개다. 즉 한글은 전부 보는 사람 기기에
+     깔린 폰트로 그려진다.
+
+     예전 목록은 Pretendard → Noto Sans KR → Apple SD Gothic Neo → sans-serif 라
+     **Windows 를 위한 이름이 한 칸도 없었다.** 그래서 Windows 에서는 목록 끝
+     sans-serif 까지 흘러내려간 뒤 글자마다 브라우저가 알아서 폰트를 골랐고,
+     결과가 기기·설치 폰트에 따라 들쭉날쭉했다.
+
+     이제 플랫폼별로 실제 존재하는 이름을 순서대로 적는다. 브라우저는 글리프 단위로
+     내려가므로, Windows 에서 라틴은 Segoe UI · 한글은 맑은 고딕으로 안정된다. */
+  font-family:
+    "Pretendard",
+    -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
+    "Segoe UI", "Malgun Gothic",
+    "Noto Sans KR", Roboto,
+    system-ui, sans-serif;
   font-feature-settings: "ss01", "ss02";
 }
 
@@ -216,6 +233,118 @@ textarea::placeholder {
 .flash-glow-rose   { animation: flashGlowRose 1.5s ease-out forwards; }
 .flash-glow-sky    { animation: flashGlowSky 1.5s ease-out forwards; }
 .flash-glow-indigo { animation: flashGlowIndigo 1.5s ease-out forwards; }
+
+/* ============================================================== */
+/* 주 행동 버튼 — 숨쉬는 테두리 빛                                  */
+/* ============================================================== */
+/*
+ * 왜 깜빡임(opacity)이 아닌가:
+ *   투명도를 껐다 켰다 하면 글자가 읽히다 말다 한다. 그건 강조가 아니라
+ *   **고장**으로 읽히고, 읽으려고 기다리게 되니 오히려 클릭이 늦어진다.
+ *   버튼 본체는 늘 또렷하게 두고 테두리 빛만 퍼지게 하면, 시선은 끌리는데
+ *   글자는 한 번도 흐려지지 않는다.
+ *
+ * 주기 2초 — 1초에 3번을 넘는 번쩍임은 광과민성 발작 유발 기준에 걸린다.
+ *   느린 파동은 그 근처에도 가지 않는다.
+ *
+ * 모션 최소화(prefers-reduced-motion)는 위쪽 전역 블록이 이미 꺼 준다.
+ *
+ * 그림자 원본(shadow-md)을 각 키프레임에 그대로 적고 시작한다 — box-shadow 는
+ * 통째로 갈아끼워지는 속성이라, 빼먹으면 애니메이션이 도는 동안 버튼이 종이처럼
+ * 납작해진다.
+ */
+@keyframes ctaBreathe {
+  0% {
+    box-shadow:
+      0 4px 6px -1px rgb(0 0 0 / 0.1),
+      0 2px 4px -2px rgb(0 0 0 / 0.1),
+      0 0 0 0 rgb(45 90 61 / 0.55);
+  }
+  70% {
+    box-shadow:
+      0 4px 6px -1px rgb(0 0 0 / 0.1),
+      0 2px 4px -2px rgb(0 0 0 / 0.1),
+      0 0 0 10px rgb(45 90 61 / 0);
+  }
+  100% {
+    box-shadow:
+      0 4px 6px -1px rgb(0 0 0 / 0.1),
+      0 2px 4px -2px rgb(0 0 0 / 0.1),
+      0 0 0 0 rgb(45 90 61 / 0);
+  }
+}
+
+.cta-breathe {
+  animation: ctaBreathe 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* 손이 닿았거나 키보드로 도달했으면 파동은 할 일을 다 했다. 멈춰서 초점
+   테두리를 가리지 않는다. */
+.cta-breathe:hover,
+.cta-breathe:focus-visible {
+  animation: none;
+}
+
+/*
+ * cta-shine — 「진행중」 행사 카드의 대표 버튼에만 얹는 빛 쓸기.
+ *
+ * ctaBreathe 는 테두리 **밖**으로 퍼지는 파동이라, 카드가 여러 장 늘어서면
+ * 옆 카드의 테두리·그림자에 섞여 잘 안 보인다. 진행중 카드는 목록에 보통
+ * 하나뿐이니 여기엔 버튼 **안쪽**을 한 번 훑고 지나가는 빛을 더한다.
+ * 밖으로 퍼지는 파동과 안을 지나는 빛이 겹쳐야 "반짝" 으로 읽힌다.
+ *
+ * ⚠ 빛 띠는 글자 **뒤**(z-index: -1)에 깐다.
+ *   흰 띠를 글자 위로 지나가게 하면 그 순간 흰 글씨 대비가 3:1 근처까지
+ *   떨어진다. 눈에 띄게 하려다 못 읽게 만드는 셈이다. 뒤에 깔면 초록 배경만
+ *   잠깐 밝아지고 글자는 한 번도 흐려지지 않는다 — ctaBreathe 와 같은 원칙이다.
+ *
+ *   isolation: isolate 가 반드시 필요하다. 이 버튼이 쌓임 맥락을 만들지 않으면
+ *   z-index: -1 인 띠가 버튼 배경보다 더 뒤, 카드 배경 밑으로 빠져 아예 보이지
+ *   않는다.
+ *
+ * 2.6초에 한 번(0.4Hz) — 광과민성 발작 기준(3Hz) 근처에도 가지 않는다.
+ */
+.cta-shine {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+
+.cta-shine::before {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  left: 0;
+  width: 45%;
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(
+    100deg,
+    rgb(255 255 255 / 0) 0%,
+    rgb(255 255 255 / 0.34) 50%,
+    rgb(255 255 255 / 0) 100%
+  );
+  animation: ctaShine 2.6s ease-in-out infinite;
+}
+
+@keyframes ctaShine {
+  0% {
+    transform: translateX(-160%);
+  }
+  /* 40% 지점에 다 지나가고 나머지 60% 는 쉰다. 쉼 없이 도는 빛은 광고 배너로
+     보이고, 계속 움직이는 것에는 눈이 금세 적응해 오히려 안 보인다. */
+  40%,
+  100% {
+    transform: translateX(340%);
+  }
+}
+
+/* 손이 닿았으면 빛도 할 일을 다 했다. */
+.cta-shine:hover::before,
+.cta-shine:focus-visible::before {
+  animation: none;
+  opacity: 0;
+}
 
 /* ======================================================= */
 /* 토리FM 전광판 VFX (Phase A)                              */

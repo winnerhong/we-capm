@@ -6,10 +6,10 @@
 //
 // 다른 건 딱 두 가지뿐이라 props 로 받는다:
 //   · 탭 목록 (행사 안에서는 행사 하위 경로를 가리켜야 한다)
-//   · 기관 종속 요소의 orgId (공지 배너·홈페이지 배너·접속 추적)
+//   · 기관 종속 요소의 orgId (LIVE 멘트 배너·홈페이지 배너·접속 추적)
 //
 // 기관 정보를 shell 이 스스로 결정하지 않는 게 핵심이다. 예전에는 레이아웃이
-// 세션 쿠키의 orgId 를 직접 읽어서, 보고 있는 행사와 다른 기관의 배너·공지가
+// 세션 쿠키의 orgId 를 직접 읽어서, 보고 있는 행사와 다른 기관의 배너·멘트가
 // 뜨는 일이 있었다. 이제 어느 기관인지는 호출하는 쪽이 정한다.
 
 import Link from "next/link";
@@ -75,7 +75,7 @@ export async function ParticipantShell({
 
   return (
     <div className="min-h-dvh bg-gradient-to-b from-[#FFF8F0] via-[#F5F1E8] to-[#E8F0E4]">
-      {/* 호스트 공지사항 — 활성 LIVE 세션의 BANNER spotlight 가 있으면 상단 고정 노출 */}
+      {/* 호스트 LIVE 멘트 — 활성 LIVE 세션의 BANNER spotlight 가 있으면 상단 고정 노출 */}
       {orgId && <PinnedNoticeBanner orgId={orgId} />}
 
       {/* Top bar */}

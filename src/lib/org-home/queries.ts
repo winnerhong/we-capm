@@ -15,7 +15,10 @@ import { loadTrailsAssignedToOrg } from "@/lib/trails/queries";
 import { loadOrgProfileSnapshot } from "@/lib/profile-completeness/queries";
 import { buildOrgProfileSchema } from "@/lib/profile-completeness/schemas/org";
 import { calcCompleteness } from "@/lib/profile-completeness/calculator";
-import { loadPartnerDisplayNameForOrg } from "@/lib/org-partner";
+import {
+  loadPartnerDisplayNameForOrg,
+  loadPartnerIdForOrg,
+} from "@/lib/org-partner";
 import type {
   NextActionKind,
   OrgHomeDashboard,
@@ -84,20 +87,22 @@ export async function loadOrgHomeDashboard(
 ): Promise<OrgHomeDashboard> {
   if (!orgId) return emptyDashboard(orgName, "운영자");
 
-  // 1) control-room snapshot 1회 호출 (여러 필드 공유 — 중복 호출 금지).
-  //    todayStats / controlRoomPreview / liveEvent activityRate / fm 에서 재사용.
-  let snapshot: Awaited<ReturnType<typeof loadControlRoomSnapshot>> | null = null;
-  try {
-    snapshot = await loadControlRoomSnapshot(orgId, orgName);
-  } catch (e) {
-    console.error("[org-home/loadOrgHomeDashboard] snapshot throw", e);
-  }
+  // 화면 한 장을 그리는 데 필요한 것을 **한 번에** 출발시킨다.
+  //
+  // 예전엔 물결이 셋이었다:
+  //   ① 관제실 스냅샷 하나만 await  ② 나머지 10개  ③ partner_id 가 나온 뒤 2개
+  // ①이 끝나기 전엔 ②가 한 줄도 시작하지 않았다. 계측해 보니 기관 홈 한 장이
+  // 질의 79건을 3.7초에 걸쳐 열 겹 넘는 물결로 흘려보내고 있었고, 개별 질의는
+  // 20~350ms 라 **기다림이 대부분**이었다.
+  //
+  // 스냅샷은 아래 어느 것도 필요로 하지 않고, ③은 partner_id 하나만 있으면 된다.
+  // 그래서 partner_id 는 프라미스로 두고 .then 으로 이어 붙여 전부 한 물결에 넣는다.
+  const partnerIdP = loadPartnerIdForOrg(orgId);
 
-  // 2) 나머지 병렬 로드.
   const [
+    snapshot,
     managerName,
     partnerName,
-    partnerId,
     events,
     profileResult,
     questPacks,
@@ -105,10 +110,16 @@ export async function loadOrgHomeDashboard(
     trails,
     participantsAddedToday,
     documentsInfo,
+    catalogCounts,
+    presetCounts,
   ] = await Promise.all([
+    // 스냅샷이 터져도 홈 전체가 빈 화면이 되면 안 된다 — null 로 떨어뜨린다.
+    loadControlRoomSnapshot(orgId, orgName).catch((e) => {
+      console.error("[org-home/loadOrgHomeDashboard] snapshot throw", e);
+      return null;
+    }),
     loadManagerName(managerId),
     loadPartnerDisplayNameForOrg(orgId).catch(() => "지사"),
-    loadPartnerIdForOrg(orgId),
     loadOrgEvents(orgId).catch(() => []),
     loadProfileCompleteness(orgId),
     loadOrgQuestPacks(orgId).catch(() => []),
@@ -116,12 +127,8 @@ export async function loadOrgHomeDashboard(
     loadTrailsAssignedToOrg(orgId).catch(() => []),
     loadParticipantsAddedToday(orgId),
     loadDocumentsInfo(orgId),
-  ]);
-
-  // 3) partner_id 기반 카탈로그/프리셋 카운트.
-  const [catalogCounts, presetCounts] = await Promise.all([
-    loadPartnerMissionCatalogCounts(partnerId, orgId),
-    loadPartnerPresetCounts(partnerId),
+    partnerIdP.then((id) => loadPartnerMissionCatalogCounts(id, orgId)),
+    partnerIdP.then((id) => loadPartnerPresetCounts(id)),
   ]);
 
   // 4) stampbook 집계.
@@ -233,38 +240,9 @@ async function loadManagerName(managerId: string): Promise<string> {
   }
 }
 
-/* -------------------------------------------------------------------------- */
-/* partner_orgs.partner_id                                                    */
-/* -------------------------------------------------------------------------- */
-
-async function loadPartnerIdForOrg(orgId: string): Promise<string | null> {
-  try {
-    const supabase = await createClient();
-    const resp = (await (
-      supabase.from("partner_orgs" as never) as unknown as {
-        select: (c: string) => {
-          eq: (k: string, v: string) => {
-            maybeSingle: () => Promise<
-              SbRespOne<{ partner_id: string | null }>
-            >;
-          };
-        };
-      }
-    )
-      .select("partner_id")
-      .eq("id", orgId)
-      .maybeSingle()) as SbRespOne<{ partner_id: string | null }>;
-
-    if (resp.error) {
-      console.error("[org-home/loadPartnerIdForOrg] error", resp.error);
-      return null;
-    }
-    return resp.data?.partner_id ?? null;
-  } catch (e) {
-    console.error("[org-home/loadPartnerIdForOrg] throw", e);
-    return null;
-  }
-}
+/* partner_orgs.partner_id 는 lib/org-partner.ts 가 갖는다.
+   여기 같은 함수를 또 두었더니 loadPartnerDisplayNameForOrg 와 나란히 돌면서
+   같은 행을 두 번 읽었다. 정의가 둘이면 조회도 둘이 된다. */
 
 /* -------------------------------------------------------------------------- */
 /* 프로필 완성도                                                              */
