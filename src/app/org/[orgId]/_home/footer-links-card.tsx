@@ -1,3 +1,9 @@
+// 기관 홈 맨 아래 — 서류와 설정, 둘뿐이다.
+//
+// 예전엔 그 밑에 작은 글씨 링크 줄(템플릿 둘러보기 · 미션 통계 · 돌발 미션 ·
+// 로그아웃)이 하나 더 있었다. 넷 다 다른 데 이미 있었다 — 앞 세 개는 바로 위
+// 「🧭 모든 기능」 목록판에, 로그아웃은 상단 계정 메뉴에. 같은 화면 안에서
+// 같은 곳으로 가는 길이 둘이면, 둘이 다른 데로 가는 줄 알고 한 번 더 누른다.
 import Link from "next/link";
 import type { OrgHomeDashboard } from "@/lib/org-home/types";
 
@@ -44,38 +50,6 @@ export function FooterLinksCard({ documents, orgId }: Props) {
             기관 정보 관리
           </p>
         </Link>
-      </div>
-
-      <div className="mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-[11px] text-[#6B6560]">
-        <Link
-          href={`/org/${orgId}/templates`}
-          className="font-semibold hover:text-[#2D5A3D] hover:underline"
-        >
-          템플릿 둘러보기
-        </Link>
-        <span aria-hidden>·</span>
-        <Link
-          href={`/org/${orgId}/missions/stats`}
-          className="font-semibold hover:text-[#2D5A3D] hover:underline"
-        >
-          미션 통계
-        </Link>
-        <span aria-hidden>·</span>
-        <Link
-          href={`/org/${orgId}/missions/broadcast`}
-          className="font-semibold hover:text-[#2D5A3D] hover:underline"
-        >
-          돌발 미션
-        </Link>
-        <span aria-hidden>·</span>
-        <form action="/api/auth/manager-logout" method="post" className="inline">
-          <button
-            type="submit"
-            className="font-semibold hover:text-rose-600 hover:underline"
-          >
-            로그아웃
-          </button>
-        </form>
       </div>
     </section>
   );
