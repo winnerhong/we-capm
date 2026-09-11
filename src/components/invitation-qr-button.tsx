@@ -1,7 +1,7 @@
 "use client";
 
-// 초대장 링크 QR 생성·다운로드 — 카드 형태로 표시 + SVG/PNG 다운로드.
-// 초대장 공유 카드에서 사용.
+// 링크 QR 생성·다운로드 — 카드 형태로 표시 + SVG/PNG 다운로드.
+// 초대장·설문·당일 입장 링크가 같이 쓴다. 무엇의 QR 인지는 kindLabel 이 정한다.
 
 import { useEffect, useRef, useState } from "react";
 import QRCode from "qrcode";
@@ -11,6 +11,12 @@ type Props = {
   url: string;
   /** 파일명·모달 제목용 (예: 행사 이름). */
   eventName: string;
+  /**
+   * 무엇의 QR 인가 — 모달 제목과 파일명에 들어간다. 기본은 「초대장」.
+   * 한 행사에서 초대장 QR 과 입장 QR 을 같이 뽑는 일이 있어서, 내려받은
+   * 파일 이름만 보고도 어느 쪽인지 알아야 한다.
+   */
+  kindLabel?: string;
 };
 
 function sanitize(s: string): string {
@@ -29,13 +35,14 @@ function triggerDownload(href: string, filename: string) {
 export function InvitationQrButton({
   url,
   eventName,
+  kindLabel = "초대장",
   /** 곁들이는 자리(기관 공통 링크 등)에서는 아이콘만 — 옆 버튼들과 크기를 맞춘다. */
   compact = false,
 }: Props & { compact?: boolean }) {
   const [open, setOpen] = useState(false);
   const [svg, setSvg] = useState("");
   const [busy, setBusy] = useState<"svg" | "png" | null>(null);
-  const base = sanitize(`${eventName}_초대장`);
+  const base = sanitize(`${eventName}_${kindLabel}`);
   const closeRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -106,7 +113,7 @@ export function InvitationQrButton({
             ? "border-[#E8DDC8] bg-white/60 px-2 py-1.5 text-[11px] text-[#8B7F75] hover:text-[#2D5A3D]"
             : "gap-1.5 border-[#D4E4BC] bg-white px-3 py-2 text-xs font-bold text-[#2D5A3D] hover:bg-[#F5F1E8]"
         }`}
-        title="초대장 링크의 QR 코드 보기·다운로드"
+        title={`${kindLabel} 링크의 QR 코드 보기·다운로드`}
         aria-label={compact ? "QR 코드" : undefined}
       >
         <span aria-hidden>🎫</span>
@@ -117,7 +124,7 @@ export function InvitationQrButton({
         <div
           role="dialog"
           aria-modal="true"
-          aria-label={`${eventName} 초대장 QR`}
+          aria-label={`${eventName} ${kindLabel} QR`}
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
           onClick={() => setOpen(false)}
         >
@@ -128,7 +135,7 @@ export function InvitationQrButton({
             <div className="flex items-center justify-between gap-2">
               <h3 className="flex items-center gap-2 text-sm font-bold text-[#2D5A3D]">
                 <span aria-hidden>🎫</span>
-                <span className="line-clamp-1">초대장 QR</span>
+                <span className="line-clamp-1">{kindLabel} QR</span>
               </h3>
               <button
                 ref={closeRef}
@@ -149,7 +156,7 @@ export function InvitationQrButton({
               {svg ? (
                 <div
                   role="img"
-                  aria-label={`${eventName} 초대장 QR`}
+                  aria-label={`${eventName} ${kindLabel} QR`}
                   dangerouslySetInnerHTML={{ __html: svg }}
                   className="h-56 w-56 rounded-xl border-2 border-[#2D5A3D] bg-white p-2 [&>svg]:h-full [&>svg]:w-full"
                 />

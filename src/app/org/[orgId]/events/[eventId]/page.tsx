@@ -72,6 +72,8 @@ import { computeEffectiveCloseAt } from "@/lib/org-events/application-core";
 import { loadEventChildrenByUser } from "@/lib/app-user/event-children";
 import { loadEventAcornBalances } from "@/lib/app-user/event-acorns";
 import { InvitationCardShare } from "./invitation-card-share";
+import { EventLoginShare } from "./event-login-share";
+import { resolveApplicationGate } from "@/lib/org-events/application-core";
 import { PhotoFeedToggle } from "./photo-feed-toggle";
 
 export const dynamic = "force-dynamic";
@@ -170,6 +172,17 @@ export default async function OrgEventDetailPage({
 
   const pendingApplications = applicationCounts.pending_count;
   const eventBase = `/org/${orgId}/events/${eventId}`;
+
+  // 접수가 지금 열려 있나 — 참가자 화면과 **같은 함수**로 판단한다.
+  // 초대장은 "마감됐어요" 를 띄우는데 기관 화면은 아무 말이 없어서, 행사를
+  // 열어 둔 줄 알고 있다가 당일에 알게 되는 일이 있었다.
+  const applicationGate = resolveApplicationGate({
+    enabled: !!event.applications_enabled,
+    closeAt: event.applications_close_at,
+    startsAt: event.starts_at,
+    capacity: event.applications_capacity,
+    approvedPeople: applicationCounts.approved_people ?? 0,
+  });
 
   // 단계 막대에 걸 상태 — 설명문 대신 이게 "다음에 뭘 하지" 에 답한다.
   const stepStatuses = resolveStepStatuses({
@@ -399,6 +412,17 @@ export default async function OrgEventDetailPage({
               eventName={event.name}
               publishedAt={event.invitation_published_at ?? null}
             />
+            <div className="h-3" />
+            {/* 초대장 바로 아래 — 「행사 전에 돌리는 것」 과 「당일 문 앞에
+                붙이는 것」 은 짝이라, 찾으러 다니지 않게 붙여 둔다. */}
+            <EventLoginShare
+              eventId={eventId}
+              eventName={event.name}
+              status={event.status}
+              applicationsEnabled={!!event.applications_enabled}
+              applicationsClosed={applicationGate.kind === "CLOSED"}
+              allowSelfRegister={event.allow_self_register ?? false}
+            />
             <div className="h-4" />
             <PhotoFeedToggle
               eventId={eventId}
@@ -451,6 +475,12 @@ export default async function OrgEventDetailPage({
               );
               return at ? fmtDateTimeKst(at) : null;
             })()}
+            closedNow={applicationGate.kind === "CLOSED"}
+            closedAtLabel={
+              applicationGate.kind === "CLOSED"
+                ? fmtDateTimeKst(applicationGate.closedAt)
+                : null
+            }
           />
         ) : sub === "roster" ? (
           <ParticipantsTabPanel
@@ -991,11 +1021,15 @@ async function ApplicationsTabPanel({
   invitationPublished,
   counts,
   defaultCloseLabel,
+  closedNow,
+  closedAtLabel,
 }: {
   orgId: string;
   eventId: string;
   enabled: boolean;
   closeAtLocal: string;
+  closedNow: boolean;
+  closedAtLabel: string | null;
   capacity: string;
   invitationPublished: boolean;
   counts: OrgEventApplicationCounts;
@@ -1034,6 +1068,8 @@ async function ApplicationsTabPanel({
       capacity={capacity}
       invitationPublished={invitationPublished}
       defaultCloseLabel={defaultCloseLabel}
+      closedNow={closedNow}
+      closedAtLabel={closedAtLabel}
       participantPhones={participantPhones}
       consent={consent}
     />

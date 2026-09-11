@@ -29,6 +29,13 @@ type Props = {
    * 행사 시작 시각이 없으면 null.
    */
   defaultCloseLabel: string | null;
+  /**
+   * 지금 이 순간 접수가 닫혀 있는가 — 서버에서 계산해 내려온다.
+   * (여기서 현재 시각을 보면 서버·클라이언트 렌더가 갈려 하이드레이션이 깨진다)
+   */
+  closedNow: boolean;
+  /** 그 마감 시각 라벨. 표시용. */
+  closedAtLabel: string | null;
 };
 
 export function ApplicationSettings({
@@ -40,6 +47,8 @@ export function ApplicationSettings({
   counts,
   invitationPublished,
   defaultCloseLabel,
+  closedNow,
+  closedAtLabel,
 }: Props) {
   const router = useRouter();
   const [enabled, setEnabled] = useState(initialEnabled);
@@ -128,6 +137,18 @@ export function ApplicationSettings({
               />
             </button>
           </div>
+
+          {/* 마감이 이미 지났다.
+              행사가 진행중인데 마감 날짜가 지난 채로 남아 있으면, 참가자는
+              초대장에서 「접수가 마감됐어요」 만 보고 돌아선다. 정작 기관은
+              행사를 열어 둔 줄 안다. 그 어긋남을 여기서 알린다. */}
+          {enabled && closedNow && (
+            <p className="mt-3 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-[11px] font-semibold text-amber-900">
+              ⚠️ 접수가 이미 마감됐어요
+              {closedAtLabel ? ` (${closedAtLabel})` : ""}. 지금은 승인된 분만
+              들어올 수 있어요. 더 받으시려면 마감을 미루거나 접수를 꺼 주세요.
+            </p>
+          )}
 
           {enabled && !invitationPublished && (
             <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-semibold text-amber-900">

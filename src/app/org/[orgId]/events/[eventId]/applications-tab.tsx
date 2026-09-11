@@ -54,6 +54,10 @@ type Props = {
   invitationPublished: boolean;
   /** 마감을 비웠을 때 적용될 자동 마감 라벨(행사 시작 1시간 전). */
   defaultCloseLabel: string | null;
+  /** 지금 접수가 닫혀 있는가(서버 계산). */
+  closedNow: boolean;
+  /** 그 마감 시각 라벨. */
+  closedAtLabel: string | null;
   /** 이미 이 행사 참가자인 연락처 — "이미 참가 중" 배지용. */
   participantPhones: string[];
   /**
@@ -79,6 +83,8 @@ export function ApplicationsTab({
   capacity,
   invitationPublished,
   defaultCloseLabel,
+  closedNow,
+  closedAtLabel,
   participantPhones,
   consent,
 }: Props) {
@@ -289,6 +295,8 @@ export function ApplicationsTab({
         counts={counts}
         invitationPublished={invitationPublished}
         defaultCloseLabel={defaultCloseLabel}
+        closedNow={closedNow}
+        closedAtLabel={closedAtLabel}
       />
 
       {/* 접수를 켠 행사에서만 — 신청서가 없으면 동의문도 뜰 일이 없다. */}
