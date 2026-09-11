@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
-import { getParticipant, getParticipantDb } from "@/lib/participant-session";
+import { notFound } from "next/navigation";
+import { getParticipant } from "@/lib/participant-session";
 import { createClient } from "@/lib/supabase/server";
 import { RealtimeRefresh } from "@/components/realtime-refresh";
 import { AcornIcon } from "@/components/acorn-icon";

@@ -11,7 +11,6 @@ import {
   formatPhone,
   type OrgRow,
 } from "./meta";
-import type { OrgStatus, OrgType } from "./actions";
 import { regenerateAllOrgAccountsAction } from "./actions";
 import { OrgRowActions } from "./org-row-actions";
 

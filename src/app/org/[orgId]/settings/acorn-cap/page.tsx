@@ -20,7 +20,7 @@ export default async function OrgAcornCapSettingsPage({
   const sp = await searchParams;
   const updated = sp.updated === "1";
 
-  const org = await requireOrg();
+  await requireOrg();
 
   const [guidelines, orgCap] = await Promise.all([
     loadPlatformAcornGuidelines(),

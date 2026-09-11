@@ -23,7 +23,7 @@ export default async function OrgUploadDocumentPage({
   const { orgId } = await params;
   const sp = await searchParams;
 
-  const session = await requireOrg();
+  await requireOrg();
 
   const typeRaw = sp.type ?? "";
   if (!ORG_DOC_TYPE_KEYS.includes(typeRaw as OrgDocType)) {

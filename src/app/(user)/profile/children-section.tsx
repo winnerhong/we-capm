@@ -19,7 +19,7 @@ type ChildRow = {
   class_name: string | null;
 };
 
-type Props = { children: ChildRow[] };
+type Props = { kids: ChildRow[] };
 
 function initialOf(name: string): string {
   const t = (name ?? "").trim();
@@ -39,7 +39,7 @@ function genderLabel(g: "M" | "F" | null): string {
   return "";
 }
 
-export function ChildrenSection({ children }: Props) {
+export function ChildrenSection({ kids }: Props) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
 
@@ -48,17 +48,17 @@ export function ChildrenSection({ children }: Props) {
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-bold text-[#2D5A3D]">🪴 우리 아이들</h2>
         <span className="text-xs font-semibold text-[#6B6560]">
-          {children.length}명
+          {kids.length}명
         </span>
       </div>
 
-      {children.length === 0 ? (
+      {kids.length === 0 ? (
         <p className="mt-3 rounded-2xl bg-[#F5F1E8] px-4 py-3 text-center text-xs text-[#6B6560]">
           아직 등록된 아이가 없어요
         </p>
       ) : (
         <ul className="mt-3 space-y-2">
-          {children.map((c) => (
+          {kids.map((c) => (
             <li
               key={c.id}
               className="rounded-2xl border border-[#E8E0D0] bg-[#FFF8F0] px-4 py-3"

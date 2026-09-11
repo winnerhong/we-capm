@@ -60,14 +60,14 @@ export function EditUserForm({
   initialParentName,
   initialStatus,
   phone,
-  children,
+  kids,
 }: {
   orgId: string;
   userId: string;
   initialParentName: string;
   initialStatus: UserStatus;
   phone: string;
-  children: ChildRow[];
+  kids: ChildRow[];
 }) {
   const router = useRouter();
   const [parentName, setParentName] = useState(initialParentName);
@@ -75,7 +75,7 @@ export function EditUserForm({
 
   // 보호자 이름 자동 제안 — 대표 자녀(원생 우선) 이름 + " 학부모".
   //   "학부모_3477" 같은 자동 생성 이름을 자녀 기준으로 손쉽게 바꾸도록.
-  const repChild = children.find((c) => c.is_enrolled) ?? children[0] ?? null;
+  const repChild = kids.find((c) => c.is_enrolled) ?? kids[0] ?? null;
   const repChildName = (repChild?.name ?? "").trim();
   const suggestedParentName = repChildName ? `${repChildName} 학부모` : null;
   const [error, setError] = useState<string | null>(null);
@@ -321,7 +321,7 @@ export function EditUserForm({
         <div className="mb-4 flex items-center justify-between">
           <h2 className="flex items-center gap-2 text-sm font-bold text-[#2D5A3D]">
             <span aria-hidden>🧒</span>
-            <span>자녀 관리 ({children.length}명)</span>
+            <span>자녀 관리 ({kids.length}명)</span>
           </h2>
         </div>
 
@@ -334,13 +334,13 @@ export function EditUserForm({
           </div>
         )}
 
-        {children.length === 0 ? (
+        {kids.length === 0 ? (
           <div className="rounded-xl border border-dashed border-[#E5D3B8] bg-[#FFFDF8] p-6 text-center text-xs text-[#8B7F75]">
             등록된 자녀가 없어요. 아래에서 추가해 주세요.
           </div>
         ) : (
           <ul className="space-y-2">
-            {children.map((c) => {
+            {kids.map((c) => {
               const isEditingBirth = editingBirthId === c.id;
               return (
                 <li

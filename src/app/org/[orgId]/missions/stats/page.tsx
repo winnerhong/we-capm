@@ -35,7 +35,7 @@ export default async function OrgMissionStatsPage({
   searchParams: Promise<{ kind?: string; pack?: string }>;
 }) {
   const { orgId } = await params;
-  const session = await requireOrg();
+  await requireOrg();
 
   const sp = await searchParams;
   const kindFilter: KindFilter = ALL_KINDS.includes(sp.kind as MissionKind)

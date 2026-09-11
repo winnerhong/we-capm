@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { formatDateKR, splitClassName, todayISO, toCSV } from "./csv-export";
 
 const BOM = "﻿";

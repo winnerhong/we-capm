@@ -7,7 +7,6 @@ import {
   ROLE_OPTIONS,
   STATUS_META,
   type TeamMemberRow,
-  type TeamRole,
 } from "@/lib/team/types";
 import {
   updateTeamMemberAction,

@@ -126,7 +126,7 @@ export default async function UserProfilePage() {
       </section>
 
       {/* 우리 아이들 */}
-      <ChildrenSection children={children} />
+      <ChildrenSection kids={children} />
 
       {/* 계정 관리 */}
       <section className="rounded-3xl border border-[#D4E4BC] bg-white p-5 shadow-sm">

@@ -127,7 +127,7 @@ export default async function OrgUserEditPage({
         initialParentName={user.parent_name}
         initialStatus={user.status}
         phone={user.phone}
-        children={children}
+        kids={children}
       />
     </div>
   );

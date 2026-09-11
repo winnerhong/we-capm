@@ -43,7 +43,7 @@ export default async function EventAlbumPage({
   const board = boardRes.data;
 
   // 슬롯 정보 (이름/아이콘 맵핑용)
-  let slotMap = new Map<string, { id: string; name: string; icon: string | null }>();
+  const slotMap = new Map<string, { id: string; name: string; icon: string | null }>();
   if (board) {
     const { data: slots } = await supabase
       .from("stamp_slots")

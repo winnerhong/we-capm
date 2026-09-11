@@ -24,7 +24,7 @@ const ARTICLES: Article[] = [
     content: (
       <div className="space-y-4">
         <p>
-          토리로(이하 '회사')는 회원가입, 서비스 이용, 고객 문의 응대 등을 위해
+          토리로(이하 ‘회사’)는 회원가입, 서비스 이용, 고객 문의 응대 등을 위해
           최소한의 개인정보를 수집합니다. 수집 항목은 다음과 같습니다.
         </p>
         <div className="overflow-x-auto rounded-xl border border-[#D4E4BC]">
@@ -446,7 +446,7 @@ const ARTICLES: Article[] = [
       <div className="space-y-3">
         <p>
           회사는 이용자에게 개별적인 맞춤 서비스를 제공하기 위해 이용 정보를
-          저장하고 수시로 불러오는 '쿠키(cookie)'를 사용합니다.
+          저장하고 수시로 불러오는 ‘쿠키(cookie)’를 사용합니다.
         </p>
         <ul className="list-disc space-y-1 pl-5">
           <li>
@@ -488,7 +488,7 @@ const ARTICLES: Article[] = [
             철회를 요구할 수 있습니다.
           </li>
           <li>
-            가족 단위 서비스 특성상 보호자 계정의 '패밀리 프로필'로 아동 정보가
+            가족 단위 서비스 특성상 보호자 계정의 ‘패밀리 프로필’로 아동 정보가
             등록되는 경우, 해당 정보의 관리 책임은 법정대리인에게 있습니다.
           </li>
         </ul>
@@ -669,7 +669,7 @@ export default function PrivacyPage() {
         <div className="mt-6 rounded-2xl border border-[#D4E4BC] bg-[#E8F0E4]/60 p-5 text-sm leading-relaxed text-[#2D5A3D]">
           <p className="font-semibold">개인정보처리방침 개요</p>
           <p className="mt-2 text-[#2C2C2C]">
-            토리로(TORIRO, 이하 '회사')는 이용자의 개인정보를 소중히 여기며,
+            토리로(TORIRO, 이하 ‘회사’)는 이용자의 개인정보를 소중히 여기며,
             「개인정보 보호법」, 「정보통신망 이용촉진 및 정보보호 등에 관한
             법률」 등 관련 법령을 준수하고 있습니다. 회사는 본 개인정보처리
             방침을 통해 이용자가 제공하는 개인정보가 어떠한 목적과 방식으로

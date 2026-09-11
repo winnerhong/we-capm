@@ -73,7 +73,7 @@ export default async function OrgTrailQrPrintPage({
   searchParams: Promise<{ layout?: string }>;
 }) {
   const { orgId, id } = await params;
-  const org = await requireOrg();
+  await requireOrg();
   const { layout: rawLayout } = await searchParams;
 
   const trail = await loadTrail(id);

@@ -40,7 +40,7 @@ function fmtSize(n: number | null | undefined) {
 export default async function OrgDocumentDetailPage({ params }: PageProps) {
   const { orgId, id } = await params;
 
-  const session = await requireOrg();
+  await requireOrg();
 
   const doc = await loadOrgDocumentById(id);
   if (!doc) notFound();

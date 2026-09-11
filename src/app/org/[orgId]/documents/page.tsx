@@ -70,7 +70,7 @@ export default async function OrgDocumentsPage({
   const { orgId } = await params;
   const sp = await searchParams;
 
-  const org = await requireOrg();
+  await requireOrg();
 
   const [latestMap, stats, expiring] = await Promise.all([
     loadLatestOrgDocuments(orgId),

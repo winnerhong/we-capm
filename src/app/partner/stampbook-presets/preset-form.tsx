@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   MISSION_KIND_META,
@@ -752,12 +753,12 @@ export function PresetForm({
             {orgs.length === 0 ? (
               <p className="text-xs text-[#8B6F47]">
                 이 지사에 등록된 기관이 없어요. 먼저{" "}
-                <a
+                <Link
                   href="/partner/customers/org"
                   className="font-semibold underline"
                 >
                   기관 고객
-                </a>
+                </Link>
                 을 추가해 주세요.
               </p>
             ) : (

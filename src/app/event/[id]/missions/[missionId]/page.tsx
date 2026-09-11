@@ -1,5 +1,5 @@
 import { notFound, redirect } from "next/navigation";
-import { getParticipant, getParticipantDb } from "@/lib/participant-session";
+import { getParticipant } from "@/lib/participant-session";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { QuizForm } from "./quiz-form";

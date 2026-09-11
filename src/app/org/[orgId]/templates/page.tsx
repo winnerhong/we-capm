@@ -40,7 +40,7 @@ export default async function TemplatesCatalogPage({
 }) {
   const { orgId } = await params;
   const { category } = await searchParams;
-  const org = await requireOrg();
+  await requireOrg();
 
   const supabase = await createClient();
 

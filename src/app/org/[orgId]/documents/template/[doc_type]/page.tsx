@@ -37,7 +37,7 @@ function fmtSize(bytes: number | null | undefined) {
 export default async function OrgDocumentTemplatePage({ params }: PageProps) {
   const { orgId, doc_type } = await params;
 
-  const org = await requireOrg();
+  await requireOrg();
 
   if (!(TEMPLATED_TYPES as readonly string[]).includes(doc_type)) {
     notFound();

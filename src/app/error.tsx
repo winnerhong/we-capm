@@ -44,6 +44,10 @@ export default function ErrorPage({
           >
             다시 시도
           </button>
+          {/* 여기서만 <a> 를 쓴다 — 에러 바운더리 안에서 Link 로 넘어가면
+              망가진 클라이언트 트리를 그대로 안고 간다. 통째로 새로 받아야
+              확실히 빠져나온다. */}
+          {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
           <a
             href="/"
             className="rounded-xl border border-[#D4E4BC] text-[#2D5A3D] px-5 py-2.5 text-sm font-semibold hover:bg-[#E8F0E4] focus:outline-none focus:ring-2 focus:ring-[#2D5A3D] focus:ring-offset-2"

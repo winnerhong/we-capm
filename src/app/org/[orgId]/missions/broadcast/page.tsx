@@ -137,7 +137,7 @@ export default async function BroadcastConsolePage({
   params: Promise<{ orgId: string }>;
 }) {
   const { orgId } = await params;
-  const session = await requireOrg();
+  await requireOrg();
 
   const [broadcastMissions, liveBroadcasts, recentBroadcasts, orgEvents] =
     await Promise.all([

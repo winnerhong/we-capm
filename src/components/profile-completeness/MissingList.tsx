@@ -33,7 +33,7 @@ export function MissingList({ result, id = "missing" }: Props) {
           ❌ 미완료 항목 {result.missing.length}개
         </h3>
         <p className="mt-0.5 text-[11px] text-[#8B7F75]">
-          하나씩 채워가면 완성도가 올라가요. 각 항목의 "입력하기"를 눌러 주세요.
+          하나씩 채워가면 완성도가 올라가요. 각 항목의 「입력하기」를 눌러 주세요.
         </p>
       </header>
 

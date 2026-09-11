@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { startOfDaysAgoKstIso, startOfTodayKstIso } from "./kst";
 
 const KST_ISO_RE = /^\d{4}-\d{2}-\d{2}T00:00:00\+09:00$/;

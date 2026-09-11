@@ -40,7 +40,7 @@ export default async function MyProgramsPage({
 }) {
   const { orgId } = await params;
   const { status } = await searchParams;
-  const org = await requireOrg();
+  await requireOrg();
 
   const supabase = await createClient();
 

@@ -26,7 +26,7 @@ export default async function EditOrgProgramPage({
   params: Promise<{ orgId: string; id: string }>;
 }) {
   const { orgId, id } = await params;
-  const org = await requireOrg();
+  await requireOrg();
 
   const supabase = await createClient();
   const { data } = await (supabase.from("org_programs" as never) as any)

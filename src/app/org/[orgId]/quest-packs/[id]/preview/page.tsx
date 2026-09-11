@@ -34,7 +34,7 @@ export default async function OrgQuestPackPreviewPage({
   params: Promise<{ orgId: string; id: string }>;
 }) {
   const { orgId, id } = await params;
-  const session = await requireOrg();
+  await requireOrg();
 
   const pack = await loadOrgQuestPackById(id);
   if (!pack || pack.org_id !== orgId) notFound();
