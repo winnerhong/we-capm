@@ -676,6 +676,81 @@ function parsePackFormFields(formData: FormData): {
   };
 }
 
+/**
+ * 갓 만든 스탬프북을 행사에 바로 붙인다.
+ *
+ * 행사 화면의 「새 스탬프북 / 프리셋 시작」 에서 출발한 생성만 eventId 를
+ * 들고 오는데, 이 연결이 없으면 만들자마자 그 행사 탭이 「0」 으로 남는다.
+ * 행사가 남의 기관 것이면 연결만 건너뛰고 생성 자체는 살린다 —
+ * 스탬프북은 이미 만들어진 뒤라 여기서 throw 하면 고아가 된다.
+ */
+async function linkPackToEvent(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  eventId: string,
+  orgId: string,
+  packId: string
+): Promise<void> {
+  if (!eventId) return;
+
+  const evResp = (await (
+    supabase.from("org_events" as never) as unknown as {
+      select: (c: string) => {
+        eq: (k: string, v: string) => {
+          maybeSingle: () => Promise<{ data: { org_id: string } | null }>;
+        };
+      };
+    }
+  )
+    .select("org_id")
+    .eq("id", eventId)
+    .maybeSingle()) as { data: { org_id: string } | null };
+
+  if (evResp.data?.org_id !== orgId) {
+    console.error("[missions/linkPackToEvent] 권한 없는 행사", { eventId });
+    return;
+  }
+
+  // 맨 뒤에 붙인다 — 기존 순서를 흔들지 않도록.
+  const orderResp = (await (
+    supabase.from("org_event_quest_packs" as never) as unknown as {
+      select: (c: string) => {
+        eq: (
+          k: string,
+          v: string
+        ) => Promise<{ data: Array<{ sort_order: number | null }> | null }>;
+      };
+    }
+  )
+    .select("sort_order")
+    .eq("event_id", eventId)) as {
+    data: Array<{ sort_order: number | null }> | null;
+  };
+
+  const nextOrder = (orderResp.data ?? []).reduce(
+    (max, r) => Math.max(max, (r.sort_order ?? 0) + 1),
+    0
+  );
+
+  const { error } = (await (
+    supabase.from("org_event_quest_packs" as never) as unknown as {
+      insert: (r: Record<string, unknown>) => Promise<{
+        error: { message: string } | null;
+      }>;
+    }
+  ).insert({
+    event_id: eventId,
+    quest_pack_id: packId,
+    sort_order: nextOrder,
+  })) as { error: { message: string } | null };
+
+  if (error) {
+    console.error("[missions/linkPackToEvent] insert 실패", error.message);
+    return;
+  }
+
+  revalidatePath(`/org/${orgId}/events/${eventId}`);
+}
+
 export async function createQuestPackAction(
   orgId: string,
   formData: FormData
@@ -722,6 +797,9 @@ export async function createQuestPackAction(
   if (error || !data) {
     throw new Error(`스탬프북 생성 실패: ${error?.message ?? "unknown"}`);
   }
+
+  const eventId = str(formData.get("event_id"));
+  await linkPackToEvent(supabase, eventId, session.orgId, data.id);
 
   revalidatePath(`/org/${session.orgId}/quest-packs`);
   redirect(`/org/${session.orgId}/quest-packs/${data.id}/edit`);
@@ -886,7 +964,8 @@ async function loadPresetByIdRaw(
 
 export async function createPackFromPresetAction(
   orgId: string,
-  presetId: string
+  presetId: string,
+  eventId?: string
 ): Promise<void> {
   const session = await requireOrg();
   if (session.orgId !== orgId) {
@@ -1014,16 +1093,15 @@ export async function createPackFromPresetAction(
   const missionMap = new Map<string, PartnerMissionRow>();
   for (const m of availableMissions) missionMap.set(m.id, m);
 
+  // 한 번에 INSERT — 미션 개수만큼 왕복하면 20개짜리 프리셋에서 「프리셋
+  // 시작」 이 눈에 띄게 늘어진다. 중간에 실패했을 때 미션 절반만 담긴 팩이
+  // 남는 문제도 같이 사라진다.
+  const missionRows: Array<Record<string, unknown>> = [];
   for (let i = 0; i < missionIds.length; i++) {
-    const mid = missionIds[i];
-    const pm = missionMap.get(mid);
+    const pm = missionMap.get(missionIds[i]);
     if (!pm) continue; // 이론적으로 없음(위에서 검증)
 
-    const configCopy = JSON.parse(
-      JSON.stringify(pm.config_json ?? {})
-    ) as Record<string, unknown>;
-
-    const row: Record<string, unknown> = {
+    missionRows.push({
       org_id: session.orgId,
       quest_pack_id: newPackId,
       source_mission_id: pm.id,
@@ -1032,7 +1110,7 @@ export async function createPackFromPresetAction(
       description: pm.description,
       icon: pm.icon,
       acorns: pm.default_acorns,
-      config_json: configCopy,
+      config_json: structuredClone(pm.config_json ?? {}),
       display_order: i,
       unlock_rule: "ALWAYS" as UnlockRule,
       unlock_threshold: null,
@@ -1044,22 +1122,24 @@ export async function createPackFromPresetAction(
       geofence_lng: null,
       geofence_radius_m: null,
       is_active: true,
-    };
+    });
+  }
 
-    const { error: insErr } = await (
+  if (missionRows.length > 0) {
+    const { error: insErr } = (await (
       supabase.from("org_missions" as never) as unknown as {
         insert: (
-          r: Record<string, unknown>
+          r: Array<Record<string, unknown>>
         ) => Promise<{ error: { message: string } | null }>;
       }
-    ).insert(row);
+    ).insert(missionRows)) as { error: { message: string } | null };
 
     if (insErr) {
-      throw new Error(
-        `미션 복사 실패 (${pm.title}): ${insErr.message}`
-      );
+      throw new Error(`미션 복사 실패: ${insErr.message}`);
     }
   }
+
+  await linkPackToEvent(supabase, eventId ?? "", session.orgId, newPackId);
 
   revalidatePath(`/org/${session.orgId}/quest-packs`);
   revalidatePath(`/org/${session.orgId}/quest-packs/${newPackId}/edit`);

@@ -8,6 +8,8 @@ import { DurationRangePicker } from "@/components/duration-range-picker";
 
 type Props = {
   orgId: string;
+  /** 행사 화면에서 시작했다면 그 행사 id — 만들자마자 그 행사에 붙는다. */
+  eventId?: string;
 };
 
 const LAYOUT_OPTIONS: Array<{
@@ -46,7 +48,7 @@ const ICON_SET_OPTIONS: Array<{
   { value: "SEASON", label: "사계절", sample: "🌸☀️🍁❄️🌻" },
 ];
 
-export function CreateQuestPackForm({ orgId }: Props) {
+export function CreateQuestPackForm({ orgId, eventId }: Props) {
   const [isPending, startTransition] = useTransition();
   const [err, setErr] = useState<string | null>(null);
 
@@ -79,6 +81,7 @@ export function CreateQuestPackForm({ orgId }: Props) {
     fd.set("layout_mode", layoutMode);
     fd.set("stamp_icon_set", iconSet);
     fd.set("cover_image_url", coverUrl.trim());
+    if (eventId) fd.set("event_id", eventId);
 
     startTransition(async () => {
       try {
@@ -236,8 +239,10 @@ export function CreateQuestPackForm({ orgId }: Props) {
         >
           {isPending ? "생성 중..." : "🌲 초안으로 만들기"}
         </button>
-        <p className="mt-2 text-center text-[11px] text-[#8B7F75]">
-          만들면 편집 화면으로 이동해요. 미션을 담고 공개할 수 있어요.
+        <p className="mt-2 text-center text-[11px] text-[#6B6560]">
+          {eventId
+            ? "만들면 이 행사에 바로 연결되고, 편집 화면으로 이동해요."
+            : "만들면 편집 화면으로 이동해요. 미션을 담고 공개할 수 있어요."}
         </p>
       </div>
     </form>

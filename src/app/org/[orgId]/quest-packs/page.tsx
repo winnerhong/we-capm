@@ -66,6 +66,72 @@ async function loadMissionCounts(
   return counts;
 }
 
+type EventLink = { id: string; name: string };
+
+/**
+ * 스탬프북 → 연결된 행사들.
+ *
+ * 스탬프북은 행사와 M:N 이라, 여기서 안 보여주면 「기관 목록엔 있는데 행사
+ * 탭엔 0」 이 왜 정상인지 알 길이 없다. 카드에 연결 상태를 박아 둔다.
+ */
+async function loadEventLinks(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  packIds: string[]
+): Promise<Record<string, EventLink[]>> {
+  if (packIds.length === 0) return {};
+
+  const linkResp = (await (
+    supabase.from("org_event_quest_packs" as never) as unknown as {
+      select: (c: string) => {
+        in: (
+          k: string,
+          v: string[]
+        ) => Promise<{
+          data: Array<{ quest_pack_id: string; event_id: string }> | null;
+        }>;
+      };
+    }
+  )
+    .select("quest_pack_id, event_id")
+    .in("quest_pack_id", packIds)) as {
+    data: Array<{ quest_pack_id: string; event_id: string }> | null;
+  };
+
+  const links = linkResp.data ?? [];
+  if (links.length === 0) return {};
+
+  const eventIds = Array.from(new Set(links.map((l) => l.event_id)));
+  const evResp = (await (
+    supabase.from("org_events" as never) as unknown as {
+      select: (c: string) => {
+        in: (
+          k: string,
+          v: string[]
+        ) => Promise<{
+          data: Array<{ id: string; name: string | null }> | null;
+        }>;
+      };
+    }
+  )
+    .select("id, name")
+    .in("id", eventIds)) as {
+    data: Array<{ id: string; name: string | null }> | null;
+  };
+
+  const nameById = new Map<string, string>();
+  for (const e of evResp.data ?? []) nameById.set(e.id, e.name ?? "");
+
+  const out: Record<string, EventLink[]> = {};
+  for (const l of links) {
+    if (!nameById.has(l.event_id)) continue;
+    (out[l.quest_pack_id] ??= []).push({
+      id: l.event_id,
+      name: nameById.get(l.event_id) || "(이름 없는 행사)",
+    });
+  }
+  return out;
+}
+
 export default async function OrgQuestPacksPage({
   params,
   searchParams,
@@ -74,7 +140,7 @@ export default async function OrgQuestPacksPage({
   searchParams: Promise<{ status?: string }>;
 }) {
   const { orgId } = await params;
-  const session = await requireOrg();
+  await requireOrg();
 
   const sp = await searchParams;
   const statusFilter: StatusFilter =
@@ -90,10 +156,11 @@ export default async function OrgQuestPacksPage({
     loadPartnerDisplayNameForOrg(orgId),
   ]);
   const supabase = await createClient();
-  const counts = await loadMissionCounts(
-    supabase,
-    all.map((p) => p.id)
-  );
+  const packIds = all.map((p) => p.id);
+  const [counts, eventLinks] = await Promise.all([
+    loadMissionCounts(supabase, packIds),
+    loadEventLinks(supabase, packIds),
+  ]);
 
   const list = all.filter((p) => {
     if (statusFilter !== "ALL" && p.status !== statusFilter) return false;
@@ -195,6 +262,7 @@ export default async function OrgQuestPacksPage({
               key={p.id}
               pack={p}
               missionCount={counts[p.id] ?? 0}
+              events={eventLinks[p.id] ?? []}
               orgId={orgId}
             />
           ))}
@@ -207,10 +275,12 @@ export default async function OrgQuestPacksPage({
 function PackCard({
   pack,
   missionCount,
+  events,
   orgId,
 }: {
   pack: OrgQuestPackRow;
   missionCount: number;
+  events: EventLink[];
   orgId: string;
 }) {
   const statusMeta = QUEST_PACK_STATUS_META[pack.status];
@@ -279,6 +349,28 @@ function PackCard({
         <p className="text-[11px] text-[#6B6560]">
           📅 {fmtDate(pack.starts_at)} ~ {fmtDate(pack.ends_at)}
         </p>
+        {/* 행사 연결 — 행사 탭에 보이려면 여기가 「연결됨」 이어야 한다. */}
+        {events.length > 0 ? (
+          <p className="flex flex-wrap items-center gap-1 text-[11px]">
+            <span aria-hidden>🎪</span>
+            <Link
+              href={`/org/${orgId}/events/${events[0].id}`}
+              className="max-w-[12rem] truncate font-semibold text-[#2D5A3D] underline decoration-[#D4E4BC] underline-offset-2 hover:decoration-[#2D5A3D]"
+            >
+              {events[0].name}
+            </Link>
+            {events.length > 1 && (
+              <span className="text-[#6B6560]">
+                외 {events.length - 1}개 행사
+              </span>
+            )}
+          </p>
+        ) : (
+          <p className="flex items-center gap-1 text-[11px] text-[#6B6560]">
+            <span aria-hidden>🎪</span>
+            <span>연결된 행사 없음 · 행사 화면에서 연결하세요</span>
+          </p>
+        )}
         {pack.description && (
           <p className="line-clamp-2 text-xs text-[#6B6560]">
             {pack.description}

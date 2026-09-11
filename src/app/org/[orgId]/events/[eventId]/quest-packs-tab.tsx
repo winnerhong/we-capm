@@ -224,14 +224,14 @@ export function QuestPacksTab({
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Link
-              href={`/org/${orgId}/quest-packs/from-preset`}
+              href={`/org/${orgId}/quest-packs/from-preset?eventId=${eventId}`}
               className="inline-flex items-center gap-1.5 rounded-xl bg-violet-600 px-3 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-violet-700"
             >
               <span aria-hidden>✨</span>
               <span>프리셋 시작</span>
             </Link>
             <Link
-              href={`/org/${orgId}/quest-packs/new`}
+              href={`/org/${orgId}/quest-packs/new?eventId=${eventId}`}
               className="inline-flex items-center gap-1.5 rounded-xl bg-white px-3 py-2 text-xs font-bold text-[#2D5A3D] shadow-sm transition hover:bg-[#F5F1E8]"
             >
               <span aria-hidden>➕</span>
@@ -432,7 +432,9 @@ export function QuestPacksTab({
       {/* ────── 하단 접이식: 기관 다른 스탬프북 추가 ────── */}
       {notInEvent.length > 0 && (
         <section className="rounded-2xl border border-[#D4E4BC] bg-white shadow-sm">
-          <details className="group" open={false}>
+          {/* 연결된 게 하나도 없으면 펼쳐 둔다 — 「0」 만 보고 기관 스탬프북이
+              사라진 줄 아는 일이 없도록. */}
+          <details className="group" open={inEvent.length === 0}>
             <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-2xl bg-gradient-to-br from-[#FAE7D0] via-white to-[#E8F0E4] p-4">
               <div className="flex items-center gap-2 text-[#2D5A3D]">
                 <span aria-hidden className="text-xl">

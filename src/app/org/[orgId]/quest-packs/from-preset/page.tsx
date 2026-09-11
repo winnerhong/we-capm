@@ -5,17 +5,25 @@ import {
   loadAvailableMissionsForOrg,
 } from "@/lib/missions/queries";
 import { createPackFromPresetAction } from "../../missions/actions";
+import { loadOrgEventById } from "@/lib/org-events/queries";
 import type { PartnerStampbookPresetRow } from "@/lib/missions/types";
 
 export const dynamic = "force-dynamic";
 
 export default async function QuestPackFromPresetPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ orgId: string }>;
+  searchParams: Promise<{ eventId?: string }>;
 }) {
   const { orgId } = await params;
   await requireOrg();
+
+  // 행사 화면에서 넘어왔으면 만든 스탬프북을 그 행사에 바로 붙인다.
+  const { eventId: eventIdRaw } = await searchParams;
+  const event = eventIdRaw ? await loadOrgEventById(eventIdRaw) : null;
+  const eventId = event && event.org_id === orgId ? event.id : undefined;
 
   // 이 기관이 접근 가능한 프리셋 = 내 지사의 published & visibility 공개 & grants 체크
   const [presets, availableMissions] = await Promise.all([
@@ -34,12 +42,21 @@ export default async function QuestPackFromPresetPage({
           기관홈
         </Link>
         <span className="mx-2">/</span>
-        <Link
-          href={`/org/${orgId}/quest-packs`}
-          className="hover:text-[#2D5A3D]"
-        >
-          스탬프북 관리
-        </Link>
+        {eventId ? (
+          <Link
+            href={`/org/${orgId}/events/${eventId}`}
+            className="hover:text-[#2D5A3D]"
+          >
+            {event?.name || "행사"}
+          </Link>
+        ) : (
+          <Link
+            href={`/org/${orgId}/quest-packs`}
+            className="hover:text-[#2D5A3D]"
+          >
+            스탬프북 관리
+          </Link>
+        )}
         <span className="mx-2">/</span>
         <span className="font-semibold text-[#2D5A3D]">
           프리셋으로 빠르게 시작
@@ -60,6 +77,14 @@ export default async function QuestPackFromPresetPage({
               지사가 만들어 둔 스탬프북 템플릿을 골라, 한 번의 클릭으로 우리
               기관의 스탬프북을 만들어요. 생성 후 자유롭게 편집할 수 있어요.
             </p>
+            {eventId && (
+              <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-[#2D5A3D] px-2.5 py-1 text-[11px] font-semibold text-white">
+                <span aria-hidden>🔗</span>
+                <span>
+                  만들면 「{event?.name || "행사"}」 에 바로 연결돼요
+                </span>
+              </p>
+            )}
           </div>
         </div>
       </section>
@@ -78,6 +103,7 @@ export default async function QuestPackFromPresetPage({
               <PresetCard
                 key={p.id}
                 orgId={orgId}
+                eventId={eventId}
                 preset={p}
                 inCatalogCount={inCatalog}
                 totalCount={total}
@@ -93,12 +119,14 @@ export default async function QuestPackFromPresetPage({
 
 function PresetCard({
   orgId,
+  eventId,
   preset,
   inCatalogCount,
   totalCount,
   fullyAvailable,
 }: {
   orgId: string;
+  eventId?: string;
   preset: PartnerStampbookPresetRow;
   inCatalogCount: number;
   totalCount: number;
@@ -107,7 +135,8 @@ function PresetCard({
   const createBound = createPackFromPresetAction.bind(
     null,
     orgId,
-    preset.id
+    preset.id,
+    eventId
   );
   return (
     <li className="flex flex-col overflow-hidden rounded-2xl border border-[#D4E4BC] bg-white shadow-sm transition hover:border-[#2D5A3D] hover:shadow-md">

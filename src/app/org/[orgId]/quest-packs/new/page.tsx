@@ -1,16 +1,27 @@
 import Link from "next/link";
 import { requireOrg } from "@/lib/org-auth-guard";
+import { loadOrgEventById } from "@/lib/org-events/queries";
 import { CreateQuestPackForm } from "./create-form";
 
 export const dynamic = "force-dynamic";
 
 export default async function NewOrgQuestPackPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ orgId: string }>;
+  searchParams: Promise<{ eventId?: string }>;
 }) {
   const { orgId } = await params;
   const session = await requireOrg();
+
+  // 행사 화면에서 넘어왔으면 그 행사로 돌아갈 길과, 연결될 거라는 예고를 준다.
+  const { eventId: eventIdRaw } = await searchParams;
+  const event =
+    eventIdRaw && session.orgId === orgId
+      ? await loadOrgEventById(eventIdRaw)
+      : null;
+  const eventId = event && event.org_id === orgId ? event.id : undefined;
 
   return (
     <div className="mx-auto max-w-2xl space-y-6 px-4 py-6">
@@ -20,12 +31,21 @@ export default async function NewOrgQuestPackPage({
           기관홈
         </Link>
         <span className="mx-2">/</span>
-        <Link
-          href={`/org/${orgId}/quest-packs`}
-          className="hover:text-[#2D5A3D]"
-        >
-          스탬프북 관리
-        </Link>
+        {eventId ? (
+          <Link
+            href={`/org/${orgId}/events/${eventId}`}
+            className="hover:text-[#2D5A3D]"
+          >
+            {event?.name || "행사"}
+          </Link>
+        ) : (
+          <Link
+            href={`/org/${orgId}/quest-packs`}
+            className="hover:text-[#2D5A3D]"
+          >
+            스탬프북 관리
+          </Link>
+        )}
         <span className="mx-2">/</span>
         <span className="font-semibold text-[#2D5A3D]">새 스탬프북</span>
       </nav>
@@ -44,11 +64,19 @@ export default async function NewOrgQuestPackPage({
               이름과 기간을 정하고 레이아웃을 골라주세요. 만든 뒤에 미션을
               담을 수 있어요.
             </p>
+            {eventId && (
+              <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-[#2D5A3D] px-2.5 py-1 text-[11px] font-semibold text-white">
+                <span aria-hidden>🔗</span>
+                <span>
+                  만들면 「{event?.name || "행사"}」 에 바로 연결돼요
+                </span>
+              </p>
+            )}
           </div>
         </div>
       </header>
 
-      <CreateQuestPackForm orgId={orgId} />
+      <CreateQuestPackForm orgId={orgId} eventId={eventId} />
 
       <div className="rounded-2xl border border-[#E5D3B8] bg-[#FFF8F0] p-4 text-[11px] text-[#6B6560]">
         <p className="font-semibold text-[#8B6F47]">💡 안내</p>
