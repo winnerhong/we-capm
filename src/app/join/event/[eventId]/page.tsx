@@ -18,6 +18,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getAppUser } from "@/lib/user-auth-guard";
 import { isEventParticipant } from "@/lib/org-events/queries";
 import { resolveEventAccess } from "@/lib/org-events/event-access";
+import { resolveApplicationGate } from "@/lib/org-events/application-core";
 import { joinOrgEventAction } from "@/lib/org-events/join-actions";
 import { JoinEventForm } from "./join-event-form";
 // 시간 표시는 KST 강제 — 서버(UTC) SSR 에서 getHours() 를 쓰면 초대장/홈보다
@@ -37,6 +38,8 @@ type OrgEventLite = {
   cover_image_url: string | null;
   /** 접수·승인제. true 면 이 페이지의 즉시 참가 경로를 쓰지 않는다. */
   applications_enabled: boolean | null;
+  /** 신청 마감 시각. 지났으면 "신청서 쓰러 가세요" 가 거짓말이 된다. */
+  applications_close_at: string | null;
 };
 
 type OrgNameRow = { org_name: string | null };
@@ -173,6 +176,22 @@ export default async function JoinEventPage({
   //    로그인해도 참가자가 아니면 아래에서 신청 안내로 보낸다. 미등록 번호는
   //    self-register 가 이미 차단돼 있어 계정이 새로 생기지도 않는다.
   const applicationsOn = !!evt.applications_enabled;
+
+  // 접수가 이미 닫혔는가.
+  //
+  // 닫힌 걸 모르면 아래 안내가 "초대장에서 신청서를 쓰세요" 라고 말하고,
+  // 초대장은 "마감됐어요" 만 보여준다 — 두 화면 사이를 오가는 막다른 고리가
+  // 된다. 실제로 그랬다. 정원 초과는 여기서 따지지 않는다(초대장이 제대로 된
+  // 안내를 띄우는 경우라 보낼 곳이 있다).
+  const applicationsClosed =
+    applicationsOn &&
+    resolveApplicationGate({
+      enabled: true,
+      closeAt: evt.applications_close_at,
+      startsAt: evt.starts_at,
+      capacity: null,
+      approvedPeople: 0,
+    }).kind === "CLOSED";
   const alreadyParticipant = session
     ? await isEventParticipant(eventId, session.id).catch(() => false)
     : false;
@@ -206,7 +225,11 @@ export default async function JoinEventPage({
             </p>
           </section>
         ) : needsApplication ? (
-          <ApplyFirstPanel eventId={eventId} orgName={orgName} />
+          <ApplyFirstPanel
+            eventId={eventId}
+            orgName={orgName}
+            closed={applicationsClosed}
+          />
         ) : isLoggedIn ? (
           <AutoJoinPanel eventId={eventId} loggedInName={loggedInName} />
         ) : (
@@ -218,7 +241,7 @@ export default async function JoinEventPage({
               initialNeedsSignup={sp.err === "needs_signup"}
             />
             {/* 접수제 행사 — 아직 신청 전인 사람이 여기서 막히지 않도록 안내. */}
-            {applicationsOn && (
+            {applicationsOn && !applicationsClosed && (
               <Link
                 href={`/invitation/${eventId}#apply`}
                 className="block rounded-2xl border border-[#D4E4BC] bg-white/70 px-4 py-3 text-center text-xs font-semibold text-[#2D5A3D] transition hover:bg-white"
@@ -294,10 +317,39 @@ function EventPreviewCard({
 function ApplyFirstPanel({
   eventId,
   orgName,
+  closed,
 }: {
   eventId: string;
   orgName: string;
+  /** 접수가 이미 닫혔다 — 보낼 폼이 없으니 다른 말을 해야 한다. */
+  closed: boolean;
 }) {
+  if (closed) {
+    return (
+      <section className="rounded-3xl border border-[#E8DDC8] bg-[#F5F1E8]/70 p-6 text-center shadow-sm">
+        <p className="text-3xl" aria-hidden>
+          🕘
+        </p>
+        <h2 className="mt-2 text-lg font-bold text-[#6B4423]">
+          접수가 마감됐어요
+        </h2>
+        <p className="mt-1.5 text-sm leading-relaxed text-[#6B6560]">
+          이 행사는 {orgName}에서 신청을 받아 참가를 확정하는데, 신청 기간이
+          끝났어요.
+          <br />
+          참가를 원하시면 기관 담당자에게 문의해 주세요.
+        </p>
+        <Link
+          href={`/invitation/${eventId}`}
+          className="mt-4 inline-flex w-full items-center justify-center gap-1.5 rounded-2xl border border-[#D4E4BC] bg-white py-3 text-sm font-bold text-[#2D5A3D] transition hover:bg-[#F5F1E8]"
+        >
+          <span aria-hidden>💌</span>
+          <span>초대장 다시 보기</span>
+        </Link>
+      </section>
+    );
+  }
+
   return (
     <section className="rounded-3xl border border-[#D4E4BC] bg-white p-6 text-center shadow-sm">
       <p className="text-3xl" aria-hidden>

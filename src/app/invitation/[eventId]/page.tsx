@@ -47,7 +47,10 @@ import type {
 } from "@/lib/org-events/types";
 import { ApplicationForm } from "./application-form";
 import { ApplicationStatusSection } from "./application-status-section";
-import { ApplicationClosedCard } from "./application-status-card";
+import {
+  AlreadyJoinedEntry,
+  ApplicationClosedCard,
+} from "./application-status-card";
 
 export const dynamic = "force-dynamic";
 
@@ -752,6 +755,8 @@ export default async function EventInvitationPage({
       <InvitationFooter
         eventId={eventId}
         eventStatus={event.status}
+        eventStartsAt={event.starts_at}
+        eventEndsAt={event.ends_at}
         joined={joined}
         loggedIn={!!session}
         gate={applicationGate}
@@ -821,6 +826,8 @@ function PendingState({ eventName }: { eventName: string }) {
 function InvitationFooter({
   eventId,
   eventStatus,
+  eventStartsAt,
+  eventEndsAt,
   joined,
   loggedIn,
   gate,
@@ -831,6 +838,8 @@ function InvitationFooter({
 }: {
   eventId: string;
   eventStatus: string;
+  eventStartsAt: string | null;
+  eventEndsAt: string | null;
   joined: boolean;
   loggedIn: boolean;
   gate: ApplicationGate;
@@ -843,12 +852,15 @@ function InvitationFooter({
 }) {
   // 기관이 종료·보관한 행사 — 접수 마감 시각과 무관하게 신청을 받지 않는다.
   // 이미 참가한 가족은 그대로 들어간다(사진·설문이 남아 있다).
-  const orgClosed = !resolveEventAccess({
+  //
+  // 날짜를 넘기는 이유: 예전엔 null 을 넣어 status 만 봤다. 지금은 예정이어도
+  // 시작 시각이 지나면 열리므로, 날짜를 빼면 이 자리만 다른 판단을 하게 된다.
+  const access = resolveEventAccess({
     status: eventStatus,
-    startsAt: null,
-    endsAt: null,
-  }).canJoin;
-  if (orgClosed && !joined) {
+    startsAt: eventStartsAt,
+    endsAt: eventEndsAt,
+  });
+  if (!access.canJoin && !joined) {
     return (
       <section className="mx-auto max-w-md px-6 pb-14 pt-2">
         <div className="rounded-2xl border border-[#E8E4DE] bg-[#FAF8F5] px-5 py-6 text-center">
@@ -861,6 +873,10 @@ function InvitationFooter({
           <p className="mt-1 text-[11px] text-[#8B7F75]">
             다음 행사에서 만나요!
           </p>
+          {/* 끝난 행사에도 그날의 사진·설문이 남아 있다. 참가했던 가족이
+              로그아웃 상태로 들어오면 여기가 유일한 문이다. 보관(canEnter=false)
+              은 정말 닫힌 것이라 문을 달지 않는다. */}
+          {access.canEnter && <AlreadyJoinedEntry eventId={eventId} />}
         </div>
       </section>
     );
@@ -909,7 +925,11 @@ function InvitationFooter({
 
   if (gate.kind === "CLOSED") {
     return (
-      <ApplicationClosedCard closedAt={gate.closedAt} implicit={gate.implicit} />
+      <ApplicationClosedCard
+        eventId={eventId}
+        closedAt={gate.closedAt}
+        implicit={gate.implicit}
+      />
     );
   }
 
@@ -960,7 +980,9 @@ function InvitationFooter({
  *
  *  1) 미로그인            → "이 행사 참가하기" (/join/event/{id} 에서 연락처 확인)
  *  2) 로그인 + 참가 완료  → "행사 입장하기" (/home?event_id={id})
- *  3) 로그인 + 미참가     → "이 행사 참가하기" (기관이 달라도 동일 — 기관 벽 없음)
+ *  3) 로그인 + 미참가     → "이 행사 참가하기" — 누르면 **바로 참가되고** 홈으로.
+ *                           예전에는 /join/event/{id} 로 보내 "참가하시겠어요?" 를
+ *                           한 번 더 물었다. 방금 누른 버튼에 이미 쓰여 있던 말이다.
  *
  * 기관 일치 여부로는 분기하지 않는다. 한 보호자가 여러 기관 초대장을 받는 것이
  * 정상 시나리오이므로, 판단 기준은 "이 행사에 참가했는가" 하나뿐.
@@ -983,7 +1005,9 @@ function InvitationCta({
   // (다른 기관 컨텍스트로 로그인한 채 들어와도 이 행사 화면이 뜨도록)
   const href = joined
     ? `/api/user/enter-event?event_id=${eventId}`
-    : `/join/event/${eventId}`;
+    : loggedIn
+      ? `/api/user/join-event?event_id=${eventId}`
+      : `/join/event/${eventId}`;
   const ended = eventStatus === "ENDED" || eventStatus === "ARCHIVED";
   const icon = joined ? (isLive ? "🎪" : ended ? "🏁" : "🏠") : "🌲";
   const label = joined

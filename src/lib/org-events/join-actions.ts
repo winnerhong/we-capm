@@ -56,25 +56,34 @@ async function loadUserSessionFromCookie(): Promise<UserSession | null> {
 }
 
 /**
- * 초대 URL 을 받은 참가자가 해당 행사에 자기 자신을 등록.
- *  - 미로그인 → /join/event/{eventId} 로 redirect (거기서 폰 입력 유도)
- *  - 타 기관 행사 → 에러
- *  - 이미 등록됨 → no-op (upsert 로 멱등)
- *  - 성공 → /home?event_id={eventId} 로 redirect
+ * 참가 처리의 알맹이 — **화면 이동 방법을 모르는** 순수 절차.
+ *
+ * 부르는 곳이 둘이다:
+ *   서버 액션(joinOrgEventAction)  — 폼·버튼에서. redirect() 로 이동한다.
+ *   라우트 핸들러(/api/user/join-event) — 링크로 들어올 때. 303 으로 이동한다.
+ *
+ * 둘이 각자 검사하면 "버튼으로는 막히는데 링크로는 들어가지는" 종류의 구멍이
+ * 생긴다. 판단은 여기 한 곳에서만 하고, 어디로 보낼지만 결과로 돌려준다.
  */
-export async function joinOrgEventAction(eventId: string): Promise<void> {
-  if (!eventId) throw new Error("행사 정보가 비어 있어요");
+export type JoinOutcome =
+  /** 참가 완료 — 이 주소로 보내면 된다. */
+  | { kind: "OK"; to: string }
+  /** 참가는 못 했지만 갈 곳이 있다 (로그인·신청 필요 등). */
+  | { kind: "REDIRECT"; to: string }
+  /** 참가할 수 없다. 사람이 읽을 이유. */
+  | { kind: "ERROR"; message: string };
 
-  // 1) 세션 확인 (redirect 는 try/catch 바깥에서 호출되어야 하므로
-  //    일단 값만 꺼낸 뒤 플래그로 판단)
+export async function performEventJoin(eventId: string): Promise<JoinOutcome> {
+  if (!eventId) return { kind: "ERROR", message: "행사 정보가 비어 있어요" };
+
   const session = await loadUserSessionFromCookie();
   if (!session) {
-    redirect(`/join/event/${eventId}`);
+    return { kind: "REDIRECT", to: `/join/event/${eventId}` };
   }
 
   const supabase = await createClient();
 
-  // 2) 행사 로드
+  // 행사 로드
   const eventResp = (await (
     supabase.from("org_events" as never) as unknown as {
       select: (c: string) => {
@@ -98,14 +107,17 @@ export async function joinOrgEventAction(eventId: string): Promise<void> {
     console.error("[org-events/join] event lookup error", {
       code: eventResp.error.code,
     });
-    throw new Error("행사를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.");
+    return {
+      kind: "ERROR",
+      message: "행사를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.",
+    };
   }
   const evt = eventResp.data;
-  if (!evt) throw new Error("행사를 찾을 수 없어요");
+  if (!evt) return { kind: "ERROR", message: "행사를 찾을 수 없어요" };
 
-  // 2-a) 기관이 종료·보관한 행사에는 새로 들어올 수 없다.
-  //      이미 참가자면 멱등 upsert 라 아무 일도 안 일어나므로 통과시킨다 —
-  //      끝난 행사 링크를 다시 눌러도 사진·설문으로 이어져야 한다.
+  // 기관이 종료·보관한 행사에는 새로 들어올 수 없다.
+  // 이미 참가자면 멱등 upsert 라 아무 일도 안 일어나므로 통과시킨다 —
+  // 끝난 행사 링크를 다시 눌러도 사진·설문으로 이어져야 한다.
   const access = resolveEventAccess({
     status: evt.status,
     startsAt: evt.starts_at,
@@ -115,13 +127,13 @@ export async function joinOrgEventAction(eventId: string): Promise<void> {
     const joined = await isEventParticipant(eventId, session.id).catch(
       () => false
     );
-    if (!joined) throw new Error("참가 신청이 마감된 행사예요");
+    if (!joined) {
+      return { kind: "ERROR", message: "참가 신청이 마감된 행사예요" };
+    }
   }
 
-  // 2-b) 접수·승인제가 켜진 행사 — 신청서를 거치지 않은 자가 참가는 막는다.
-  //      이미 참가자면(= 기관이 수락했거나 명단에 올렸으면) 그대로 통과.
-  //      redirect 는 throw 이므로 조건만 계산하고 try/catch 밖에서 호출한다.
-  let mustApply = false;
+  // 접수·승인제가 켜진 행사 — 신청서를 거치지 않은 자가 참가는 막는다.
+  // 이미 참가자면(= 기관이 수락했거나 명단에 올렸으면) 그대로 통과.
   if (evt.applications_enabled) {
     const existingResp = (await (
       supabase.from("org_event_participants" as never) as unknown as {
@@ -139,18 +151,17 @@ export async function joinOrgEventAction(eventId: string): Promise<void> {
       .eq("user_id", session.id)
       .maybeSingle()) as { data: { user_id: string } | null };
 
-    mustApply = !existingResp.data;
-  }
-  if (mustApply) {
-    redirect(`/invitation/${eventId}#apply`);
+    if (!existingResp.data) {
+      return { kind: "REDIRECT", to: `/invitation/${eventId}#apply` };
+    }
   }
 
-  // 3) 소속은 만들지 않는다 — 행사 참가 ≠ 기관 소속.
-  //    초대장으로 행사 하나에 참가한 것만으로 그 기관이 "내 기관"이 되면,
-  //    등록한 적 없는 기관 화면이 홈처럼 뜬다. 접근 권한은 아래 참가 기록
-  //    (org_event_participants) 만으로 충분하다.
+  // 소속은 만들지 않는다 — 행사 참가 ≠ 기관 소속.
+  //   초대장으로 행사 하나에 참가한 것만으로 그 기관이 "내 기관"이 되면,
+  //   등록한 적 없는 기관 화면이 홈처럼 뜬다. 접근 권한은 아래 참가 기록
+  //   (org_event_participants) 만으로 충분하다.
 
-  // 4) org_event_participants upsert (PK: event_id,user_id → 멱등)
+  // org_event_participants upsert (PK: event_id,user_id → 멱등)
   const upResp = (await (
     supabase.from("org_event_participants" as never) as unknown as {
       upsert: (
@@ -172,15 +183,31 @@ export async function joinOrgEventAction(eventId: string): Promise<void> {
     console.error("[org-events/join] upsert error", {
       code: upResp.error.code,
     });
-    throw new Error(`참가 등록에 실패했어요: ${upResp.error.message}`);
+    return {
+      kind: "ERROR",
+      message: `참가 등록에 실패했어요: ${upResp.error.message}`,
+    };
   }
 
-  // 5) 활성 기관을 이 행사의 기관으로 전환 — 홈·스탬프북·FM 이 전부 세션의
-  //    orgId 를 컨텍스트로 읽으므로, 전환하지 않으면 방금 참가한 행사가 아니라
-  //    이전 기관 화면이 뜬다. (4단계에서 소속을 넣었으므로 검증도 통과)
+  // 활성 기관을 이 행사의 기관으로 전환 — 홈·스탬프북·FM 이 전부 세션의
+  // orgId 를 컨텍스트로 읽으므로, 전환하지 않으면 방금 참가한 행사가 아니라
+  // 이전 기관 화면이 뜬다.
   await switchActiveOrg(evt.org_id);
 
-  // 6) 홈으로 리다이렉트
-  revalidatePath("/home");
-  redirect(`/home?event_id=${eventId}`);
+  return { kind: "OK", to: `/home?event_id=${eventId}` };
+}
+
+/**
+ * 초대 URL 을 받은 참가자가 해당 행사에 자기 자신을 등록.
+ *  - 미로그인 → /join/event/{eventId} 로 redirect (거기서 폰 입력 유도)
+ *  - 접수제 미신청 → /invitation/{id}#apply
+ *  - 이미 등록됨 → no-op (upsert 로 멱등)
+ *  - 성공 → /home?event_id={eventId} 로 redirect
+ */
+export async function joinOrgEventAction(eventId: string): Promise<void> {
+  const result = await performEventJoin(eventId);
+  // redirect() 는 throw 다 — 에러 흐름이 아니므로 try/catch 로 감싸지 않는다.
+  if (result.kind === "ERROR") throw new Error(result.message);
+  if (result.kind === "OK") revalidatePath("/home");
+  redirect(result.to);
 }

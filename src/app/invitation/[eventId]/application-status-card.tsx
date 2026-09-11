@@ -114,13 +114,38 @@ export function ApplicationStatusCard({
 }
 
 /**
+ * 막다른 길에 놓는 문 — "이미 신청/참가했는데요" 를 위한 로그인 통로.
+ *
+ * 접수가 마감되거나 기관이 종료를 누르면 초대장 아래에는 안내문만 남았다.
+ * 그런데 **승인까지 받은 가족**이 다른 기기에서 열거나 로그아웃돼 있으면,
+ * 이 페이지는 그 사람이 누군지 알 방법이 없다(신청서는 쿠키로 찾고, 참가
+ * 여부는 로그인해야 안다). 그래서 정작 들어갈 자격이 있는 사람이 "마감됐어요"
+ * 만 보고 돌아섰다. 행사 당일 현장에서 이게 제일 자주 터진다.
+ *
+ * /join/event/{id} 는 이 경우를 이미 제대로 처리한다 — 참가자면 입장,
+ * 아니면 안내. 판단을 거기로 넘기고, 여기서는 문만 열어 둔다.
+ */
+export function AlreadyJoinedEntry({ eventId }: { eventId: string }) {
+  return (
+    <Link
+      href={`/join/event/${eventId}`}
+      className="mt-4 block rounded-2xl border border-[#D4E4BC] bg-white px-4 py-3 text-center text-xs font-bold text-[#2D5A3D] transition hover:bg-[#F5F1E8]"
+    >
+      🔑 이미 신청·참가하셨나요? 로그인하고 입장하기 →
+    </Link>
+  );
+}
+
+/**
  * 접수 마감 안내 — 폼 자리를 대신한다.
  * implicit = 기관이 마감을 따로 정하지 않아 "행사 시작 1시간 전"으로 닫힌 경우.
  */
 export function ApplicationClosedCard({
+  eventId,
   closedAt,
   implicit = false,
 }: {
+  eventId: string;
   closedAt: string;
   implicit?: boolean;
 }) {
@@ -139,6 +164,7 @@ export function ApplicationClosedCard({
           <br />
           참가를 원하시면 기관 담당자에게 문의해 주세요.
         </p>
+        <AlreadyJoinedEntry eventId={eventId} />
       </div>
     </section>
   );

@@ -1,9 +1,13 @@
 "use client";
 
 // 미로그인 참가자용 폰 입력 폼.
-// form POST /api/auth/user-login?redirect=/join/event/{eventId}
-//  → 성공 시 브라우저가 이 페이지로 redirect 되고, 서버 컴포넌트가 쿠키를 읽어
-//    AutoJoinPanel 을 렌더.
+// form POST /api/auth/user-login?redirect=/api/user/join-event?event_id={id}
+//  → 로그인이 끝나면 그 라우트가 참가까지 시키고 홈으로 보낸다.
+//
+// 예전에는 redirect 대상이 이 페이지였다. 돌아오면 "○○ 학부모님 반가워요!
+// 이 행사에 참가하시겠어요?" 가 떠서, 방금 **이 행사의** 연락처를 넣은 사람에게
+// 같은 질문을 한 번 더 했다. 한 번 한 말은 다시 묻지 않는다.
+// (JS 없는 환경도 같은 303 을 타므로 두 경로가 같은 길로 모인다)
 //
 // self-register 분기:
 //  - event 가 allow_self_register=true 이고 번호가 app_users 에 없을 때,
@@ -14,7 +18,6 @@
 //    page.tsx 가 `initialNeedsSignup` prop 으로 이름 필드를 미리 노출.
 
 import { useEffect, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 
 type Props = {
   eventId: string;
@@ -38,7 +41,6 @@ export function JoinEventForm({
   initialError = null,
   initialNeedsSignup = false,
 }: Props) {
-  const router = useRouter();
   const [phone, setPhone] = useState("");
   const [parentName, setParentName] = useState("");
   const [childName, setChildName] = useState("");
@@ -51,7 +53,8 @@ export function JoinEventForm({
     if (initialNeedsSignup) setNeedsSignup(true);
   }, [initialNeedsSignup]);
 
-  const redirectTarget = `/join/event/${eventId}`;
+  // 로그인 뒤 곧장 참가까지 — 확인 화면을 한 칸 없앤다.
+  const redirectTarget = `/api/user/join-event?event_id=${eventId}`;
   const loginUrl = `/api/auth/user-login?redirect=${encodeURIComponent(
     redirectTarget
   )}`;
@@ -105,9 +108,9 @@ export function JoinEventForm({
             redirectTo?: string;
           } | null;
           const dest = data?.redirectTo ?? redirectTarget;
-          // 세션 쿠키가 이미 세팅됐으므로, 같은 페이지로 돌아가 AutoJoinPanel 을 렌더
-          router.push(dest);
-          router.refresh();
+          // 라우트 핸들러(303 체인)라 클라이언트 라우터로는 못 간다 —
+          // 브라우저에게 넘겨 리다이렉트를 그대로 따라가게 한다.
+          window.location.assign(dest);
           return;
         }
         const errBody = (await res.json().catch(() => null)) as {
