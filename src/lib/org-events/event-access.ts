@@ -13,6 +13,12 @@
 //     회색 = 날짜가 지났다 (자동)
 //     잠금 = 기관이 종료를 눌렀다 (수동)
 //
+// 여는 쪽도 두 길이다:
+//     기관이 「진행중」 을 눌렀다        — 날짜와 무관하게 즉시. 리허설이 여기다.
+//     예정인데 시작 **시각**이 지났다   — 저절로. 09:40 행사는 09:40 에 열린다.
+//   깜빡하고 안 눌러도 당일 제시간에 열리고, 미리 눌러 두면 그 전에도 열린다.
+//   닫는 건 여전히 사람의 몫이다 — 시스템은 열기만 한다.
+//
 // 종료(ENDED)가 사진·설문까지 막지 않는 이유:
 //   기관의 진행 순서가 `내 행사 → 초대장 → 참가자 → 진행 → 결과[설문]` 이다.
 //   설문은 **끝난 뒤에** 받는 것이라, 종료가 문을 완전히 잠그면 설문 링크가
@@ -23,7 +29,7 @@ import { kstDayIndex } from "@/lib/datetime/kst";
 import type { OrgEventStatus } from "./types";
 
 export type EventPhase =
-  /** 아직 안 열림 — 예정(DRAFT)이고 날짜도 안 지남 */
+  /** 아직 안 열림 — 예정(DRAFT)이고 시작 시각도 아직 안 옴 */
   | "upcoming"
   /** 열려 있음 */
   | "live"
@@ -219,7 +225,38 @@ export function resolveEventAccess(input: {
     };
   }
 
+  // 기관이 「진행중」 을 누르면 날짜와 무관하게 전부 열린다.
+  //
+  // 행사 이틀 전에 스탬프북을 실제로 눌러 보고 싶은데 방법이 없다는 게
+  // 문제였다. 진행중은 **사람이 내린 결정**이라, 날짜가 아직 안 왔다고
+  // 시스템이 되물을 이유가 없다. 리허설도 이 자리로 한다.
   if (input.status === "LIVE") {
+    return {
+      ...base,
+      phase: "live",
+      badgeEmoji: "🟢",
+      badgeLabel: "진행중",
+      dimmed: false,
+      canEnter: true,
+      canPlay: true,
+      canJoin: true,
+      cta: "행사 입장하기 →",
+      notice: null,
+    };
+  }
+
+  // 예정(DRAFT) 인데 시작 시각이 지났다 — 스스로 열린다.
+  //
+  // 예전에는 기관이 「진행중」 을 깜빡하면 정작 **행사 당일에** 스탬프·미션이
+  // 전부 잠겨 있었다. 그런데 그 다음 날이 되면 isPastDay 가 걸려 'past' 로
+  // 내려앉고, past 는 canPlay 가 true 다 — 당일에 못 하던 걸 하루 뒤에는
+  // 할 수 있는 역전이 있었다. 현장에서 제일 잠기면 안 되는 순간이 잠겼다.
+  //
+  // 판단은 **날짜가 아니라 시각**으로 한다. 09:40 시작이면 09:40 에 열린다.
+  // 여는 건 시스템이 하고, 닫는 건 여전히 기관의 몫이다(🏁 종료).
+  // starts_at 이 비어 있으면 열 기준이 없으니 기관이 직접 눌러야 한다.
+  const startMs = input.startsAt ? new Date(input.startsAt).getTime() : NaN;
+  if (Number.isFinite(startMs) && nowSafe.getTime() >= startMs) {
     return {
       ...base,
       phase: "live",

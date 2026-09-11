@@ -143,6 +143,55 @@ describe("예정(DRAFT)", () => {
   });
 });
 
+describe("③ 열림 = 시작 시각이 됐다 (자동)", () => {
+  // 마라톤은 2026-09-12(토) 09:40 시작.
+  const BEFORE = "2026-09-12T09:39:00+09:00";
+  const SHARP = "2026-09-12T09:40:00+09:00";
+  const AFTER = "2026-09-12T11:00:00+09:00";
+
+  it("예정이어도 시작 시각이 되면 스스로 열린다 — 기관이 안 눌러도", () => {
+    const a = at({ status: "DRAFT", now: SHARP });
+    expect(a.phase).toBe("live");
+    expect(a.canPlay).toBe(true);
+  });
+
+  it("1분 전에는 아직 잠겨 있다 — 날짜가 아니라 시각으로 연다", () => {
+    const a = at({ status: "DRAFT", now: BEFORE });
+    expect(a.phase).toBe("upcoming");
+    expect(a.canPlay).toBe(false);
+    // 당일이긴 하다 — 그래도 시각이 안 됐으면 안 연다.
+    expect(a.ddayLabel).toBe("D-DAY");
+  });
+
+  it("당일엔 잠겼다가 다음 날 열리는 역전이 없다", () => {
+    // 예전 동작: 당일 canPlay=false → 다음 날 'past' 로 내려앉아 canPlay=true.
+    const sameDay = at({ status: "DRAFT", now: AFTER });
+    const nextDay = at({ status: "DRAFT", now: "2026-09-13T09:00:00+09:00" });
+    expect(sameDay.canPlay).toBe(true);
+    expect(nextDay.canPlay).toBe(true);
+  });
+
+  it("시작 시각이 없으면 저절로 열리지 않는다 — 기관이 눌러야 한다", () => {
+    const a = at({ status: "DRAFT", startsAt: null, now: AFTER });
+    expect(a.phase).toBe("upcoming");
+    expect(a.canPlay).toBe(false);
+  });
+
+  it("종료·보관은 시작 시각이 지나도 열리지 않는다 — 닫는 건 사람의 몫", () => {
+    expect(at({ status: "ENDED", now: AFTER }).canPlay).toBe(false);
+    expect(at({ status: "ARCHIVED", now: AFTER }).canEnter).toBe(false);
+  });
+});
+
+describe("진행중은 날짜를 묻지 않는다 (리허설)", () => {
+  it("행사 13일 전이어도 진행중이면 스탬프·미션이 전부 열린다", () => {
+    const a = at({ status: "LIVE" }); // NOW = D-13
+    expect(a.phase).toBe("live");
+    expect(a.canPlay).toBe(true);
+    expect(a.dimmed).toBe(false);
+  });
+});
+
 describe("참가 접수", () => {
   it("끝나기 전까지는 언제든 들어올 수 있다 — 예정·진행중·지난 행사 모두", () => {
     expect(at({ status: "DRAFT" }).canJoin).toBe(true);
