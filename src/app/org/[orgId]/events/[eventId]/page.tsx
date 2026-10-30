@@ -53,6 +53,7 @@ import {
 } from "./fm-sessions-tab";
 import { AnalyticsTabPanel } from "./analytics-tab";
 import { TimelineTabPanel } from "./timeline-tab";
+import { loadTimelineSlots } from "@/lib/event-timeline/queries";
 import { ParticipantsTab } from "./participants-tab";
 import { ApplicationsTab } from "./applications-tab";
 import {
@@ -533,7 +534,7 @@ export default async function OrgEventDetailPage({
   );
 }
 
-function OverviewPanel({
+async function OverviewPanel({
   orgId,
   eventId,
   eventName,
@@ -556,6 +557,10 @@ function OverviewPanel({
     trail_count: number;
   };
 }) {
+    // 일정표 슬롯 수 — summary 뷰에 없어 여기서 직접 센다 (가벼운 단건 조회).
+  const timelineCount = (await loadTimelineSlots(eventId).catch(() => []))
+    .length;
+
   const items: Array<{
     icon: string;
     label: string;
@@ -601,11 +606,20 @@ function OverviewPanel({
       step: "run",
       sub: "trails",
     },
+    {
+      // 참가자 「일정」 탭의 타임테이블 — 여기 말고는 들어가는 문이 없었다.
+      icon: "📅",
+      label: "일정표",
+      value: timelineCount,
+      step: "run",
+      sub: "timeline",
+      highlight: true,
+    },
   ];
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
         {items.map((it) => {
           const isZero = it.value === 0;
           const isParticipants = it.sub === "roster";
