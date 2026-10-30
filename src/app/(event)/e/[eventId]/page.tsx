@@ -453,8 +453,9 @@ export default async function EventHomePage({
         </section>
       )}
 
-      {/* 오늘의 일정 — 진행 중 + 다음 슬롯 압축 미리보기 */}
-      {timelineSlots.length > 0 && (
+      {/* 오늘의 일정 — 진행 중 + 다음 슬롯 압축 미리보기.
+          기관이 일정표를 끈 행사는 카드도 숨긴다. */}
+      {selectedEvent.timeline_enabled !== false && timelineSlots.length > 0 && (
         <NextUpCard
           eventName={selectedEvent.name}
           eventStartsAt={selectedEvent.starts_at}

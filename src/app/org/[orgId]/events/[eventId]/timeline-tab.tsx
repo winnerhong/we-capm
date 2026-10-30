@@ -6,6 +6,7 @@ import { loadOrgEventById } from "@/lib/org-events/queries";
 import { loadTimelineSlots } from "@/lib/event-timeline/queries";
 import { loadTimetableTemplatesForOrg } from "@/lib/timetable-templates/queries";
 import { TimelineEditor } from "./timeline-editor";
+import { TimelineToggle } from "./timeline-toggle";
 
 interface Props {
   orgId: string;
@@ -32,6 +33,10 @@ export async function TimelineTabPanel({ orgId, eventId }: Props) {
 
   return (
     <div className="space-y-4">
+      <TimelineToggle
+        eventId={eventId}
+        initialEnabled={event.timeline_enabled !== false}
+      />
       <header className="rounded-2xl border border-[#D4E4BC] bg-[#E8F0E4]/60 p-4">
         <h2 className="flex items-center gap-2 text-sm font-bold text-[#2D5A3D]">
           <span aria-hidden>📅</span>

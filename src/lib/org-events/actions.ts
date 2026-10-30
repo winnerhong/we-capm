@@ -961,3 +961,34 @@ export async function updateEventPhotoFeedAction(
 
   revalidateEvents(org.orgId, eventId);
 }
+
+/** 타임테이블 사용 여부 — 끄면 참가자 일정 화면·다음 일정 카드가 숨는다. */
+export async function updateEventTimelineEnabledAction(
+  eventId: string,
+  enabled: boolean
+): Promise<void> {
+  const org = await requireOrg();
+  if (!eventId) throw new Error("행사를 찾을 수 없어요");
+
+  await assertEventOwned(eventId, org.orgId);
+
+  const supabase = await createClient();
+  const resp = (await (
+    supabase.from("org_events" as never) as unknown as {
+      update: (p: Row) => {
+        eq: (k: string, v: string) => Promise<{ error: SbErr }>;
+      };
+    }
+  )
+    .update({ timeline_enabled: enabled } satisfies Row)
+    .eq("id", eventId)) as { error: SbErr };
+
+  if (resp.error) {
+    console.error("[org-events/updateTimelineEnabled] error", {
+      code: resp.error.code,
+    });
+    throw new Error("타임테이블 설정 변경에 실패했어요");
+  }
+
+  revalidateEvents(org.orgId, eventId);
+}

@@ -46,6 +46,8 @@ export interface OrgEventRow {
    * 돌려주지 않는다. undefined 는 "꺼짐" 으로 읽는다(공개는 기본이 잠김).
    */
   photo_feed_enabled?: boolean | null;
+  /** 타임테이블 사용 여부 — false 면 참가자 일정 화면을 숨긴다. 컬럼 미적용 창에선 undefined(=사용). */
+  timeline_enabled?: boolean | null;
   /** 초대장 주차장 — 최대 5개. */
   invitation_parkings: ParkingItem[] | null;
   /** 초대장 주최 (자유 입력). 예: "구미혜당학교". 비우면 줄 자체 숨김. */

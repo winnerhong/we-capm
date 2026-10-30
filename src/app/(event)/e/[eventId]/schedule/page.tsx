@@ -18,6 +18,30 @@ export default async function SchedulePage({
   const { eventId } = await params;
   const ctx = await requireEventContext(eventId);
 
+  // 기관이 일정표를 끈 행사 — "없어요" 가 아니라 "안 써요" 로 안내한다.
+  if (ctx.event.timeline_enabled === false) {
+    return (
+      <div className="space-y-4">
+        <nav className="text-[11px] text-[#6B6560]">
+          <Link href={ctx.href()} className="hover:underline">
+            ← 행사홈으로
+          </Link>
+        </nav>
+        <section className="rounded-3xl border-2 border-dashed border-[#E8E4DE] bg-white/70 p-8 text-center shadow-sm">
+          <p className="text-3xl" aria-hidden>
+            📅
+          </p>
+          <p className="mt-2 text-sm font-bold text-[#6B6560]">
+            이 행사는 일정표를 사용하지 않아요
+          </p>
+          <p className="mt-1 text-xs text-[#8B7F75]">
+            자세한 순서는 현장 안내를 따라 주세요.
+          </p>
+        </section>
+      </div>
+    );
+  }
+
   const slots = await loadTimelineSlots(ctx.event.id).catch(() => []);
 
   return (
