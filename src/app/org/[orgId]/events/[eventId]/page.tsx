@@ -607,11 +607,12 @@ async function OverviewPanel({
       sub: "trails",
     },
     {
-      // 참가자 「일정」 탭의 타임테이블 — 여기 말고는 들어가는 문이 없었다.
+      // 참가자 「일정」 탭의 타임테이블. 내 행사 단계의 하위탭이지만
+      // 눈에 잘 안 띄어 개요 카드에도 문을 하나 더 둔다.
       icon: "📅",
       label: "일정표",
       value: timelineCount,
-      step: "run",
+      step: "event",
       sub: "timeline",
       highlight: true,
     },
