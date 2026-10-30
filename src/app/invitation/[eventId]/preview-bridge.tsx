@@ -55,23 +55,27 @@ export function InvitationPreviewBridge() {
         });
     };
 
-    // 편집 중인 칸의 자리로 스크롤 + 잠깐 하이라이트.
+    // 편집 중인 칸의 자리로 스크롤 + 하이라이트.
     // 안내문처럼 화면 아래쪽에 있는 덩어리를 고칠 때 폰을 손으로 내리지 않아도 된다.
-    let highlightTimer: ReturnType<typeof setTimeout> | null = null;
+    // 테두리는 **커서가 그 칸에 있는 동안만** — 칸을 떠나면(field:"") 바로 걷는다.
+    // 타이머로 지우면 칸을 빨리 옮길 때 이전 테두리가 영영 남는다.
+    let highlighted: HTMLElement | null = null;
+    const clearHighlight = () => {
+      if (highlighted) highlighted.style.boxShadow = "";
+      highlighted = null;
+    };
     const focusField = (key: string) => {
+      clearHighlight();
+      if (!key) return; // 편집 칸에서 빠져나감 — 테두리만 걷는다.
       const el = document.querySelector<HTMLElement>(`[data-inv="${key}"]`);
       if (!el) return;
       // 숨겨진 덩어리(값이 비어 display:none) 는 스크롤할 자리가 없다.
       if (el.offsetParent === null) return;
       el.scrollIntoView({ behavior: "smooth", block: "center" });
-      // 어디를 보라는 건지 — 연두 테두리가 잠깐 들어왔다 나간다.
       el.style.transition = "box-shadow 0.25s ease";
       el.style.borderRadius = el.style.borderRadius || "8px";
       el.style.boxShadow = "0 0 0 3px rgba(127, 176, 105, 0.8)";
-      if (highlightTimer) clearTimeout(highlightTimer);
-      highlightTimer = setTimeout(() => {
-        el.style.boxShadow = "";
-      }, 1400);
+      highlighted = el;
     };
 
     const onMessage = (e: MessageEvent) => {
@@ -111,7 +115,7 @@ export function InvitationPreviewBridge() {
     window.parent?.postMessage({ type: INVITATION_PREVIEW_READY }, origin);
 
     return () => {
-      if (highlightTimer) clearTimeout(highlightTimer);
+      clearHighlight();
       window.removeEventListener("message", onMessage);
       document.removeEventListener("click", block, true);
       document.removeEventListener("submit", block, true);

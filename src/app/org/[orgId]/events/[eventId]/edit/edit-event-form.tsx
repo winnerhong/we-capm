@@ -618,6 +618,7 @@ export function EditEventForm({
                   value={invMessage}
                   onChange={(e) => setInvMessage(e.target.value)}
                   onFocus={() => focusPreview("message")}
+                  onBlur={() => focusPreview("")}
                   placeholder="예) 함께 즐거운 시간을 만들어요"
                   className={INPUT_CLS}
                 />
@@ -653,6 +654,7 @@ export function EditEventForm({
                   value={invBody}
                   onChange={(e) => setInvBody(e.target.value)}
                   onFocus={() => focusPreview("body")}
+                  onBlur={() => focusPreview("")}
                   placeholder={
                     "예)\n안녕하세요! 참좋은어린이집 가족 여러분 🎉\n\n26년 봄 미션 트레일에 초대합니다.\n\n📅 일시: 2026년 5월 16일 토요일 오전 10:00\n📍 장소: 침산공원\n\n즐거운 시간 함께해요! ✊"
                   }
@@ -719,6 +721,7 @@ export function EditEventForm({
                   value={invLocation}
                   onChange={(e) => setInvLocation(e.target.value)}
                   onFocus={() => focusPreview("location")}
+                  onBlur={() => focusPreview("")}
                   placeholder="예) 침산공원 / 참좋은어린이집 운동장"
                   className={INPUT_CLS}
                 />
@@ -738,6 +741,7 @@ export function EditEventForm({
                   value={invAddress}
                   onChange={(e) => setInvAddress(e.target.value)}
                   onFocus={() => focusPreview("address")}
+                  onBlur={() => focusPreview("")}
                   placeholder="예) 대구 북구 침산동 1344-1"
                   className={INPUT_CLS}
                 />
@@ -776,6 +780,7 @@ export function EditEventForm({
                   value={invDressCode}
                   onChange={(e) => setInvDressCode(e.target.value)}
                   onFocus={() => focusPreview("dress")}
+                  onBlur={() => focusPreview("")}
                   placeholder={
                     "예)\n- 운동화 (굽 없는 편한 신발)\n- 개인 물병\n- 모자 (야외 시)\n- 여벌옷"
                   }
