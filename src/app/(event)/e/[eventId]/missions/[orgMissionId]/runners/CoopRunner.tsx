@@ -445,11 +445,7 @@ export function CoopRunner({
           )}
         </section>
 
-        <section className="space-y-3 rounded-3xl border border-[#D4E4BC] bg-white p-4 shadow-sm">
-          <p className="text-sm text-[#6B6560]">
-            짝꿍 가족이 <b>카메라로 QR을 찍으면</b> 바로 합류 화면이 열려요.
-            QR이 어려우면 아래 4자리 코드를 불러줘도 돼요.
-          </p>
+        <section className="space-y-2 rounded-3xl border border-[#D4E4BC] bg-white p-4 shadow-sm">
           {/* 상대도 코드를 만들어 둘 다 QR 만 보고 있는 교착 — 여기서 찍으면
               내 코드를 접고 그쪽으로 합류한다. */}
           {scanOpen ? (
@@ -482,12 +478,11 @@ export function CoopRunner({
               disabled={isPending}
               className="min-h-[48px] w-full rounded-2xl border-2 border-[#2D5A3D] bg-white px-4 py-3 text-sm font-bold text-[#2D5A3D] transition hover:bg-[#F5F1E8] disabled:opacity-50"
             >
-              📷 상대 가족 QR 찍기
+              📷 상대 QR 찍기
             </button>
           )}
-          <p className="text-[11px] leading-relaxed text-[#8B7F75]">
-            상대 가족도 코드를 만들었나요? 그 QR을 찍으면 내 코드는 취소되고
-            그쪽 짝꿍으로 합류해요.
+          <p className="text-center text-[11px] text-[#8B7F75]">
+            상대 QR을 찍으면 내 코드는 취소돼요
           </p>
         </section>
 
@@ -966,7 +961,7 @@ function PairQr({ code }: { code: string }) {
         className="h-44 w-44 rounded-2xl border border-current/15 bg-white p-2 shadow-sm"
       />
       <p className="mt-1.5 text-center text-[11px] font-semibold opacity-80">
-        📷 짝꿍이 폰 카메라로 찍으면 바로 열려요
+        짝꿍이 카메라로 찍으면 돼요
       </p>
     </div>
   );
