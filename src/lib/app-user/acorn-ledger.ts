@@ -90,7 +90,49 @@ export async function eventIdForQuestPack(
       .select("event_id")
       .eq("quest_pack_id", questPackId)
       .limit(1)) as { data: { event_id: string }[] | null };
-    return resp.data?.[0]?.event_id ?? null;
+    if (resp.data?.[0]?.event_id) return resp.data[0].event_id;
+
+    // 폴백 — 행사에 연결 안 된 LIVE 팩.
+    // 참가자 화면(resolveEventPackIds)은 행사에 팩이 없으면 기관의 LIVE 팩을
+    // 대신 보여준다. 그 경로로 미션을 하면 여기 링크 조회가 비어서 도토리가
+    // **어느 행사에도 귀속되지 않았고**, 헤더의 행사 잔액이 획득보다 작게
+    // 보였다. 같은 규칙을 거꾸로 적용한다: 이 팩 기관의 LIVE 행사가 딱
+    // 하나면 그 행사로 귀속. 둘 이상이면 어느 쪽인지 알 수 없으니 null.
+    const pack = (await (
+      supabase.from("org_quest_packs" as never) as unknown as {
+        select: (c: string) => {
+          eq: (
+            k: string,
+            v: string
+          ) => {
+            maybeSingle: () => Promise<{
+              data: { org_id: string; status: string } | null;
+            }>;
+          };
+        };
+      }
+    )
+      .select("org_id, status")
+      .eq("id", questPackId)
+      .maybeSingle()) as { data: { org_id: string; status: string } | null };
+    if (!pack.data || pack.data.status !== "LIVE") return null;
+
+    const events = (await (
+      supabase.from("org_events" as never) as unknown as {
+        select: (c: string) => {
+          eq: (k: string, v: string) => {
+            eq: (k: string, v: string) => {
+              limit: (n: number) => Promise<{ data: { id: string }[] | null }>;
+            };
+          };
+        };
+      }
+    )
+      .select("id")
+      .eq("org_id", pack.data.org_id)
+      .eq("status", "LIVE")
+      .limit(2)) as { data: { id: string }[] | null };
+    return events.data?.length === 1 ? events.data[0].id : null;
   } catch {
     return null;
   }
