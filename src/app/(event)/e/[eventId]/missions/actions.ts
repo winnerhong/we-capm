@@ -376,9 +376,8 @@ async function submitMissionActionInner(
       photo_urls: urls,
       ...(caption ? { caption } : {}),
     };
-    // PHOTO_APPROVAL 는 정의상 항상 PENDING_REVIEW — approval_mode 무시
-    forcedStatus = "PENDING_REVIEW";
-    forcedAcorns = null;
+    // 승인 방식은 기관이 고른 approval_mode 를 따른다(아래 switch). 예전엔 여기서 PENDING_REVIEW 로 못박아
+    // 「자동 승인」 을 골라도(편집 화면 안내: "제출 즉시 도토리 지급") 검토 대기에 멈췄다(사용자 2026-10-30).
   } else if (mission.kind === "TREASURE") {
     const p = payload as {
       steps_cleared?: unknown;
@@ -450,9 +449,8 @@ async function submitMissionActionInner(
       ...(artistName ? { artist: artistName } : {}),
       ...(childName ? { child_name: childName } : {}),
     };
-    // RADIO 는 운영자 모더레이션 대기 — 도토리는 승인 후 지급
-    forcedStatus = "PENDING_REVIEW";
-    forcedAcorns = null;
+    // 스탬프·도토리 승인은 approval_mode 를 따른다(아래 switch — 자동 승인이면 바로).
+    // 토리FM 송출 여부는 이와 따로 mission_radio_queue 모더레이션(PENDING)이 맡는다 — 아래 인큐 그대로.
   } else if (mission.kind === "COOP") {
     // COOP 는 전용 액션(confirmCoopSideAction / uploadCoopSharedPhotoAction)을 사용
     throw new Error(
@@ -834,8 +832,10 @@ export async function replaceMissionPhotosAction(
     // 갈아끼우면 아무도 확인하지 않은 사진이 곧장 다른 가족들 피드에 오른다.
     // 그래서 사진을 바꾸면 검토 대기로 되돌린다 — 도토리는 그대로 두고(이미 한 일은
     // 한 일이다) 노출만 멈춘다. PHOTO(자동 승인)는 애초에 검토가 없으니 그대로 둔다.
+    // 단, 기관이 「자동 승인」 으로 둔 미션은 애초에 검토가 없다 — 사진을 바꿔도 승인 그대로.
     const needsReview =
       mission.kind === "PHOTO_APPROVAL" &&
+      mission.approval_mode !== "AUTO" &&
       (existing.status === "APPROVED" || existing.status === "AUTO_APPROVED");
 
     const patch: Row = { payload_json: nextPayload };

@@ -56,6 +56,8 @@ export function PhotoApprovalRunner({
 
   const minPhotos = Math.max(1, config.min_photos ?? 1);
   const slaHours = Math.max(1, config.sla_hours ?? 24);
+  /* 기관이 「자동 승인」 으로 두면 제출 즉시 승인 — 「검토 요청」·「운영자 확인 후」 문구를 쓰지 않는다 */
+  const autoApprove = mission.approval_mode === "AUTO";
 
   // 상태별 UI 분기
   const isPendingReview =
@@ -185,7 +187,7 @@ export function PhotoApprovalRunner({
           </p>
         )}
         <p className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-semibold text-amber-800">
-          🔍 운영자가 확인 후 승인하면 도토리를 드려요 (최대 {slaHours}시간)
+          {autoApprove ? "✅ 올리면 바로 스탬프와 도토리를 드려요" : <>🔍 운영자가 확인 후 승인하면 도토리를 드려요 (최대 {slaHours}시간)</>}
         </p>
       </section>
 
@@ -371,7 +373,7 @@ export function PhotoApprovalRunner({
               ? "제출 중..."
               : isRejected
                 ? "🔄 다시 제출하기"
-                : "📤 검토 요청하기"}
+                : autoApprove ? "📤 제출하기" : "📤 검토 요청하기"}
           </button>
         </>
       )}
