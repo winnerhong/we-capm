@@ -99,13 +99,17 @@ export function CoopRunner({
     setErrorMsg(null);
     startTransition(async () => {
       try {
-        await createCoopSessionAction(
+        const res = await createCoopSessionAction(
           mission.id,
           selectedChildId || undefined
         );
+        if (!res.ok) {
+          setErrorMsg(res.message);
+          return;
+        }
         router.refresh();
-      } catch (e) {
-        setErrorMsg(e instanceof Error ? e.message : String(e));
+      } catch {
+        setErrorMsg("처리에 실패했어요. 잠시 후 다시 시도해 주세요");
       }
     });
   };
@@ -120,14 +124,18 @@ export function CoopRunner({
     setErrorMsg(null);
     startTransition(async () => {
       try {
-        await joinCoopSessionAction(
+        const res = await joinCoopSessionAction(
           mission.id,
           code,
           selectedChildId || undefined
         );
+        if (!res.ok) {
+          setErrorMsg(res.message);
+          return;
+        }
         router.refresh();
-      } catch (e) {
-        setErrorMsg(e instanceof Error ? e.message : String(e));
+      } catch {
+        setErrorMsg("처리에 실패했어요. 잠시 후 다시 시도해 주세요");
       }
     });
   };
@@ -138,10 +146,14 @@ export function CoopRunner({
     setErrorMsg(null);
     startTransition(async () => {
       try {
-        await cancelCoopSessionAction(session.id);
+        const res = await cancelCoopSessionAction(session.id);
+        if (!res.ok) {
+          setErrorMsg(res.message);
+          return;
+        }
         router.refresh();
-      } catch (e) {
-        setErrorMsg(e instanceof Error ? e.message : String(e));
+      } catch {
+        setErrorMsg("처리에 실패했어요. 잠시 후 다시 시도해 주세요");
       }
     });
   };
@@ -153,11 +165,23 @@ export function CoopRunner({
     setErrorMsg(null);
     startTransition(async () => {
       try {
-        await cancelCoopSessionAction(session.id);
-        await joinCoopSessionAction(mission.id, code, selectedChildId || undefined);
+        const canceled = await cancelCoopSessionAction(session.id);
+        if (!canceled.ok) {
+          setErrorMsg(canceled.message);
+          return;
+        }
+        const joined = await joinCoopSessionAction(
+          mission.id,
+          code,
+          selectedChildId || undefined
+        );
+        if (!joined.ok) {
+          setErrorMsg(joined.message);
+          return;
+        }
         router.refresh();
-      } catch (e) {
-        setErrorMsg(e instanceof Error ? e.message : String(e));
+      } catch {
+        setErrorMsg("처리에 실패했어요. 잠시 후 다시 시도해 주세요");
       }
     });
   };
@@ -175,11 +199,15 @@ export function CoopRunner({
     setErrorMsg(null);
     startTransition(async () => {
       try {
-        await confirmPartnerCodeAction(session.id, code);
+        const res = await confirmPartnerCodeAction(session.id, code);
+        if (!res.ok) {
+          setErrorMsg(res.message);
+          return;
+        }
         setPartnerCodeInput("");
         router.refresh();
-      } catch (e) {
-        setErrorMsg(e instanceof Error ? e.message : String(e));
+      } catch {
+        setErrorMsg("처리에 실패했어요. 잠시 후 다시 시도해 주세요");
       }
     });
   };
@@ -189,10 +217,14 @@ export function CoopRunner({
     setErrorMsg(null);
     startTransition(async () => {
       try {
-        await confirmCoopSideAction(session.id, myRole);
+        const res = await confirmCoopSideAction(session.id, myRole);
+        if (!res.ok) {
+          setErrorMsg(res.message);
+          return;
+        }
         router.refresh();
-      } catch (e) {
-        setErrorMsg(e instanceof Error ? e.message : String(e));
+      } catch {
+        setErrorMsg("처리에 실패했어요. 잠시 후 다시 시도해 주세요");
       }
     });
   };
@@ -224,7 +256,11 @@ export function CoopRunner({
           return;
         }
 
-        await uploadCoopSharedPhotoAction(session.id, result.url);
+        const res = await uploadCoopSharedPhotoAction(session.id, result.url);
+        if (!res.ok) {
+          setErrorMsg(`업로드 실패: ${res.message}`);
+          return;
+        }
         router.refresh();
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);

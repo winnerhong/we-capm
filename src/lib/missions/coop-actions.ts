@@ -229,7 +229,7 @@ function revalidateAll(orgMissionId: string): void {
 /* 1) createCoopSessionAction                                                 */
 /* -------------------------------------------------------------------------- */
 
-export async function createCoopSessionAction(
+async function createCoopSessionImpl(
   orgMissionId: string,
   childId?: string
 ): Promise<{ sessionId: string; pairCode: string }> {
@@ -327,7 +327,7 @@ export async function createCoopSessionAction(
  *  - A 가 그 코드를 확인(confirmPartnerCodeAction) 해야 PAIRED 로 진입.
  *  - partner_pair_code 충돌 시 최대 10회 재시도 (활성 세션 안에서 UNIQUE).
  */
-export async function joinCoopSessionAction(
+async function joinCoopSessionImpl(
   orgMissionId: string,
   pairCode: string,
   childId?: string
@@ -429,7 +429,7 @@ export async function joinCoopSessionAction(
  *  - partner_pair_code 와 정확히 일치해야 함
  *  - 성공 시 state='PAIRED', paired_at = now, initiator_confirmed_partner_at = now
  */
-export async function confirmPartnerCodeAction(
+async function confirmPartnerCodeImpl(
   sessionId: string,
   enteredCode: string
 ): Promise<{ ok: true }> {
@@ -626,7 +626,7 @@ async function performConfirmCoopSide(
   revalidateAll(orgMissionId);
 }
 
-export async function confirmCoopSideAction(
+async function confirmCoopSideImpl(
   sessionId: string,
   role: "A" | "B"
 ): Promise<void> {
@@ -664,7 +664,7 @@ export async function confirmCoopSideAction(
 /* 4) uploadCoopSharedPhotoAction                                             */
 /* -------------------------------------------------------------------------- */
 
-export async function uploadCoopSharedPhotoAction(
+async function uploadCoopSharedPhotoImpl(
   sessionId: string,
   photoUrl: string
 ): Promise<void> {
@@ -736,7 +736,7 @@ export async function uploadCoopSharedPhotoAction(
 /* 5) cancelCoopSessionAction                                                 */
 /* -------------------------------------------------------------------------- */
 
-export async function cancelCoopSessionAction(
+async function cancelCoopSessionImpl(
   sessionId: string
 ): Promise<void> {
   const user = await requireAppUser();
@@ -777,3 +777,75 @@ export async function cancelCoopSessionAction(
 
   revalidateAll(session.org_mission_id);
 }
+
+/* -------------------------------------------------------------------------- */
+/* 결과 래퍼 — 던지지 않고 돌려준다                                            */
+/*                                                                            */
+/* 프로덕션 Next.js 는 서버 액션이 던진 Error 의 message 를 가린다              */
+/* ("An error occurred in the Server Components render…"). "페어 코드 유효     */
+/* 시간이 지났어요" 같은 안내가 참가자에게 영문 경고로 둔갑했던 원인.           */
+/* 위 Impl 들은 그대로 던지고, 바깥(클라이언트가 부르는 액션)은 값으로 돌려준다. */
+/* -------------------------------------------------------------------------- */
+
+export type CoopActionResult =
+  | { ok: true }
+  | { ok: false; message: string };
+
+async function asResult(fn: () => Promise<unknown>): Promise<CoopActionResult> {
+  try {
+    await fn();
+    return { ok: true };
+  } catch (e) {
+    console.error("[coop-actions] fail", e);
+    return {
+      ok: false,
+      message:
+        e instanceof Error && e.message
+          ? e.message
+          : "처리에 실패했어요. 잠시 후 다시 시도해 주세요",
+    };
+  }
+}
+
+export async function createCoopSessionAction(
+  orgMissionId: string,
+  childId?: string
+): Promise<CoopActionResult> {
+  return asResult(() => createCoopSessionImpl(orgMissionId, childId));
+}
+
+export async function joinCoopSessionAction(
+  orgMissionId: string,
+  pairCode: string,
+  childId?: string
+): Promise<CoopActionResult> {
+  return asResult(() => joinCoopSessionImpl(orgMissionId, pairCode, childId));
+}
+
+export async function confirmPartnerCodeAction(
+  sessionId: string,
+  enteredCode: string
+): Promise<CoopActionResult> {
+  return asResult(() => confirmPartnerCodeImpl(sessionId, enteredCode));
+}
+
+export async function confirmCoopSideAction(
+  sessionId: string,
+  role: "A" | "B"
+): Promise<CoopActionResult> {
+  return asResult(() => confirmCoopSideImpl(sessionId, role));
+}
+
+export async function uploadCoopSharedPhotoAction(
+  sessionId: string,
+  photoUrl: string
+): Promise<CoopActionResult> {
+  return asResult(() => uploadCoopSharedPhotoImpl(sessionId, photoUrl));
+}
+
+export async function cancelCoopSessionAction(
+  sessionId: string
+): Promise<CoopActionResult> {
+  return asResult(() => cancelCoopSessionImpl(sessionId));
+}
+
