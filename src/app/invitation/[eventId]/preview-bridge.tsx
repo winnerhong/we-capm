@@ -53,6 +53,39 @@ export function InvitationPreviewBridge() {
           const on = isPreviewBlockVisible(el.dataset.invIf ?? "", fields);
           el.style.display = on ? "" : "none";
         });
+
+      // 주차장 글자 — 이름·주소를 갈아끼우고, 빈 줄은 숨긴다. 둘 다 비면
+      // 카드째 숨긴다 (실제 초대장도 둘 다 비면 카드를 안 그린다).
+      // 카드 자체의 추가·삭제·사진은 저장 후 새로고침 영역 그대로.
+      const parkings = fields.parkings;
+      if (Array.isArray(parkings)) {
+        for (let i = 0; ; i++) {
+          const card = document.querySelector<HTMLElement>(
+            `[data-inv="parking-${i}"]`
+          );
+          if (!card) break;
+          const p = parkings[i] as
+            | { name?: unknown; address?: unknown }
+            | undefined;
+          const nm = typeof p?.name === "string" ? p.name : "";
+          const ad = typeof p?.address === "string" ? p.address : "";
+          const nameEl = card.querySelector<HTMLElement>(
+            `[data-inv="parking-${i}-name"]`
+          );
+          if (nameEl) {
+            nameEl.textContent = nm;
+            nameEl.style.display = nm ? "" : "none";
+          }
+          const adEl = card.querySelector<HTMLElement>(
+            `[data-inv="parking-${i}-address"]`
+          );
+          if (adEl) {
+            adEl.textContent = ad;
+            adEl.style.display = ad ? "" : "none";
+          }
+          card.style.display = !p || (!nm && !ad) ? "none" : "";
+        }
+      }
     };
 
     // 편집 중인 칸의 자리로 스크롤 + 하이라이트.

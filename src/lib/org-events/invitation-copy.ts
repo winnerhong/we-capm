@@ -36,6 +36,11 @@ export type InvitationPreviewFields = {
   dress: string;
   location: string;
   address: string;
+  /**
+   * 주차장 글자(이름·주소)도 타이핑 즉시 반영 — 카드 자체(추가·삭제·사진)는
+   * 여전히 저장 후 새로고침이다. 저장 전의 새 카드는 미리보기에 없다.
+   */
+  parkings?: { name: string; address: string }[];
 };
 
 export const INVITATION_PREVIEW_FIELDS = [

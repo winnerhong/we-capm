@@ -272,16 +272,26 @@ function Live({
   }, []);
 
   const { name, message, body, dress, location, address } = fields;
+  // 배열은 참조가 매번 바뀌므로 내용 기준으로 비교한다.
+  const parkingsJson = JSON.stringify(fields.parkings ?? []);
   useEffect(() => {
     if (!ready) return;
     ref.current?.contentWindow?.postMessage(
       {
         type: INVITATION_PREVIEW_MESSAGE,
-        fields: { name, message, body, dress, location, address },
+        fields: {
+          name,
+          message,
+          body,
+          dress,
+          location,
+          address,
+          parkings: JSON.parse(parkingsJson),
+        },
       },
       window.location.origin
     );
-  }, [ready, name, message, body, dress, location, address]);
+  }, [ready, name, message, body, dress, location, address, parkingsJson]);
 
   // 편집 중인 칸으로 미리보기 스크롤 — 같은 칸 재클릭(n 증가)에도 다시 보낸다.
   useEffect(() => {

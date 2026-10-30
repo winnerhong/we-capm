@@ -257,8 +257,12 @@ export function EditEventForm({
       dress: invDressCode.trim(),
       location: invLocation.trim(),
       address: invAddress.trim(),
+      parkings: invParkings.map((p) => ({
+        name: p.name.trim(),
+        address: p.address.trim(),
+      })),
     }),
-    [name, invMessage, invBody, invDressCode, invLocation, invAddress]
+    [name, invMessage, invBody, invDressCode, invLocation, invAddress, invParkings]
   );
 
   const startsAt = useMemo(() => {

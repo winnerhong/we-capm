@@ -672,13 +672,22 @@ export default async function EventInvitationPage({
                         />
                       )}
                     </div>
-                    {p.name && (
-                      <p className="mt-2 break-words text-sm font-bold text-[#2C2C2C]">
+                    {/* preview 에선 빈 값이어도 노드를 남긴다 — 타이핑 즉시 반영 대상. */}
+                    {(preview || p.name) && (
+                      <p
+                        {...pv(`parking-${idx}-name`)}
+                        className="mt-2 break-words text-sm font-bold text-[#2C2C2C]"
+                        style={preview && !p.name ? { display: "none" } : undefined}
+                      >
                         {p.name}
                       </p>
                     )}
-                    {p.address && (
-                      <p className="mt-0.5 break-words text-xs text-[#6B6560]">
+                    {(preview || p.address) && (
+                      <p
+                        {...pv(`parking-${idx}-address`)}
+                        className="mt-0.5 break-words text-xs text-[#6B6560]"
+                        style={preview && !p.address ? { display: "none" } : undefined}
+                      >
                         {p.address}
                       </p>
                     )}
