@@ -847,26 +847,41 @@ export async function updateQuestPackAction(
   revalidatePath(`/org/${session.orgId}/quest-packs/${id}/edit`);
 }
 
+/**
+ * 상태 전환 결과 — **던지지 않고 돌려준다.**
+ *
+ * 프로덕션 Next.js 는 서버 액션이 던진 Error 의 message 를 가린다
+ * ("An error occurred in the Server Components render…"). "미션을 1개 이상
+ * 담아야 해요" 같은 안내가 사용자에게 영문 경고로 둔갑했던 원인.
+ * 안내용 실패는 값으로 돌려주고, 호출부가 그대로 보여준다.
+ */
+export type QuestPackActionResult =
+  | { ok: true }
+  | { ok: false; message: string };
+
 async function setQuestPackStatus(
   id: string,
   status: QuestPackStatus
-): Promise<void> {
+): Promise<QuestPackActionResult> {
   const session = await requireOrg();
   const supabase = await createClient();
 
   const existing = await loadOrgQuestPackOwned(supabase, id, session.orgId);
-  if (!existing) throw new Error("스탬프북을 찾을 수 없어요");
+  if (!existing) return { ok: false, message: "스탬프북을 찾을 수 없어요" };
 
   if (status === "LIVE") {
     if (!existing.name || existing.name.trim().length === 0) {
-      throw new Error("이름을 먼저 입력해 주세요");
+      return { ok: false, message: "이름을 먼저 입력해 주세요" };
     }
     if (!existing.starts_at || !existing.ends_at) {
-      throw new Error("시작·종료 일시를 먼저 설정해 주세요");
+      return { ok: false, message: "시작·종료 일시를 먼저 설정해 주세요" };
     }
     const missionCount = await countMissionsInPack(supabase, id);
     if (missionCount < 1) {
-      throw new Error("최소 1개의 미션이 담겨 있어야 공개할 수 있어요");
+      return {
+        ok: false,
+        message: "최소 1개의 미션이 담겨 있어야 공개할 수 있어요",
+      };
     }
   }
 
@@ -888,35 +903,46 @@ async function setQuestPackStatus(
     .update(patch)
     .eq("id", id);
 
-  if (error) throw new Error(`상태 변경 실패: ${error.message}`);
+  if (error) return { ok: false, message: `상태 변경 실패: ${error.message}` };
 
   revalidatePath(`/org/${session.orgId}/quest-packs`);
   revalidatePath(`/org/${session.orgId}/quest-packs/${id}/edit`);
+  return { ok: true };
 }
 
-export async function publishQuestPackAction(id: string): Promise<void> {
-  await setQuestPackStatus(id, "LIVE");
+export async function publishQuestPackAction(
+  id: string
+): Promise<QuestPackActionResult> {
+  return setQuestPackStatus(id, "LIVE");
 }
 
-export async function endQuestPackAction(id: string): Promise<void> {
-  await setQuestPackStatus(id, "ENDED");
+export async function endQuestPackAction(
+  id: string
+): Promise<QuestPackActionResult> {
+  return setQuestPackStatus(id, "ENDED");
 }
 
-export async function archiveQuestPackAction(id: string): Promise<void> {
-  await setQuestPackStatus(id, "ARCHIVED");
+export async function archiveQuestPackAction(
+  id: string
+): Promise<QuestPackActionResult> {
+  return setQuestPackStatus(id, "ARCHIVED");
 }
 
-export async function deleteQuestPackAction(id: string): Promise<void> {
+export async function deleteQuestPackAction(
+  id: string
+): Promise<QuestPackActionResult> {
   const session = await requireOrg();
   const supabase = await createClient();
 
   const existing = await loadOrgQuestPackOwned(supabase, id, session.orgId);
-  if (!existing) throw new Error("스탬프북을 찾을 수 없어요");
+  if (!existing) return { ok: false, message: "스탬프북을 찾을 수 없어요" };
 
   if (existing.status === "LIVE") {
-    throw new Error(
-      "공개중인 스탬프북은 바로 삭제할 수 없어요. 먼저 '종료' 또는 '보관'을 눌러 주세요."
-    );
+    return {
+      ok: false,
+      message:
+        "공개중인 스탬프북은 바로 삭제할 수 없어요. 먼저 '종료' 또는 '보관'을 눌러 주세요.",
+    };
   }
 
   const { error } = await (
@@ -932,9 +958,10 @@ export async function deleteQuestPackAction(id: string): Promise<void> {
     .delete()
     .eq("id", id);
 
-  if (error) throw new Error(`삭제 실패: ${error.message}`);
+  if (error) return { ok: false, message: `삭제 실패: ${error.message}` };
 
   revalidatePath(`/org/${session.orgId}/quest-packs`);
+  return { ok: true };
 }
 
 /* -------------------------------------------------------------------------- */

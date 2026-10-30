@@ -31,10 +31,14 @@ export function DeletePackButton({
     if (!ok) return;
     startTransition(async () => {
       try {
-        await deleteQuestPackAction(packId);
+        const res = await deleteQuestPackAction(packId);
+        if (!res.ok) {
+          window.alert(res.message);
+          return;
+        }
         router.refresh();
-      } catch (e) {
-        window.alert(e instanceof Error ? e.message : "삭제 실패");
+      } catch {
+        window.alert("삭제에 실패했어요. 잠시 후 다시 시도해 주세요.");
       }
     });
   }

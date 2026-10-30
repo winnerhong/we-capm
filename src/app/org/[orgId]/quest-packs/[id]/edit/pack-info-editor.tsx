@@ -9,6 +9,7 @@ import {
   archiveQuestPackAction,
   deleteQuestPackAction,
 } from "../../../missions/actions";
+import type { QuestPackActionResult } from "../../../missions/actions";
 import {
   QUEST_PACK_STATUS_META,
   type LayoutMode,
@@ -103,23 +104,24 @@ export function PackInfoEditor({ pack, missionCount }: Props) {
   }
 
   async function runStatus(
-    action: (id: string) => Promise<void>,
+    action: (id: string) => Promise<QuestPackActionResult>,
     confirmText?: string,
     successText?: string
   ) {
     if (confirmText && !window.confirm(confirmText)) return;
     startTransition(async () => {
       try {
-        await action(pack.id);
+        const res = await action(pack.id);
+        if (!res.ok) {
+          setMsg({ kind: "error", text: res.message });
+          return;
+        }
         if (successText) {
           setMsg({ kind: "ok", text: successText });
         }
         router.refresh();
-      } catch (e) {
-        setMsg({
-          kind: "error",
-          text: e instanceof Error ? e.message : "상태 변경 실패",
-        });
+      } catch {
+        setMsg({ kind: "error", text: "상태 변경에 실패했어요" });
       }
     });
   }
@@ -169,13 +171,14 @@ export function PackInfoEditor({ pack, missionCount }: Props) {
     if (!ok) return;
     startTransition(async () => {
       try {
-        await deleteQuestPackAction(pack.id);
+        const res = await deleteQuestPackAction(pack.id);
+        if (!res.ok) {
+          setMsg({ kind: "error", text: res.message });
+          return;
+        }
         router.push(`/org/${pack.org_id}/quest-packs`);
-      } catch (e) {
-        setMsg({
-          kind: "error",
-          text: e instanceof Error ? e.message : "삭제 실패",
-        });
+      } catch {
+        setMsg({ kind: "error", text: "삭제에 실패했어요" });
       }
     });
   }

@@ -20,10 +20,14 @@ export function PublishPackButton({ packId, packName }: Props) {
     if (!ok) return;
     startTransition(async () => {
       try {
-        await publishQuestPackAction(packId);
+        const res = await publishQuestPackAction(packId);
+        if (!res.ok) {
+          window.alert(res.message);
+          return;
+        }
         router.refresh();
-      } catch (e) {
-        window.alert(e instanceof Error ? e.message : "공개 실패");
+      } catch {
+        window.alert("공개에 실패했어요. 잠시 후 다시 시도해 주세요.");
       }
     });
   }
