@@ -94,7 +94,11 @@ export function InvitationPreviewBridge() {
     // 타이머로 지우면 칸을 빨리 옮길 때 이전 테두리가 영영 남는다.
     let highlighted: HTMLElement | null = null;
     const clearHighlight = () => {
-      if (highlighted) highlighted.style.boxShadow = "";
+      if (highlighted) {
+        highlighted.style.removeProperty("box-shadow");
+        highlighted.style.removeProperty("outline");
+        highlighted.style.removeProperty("outline-offset");
+      }
       highlighted = null;
     };
     const focusField = (key: string) => {
@@ -107,7 +111,15 @@ export function InvitationPreviewBridge() {
       el.scrollIntoView({ behavior: "smooth", block: "center" });
       el.style.transition = "box-shadow 0.25s ease";
       el.style.borderRadius = el.style.borderRadius || "8px";
-      el.style.boxShadow = "0 0 0 3px rgba(127, 176, 105, 0.8)";
+      // 주차장 카드처럼 자체 그림자(!important)가 있는 요소에선 일반 인라인
+      // box-shadow 가 진다 — important 로 얹고, outline 으로 한 번 더 보강.
+      el.style.setProperty(
+        "box-shadow",
+        "0 0 0 3px rgba(127, 176, 105, 0.8)",
+        "important"
+      );
+      el.style.setProperty("outline", "3px solid rgba(127, 176, 105, 0.8)");
+      el.style.setProperty("outline-offset", "1px");
       highlighted = el;
     };
 
