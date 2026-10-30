@@ -149,6 +149,22 @@ export function CoopRunner({
     });
   };
 
+  // 양쪽 가족이 둘 다 코드를 만들어버린 경우의 구출로 —
+  // 대기 화면에서 상대 QR 을 찍으면 내 코드를 접고 그쪽으로 합류한다.
+  const handleScanWhileWaiting = (code: string) => {
+    if (!session) return;
+    setErrorMsg(null);
+    startTransition(async () => {
+      try {
+        await cancelCoopSessionAction(session.id);
+        await joinCoopSessionAction(mission.id, code, selectedChildId || undefined);
+        router.refresh();
+      } catch (e) {
+        setErrorMsg(e instanceof Error ? e.message : String(e));
+      }
+    });
+  };
+
   // A 가 B 의 코드를 입력해 짝꿍 성립을 확정.
   const handleConfirmPartnerCode = (codeOverride?: string) => {
     if (!session) return;
@@ -429,10 +445,49 @@ export function CoopRunner({
           )}
         </section>
 
-        <section className="rounded-3xl border border-[#D4E4BC] bg-white p-4 shadow-sm">
+        <section className="space-y-3 rounded-3xl border border-[#D4E4BC] bg-white p-4 shadow-sm">
           <p className="text-sm text-[#6B6560]">
             짝꿍 가족이 <b>카메라로 QR을 찍으면</b> 바로 합류 화면이 열려요.
             QR이 어려우면 아래 4자리 코드를 불러줘도 돼요.
+          </p>
+          {/* 상대도 코드를 만들어 둘 다 QR 만 보고 있는 교착 — 여기서 찍으면
+              내 코드를 접고 그쪽으로 합류한다. */}
+          {scanOpen ? (
+            <div className="space-y-2">
+              <QrScanner
+                autoStart
+                onScan={(text) => {
+                  const code = extractPairCode(text);
+                  if (!code) {
+                    setErrorMsg("짝꿍 QR 이 아니에요");
+                    setScanOpen(false);
+                    return;
+                  }
+                  setScanOpen(false);
+                  handleScanWhileWaiting(code);
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => setScanOpen(false)}
+                className="min-h-[44px] w-full rounded-2xl border border-[#D4E4BC] bg-white px-4 py-2 text-sm font-bold text-[#8B7F75] hover:bg-[#F5F1E8]"
+              >
+                ✕ 카메라 닫기
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setScanOpen(true)}
+              disabled={isPending}
+              className="min-h-[48px] w-full rounded-2xl border-2 border-[#2D5A3D] bg-white px-4 py-3 text-sm font-bold text-[#2D5A3D] transition hover:bg-[#F5F1E8] disabled:opacity-50"
+            >
+              📷 상대 가족 QR 찍기
+            </button>
+          )}
+          <p className="text-[11px] leading-relaxed text-[#8B7F75]">
+            상대 가족도 코드를 만들었나요? 그 QR을 찍으면 내 코드는 취소되고
+            그쪽 짝꿍으로 합류해요.
           </p>
         </section>
 
