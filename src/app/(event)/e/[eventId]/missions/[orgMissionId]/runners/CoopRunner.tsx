@@ -61,13 +61,10 @@ export function CoopRunner({
   const [pairCodeInput, setPairCodeInput] = useState(prefill);
   // A 가 WAITING_RECIPROCAL 단계에서 B 가 발급한 코드를 입력하는 칸.
   const [partnerCodeInput, setPartnerCodeInput] = useState(prefill);
-  // 📷 QR 스캔 카메라 열림 여부 (합류 입력칸 / 상호확정 입력칸 공용).
-  const [scanOpen, setScanOpen] = useState(false);
   const [selectedChildId, setSelectedChildId] = useState<string>(
     kids[0]?.id ?? ""
   );
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [copyToast, setCopyToast] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -200,17 +197,6 @@ export function CoopRunner({
     });
   };
 
-  const handleCopyCode = async () => {
-    if (!session) return;
-    try {
-      await navigator.clipboard.writeText(session.pair_code);
-      setCopyToast(true);
-      setTimeout(() => setCopyToast(false), 1500);
-    } catch {
-      setErrorMsg("클립보드 복사에 실패했어요. 길게 눌러서 복사해 주세요");
-    }
-  };
-
   const handleSharedPhotoUpload = useCallback(
     async (files: FileList | File[]) => {
       if (!session) return;
@@ -322,40 +308,20 @@ export function CoopRunner({
           </div>
 
           <div>
-            {/* 📷 QR 합류 — 짝꿍 폰의 QR 을 찍으면 코드 입력 없이 바로 합류 */}
-            {scanOpen ? (
-              <div className="space-y-2">
-                <QrScanner
-                  autoStart
-                  onScan={(text) => {
-                    const code = extractPairCode(text);
-                    if (!code) {
-                      setErrorMsg("짝꿍 QR 이 아니에요. 코드를 직접 입력해 주세요");
-                      setScanOpen(false);
-                      return;
-                    }
-                    setScanOpen(false);
-                    setPairCodeInput(code);
-                    handleJoin(code);
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={() => setScanOpen(false)}
-                  className="min-h-[44px] w-full rounded-2xl border border-[#D4E4BC] bg-white px-4 py-2 text-sm font-bold text-[#8B7F75] hover:bg-[#F5F1E8]"
-                >
-                  ✕ 카메라 닫기
-                </button>
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setScanOpen(true)}
-                className="min-h-[48px] w-full rounded-2xl border-2 border-[#2D5A3D] bg-white px-4 py-3 text-sm font-bold text-[#2D5A3D] transition hover:bg-[#F5F1E8]"
-              >
-                📷 짝꿍 QR 찍고 바로 합류
-              </button>
-            )}
+            {/* 📷 QR 합류 — 짝꿍 폰의 QR 을 찍으면 코드 입력 없이 바로 합류.
+                열기/취소는 QrScanner 자체 버튼 하나로. */}
+            <QrScanner
+              buttonLabel="📷 짝꿍 QR 찍고 바로 합류"
+              onScan={(text) => {
+                const code = extractPairCode(text);
+                if (!code) {
+                  setErrorMsg("짝꿍 QR 이 아니에요. 코드를 직접 입력해 주세요");
+                  return;
+                }
+                setPairCodeInput(code);
+                handleJoin(code);
+              }}
+            />
 
             <label
               htmlFor="coop-code"
@@ -428,61 +394,46 @@ export function CoopRunner({
           <p className="mt-1 text-center text-4xl font-mono font-bold tracking-[0.3em]">
             {session.pair_code}
           </p>
-          <button
-            type="button"
-            onClick={handleCopyCode}
-            className="mt-3 min-h-[44px] w-full rounded-2xl border border-current/20 bg-white/60 px-4 py-2 text-sm font-bold backdrop-blur-sm transition hover:bg-white/80"
-          >
-            📋 코드 복사
-          </button>
-          {copyToast && (
-            <p
-              role="status"
-              className="mt-2 text-center text-[12px] font-semibold"
-            >
-              ✅ 복사 완료!
-            </p>
-          )}
         </section>
 
         <section className="space-y-2 rounded-3xl border border-[#D4E4BC] bg-white p-4 shadow-sm">
-          {/* 상대도 코드를 만들어 둘 다 QR 만 보고 있는 교착 — 여기서 찍으면
-              내 코드를 접고 그쪽으로 합류한다. */}
-          {scanOpen ? (
-            <div className="space-y-2">
-              <QrScanner
-                autoStart
-                onScan={(text) => {
-                  const code = extractPairCode(text);
-                  if (!code) {
-                    setErrorMsg("짝꿍 QR 이 아니에요");
-                    setScanOpen(false);
-                    return;
-                  }
-                  setScanOpen(false);
-                  handleScanWhileWaiting(code);
-                }}
-              />
-              <button
-                type="button"
-                onClick={() => setScanOpen(false)}
-                className="min-h-[44px] w-full rounded-2xl border border-[#D4E4BC] bg-white px-4 py-2 text-sm font-bold text-[#8B7F75] hover:bg-[#F5F1E8]"
-              >
-                ✕ 카메라 닫기
-              </button>
-            </div>
-          ) : (
+          {/* 상대도 코드를 만들어 둘 다 QR 만 보고 있는 교착 — 여기서 찍거나
+              코드를 넣으면 내 코드를 접고 그쪽으로 합류한다.
+              열기/취소 버튼은 QrScanner 가 스스로 가진다 — 겹버튼 금지. */}
+          <QrScanner
+            buttonLabel="📷 상대 QR 찍기"
+            onScan={(text) => {
+              const code = extractPairCode(text);
+              if (!code) {
+                setErrorMsg("짝꿍 QR 이 아니에요");
+                return;
+              }
+              handleScanWhileWaiting(code);
+            }}
+          />
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={pairCodeInput}
+              onChange={(e) =>
+                setPairCodeInput(e.target.value.replace(/\D/g, "").slice(0, 4))
+              }
+              placeholder="코드 4자리"
+              inputMode="numeric"
+              maxLength={4}
+              className="min-h-[44px] min-w-0 flex-1 rounded-xl border border-[#D4E4BC] bg-[#FFF8F0] px-3 text-center text-lg font-mono font-bold tracking-[0.3em] text-[#3D3A36] outline-none focus:border-[#2D5A3D]"
+            />
             <button
               type="button"
-              onClick={() => setScanOpen(true)}
-              disabled={isPending}
-              className="min-h-[48px] w-full rounded-2xl border-2 border-[#2D5A3D] bg-white px-4 py-3 text-sm font-bold text-[#2D5A3D] transition hover:bg-[#F5F1E8] disabled:opacity-50"
+              onClick={() => handleScanWhileWaiting(pairCodeInput)}
+              disabled={isPending || pairCodeInput.length !== 4}
+              className="min-h-[44px] shrink-0 rounded-xl bg-[#2D5A3D] px-4 text-sm font-bold text-white disabled:opacity-40"
             >
-              📷 상대 QR 찍기
+              합류
             </button>
-          )}
+          </div>
           <p className="text-center text-[11px] text-[#8B7F75]">
-            상대 QR을 찍으면 내 코드는 취소돼요
+            상대 쪽으로 합류하면 내 코드는 취소돼요
           </p>
         </section>
 
@@ -531,41 +482,21 @@ export function CoopRunner({
                 ✓ 짝꿍이 합류했어요! 짝꿍이 발급받은 4자리 코드를 입력하면
                 짝꿍 성립이 끝나요.
               </p>
-              {scanOpen ? (
-                <div className="mt-4 space-y-2">
-                  <QrScanner
-                    autoStart
-                    onScan={(text) => {
-                      const code = extractPairCode(text);
-                      if (!code) {
-                        setErrorMsg(
-                          "짝꿍 QR 이 아니에요. 코드를 직접 입력해 주세요"
-                        );
-                        setScanOpen(false);
-                        return;
-                      }
-                      setScanOpen(false);
-                      setPartnerCodeInput(code);
-                      handleConfirmPartnerCode(code);
-                    }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setScanOpen(false)}
-                    className="min-h-[44px] w-full rounded-2xl border border-current/20 bg-white/70 px-4 py-2 text-sm font-bold hover:bg-white"
-                  >
-                    ✕ 카메라 닫기
-                  </button>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setScanOpen(true)}
-                  className="mt-4 min-h-[48px] w-full rounded-2xl border-2 border-current/40 bg-white/70 px-4 py-3 text-sm font-bold transition hover:bg-white"
-                >
-                  📷 짝꿍 QR 찍고 바로 성립
-                </button>
-              )}
+              <QrScanner
+                className="mt-4"
+                buttonLabel="📷 짝꿍 QR 찍고 바로 성립"
+                onScan={(text) => {
+                  const code = extractPairCode(text);
+                  if (!code) {
+                    setErrorMsg(
+                      "짝꿍 QR 이 아니에요. 코드를 직접 입력해 주세요"
+                    );
+                    return;
+                  }
+                  setPartnerCodeInput(code);
+                  handleConfirmPartnerCode(code);
+                }}
+              />
               <label
                 htmlFor="partner-code"
                 className="mt-4 block text-[11px] font-bold uppercase tracking-widest opacity-80"
@@ -609,36 +540,8 @@ export function CoopRunner({
               <p className="mt-1 text-center text-4xl font-mono font-bold tracking-[0.3em]">
                 {session.partner_pair_code ?? "----"}
               </p>
-              {session.partner_pair_code && (
-                <button
-                  type="button"
-                  onClick={async () => {
-                    try {
-                      await navigator.clipboard.writeText(
-                        session.partner_pair_code!
-                      );
-                      setCopyToast(true);
-                      setTimeout(() => setCopyToast(false), 1500);
-                    } catch {
-                      setErrorMsg("클립보드 복사 실패");
-                    }
-                  }}
-                  className="mt-3 min-h-[44px] w-full rounded-2xl border border-current/20 bg-white/60 px-4 py-2 text-sm font-bold backdrop-blur-sm transition hover:bg-white/80"
-                >
-                  📋 코드 복사
-                </button>
-              )}
-              {copyToast && (
-                <p
-                  role="status"
-                  className="mt-2 text-center text-[12px] font-semibold"
-                >
-                  ✅ 복사 완료!
-                </p>
-              )}
-              <p className="mt-4 rounded-2xl bg-white/70 px-3 py-2 text-[13px] font-semibold leading-relaxed text-current">
-                짝꿍에게 위 코드를 알려주세요. 짝꿍이 입력하면 자동으로 짝꿍
-                성립이 끝나요.
+              <p className="mt-3 text-center text-[12px] font-semibold opacity-80">
+                짝꿍이 QR을 찍거나 코드를 넣으면 끝나요
               </p>
             </>
           )}
