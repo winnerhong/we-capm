@@ -92,6 +92,39 @@ export function InvitationPreviewBridge() {
     // 안내문처럼 화면 아래쪽에 있는 덩어리를 고칠 때 폰을 손으로 내리지 않아도 된다.
     // 테두리는 **커서가 그 칸에 있는 동안만** — 칸을 떠나면(field:"") 바로 걷는다.
     // 타이머로 지우면 칸을 빨리 옮길 때 이전 테두리가 영영 남는다.
+    // 부드러운 이동 — 브라우저 기본 smooth 는 먼 거리를 순간에 건너뛰어
+    // "확확" 움직인다. 거리와 무관하게 일정한 시간(0.7s) 동안 ease-in-out 으로
+    // 흘러가게 직접 굴린다. 새 목적지가 오면 가던 길을 끊고 이어 간다.
+    let glideRaf = 0;
+    const glideTo = (el: HTMLElement) => {
+      cancelAnimationFrame(glideRaf);
+      const rect = el.getBoundingClientRect();
+      const target = Math.max(
+        0,
+        Math.min(
+          window.scrollY + rect.top - (window.innerHeight - rect.height) / 2,
+          document.documentElement.scrollHeight - window.innerHeight
+        )
+      );
+      const from = window.scrollY;
+      if (Math.abs(target - from) < 2) return;
+      const DURATION = 700;
+      const start = performance.now();
+      const ease = (t: number) =>
+        t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+      const step = (now: number) => {
+        const t = Math.min(1, (now - start) / DURATION);
+        // 전역 scroll-behavior:smooth 가 매 프레임을 또 스무딩하면 끝값으로
+        // 점프해 버린다 — 프레임 단위 이동은 즉시 적용으로 강제한다.
+        window.scrollTo({
+          top: from + (target - from) * ease(t),
+          behavior: "instant" as ScrollBehavior,
+        });
+        if (t < 1) glideRaf = requestAnimationFrame(step);
+      };
+      glideRaf = requestAnimationFrame(step);
+    };
+
     let highlighted: HTMLElement | null = null;
     const clearHighlight = () => {
       if (highlighted) {
@@ -108,7 +141,7 @@ export function InvitationPreviewBridge() {
       if (!el) return;
       // 숨겨진 덩어리(값이 비어 display:none) 는 스크롤할 자리가 없다.
       if (el.offsetParent === null) return;
-      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      glideTo(el);
       el.style.transition = "box-shadow 0.25s ease";
       el.style.borderRadius = el.style.borderRadius || "8px";
       // 주차장 카드처럼 자체 그림자(!important)가 있는 요소에선 일반 인라인
@@ -160,6 +193,7 @@ export function InvitationPreviewBridge() {
     window.parent?.postMessage({ type: INVITATION_PREVIEW_READY }, origin);
 
     return () => {
+      cancelAnimationFrame(glideRaf);
       clearHighlight();
       window.removeEventListener("message", onMessage);
       document.removeEventListener("click", block, true);
