@@ -136,6 +136,21 @@ async function approveSubmissionActionInner(
     expectedOrgId: org.orgId,
   });
 
+  // core 가 못 했다고 하면 못 한 것이다.
+  //
+  // 예전에는 이 결과를 알림 발송 여부에만 쓰고 무조건 { ok: true } 를 돌려줬다.
+  // 반려·회수된 제출을 승인하면 core 는 { ok:false, skipped:true } 를 주는데도
+  // 화면은 성공으로 알고 그 건을 큐에서 지웠다 — 아무 일도 안 일어났는데
+  // 처리된 것처럼 사라지니, 승인이 안 된다는 말이 나올 수밖에 없다.
+  if (!result.ok) {
+    return {
+      ok: false,
+      error: result.skipped
+        ? "이미 반려·회수된 제출이라 승인할 수 없어요. 참가자가 다시 제출해야 해요."
+        : "승인에 실패했어요. 잠시 후 다시 시도해 주세요.",
+    };
+  }
+
   // 승인이 실제로 이번에 발생한 경우에만 알림 발송 (idempotent re-approve 스킵).
   // 외부 API(SMS) 실패가 승인 처리 자체를 막지 않도록 try/catch 로 완전히 격리.
   if (result.ok && !result.alreadyApproved && !result.skipped) {
@@ -167,9 +182,112 @@ async function approveSubmissionActionInner(
 
   revalidatePath(`/org/${org.orgId}/missions/review`);
   revalidatePath(`/org/${org.orgId}/missions/radio`);
+  // 관제실 — 여기서 승인하는 일이 제일 잦은데 목록에 빠져 있었다.
+  revalidatePath(`/org/${org.orgId}/control-room`);
   revalidatePath("/e/[eventId]/stampbook", "page");
   revalidatePath("/home");
   return { ok: true };
+}
+
+/* -------------------------------------------------------------------------- */
+/* 1-b) approveSubmissionsBulkAction                                          */
+/* -------------------------------------------------------------------------- */
+
+export type BulkApproveResult = {
+  approved: number;
+  /** 이미 승인돼 있어 아무 일도 안 한 건. */
+  alreadyDone: number;
+  /** 반려·회수 등으로 승인할 수 없던 건. */
+  failed: number;
+  /** 첫 실패 사유 — 다 적으면 읽지 않는다. */
+  firstError: string | null;
+};
+
+/**
+ * 여러 건 한꺼번에 승인.
+ *
+ * 행사 당일 사진 미션 하나에 스무 집이 몰린다. 한 건씩 누르면 스무 번이고,
+ * 그 사이에도 계속 들어온다. 현장에서 쓸 수 있는 도구가 아니었다.
+ *
+ * 승인 자체는 기존 core 를 그대로 부른다 — 도토리 상한·점수 원장·중복 방지가
+ * 전부 거기 있고, 여기서 다시 짜면 두 경로가 갈라진다.
+ *
+ * **순차 처리**다. 도토리 상한이 "이 사람이 지금까지 받은 양" 을 읽어 계산하므로
+ * 병렬로 돌리면 같은 가족의 두 건이 서로의 적립을 못 보고 상한을 넘길 수 있다.
+ * 스무 건 남짓이라 순서대로 도는 편이 안전하고 충분히 빠르다.
+ *
+ * 한 건이 실패해도 멈추지 않는다 — 스무 건 중 하나 때문에 나머지가 막히면
+ * 안 그래도 바쁜 현장에서 손쓸 방법이 없다. 결과만 세어서 돌려준다.
+ */
+export async function approveSubmissionsBulkAction(
+  submissionIds: string[]
+): Promise<BulkApproveResult> {
+  const org = await requireOrg();
+  const ids = Array.from(
+    new Set((submissionIds ?? []).filter((v) => typeof v === "string" && v))
+  );
+
+  let approved = 0;
+  let alreadyDone = 0;
+  let failed = 0;
+  let firstError: string | null = null;
+
+  for (const id of ids) {
+    try {
+      const result = await approveSubmissionCore({
+        submissionId: id,
+        reviewedBy: org.managerId,
+        expectedOrgId: org.orgId,
+      });
+      if (!result.ok) {
+        failed++;
+        firstError ??= "이미 반려·회수된 제출이 섞여 있어요";
+        continue;
+      }
+      if (result.alreadyApproved) {
+        alreadyDone++;
+        continue;
+      }
+      approved++;
+
+      // 알림은 승인이 실제로 일어난 건만. 실패해도 승인은 이미 끝났다.
+      try {
+        const supabase = await createClient();
+        const submission = await loadSubmissionById(supabase, id);
+        if (submission) {
+          const mission = await loadOrgMissionById(submission.org_mission_id);
+          const missionTitle = mission?.title ?? "미션";
+          const awarded = result.acorns ?? 0;
+          await dispatchNotify(supabase as unknown as SupabaseClient, {
+            userId: submission.user_id,
+            kind: "MISSION_APPROVED",
+            type: "mission_approved",
+            title: "스탬프가 승인됐어요",
+            message:
+              awarded > 0
+                ? `"${missionTitle}"에서 도토리 ${awarded}개를 얻었어요!`
+                : `"${missionTitle}" 스탬프가 승인됐어요!`,
+            channels: ["inapp", "sms"],
+          });
+        }
+      } catch (e) {
+        console.error("[review-actions/bulk] notify failed (non-fatal)", {
+          msg: e instanceof Error ? e.message : String(e),
+        });
+      }
+    } catch (e) {
+      failed++;
+      firstError ??= e instanceof Error ? e.message : "승인에 실패했어요";
+      console.error("[review-actions/bulk] item failed", { id, error: e });
+    }
+  }
+
+  revalidatePath(`/org/${org.orgId}/missions/review`);
+  revalidatePath(`/org/${org.orgId}/control-room`);
+  revalidatePath("/e/[eventId]/stampbook", "page");
+  revalidatePath("/home");
+
+  return { approved, alreadyDone, failed, firstError };
 }
 
 /* -------------------------------------------------------------------------- */

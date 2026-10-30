@@ -64,21 +64,11 @@ export function PhotoLightbox({ items, startIndex, onClose }: Props) {
       className="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-black/90 p-4"
       onClick={onClose}
     >
-      {/* 상단 메타·닫기 */}
+      {/* 상단 — 카운터·닫기 (메타는 하단 바에서 크게) */}
       <div
-        className="absolute inset-x-0 top-0 flex items-center justify-between gap-3 p-4 text-white"
+        className="absolute inset-x-0 top-0 flex items-center justify-end gap-3 p-4 text-white"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="min-w-0">
-          {current.caption && (
-            <p className="truncate text-sm font-bold">{current.caption}</p>
-          )}
-          {current.subCaption && (
-            <p className="truncate text-[11px] text-white/70">
-              {current.subCaption}
-            </p>
-          )}
-        </div>
         <div className="flex shrink-0 items-center gap-2">
           {total > 1 && (
             <span className="font-mono text-xs tabular-nums text-white/80">
@@ -133,6 +123,25 @@ export function PhotoLightbox({ items, startIndex, onClose }: Props) {
             ›
           </button>
         </>
+      )}
+
+      {/* 하단 메타 바 — 누구 가족 사진인지 확실하게 */}
+      {(current.caption || current.subCaption) && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className="absolute bottom-9 left-1/2 max-w-[92vw] -translate-x-1/2 rounded-2xl bg-black/75 px-5 py-2.5 text-center shadow-xl ring-1 ring-white/15 backdrop-blur"
+        >
+          {current.caption && (
+            <p className="truncate text-base font-extrabold text-white">
+              👨‍👩‍👧 {current.caption}
+            </p>
+          )}
+          {current.subCaption && (
+            <p className="mt-0.5 truncate text-[11px] text-white/70">
+              {current.subCaption}
+            </p>
+          )}
+        </div>
       )}
 
       {/* 힌트 */}

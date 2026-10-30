@@ -26,6 +26,10 @@ import {
   type EventAccess,
 } from "@/lib/org-events/event-access";
 import { fmtFullDateKst, fmtAmPmClockKst } from "@/lib/datetime/kst";
+import {
+  describeEventStatus,
+  type EventStatusTone,
+} from "@/lib/org-events/event-status-label";
 import type { OrgEventRow } from "@/lib/org-events/types";
 
 export const dynamic = "force-dynamic";
@@ -132,6 +136,27 @@ function EventCard({
   const startClock = event.starts_at ? fmtAmPmClockKst(event.starts_at) : "";
   const dim = access.dimmed;
 
+  // 기관이 정한 상태(예정/진행중/종료/보관중) — phase 배지가 같은 말을 이미
+  // 하고 있으면 두 번 적지 않는다. "지난 행사" 인데 아직 예정/진행중인 경우처럼
+  // 서로 다른 말을 할 때만 상태 칩이 하나 더 붙는다.
+  const statusDesc = describeEventStatus({
+    status: event.status,
+    startsAt: event.starts_at,
+    endsAt: event.ends_at,
+  });
+  const phaseTone: Record<string, EventStatusTone> = {
+    live: "live",
+    closed: "ended",
+    archived: "archived",
+  };
+  const showStatusChip = phaseTone[access.phase] !== statusDesc.tone;
+  const statusChipCls: Record<EventStatusTone, string> = {
+    draft: "bg-amber-50 text-amber-800 ring-1 ring-amber-200",
+    live: "bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200",
+    ended: "bg-zinc-100 text-zinc-700 ring-1 ring-zinc-200",
+    archived: "bg-stone-100 text-stone-600 ring-1 ring-stone-200",
+  };
+
   return (
     <Link
       href={eventHref(event.id)}
@@ -155,6 +180,13 @@ function EventCard({
         >
           {access.badgeEmoji} {access.badgeLabel}
         </span>
+        {showStatusChip && (
+          <span
+            className={`inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[10px] font-bold ${statusChipCls[statusDesc.tone]}`}
+          >
+            {statusDesc.emoji} {statusDesc.label}
+          </span>
+        )}
         {/* 끝난 행사에 D+숫자를 붙이면 "며칠이나 지났나" 만 눈에 남는다.
             남은 날이 의미 있을 때만 센다. */}
         {access.ddayLabel && !dim && (

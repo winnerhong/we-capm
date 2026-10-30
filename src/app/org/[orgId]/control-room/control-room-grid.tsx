@@ -1,7 +1,7 @@
 import type { ControlRoomSnapshot } from "@/lib/control-room/types";
 import { loadOrgGiftTemplates } from "@/lib/gifts/queries";
 import styles from "./control-room.module.css";
-import { HeaderBar } from "./widgets/header-bar";
+import { HeaderBar, type HeaderBarCurrentEvent } from "./widgets/header-bar";
 import { ParticipantsTile, RankingLauncher } from "./widgets/participants-tile";
 // FmTile · ChatTile · PendingTile · MissionProgressTile · LeaderboardTile 제거됨.
 //  - 토리FM 라이브 스튜디오가 페이지 하단 풀콘솔로 임베드 → FM/채팅 중복 회피
@@ -23,12 +23,19 @@ type Props = {
   snapshot: ControlRoomSnapshot;
   orgId: string;
   isTvMode: boolean;
+  /** 대표 행사 — 헤더의 예정/진행중/종료/보관 상태 토글용. TV 모드는 생략. */
+  currentEvent?: HeaderBarCurrentEvent | null;
 };
 
 // ControlRoomGrid 는 async — FmStudioEmbed (server component) 가 LIVE 세션
 // 데이터를 직접 로드한다. 가족 미리보기 패널의 🎁 선물 증정 인라인 폼에서 쓸
 // 쿠폰 템플릿도 여기서 같이 로드해 prop drilling.
-export async function ControlRoomGrid({ snapshot, orgId, isTvMode }: Props) {
+export async function ControlRoomGrid({
+  snapshot,
+  orgId,
+  isTvMode,
+  currentEvent = null,
+}: Props) {
   const giftTemplates = await loadOrgGiftTemplates(orgId);
   const giftTemplatesLite = giftTemplates.map((t) => ({
     id: t.id,
@@ -51,7 +58,12 @@ export async function ControlRoomGrid({ snapshot, orgId, isTvMode }: Props) {
         }`}
       >
         {/* row 1: Header */}
-        <HeaderBar snapshot={snapshot} orgId={orgId} isTvMode={isTvMode} />
+        <HeaderBar
+          snapshot={snapshot}
+          orgId={orgId}
+          isTvMode={isTvMode}
+          currentEvent={currentEvent}
+        />
 
         {/* row 2: 3 stats tiles — 모바일 1열, md 이상 3열 */}
         <div
@@ -79,6 +91,7 @@ export async function ControlRoomGrid({ snapshot, orgId, isTvMode }: Props) {
             orgId={orgId}
             grid={snapshot.familyGrid}
             photos={snapshot.photoWall}
+            submissionFeed={snapshot.submissionFeed}
             missionProgress={snapshot.missionProgress}
             isTvMode={isTvMode}
             giftTemplates={giftTemplatesLite}

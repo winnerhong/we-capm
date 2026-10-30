@@ -1,16 +1,33 @@
 import Link from "next/link";
 import type { ControlRoomSnapshot } from "@/lib/control-room/types";
+import type { OrgEventStatus } from "@/lib/org-events/types";
+import { EventStatusToggle } from "../../events/status-toggle";
 import styles from "../control-room.module.css";
 import { ServerClock } from "./server-clock";
 import { BroadcastInlineLauncher } from "./broadcast-inline-launcher";
+
+/** 헤더 상태 토글에 필요한 대표 행사 정보. */
+export type HeaderBarCurrentEvent = {
+  id: string;
+  name: string;
+  status: OrgEventStatus;
+  startsAt: string | null;
+  endsAt: string | null;
+};
 
 type Props = {
   snapshot: ControlRoomSnapshot;
   orgId: string;
   isTvMode: boolean;
+  currentEvent?: HeaderBarCurrentEvent | null;
 };
 
-export function HeaderBar({ snapshot, orgId, isTvMode }: Props) {
+export function HeaderBar({
+  snapshot,
+  orgId,
+  isTvMode,
+  currentEvent = null,
+}: Props) {
   const names = snapshot.liveEventNames.slice(0, 2);
   const extra = Math.max(0, snapshot.liveEventCount - names.length);
   const isLive = snapshot.liveEventCount > 0;
@@ -34,6 +51,25 @@ export function HeaderBar({ snapshot, orgId, isTvMode }: Props) {
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
+        {/* 대표 행사 상태 토글 — 예정/진행중/종료/보관 을 관제실에서 바로.
+            토글 컴포넌트는 라이트 테마라 크림색 카드에 얹어 그대로 재사용. */}
+        {!isTvMode && currentEvent && (
+          <div className="flex items-center gap-3 rounded-xl bg-[#FDFBF7] px-3 py-1.5 shadow-md">
+            <span
+              className="max-w-[180px] truncate text-xs font-bold text-[#3d3835]"
+              title={currentEvent.name}
+            >
+              📅 {currentEvent.name}
+            </span>
+            <EventStatusToggle
+              eventId={currentEvent.id}
+              initialStatus={currentEvent.status}
+              startsAt={currentEvent.startsAt}
+              endsAt={currentEvent.endsAt}
+              variant="inline"
+            />
+          </div>
+        )}
         {isLive ? (
           <div className="flex max-w-full items-center gap-2 whitespace-nowrap rounded-full border border-[#3a1616] bg-[#1a0a0a] py-1.5 pl-3 pr-4">
             <span

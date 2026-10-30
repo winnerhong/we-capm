@@ -2,6 +2,7 @@
 import Link from "next/link";
 import type { ReviewSubmissionItem } from "@/lib/missions/review-queries";
 import { ReviewList } from "./review-list";
+import { BulkApproveBar } from "./bulk-approve-bar";
 
 export type ReviewTab = "pending" | "approved" | "rejected";
 
@@ -151,7 +152,16 @@ export function ReviewLayout({ orgId, tab, pendingCount, items }: Props) {
           <p className="mt-1 text-xs text-[#6B6560]">{empty.hint}</p>
         </div>
       ) : (
-        <ReviewList items={items} tab={tab} />
+        <>
+          {/* 대기 탭에서만 — 승인된 것을 또 승인할 일은 없다. */}
+          {tab === "pending" && (
+            <BulkApproveBar
+              submissionIds={items.map((i) => i.id)}
+              totalAcorns={items.reduce((sum, i) => sum + (i.defaultAcorns ?? 0), 0)}
+            />
+          )}
+          <ReviewList items={items} tab={tab} />
+        </>
       )}
     </div>
   );

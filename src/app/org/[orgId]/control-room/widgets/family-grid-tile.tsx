@@ -6,6 +6,7 @@ import type {
   ControlRoomFamilyGrid,
   ControlRoomMissionProgressRow,
   ControlRoomPhotoItem,
+  ControlRoomSubmissionDetail,
   FamilyMissionCellState,
 } from "@/lib/control-room/types";
 import { fmtClockKstAlways } from "@/lib/datetime/kst";
@@ -13,6 +14,7 @@ import { useLightbox, type LightboxItem } from "@/components/photo-lightbox";
 import { AcornIcon } from "@/components/acorn-icon";
 import { GiftGrantInline } from "./gift-grant-inline";
 import styles from "../control-room.module.css";
+import { InlineReviewModal } from "./inline-review-modal";
 
 export type FamilyGridGiftTemplate = {
   id: string;
@@ -27,6 +29,8 @@ type Props = {
   grid: ControlRoomFamilyGrid;
   /** 가족 클릭 시 그 가족의 사진을 모아 보여주기 위해 photoWall 도 함께 받음 */
   photos: ControlRoomPhotoItem[];
+  /** 제출물 상세 피드 — 가족 패널 미션 행 클릭 시 사진·텍스트 자료 드릴다운. */
+  submissionFeed: ControlRoomSubmissionDetail[];
   /** 평시 우측 사이드(아무 가족도 hover 안 됨)에 컴팩트 미션 진행률을 표시. */
   missionProgress: ControlRoomMissionProgressRow[];
   isTvMode: boolean;
@@ -64,6 +68,7 @@ export function FamilyGridTile({
   orgId,
   grid,
   photos,
+  submissionFeed,
   missionProgress,
   isTvMode,
   giftTemplates = [],
@@ -81,8 +86,28 @@ export function FamilyGridTile({
   const [hoveredMissionId, setHoveredMissionId] = useState<string | null>(
     null
   );
+  // 미션 상세 — 완료/대기/반려/미시작 그룹 펼침. 요약 칩 클릭으로도 토글.
+  const [missionGroupOpen, setMissionGroupOpen] = useState({
+    done: true,
+    waiting: true,
+    rejected: true,
+    notStarted: false,
+  });
+  const toggleMissionGroup = (k: keyof typeof missionGroupOpen) =>
+    setMissionGroupOpen((prev) => ({ ...prev, [k]: !prev[k] }));
+  /** 요약 칩 클릭 → 그 그룹 펼치고 화면에 보이게 스크롤. 이미 열려 있으면 스크롤만. */
+  const revealMissionGroup = (k: keyof typeof missionGroupOpen) => {
+    setMissionGroupOpen((prev) => ({ ...prev, [k]: true }));
+    requestAnimationFrame(() => {
+      document
+        .getElementById(`mission-group-${k}`)
+        ?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    });
+  };
   // 반별 필터 — null=전체, 그 외는 정확한 class_name 매칭(혹은 "없음" 가상값).
   const [classFilter, setClassFilter] = useState<string | null>(null);
+  // ⏳ 칸을 누르면 그 제출부터 검수 큐를 연다.
+  const [reviewingId, setReviewingId] = useState<string | null>(null);
   // 검색어 — 이름/연락처/자녀 이름/반 부분 매칭. 비어있으면 필터 적용 안 함.
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -119,11 +144,56 @@ export function FamilyGridTile({
 
   const previewPhotos = useMemo(() => {
     if (!previewRow) return [];
-    // photo wall 에 그 가족의 사진들만 필터 — userDisplayName 매칭.
-    return photos.filter((p) => p.userDisplayName === previewRow.displayName);
+    // photo wall 에 그 가족의 사진들만 필터 — userId 매칭 (표시명은 조합이 바뀔 수 있어 불안정).
+    return photos.filter((p) => p.userId === previewRow.userId);
   }, [previewRow, photos]);
 
   const isPinned = selectedUserId !== null;
+
+  // 가족 패널 미션 행 클릭 → 그 가족×미션 제출물 아코디언.
+  // userId 를 같이 담아, 다른 가족으로 바뀌면 stale 상태가 자동 무시되도록.
+  const [openFamilyMission, setOpenFamilyMission] = useState<{
+    userId: string;
+    missionId: string;
+  } | null>(null);
+
+  // userId|missionId → 제출물들 (피드가 이미 submitted_at desc 정렬).
+  const feedByUserMission = useMemo(() => {
+    const m = new Map<string, ControlRoomSubmissionDetail[]>();
+    for (const f of submissionFeed) {
+      const key = `${f.userId}|${f.missionId}`;
+      const list = m.get(key) ?? [];
+      list.push(f);
+      m.set(key, list);
+    }
+    return m;
+  }, [submissionFeed]);
+
+  const openMissionSubs = useMemo(() => {
+    if (!openFamilyMission || openFamilyMission.userId !== previewRow?.userId)
+      return [];
+    return (
+      feedByUserMission.get(
+        `${openFamilyMission.userId}|${openFamilyMission.missionId}`
+      ) ?? []
+    );
+  }, [openFamilyMission, previewRow, feedByUserMission]);
+
+  // 아코디언 사진 확대 — 가족 전체 사진 라이트박스와 별개 인스턴스.
+  const accordionLightboxItems: LightboxItem[] = useMemo(
+    () =>
+      openMissionSubs.flatMap((sub) =>
+        sub.photoUrls.map((u) => ({
+          url: u,
+          caption: previewRow?.displayName,
+          subCaption: fmtClockKstAlways(sub.submittedAt),
+        }))
+      ),
+    [openMissionSubs, previewRow]
+  );
+  const { openAt: openAccordionAt, lightbox: accordionLightbox } = useLightbox(
+    accordionLightboxItems
+  );
 
   // 사진 클릭 → 확대 모달. 현재 previewRow 의 사진 시퀀스를 보여줌.
   const lightboxItems: LightboxItem[] = useMemo(
@@ -199,10 +269,11 @@ export function FamilyGridTile({
       else if (s === "REJECTED") rejected.push(r);
       else notStarted.push(r);
     }
-    const missionPhotos = photos
-      .filter((p) => p.missionId === activeMissionId)
-      .slice(0, 6);
-    return { mission, progress, done, waiting, rejected, notStarted, missionPhotos };
+    // 그 미션의 제출물 전부 (최신순) — 사진 + 텍스트 자료.
+    const missionSubs = submissionFeed.filter(
+      (f) => f.missionId === activeMissionId
+    );
+    return { mission, progress, done, waiting, rejected, notStarted, missionSubs };
   }, [
     activeMissionId,
     selectedUserId,
@@ -210,8 +281,23 @@ export function FamilyGridTile({
     grid.missions,
     grid.rows,
     missionProgress,
-    photos,
+    submissionFeed,
   ]);
+
+  // 미션 상세 제출물 사진 확대 — 그 미션의 모든 가족 사진을 한 시퀀스로,
+  // 라이트박스 ← → 로 가족들 사진을 돌아가며 볼 수 있다.
+  const missionLightboxItems: LightboxItem[] = useMemo(() => {
+    if (!missionDetail) return [];
+    return missionDetail.missionSubs.flatMap((sub) =>
+      sub.photoUrls.map((u) => ({
+        url: u,
+        caption: sub.userDisplayName,
+        subCaption: `${missionDetail.mission.title} · ${fmtClockKstAlways(sub.submittedAt)}`,
+      }))
+    );
+  }, [missionDetail]);
+  const { openAt: openMissionPhotoAt, lightbox: missionLightbox } =
+    useLightbox(missionLightboxItems);
 
   // 헤더 클릭 → 섹션을 화면 최상단으로 스크롤 (자석 정렬).
   const sectionRef = useRef<HTMLDivElement | null>(null);
@@ -295,14 +381,24 @@ export function FamilyGridTile({
                   classFilter === "__no_class__" ? "반미지정" : classFilter
                 )}`;
           return (
-            <a
-              href={href}
-              title={`${clsLabel} 가족들이 올린 사진을 zip으로 받기`}
-              className="flex shrink-0 items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1.5 text-[11px] font-bold text-white transition hover:bg-emerald-500"
-            >
-              <span aria-hidden>📥</span>
-              {clsLabel} 사진 받기
-            </a>
+            <>
+              <a
+                href={href}
+                title={`${clsLabel} 가족들이 올린 사진을 zip으로 받기 (한 폴더)`}
+                className="flex shrink-0 items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1.5 text-[11px] font-bold text-white transition hover:bg-emerald-500"
+              >
+                <span aria-hidden>📥</span>
+                {clsLabel} 사진 받기
+              </a>
+              <a
+                href={`${href}&group=family`}
+                title={`${clsLabel} 사진을 반/원아이름 폴더로 정리한 zip — 가족별 배부용`}
+                className="flex shrink-0 items-center gap-1 rounded-lg bg-sky-600 px-2.5 py-1.5 text-[11px] font-bold text-white transition hover:bg-sky-500"
+              >
+                <span aria-hidden>📁</span>
+                가족별 폴더로
+              </a>
+            </>
           );
         })()}
       </div>
@@ -385,7 +481,7 @@ export function FamilyGridTile({
                     return (
                       <th
                         key={m.id}
-                        title={m.title}
+                        title={`${m.title} — 클릭하면 완료/미완료 가족 + 제출물 상세`}
                         onMouseEnter={() => setHoveredMissionId(m.id)}
                         onMouseLeave={() =>
                           setHoveredMissionId((prev) =>
@@ -485,14 +581,36 @@ export function FamilyGridTile({
                           );
                         }
                         const meta = STATE_META[state];
+                        // ⏳ 는 「해야 할 일」 이다. 보여주기만 하면 여기서
+                        // 확정할 방법이 없어 검토 대기 타일까지 찾아가야 했다.
+                        // 누르면 그 제출의 검수 창이 바로 열린다.
+                        const waitingId =
+                          state === "WAITING"
+                            ? r.waitingSubmissionId?.[m.id]
+                            : undefined;
                         return (
                           <td key={m.id} className="px-1 py-1 text-center">
-                            <span
-                              className={`inline-flex h-4 w-4 items-center justify-center rounded text-[9px] font-bold leading-none ${meta.cls}`}
-                              title={`${m.title}: ${meta.label}`}
-                            >
-                              {meta.emoji}
-                            </span>
+                            {waitingId ? (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  // 행 클릭(가족 고정)까지 같이 일어나면 안 된다.
+                                  e.stopPropagation();
+                                  setReviewingId(waitingId);
+                                }}
+                                className={`inline-flex h-4 w-4 cursor-pointer items-center justify-center rounded text-[9px] font-bold leading-none ring-offset-1 ring-offset-[#0a1839] transition hover:ring-2 hover:ring-amber-300 ${meta.cls}`}
+                                title={`${m.title}: ${meta.label} — 눌러서 검수`}
+                              >
+                                {meta.emoji}
+                              </button>
+                            ) : (
+                              <span
+                                className={`inline-flex h-4 w-4 items-center justify-center rounded text-[9px] font-bold leading-none ${meta.cls}`}
+                                title={`${m.title}: ${meta.label}`}
+                              >
+                                {meta.emoji}
+                              </span>
+                            )}
                           </td>
                         );
                       })}
@@ -574,6 +692,19 @@ export function FamilyGridTile({
                 templates={giftTemplates}
               />
 
+              {/* 🔑 부모용 포털 바로가기 — 이 가족으로 로그인된 개인화면을 새창으로 (임퍼소네이트) */}
+              <a
+                href={`/api/org/impersonate-user?id=${previewRow.userId}&org=${orgId}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="이 가족으로 로그인된 부모용 포털을 새창으로 열기"
+                className="mt-2 flex items-center justify-center gap-1.5 rounded-lg bg-sky-500/90 py-2 text-[11px] font-bold text-white transition hover:bg-sky-500 active:scale-[0.99]"
+              >
+                <span aria-hidden>🔑</span>
+                부모용 포털 바로가기
+                <span aria-hidden>↗</span>
+              </a>
+
               {/* 📥 이 가족 사진 받기 — 그 가족이 올린 사진 zip */}
               {previewPhotos.length > 0 && (
                 <a
@@ -586,28 +717,123 @@ export function FamilyGridTile({
                 </a>
               )}
 
-              {/* 미션별 상태 리스트 */}
+              {/* 미션별 상태 리스트 — 행 클릭 시 그 미션의 제출물(사진·자료) 아코디언 */}
               <ul className="mt-3 space-y-1">
                 {grid.missions.map((m) => {
                   const state = previewRow.perMission[m.id];
+                  const isOpen =
+                    openFamilyMission?.userId === previewRow.userId &&
+                    openFamilyMission.missionId === m.id;
                   return (
-                    <li
-                      key={m.id}
-                      className="flex items-center justify-between gap-2 rounded px-1 py-0.5 text-[10px] text-[#cad3e0]"
-                    >
-                      <span className="min-w-0 flex-1 truncate">
-                        {m.icon ?? "🌱"} {m.title}
-                      </span>
-                      {state ? (
+                    <li key={m.id}>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setOpenFamilyMission(
+                            isOpen
+                              ? null
+                              : { userId: previewRow.userId, missionId: m.id }
+                          )
+                        }
+                        title={`${m.title} — 클릭하면 제출물 보기`}
+                        className={`flex w-full items-center justify-between gap-2 rounded px-1 py-0.5 text-left text-[10px] text-[#cad3e0] transition hover:bg-[#16234a] ${
+                          isOpen ? "bg-[#16234a]" : ""
+                        }`}
+                      >
+                        <span className="min-w-0 flex-1 truncate">
+                          {m.icon ?? "🌱"} {m.title}
+                        </span>
+                        {state ? (
+                          <span
+                            className={`shrink-0 rounded px-1.5 py-0.5 text-[9px] font-bold ${STATE_META[state].cls}`}
+                          >
+                            {STATE_META[state].emoji} {STATE_META[state].label}
+                          </span>
+                        ) : (
+                          <span className="shrink-0 text-[9px] text-[#3a4868]">
+                            미시작
+                          </span>
+                        )}
                         <span
-                          className={`shrink-0 rounded px-1.5 py-0.5 text-[9px] font-bold ${STATE_META[state].cls}`}
+                          aria-hidden
+                          className="shrink-0 text-[8px] text-[#5a6a8f]"
                         >
-                          {STATE_META[state].emoji} {STATE_META[state].label}
+                          {isOpen ? "▼" : "▶"}
                         </span>
-                      ) : (
-                        <span className="shrink-0 text-[9px] text-[#3a4868]">
-                          미시작
-                        </span>
+                      </button>
+                      {isOpen && (
+                        <div className="mb-1 ml-1.5 mt-1 rounded-md border-l-2 border-[#243366] bg-[#0d1530] px-2 py-1.5">
+                          {openMissionSubs.length === 0 ? (
+                            <p className="text-[9px] text-[#7a8aa8]">
+                              🌱 아직 제출이 없어요
+                            </p>
+                          ) : (
+                            openMissionSubs.map((sub, si) => {
+                              // 라이트박스는 열린 아코디언 사진 전체를 한 시퀀스로 —
+                              // 이 제출의 j번째 사진의 전역 인덱스 = 앞 제출들 사진 수 합 + j.
+                              const offset = openMissionSubs
+                                .slice(0, si)
+                                .reduce((a, s) => a + s.photoUrls.length, 0);
+                              return (
+                                <div
+                                  key={sub.submissionId}
+                                  className={si > 0 ? "mt-2 border-t border-[#16234a] pt-2" : ""}
+                                >
+                                  <div className="flex items-center justify-between text-[9px] text-[#a8b8d0]">
+                                    <span>
+                                      🕐 {fmtClockKstAlways(sub.submittedAt)}
+                                    </span>
+                                    <span className="font-semibold">
+                                      {sub.status === "REJECTED"
+                                        ? "✕ 반려"
+                                        : sub.status === "SUBMITTED" ||
+                                            sub.status === "PENDING_REVIEW"
+                                          ? "⏳ 검수 대기"
+                                          : "✓ 완료"}
+                                    </span>
+                                  </div>
+                                  {sub.photoUrls.length > 0 && (
+                                    <ul className="mt-1 grid grid-cols-3 gap-1">
+                                      {sub.photoUrls.map((u, j) => (
+                                        <li
+                                          key={`${sub.submissionId}-${j}`}
+                                          className="aspect-square overflow-hidden rounded border border-[#16234a]"
+                                        >
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              openAccordionAt(offset + j)
+                                            }
+                                            className="block h-full w-full cursor-zoom-in transition hover:scale-105"
+                                            aria-label="사진 확대 보기"
+                                          >
+                                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                                            <img
+                                              src={u}
+                                              alt={m.title}
+                                              className="h-full w-full object-cover"
+                                              loading="lazy"
+                                            />
+                                          </button>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  )}
+                                  {sub.text && (
+                                    <p className="mt-1 whitespace-pre-wrap break-words rounded bg-[#0a1839] px-1.5 py-1 text-[10px] leading-relaxed text-[#e8e0d0]">
+                                      📝 {sub.text}
+                                    </p>
+                                  )}
+                                  {sub.photoUrls.length === 0 && !sub.text && (
+                                    <p className="mt-1 text-[9px] text-[#7a8aa8]">
+                                      ✓ 제출됨 (사진·텍스트 자료 없는 미션)
+                                    </p>
+                                  )}
+                                </div>
+                              );
+                            })
+                          )}
+                        </div>
                       )}
                     </li>
                   );
@@ -717,84 +943,159 @@ export function FamilyGridTile({
                     }}
                   />
                 </div>
-                <div className="mt-2 flex flex-wrap gap-2 text-[10px]">
-                  <span className="text-emerald-300">
+                {/* 요약 칩 — 클릭하면 아래 해당 가족 그룹이 펼쳐지며 스크롤 */}
+                <div className="mt-2 flex flex-wrap gap-1.5 text-[10px]">
+                  <button
+                    type="button"
+                    onClick={() => revealMissionGroup("done")}
+                    title="완료한 가족 보기"
+                    className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 font-semibold text-emerald-300 transition hover:bg-emerald-500/20"
+                  >
                     ✓ 완료 {missionDetail.done.length}
-                  </span>
+                  </button>
                   {missionDetail.waiting.length > 0 && (
-                    <span className="text-amber-300">
+                    <button
+                      type="button"
+                      onClick={() => revealMissionGroup("waiting")}
+                      title="검수 대기 가족 보기"
+                      className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 font-semibold text-amber-300 transition hover:bg-amber-500/20"
+                    >
                       ⏳ 대기 {missionDetail.waiting.length}
-                    </span>
+                    </button>
                   )}
                   {missionDetail.rejected.length > 0 && (
-                    <span className="text-rose-300">
+                    <button
+                      type="button"
+                      onClick={() => revealMissionGroup("rejected")}
+                      title="반려된 가족 보기"
+                      className="rounded-full border border-rose-500/30 bg-rose-500/10 px-2 py-0.5 font-semibold text-rose-300 transition hover:bg-rose-500/20"
+                    >
                       ✕ 반려 {missionDetail.rejected.length}
-                    </span>
+                    </button>
                   )}
-                  <span className="text-[#7a8aa8]">
+                  <button
+                    type="button"
+                    onClick={() => revealMissionGroup("notStarted")}
+                    title="아직 안 한 가족 보기"
+                    className="rounded-full border border-[#1a2a52] bg-[#0a1839] px-2 py-0.5 font-semibold text-[#a8b8d0] transition hover:bg-[#16234a]"
+                  >
                     · 미시작 {missionDetail.notStarted.length}
-                  </span>
+                  </button>
                 </div>
               </div>
 
-              {/* 최근 제출 사진 (사진 미션만 — photoWall 에 있을 때) */}
-              {missionDetail.missionPhotos.length > 0 && (
+              {/* 최근 제출물 — 가족 이름 + 사진 + 텍스트 자료 (전체 kind) */}
+              {missionDetail.missionSubs.length > 0 && (
                 <div className="mb-3">
                   <div className="mb-1 text-[10px] font-semibold text-[#a8b8d0]">
-                    📸 최근 제출 ({missionDetail.missionPhotos.length})
+                    📬 제출물 ({missionDetail.missionSubs.length})
+                    <span className="ml-1 font-normal text-[#7a8aa8]">
+                      · 최신순
+                    </span>
                   </div>
-                  <ul className="grid grid-cols-3 gap-1">
-                    {missionDetail.missionPhotos.map((p) => (
+                  <ul className="scroll-dark max-h-64 space-y-1.5 overflow-y-auto pr-0.5">
+                    {missionDetail.missionSubs.map((sub, si) => {
+                      // 라이트박스는 미션 전체 사진을 한 시퀀스로 —
+                      // 이 제출의 j번째 사진의 전역 인덱스 = 앞 제출들 사진 수 합 + j.
+                      const offset = missionDetail.missionSubs
+                        .slice(0, si)
+                        .reduce((a, s) => a + s.photoUrls.length, 0);
+                      return (
                       <li
-                        key={p.submissionId}
-                        className="aspect-square overflow-hidden rounded border border-[#16234a]"
-                        title={`${p.userDisplayName} · ${fmtClockKstAlways(p.submittedAt)}`}
+                        key={sub.submissionId}
+                        className="rounded-md bg-[#16234a]/50 px-1.5 py-1"
                       >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={p.url}
-                          alt={p.userDisplayName}
-                          className="h-full w-full object-cover"
-                          loading="lazy"
-                        />
+                        <button
+                          type="button"
+                          onClick={() => setSelectedUserId(sub.userId)}
+                          title={`${sub.userDisplayName} 가족 상세로`}
+                          className="flex w-full items-center justify-between gap-2 text-left text-[9px]"
+                        >
+                          <span className="min-w-0 truncate font-semibold text-[#f4ecd8] hover:underline">
+                            {sub.userDisplayName}
+                          </span>
+                          <span className="shrink-0 text-[#a8b8d0]">
+                            {fmtClockKstAlways(sub.submittedAt)}
+                          </span>
+                        </button>
+                        {sub.photoUrls.length > 0 && (
+                          <ul className="mt-1 grid grid-cols-4 gap-1">
+                            {sub.photoUrls.map((u, j) => (
+                              <li
+                                key={`${sub.submissionId}-${j}`}
+                                className="aspect-square overflow-hidden rounded border border-[#16234a]"
+                              >
+                                <button
+                                  type="button"
+                                  onClick={() => openMissionPhotoAt(offset + j)}
+                                  title="클릭하면 확대 — ← → 로 다른 가족 사진 넘겨보기"
+                                  className="block h-full w-full cursor-zoom-in transition duration-150 hover:scale-125"
+                                  aria-label={`${sub.userDisplayName} 사진 확대 보기`}
+                                >
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img
+                                    src={u}
+                                    alt={sub.userDisplayName}
+                                    className="h-full w-full object-cover"
+                                    loading="lazy"
+                                  />
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                        {sub.text && (
+                          <p className="mt-1 whitespace-pre-wrap break-words text-[10px] leading-relaxed text-[#e8e0d0]">
+                            📝 {sub.text}
+                          </p>
+                        )}
                       </li>
-                    ))}
+                      );
+                    })}
                   </ul>
                 </div>
               )}
 
-              {/* 가족 분류 — 완료/대기/반려/미시작 */}
+              {/* 가족 분류 — 완료/대기/반려/미시작. 위 요약 칩과 펼침 상태 공유. */}
               <MissionFamilyGroup
+                id="mission-group-done"
                 label="✓ 완료"
                 rows={missionDetail.done}
                 color="emerald"
                 onPickFamily={setSelectedUserId}
-                defaultOpen
+                open={missionGroupOpen.done}
+                onToggle={() => toggleMissionGroup("done")}
               />
               {missionDetail.waiting.length > 0 && (
                 <MissionFamilyGroup
+                  id="mission-group-waiting"
                   label="⏳ 검수 대기"
                   rows={missionDetail.waiting}
                   color="amber"
                   onPickFamily={setSelectedUserId}
-                  defaultOpen
+                  open={missionGroupOpen.waiting}
+                  onToggle={() => toggleMissionGroup("waiting")}
                 />
               )}
               {missionDetail.rejected.length > 0 && (
                 <MissionFamilyGroup
+                  id="mission-group-rejected"
                   label="✕ 반려"
                   rows={missionDetail.rejected}
                   color="rose"
                   onPickFamily={setSelectedUserId}
-                  defaultOpen
+                  open={missionGroupOpen.rejected}
+                  onToggle={() => toggleMissionGroup("rejected")}
                 />
               )}
               <MissionFamilyGroup
+                id="mission-group-notStarted"
                 label="· 미시작"
                 rows={missionDetail.notStarted}
                 color="slate"
                 onPickFamily={setSelectedUserId}
-                defaultOpen={false}
+                open={missionGroupOpen.notStarted}
+                onToggle={() => toggleMissionGroup("notStarted")}
               />
             </aside>
           ) : (
@@ -806,17 +1107,20 @@ export function FamilyGridTile({
                   미션별 진행률
                 </h3>
                 <span className="text-[9px] text-[#7a8aa8]">
-                  미션·가족 hover = 상세
+                  미션 클릭 = 완료/미완료 상세
                 </span>
               </header>
               <ul className="space-y-1.5">
                 {missionProgress.map((m) => {
                   const pct = Math.max(0, Math.min(100, m.completionPct));
                   return (
-                    <li
-                      key={m.missionId}
-                      className="rounded-md bg-[#0a1839] px-2 py-1.5"
-                    >
+                    <li key={m.missionId}>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedMissionId(m.missionId)}
+                        title={`${m.title} — 클릭하면 완료/미완료 가족 + 제출물 상세`}
+                        className="w-full rounded-md bg-[#0a1839] px-2 py-1.5 text-left transition hover:bg-[#16234a]"
+                      >
                       <div className="flex items-center gap-1.5">
                         <span className="text-sm leading-none" aria-hidden>
                           {m.icon ?? "🌱"}
@@ -854,6 +1158,7 @@ export function FamilyGridTile({
                           </span>
                         )}
                       </div>
+                      </button>
                     </li>
                   );
                 })}
@@ -863,6 +1168,17 @@ export function FamilyGridTile({
         </div>
       )}
       {lightbox}
+      {accordionLightbox}
+      {missionLightbox}
+
+      {/* ⏳ 칸에서 연 검수 창 — 큐 안에서 다음 건까지 이어서 처리한다.
+          닫히면 router.refresh() 는 모달이 이미 부르므로 여기선 상태만 비운다. */}
+      {reviewingId && (
+        <InlineReviewModal
+          initialSubmissionId={reviewingId}
+          onClose={() => setReviewingId(null)}
+        />
+      )}
     </div>
   );
 }
@@ -968,26 +1284,30 @@ const GROUP_COLOR: Record<
 };
 
 function MissionFamilyGroup({
+  id,
   label,
   rows,
   color,
   onPickFamily,
-  defaultOpen,
+  open,
+  onToggle,
 }: {
+  /** 요약 칩 클릭 시 scrollIntoView 타깃. */
+  id: string;
   label: string;
   rows: ControlRoomFamilyRow[];
   color: "emerald" | "amber" | "rose" | "slate";
   onPickFamily: (userId: string) => void;
-  defaultOpen: boolean;
+  open: boolean;
+  onToggle: () => void;
 }) {
-  const [open, setOpen] = useState(defaultOpen);
   if (rows.length === 0) return null;
   const palette = GROUP_COLOR[color];
   return (
-    <section className="mt-2">
+    <section id={id} className="mt-2">
       <button
         type="button"
-        onClick={() => setOpen((o) => !o)}
+        onClick={onToggle}
         className={`flex w-full items-center justify-between rounded-md px-1.5 py-1 text-[10px] font-bold ${palette.header} hover:bg-[#16234a]`}
       >
         <span>

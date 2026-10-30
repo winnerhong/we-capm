@@ -243,14 +243,14 @@ export default async function OrgEventDetailPage({
       >
         {event.cover_image_url ? (
           <div
-            className="h-40 w-full bg-cover bg-center"
+            className="h-20 w-full bg-cover bg-center"
             style={{ backgroundImage: `url(${event.cover_image_url})` }}
             role="img"
             aria-label={`${event.name} 커버 이미지`}
           />
         ) : (
           <div
-            className="flex h-40 w-full items-center justify-center bg-gradient-to-br from-[#2D5A3D] via-[#4A7C59] to-[#2D5A3D] text-6xl text-white"
+            className="flex h-20 w-full items-center justify-center bg-gradient-to-br from-[#2D5A3D] via-[#4A7C59] to-[#2D5A3D] text-4xl text-white"
             aria-hidden
           >
             🎪

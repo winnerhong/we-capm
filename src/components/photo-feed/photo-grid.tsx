@@ -13,7 +13,7 @@
 // 서버(DB 함수)** 다 — 실패하면 되돌리고 이유를 적는다. 남은 개수는 미션마다
 // 따로 센다(행사 사진 탭에는 여러 미션 사진이 섞여 있다).
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { FeedPhoto } from "@/lib/missions/photo-feed-queries";
@@ -41,6 +41,8 @@ export function PhotoGrid({
   usedByMission = {},
   /** 실시간 구독 채널 이름. 없으면 구독하지 않는다. */
   channelKey,
+  /** 행사 사진 탭 — 내 사진 / 미션별 필터 칩을 보여준다. */
+  showFilters = false,
 }: {
   photos: FeedPhoto[];
   showMissionChip?: boolean;
@@ -48,6 +50,7 @@ export function PhotoGrid({
   viewerId?: string;
   usedByMission?: Record<string, number>;
   channelKey?: string;
+  showFilters?: boolean;
 }) {
   const router = useRouter();
   const [openIndex, setOpenIndex] = useState<number | null>(null);
@@ -58,16 +61,75 @@ export function PhotoGrid({
   const [notice, setNotice] = useState<string | null>(null);
 
   const close = useCallback(() => setOpenIndex(null), []);
+
+  const canInteract = Boolean(eventId && viewerId);
+
+  // 필터 — "all" | "mine" | missionId. 사진이 많아지면 한 그리드는 너무 복잡하다.
+  const [filter, setFilter] = useState<"all" | "mine" | string>("all");
+  const missionTabs = useMemo(() => {
+    if (!showFilters) return [];
+    const m = new Map<string, { id: string; title: string; icon: string | null }>();
+    for (const p of photos) {
+      if (!m.has(p.missionId)) {
+        m.set(p.missionId, {
+          id: p.missionId,
+          title: p.missionTitle,
+          icon: p.missionIcon,
+        });
+      }
+    }
+    // "1. …" "2. …" 제목이 번호를 품고 있어 numeric 정렬이면 미션 순서가 된다.
+    return [...m.values()].sort((a, b) =>
+      a.title.localeCompare(b.title, "ko", { numeric: true })
+    );
+  }, [photos, showFilters]);
+  const hasMine = Boolean(
+    showFilters && viewerId && photos.some((p) => p.userId === viewerId)
+  );
+  const visible = useMemo(() => {
+    if (!showFilters || filter === "all") return photos;
+    if (filter === "mine") return photos.filter((p) => p.userId === viewerId);
+    return photos.filter((p) => p.missionId === filter);
+  }, [photos, filter, viewerId, showFilters]);
+  const pickFilter = (next: "all" | "mine" | string) => {
+    setFilter(next);
+    setOpenIndex(null); // 크게 보기 인덱스는 필터된 목록 기준이라 같이 비운다.
+  };
+
+  // ⬇ 내 사진 전부 저장 — zip 이 아니라 그림 파일 그대로, 한 장씩 이어서 내려받는다.
+  // (브라우저가 "여러 파일 다운로드 허용" 을 한 번 물을 수 있다.)
+  const [savingAll, setSavingAll] = useState<{
+    done: number;
+    total: number;
+  } | null>(null);
+  const saveAllMine = async () => {
+    if (savingAll) return;
+    const mine = photos.filter((p) => p.userId === viewerId);
+    if (mine.length === 0) return;
+    setSavingAll({ done: 0, total: mine.length });
+    const seqByMission = new Map<string, number>();
+    for (let i = 0; i < mine.length; i++) {
+      const n = (seqByMission.get(mine[i].missionId) ?? 0) + 1;
+      seqByMission.set(mine[i].missionId, n);
+      await downloadMyPhoto(mine[i], n);
+      setSavingAll({ done: i + 1, total: mine.length });
+      // 연속 다운로드가 브라우저에 뭉개지지 않게 살짝 간격.
+      await new Promise((r) => setTimeout(r, 400));
+    }
+    setSavingAll(null);
+    setNotice("내 사진을 모두 저장했어요 📸");
+  };
+
   // 끝에서 한 바퀴 돌지 않는다 — 어디가 끝인지 모른 채 계속 넘기게 된다.
   const step = useCallback(
     (delta: number) =>
       setOpenIndex((cur) =>
-        cur == null ? cur : Math.min(photos.length - 1, Math.max(0, cur + delta))
+        cur == null
+          ? cur
+          : Math.min(visible.length - 1, Math.max(0, cur + delta))
       ),
-    [photos.length]
+    [visible.length]
   );
-
-  const canInteract = Boolean(eventId && viewerId);
 
   // 구독 콜백이 최신 목록을 봐야 하는데, 목록이 바뀔 때마다 재구독하면 채널이
   // 계속 끊겼다 붙는다. ref 로 흘려 넣고 구독은 채널 이름에만 매단다.
@@ -244,8 +306,62 @@ export function PhotoGrid({
 
   return (
     <>
+      {/* 필터 — 스탬프북풍 도장 그리드. 가로 스크롤 없이 전부 보인다. */}
+      {showFilters && missionTabs.length > 0 && (
+        <div className="mb-4 flex flex-wrap justify-center gap-x-1.5 gap-y-2 rounded-2xl bg-[#F5F1E8]/70 px-2 py-3">
+          <FilterStamp
+            icon="🌈"
+            label="전체"
+            active={filter === "all"}
+            onClick={() => pickFilter("all")}
+          />
+          {hasMine && (
+            <FilterStamp
+              icon="⭐"
+              label="내 사진"
+              active={filter === "mine"}
+              onClick={() => pickFilter("mine")}
+            />
+          )}
+          {missionTabs.map((t) => {
+            const numMatch = t.title.match(/^\s*(\d+)/);
+            return (
+              <FilterStamp
+                key={t.id}
+                icon={t.icon ?? "📷"}
+                num={numMatch?.[1]}
+                label={t.title.replace(/^\s*\d+\s*[.)]?\s*/, "")}
+                active={filter === t.id}
+                onClick={() => pickFilter(t.id)}
+              />
+            );
+          })}
+        </div>
+      )}
+      {/* ⬇ 내 사진 전부 저장 — "내 사진" 도장을 골랐을 때만 보인다. */}
+      {showFilters && filter === "mine" && visible.length > 0 && (
+        <button
+          type="button"
+          onClick={() => void saveAllMine()}
+          disabled={savingAll !== null}
+          className="mb-3 flex w-full items-center justify-center gap-1.5 rounded-2xl bg-[#2D5A3D] px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[#3A7A52] active:scale-[0.99] disabled:opacity-60"
+        >
+          {savingAll ? (
+            <>저장 중 {savingAll.done}/{savingAll.total}…</>
+          ) : (
+            <>
+              <span aria-hidden>⬇</span> 내 사진 전부 저장 ({visible.length}장)
+            </>
+          )}
+        </button>
+      )}
+      {visible.length === 0 && (
+        <p className="rounded-2xl bg-[#F5F1E8]/70 px-3 py-6 text-center text-xs font-semibold text-[#8B7F75]">
+          🌱 이 항목에는 아직 사진이 없어요
+        </p>
+      )}
       <ul className="grid grid-cols-3 gap-2">
-        {photos.map((p, i) => {
+        {visible.map((p, i) => {
           const like = likeStateOf(p);
           return (
             <li key={`${p.submissionId}-${p.url}`}>
@@ -263,6 +379,11 @@ export function PhotoGrid({
                     loading="lazy"
                   />
                 </button>
+                {p.userId === viewerId && (
+                  <span className="absolute left-1.5 top-1.5 rounded-full bg-[#2D5A3D]/90 px-1.5 py-0.5 text-[9px] font-bold text-white shadow">
+                    ⭐ 내 사진
+                  </span>
+                )}
                 <HeartButton
                   like={like}
                   disabled={!canInteract || pendingId === p.submissionId}
@@ -293,19 +414,19 @@ export function PhotoGrid({
         </p>
       )}
 
-      {openIndex != null && photos[openIndex] && (
+      {openIndex != null && visible[openIndex] && (
         <PhotoLightbox
-          photos={photos}
+          photos={visible}
           index={openIndex}
-          like={likeStateOf(photos[openIndex])}
+          like={likeStateOf(visible[openIndex])}
           likeDisabled={
-            !canInteract || pendingId === photos[openIndex].submissionId
+            !canInteract || pendingId === visible[openIndex].submissionId
           }
-          isMine={photos[openIndex].userId === viewerId}
+          isMine={visible[openIndex].userId === viewerId}
           remaining={
-            LIKES_PER_MISSION - usedIn(photos[openIndex].missionId)
+            LIKES_PER_MISSION - usedIn(visible[openIndex].missionId)
           }
-          onToggleLike={() => void toggleLike(photos[openIndex])}
+          onToggleLike={() => void toggleLike(visible[openIndex])}
           onClose={close}
           onStep={step}
         />
@@ -370,9 +491,98 @@ function HeartButton({
   );
 }
 
+/**
+ * 스탬프북풍 필터 도장 — 동그란 도장 + 아래 한 줄 라벨.
+ * 고른 도장은 초록 잉크로 "찍힌" 모양(기울어짐 + 커짐)이 된다.
+ */
+function FilterStamp({
+  icon,
+  num,
+  label,
+  active,
+  onClick,
+}: {
+  icon: string;
+  /** 미션 번호 — 도장 오른쪽 위 작은 배지. */
+  num?: string;
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className="flex w-[62px] flex-col items-center gap-1"
+    >
+      <span
+        className={`relative flex h-12 w-12 items-center justify-center rounded-full border-2 text-xl transition-all duration-150 ${
+          active
+            ? "-rotate-6 scale-110 border-[#2D5A3D] bg-[#2D5A3D] text-white shadow-md"
+            : "border-dashed border-[#C9BBA4] bg-white hover:border-[#2D5A3D]/50 hover:bg-[#FDFBF7]"
+        }`}
+      >
+        <span aria-hidden className={active ? "" : "opacity-80 grayscale-[25%]"}>
+          {icon}
+        </span>
+        {num && (
+          <span
+            className={`absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-extrabold ${
+              active
+                ? "bg-amber-400 text-[#2D5A3D] shadow"
+                : "bg-[#F5F1E8] text-[#8B7F75] ring-1 ring-[#D4E4BC]"
+            }`}
+          >
+            {num}
+          </span>
+        )}
+      </span>
+      <span
+        className={`w-full truncate text-center text-[9px] font-bold leading-tight ${
+          active ? "text-[#2D5A3D]" : "text-[#8B7F75]"
+        }`}
+      >
+        {label}
+      </span>
+    </button>
+  );
+}
+
 /* -------------------------------------------------------------------------- */
 /* 크게 보기                                                                   */
 /* -------------------------------------------------------------------------- */
+
+/**
+ * 내 사진 저장 — signed URL 을 blob 으로 받아 파일로 내려준다.
+ * <a download> 만으로는 cross-origin 이라 브라우저가 무시하고 새 탭을 연다.
+ * fetch 실패(만료 등) 시엔 새 탭 fallback — 길게 눌러 저장은 언제나 된다.
+ */
+async function downloadMyPhoto(photo: FeedPhoto, seq?: number) {
+  try {
+    const res = await fetch(photo.url);
+    if (!res.ok) throw new Error(String(res.status));
+    const blob = await res.blob();
+    const ext = blob.type.includes("png")
+      ? "png"
+      : blob.type.includes("webp")
+        ? "webp"
+        : "jpg";
+    const safeTitle = (photo.missionTitle || "사진")
+      .replace(/[\\/:*?"<>|]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `${safeTitle}${seq ? ` ${seq}` : ""}.${ext}`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  } catch {
+    window.open(photo.url, "_blank", "noopener");
+  }
+}
 
 function PhotoLightbox({
   photos,
@@ -494,11 +704,26 @@ function PhotoLightbox({
             size="lg"
           />
         </div>
-        <p className="mt-2 text-center text-xs font-semibold text-white">
+        {/* 누구 가족 사진인지가 첫눈에 — 가족 이름이 제일 크다.
+            meta("이름 가족 · 3일 전")에서 이름은 위로 올렸으니 시각만 남긴다. */}
+        {photo.userName && (
+          <p className="mt-2 text-center text-lg font-extrabold text-white">
+            👨‍👩‍👧 {photo.userName} 가족
+          </p>
+        )}
+        <p className={`text-center text-xs font-semibold text-white/85 ${photo.userName ? "mt-0.5" : "mt-2"}`}>
           {photo.missionIcon ?? "📷"} {photo.missionTitle}
-        </p>
-        <p className="mt-0.5 text-center text-[11px] text-white/70">
-          {photo.meta}
+          {(() => {
+            const when = photo.userName
+              ? photo.meta
+                  .replace(`${photo.userName} 가족`, "")
+                  .replace(/^\s*·\s*/, "")
+                  .trim()
+              : photo.meta;
+            return when ? (
+              <span className="font-normal text-white/60"> · {when}</span>
+            ) : null;
+          })()}
         </p>
         {!isMine && (
           <p className="mt-1 text-center text-[11px] text-white/60">
@@ -506,6 +731,15 @@ function PhotoLightbox({
               ? `이 미션에서 좋아요 ${remaining}개 남았어요 · 하트 1개 = 도토리 1개`
               : "이 미션의 좋아요를 다 썼어요"}
           </p>
+        )}
+        {isMine && (
+          <button
+            type="button"
+            onClick={() => void downloadMyPhoto(photo)}
+            className="mx-auto mt-3 flex items-center justify-center gap-1.5 rounded-2xl bg-white px-6 py-2.5 text-sm font-bold text-[#2D5A3D] shadow-lg transition hover:bg-[#F5F1E8] active:scale-[0.98]"
+          >
+            <span aria-hidden>⬇</span> 내 사진 저장하기
+          </button>
         )}
         <p className="mt-3 text-center text-[11px] text-white/50">
           <span className="font-semibold text-white/70">

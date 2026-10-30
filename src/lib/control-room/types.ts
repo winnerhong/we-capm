@@ -99,6 +99,24 @@ export interface ControlRoomPhotoItem {
 }
 
 /**
+ * 관제 — 제출물 상세 피드 (모든 미션 kind).
+ * 가족 패널의 미션 행 클릭 / 미션 상세 패널에서 "그 제출에 뭐가 들었는지" 보여주기용.
+ * photoWall 과 달리 사진 없는 kind(QR/라디오 등)의 텍스트 자료도 담는다.
+ */
+export interface ControlRoomSubmissionDetail {
+  submissionId: string;
+  missionId: string;
+  userId: string;
+  userDisplayName: string;
+  status: string; // SUBMITTED | AUTO_APPROVED | APPROVED | PENDING_REVIEW | REJECTED
+  submittedAt: string;
+  /** 재서명 완료된 사진 URL 전부 (payload 의 모든 장). 없으면 빈 배열. */
+  photoUrls: string[];
+  /** kind 별 텍스트 자료 — caption/퀴즈 답/사연/쪽지/방송 텍스트 등. 없으면 null. */
+  text: string | null;
+}
+
+/**
  * Phase 1 관제 — 미션별 진행 현황.
  * 미션마다 "몇 명 완료했는지 / 검수 대기 / 미시작" 한눈에.
  */
@@ -131,6 +149,12 @@ export interface ControlRoomFamilyRow {
   doneCount: number;
   /** missionId → 셀 상태. 미션 목록은 missionsForGrid 와 동일 순서. */
   perMission: Record<string, FamilyMissionCellState>;
+  /**
+   * missionId → 검토를 기다리는 제출의 id.
+   * ⏳ 칸을 눌러 바로 그 건을 검수하려면 어느 제출인지 알아야 한다.
+   * WAITING 인 칸에만 들어 있다.
+   */
+  waitingSubmissionId: Record<string, string>;
   /** 자녀들의 반명 (unique). 형제가 다른 반이면 여러 개. 없으면 빈 배열. */
   classNames: string[];
   /**
@@ -230,6 +254,8 @@ export interface ControlRoomSnapshot {
   heatmap: ControlRoomHeatmap; // K) 지난 24시간 시간대별 활동량
   // Phase 4 widgets — 실시간 관제 (사진 월, 미션별 진행, 가족 매트릭스)
   photoWall: ControlRoomPhotoItem[]; // 최근 30장
+  /** 제출물 상세 피드 (전체 kind, 최신순) — 가족×미션 드릴다운용. */
+  submissionFeed: ControlRoomSubmissionDetail[];
   missionProgress: ControlRoomMissionProgressRow[]; // 활성 미션 전부
   familyGrid: ControlRoomFamilyGrid;
   /** org 등록 참가자 전체 명단 (미션과 무관). 참가자 모달에서 사용. */

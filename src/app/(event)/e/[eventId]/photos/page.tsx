@@ -71,8 +71,15 @@ export default async function EventPhotosPage({
   const photos = await loadEventPhotoFeed({
     eventId,
     viewerId: ctx.user.id,
-    limit: 60,
+    // 스크롤 내리면 행사 사진 전부 — 이미지가 lazy 라 장수가 많아도 부담 없다.
+    limit: 500,
   }).catch(() => []);
+
+  // 내 사진이 맨 앞 — 그다음 다른 가족들. stable sort 라 각 묶음 안은 최신순 유지.
+  photos.sort(
+    (a, b) =>
+      Number(b.userId === ctx.user.id) - Number(a.userId === ctx.user.id)
+  );
 
   // 좋아요는 미션 단위로 3개씩이라, 이 탭에서는 사진마다 남은 개수가 다르다.
   const usedByMission = await loadMyLikeCountsByMission(
@@ -106,6 +113,7 @@ export default async function EventPhotosPage({
           eventId={eventId}
           viewerId={ctx.user.id}
           usedByMission={usedByMission}
+          showFilters
           channelKey={`event-${eventId}`}
         />
       </section>

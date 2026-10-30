@@ -176,7 +176,9 @@ export default async function MissionRunnerPage({
             missionId: mission.id,
             excludeUserId: ctx.user.id,
             viewerId: ctx.user.id,
-            limit: 12,
+            // 스크롤 내리면 전부 보이게 — 12장 캡은 "왜 내 사진이 없지" 를 만들었다.
+            // 이미지가 lazy 라 장수가 많아도 화면에 들어올 때만 내려받는다.
+            limit: 500,
           }),
         []
       )

@@ -27,12 +27,17 @@ export async function PhotoFeedCard({
 
   // 스위치는 loadEventPhotoFeed 안에서 이미 본다 — 여기서 또 물으면 왕복만 는다.
   // 꺼진 행사·사진 0장 모두 빈 배열이고, 그때 카드는 나타나지 않는다.
-  const photos = await loadEventPhotoFeed({
+  // PREVIEW_COUNT 장만 받으면 최신 순서라 내 사진이 밀려날 수 있다 —
+  // 넉넉히 받아 내 사진을 앞세운 뒤 자른다.
+  const loaded = await loadEventPhotoFeed({
     eventId,
     viewerId,
-    limit: PREVIEW_COUNT,
+    limit: 30,
   }).catch(() => []);
-  if (photos.length === 0) return null;
+  if (loaded.length === 0) return null;
+  const photos = [...loaded]
+    .sort((a, b) => Number(b.userId === viewerId) - Number(a.userId === viewerId))
+    .slice(0, PREVIEW_COUNT);
 
   return (
     <Link

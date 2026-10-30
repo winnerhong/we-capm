@@ -241,6 +241,7 @@ const EMPTY_SNAPSHOT_BASE = {
     lastSentTitle: null,
   } as ControlRoomBroadcastStat,
   photoWall: [] as import("./types").ControlRoomPhotoItem[],
+  submissionFeed: [] as import("./types").ControlRoomSubmissionDetail[],
   missionProgress: [] as import("./types").ControlRoomMissionProgressRow[],
   familyGrid: {
     missions: [],
@@ -382,7 +383,7 @@ export async function loadControlRoomSnapshot(
     leaderboard,
     broadcastStats,
     heatmap,
-    photoWall,
+    submissionsBundle,
     missionProgress,
     familyGrid,
     live,
@@ -401,7 +402,7 @@ export async function loadControlRoomSnapshot(
       loadBroadcastStats(supabase, orgId, todayIso, ids.length)
     ),
     loadHeatmap(supabase, orgId, last24hIso),
-    loadPhotoWall(supabase, orgId),
+    loadSubmissionsBundle(supabase, orgId),
     idsP.then((ids) => loadMissionProgress(supabase, orgId, ids.length)),
     idsP.then((ids) => loadFamilyGrid(supabase, orgId, ids)),
     loadLiveAttempts(supabase, orgId),
@@ -424,7 +425,8 @@ export async function loadControlRoomSnapshot(
     leaderboard,
     broadcast: broadcastStats,
     heatmap,
-    photoWall,
+    photoWall: submissionsBundle.photoWall,
+    submissionFeed: submissionsBundle.submissionFeed,
     missionProgress,
     familyGrid,
     participants: participantDirectory,
@@ -1891,36 +1893,87 @@ async function loadHeatmap(
  *     BROADCAST            : payload_json.content (content_type='PHOTO' 일 때)
  * - 최대 30장
  */
-async function loadPhotoWall(
+/** loadSubmissionsBundle 결과 — 사진월 + 제출물 상세 피드를 한 번의 쿼리로. */
+type SubmissionsBundle = {
+  photoWall: ControlRoomPhotoItem[];
+  submissionFeed: import("./types").ControlRoomSubmissionDetail[];
+};
+const EMPTY_SUBMISSIONS_BUNDLE: SubmissionsBundle = {
+  photoWall: [],
+  submissionFeed: [],
+};
+
+/** kind 별 payload 에서 사진 URL 전부 추출. */
+function feedPhotoUrlsOf(
+  kind: string,
+  p: Record<string, unknown>
+): string[] {
+  if (kind === "PHOTO" || kind === "PHOTO_APPROVAL") {
+    const arr = Array.isArray(p.photo_urls) ? p.photo_urls : [];
+    return arr.filter((u): u is string => typeof u === "string" && u.length > 0);
+  }
+  if (kind === "COOP") {
+    return typeof p.shared_photo_url === "string" && p.shared_photo_url
+      ? [p.shared_photo_url]
+      : [];
+  }
+  if (kind === "BROADCAST") {
+    return p.content_type === "PHOTO" &&
+      typeof p.content === "string" &&
+      p.content
+      ? [p.content]
+      : [];
+  }
+  return [];
+}
+
+/** kind 별 payload 에서 텍스트 자료 추출 (없으면 null). */
+function feedTextOf(kind: string, p: Record<string, unknown>): string | null {
+  const s = (v: unknown): string | null =>
+    typeof v === "string" && v.trim() ? v.trim() : null;
+  if (kind === "PHOTO" || kind === "PHOTO_APPROVAL") return s(p.caption);
+  if (kind === "QR_QUIZ") return s(p.quiz_answer);
+  if (kind === "COOP") return s(p.note);
+  if (kind === "BROADCAST")
+    return p.content_type === "TEXT" ? s(p.content) : null;
+  if (kind === "RADIO") {
+    const song = s(p.song_title);
+    const artist = s(p.artist);
+    const head = song ? `♪ ${song}${artist ? ` — ${artist}` : ""}` : null;
+    const story = s(p.story_text);
+    const joined = [head, story].filter(Boolean).join("\n");
+    return joined || null;
+  }
+  return null;
+}
+
+async function loadSubmissionsBundle(
   supabase: Awaited<ReturnType<typeof createClient>>,
   orgId: string
-): Promise<ControlRoomPhotoItem[]> {
+): Promise<SubmissionsBundle> {
   try {
-    // 1) org 의 사진 종류 미션 id + meta — MISSION_KIND_META.hasPhoto:true 인 kind 모두 포함.
-    //    새 사진 kind 가 META 에 추가되면 자동으로 여기에도 흡수됨.
+    // 1) org 의 모든 미션 — 사진월은 hasPhoto kind 만 쓰지만,
+    //    제출물 피드는 QR/라디오 등 텍스트 kind 도 담아야 하므로 전체 조회.
     const missionResp = (await (
       supabase.from("org_missions" as never) as unknown as {
         select: (c: string) => {
-          eq: (k: string, v: string) => {
-            in: (
-              k: string,
-              v: string[]
-            ) => Promise<
-              SbResp<{
-                id: string;
-                title: string;
-                icon: string | null;
-                kind: string;
-                display_order: number | null;
-              }>
-            >;
-          };
+          eq: (
+            k: string,
+            v: string
+          ) => Promise<
+            SbResp<{
+              id: string;
+              title: string;
+              icon: string | null;
+              kind: string;
+              display_order: number | null;
+            }>
+          >;
         };
       }
     )
       .select("id, title, icon, kind, display_order")
-      .eq("org_id", orgId)
-      .in("kind", PHOTO_BEARING_MISSION_KINDS)) as SbResp<{
+      .eq("org_id", orgId)) as SbResp<{
       id: string;
       title: string;
       icon: string | null;
@@ -1930,10 +1983,10 @@ async function loadPhotoWall(
 
     if (missionResp.error) {
       console.error("[control-room/loadPhotoWall] mission err", missionResp.error);
-      return [];
+      return EMPTY_SUBMISSIONS_BUNDLE;
     }
     const missions = missionResp.data ?? [];
-    if (missions.length === 0) return [];
+    if (missions.length === 0) return EMPTY_SUBMISSIONS_BUNDLE;
 
     const missionMap = new Map(missions.map((m) => [m.id, m]));
     const missionIds = missions.map((m) => m.id);
@@ -1945,14 +1998,7 @@ async function loadPhotoWall(
       user_id: string;
       status: string;
       submitted_at: string;
-      payload_json:
-        | {
-            photo_urls?: string[];
-            shared_photo_url?: string;
-            content?: string;
-            content_type?: string;
-          }
-        | null;
+      payload_json: Record<string, unknown> | null;
     };
     // 관제실에서 운영자가 부적절한 사진을 'REVOKED' 로 마킹하면 사진 월에서 제외.
     const subResp = (await (
@@ -1975,14 +2021,16 @@ async function loadPhotoWall(
       .in("org_mission_id", missionIds)
       .neq("status", "REVOKED")
       .order("submitted_at", { ascending: false })
-      .limit(200)) as SbResp<SubRow>;
+      // 200 이면 가족 수 × 사진 미션 수가 조금만 커져도 오래된 가족 사진이 잘려나감
+      // (가족 패널에서 간헐적으로 "사진 없음" 으로 보이던 원인). 넉넉히 600.
+      .limit(600)) as SbResp<SubRow>;
 
     if (subResp.error) {
       console.error("[control-room/loadPhotoWall] sub err", subResp.error);
-      return [];
+      return EMPTY_SUBMISSIONS_BUNDLE;
     }
     const subs = subResp.data ?? [];
-    if (subs.length === 0) return [];
+    if (subs.length === 0) return EMPTY_SUBMISSIONS_BUNDLE;
 
     // 3) 사용자 이름 + 자녀 이름 (formatFamilyDisplayName 사용)
     const userIds = Array.from(new Set(subs.map((s) => s.user_id)));
@@ -2050,55 +2098,58 @@ async function loadPhotoWall(
       ]);
     }
 
-    // 4) 사진 URL 추출 + 30장 cap — kind 별 payload 키 분기
+    // 4) 사진월 + 제출물 피드 동시 빌드 — kind 별 payload 키 분기는 헬퍼로.
     const out: ControlRoomPhotoItem[] = [];
+    const feed: SubmissionsBundle["submissionFeed"] = [];
     for (const s of subs) {
       const mission = missionMap.get(s.org_mission_id);
       if (!mission) continue;
       const p = s.payload_json ?? {};
 
-      let firstUrl: string | null = null;
-      if (mission.kind === "PHOTO" || mission.kind === "PHOTO_APPROVAL") {
-        const arr = p.photo_urls ?? [];
-        firstUrl =
-          arr.find((u) => typeof u === "string" && u.length > 0) ?? null;
-      } else if (mission.kind === "COOP") {
-        // COOP shared_photo_url — 같은 세션의 A/B 두 submission 모두 같은 url 을 가짐.
-        // 일단 그대로 두 장 표시 (가족 둘이 한 사진 같이 올린 것처럼 자연스러움).
-        if (typeof p.shared_photo_url === "string" && p.shared_photo_url) {
-          firstUrl = p.shared_photo_url;
-        }
-      } else if (mission.kind === "BROADCAST") {
-        // BROADCAST: content_type='PHOTO' 일 때만 content 가 사진 URL
-        if (
-          p.content_type === "PHOTO" &&
-          typeof p.content === "string" &&
-          p.content
-        ) {
-          firstUrl = p.content;
-        }
-      }
-      if (!firstUrl) continue;
+      const photoUrls = feedPhotoUrlsOf(mission.kind, p);
+      const text = feedTextOf(mission.kind, p);
 
       const parentName = nameMap.get(s.user_id) || "보호자";
-      out.push({
+      const displayName = formatFamilyDisplayName(
+        parentName,
+        enrolledMap.get(s.user_id) ?? [],
+        allChildrenMap.get(s.user_id) ?? []
+      );
+
+      // 피드 — 사진 없는 kind 도 담는다 (텍스트 자료·상태 확인용).
+      feed.push({
         submissionId: s.id,
         missionId: s.org_mission_id,
-        missionKind: mission.kind,
-        missionDisplayOrder: mission.display_order ?? 0,
-        url: firstUrl,
-        missionTitle: mission.title,
-        missionIcon: mission.icon ?? null,
         userId: s.user_id,
-        userDisplayName: formatFamilyDisplayName(
-          parentName,
-          enrolledMap.get(s.user_id) ?? [],
-          allChildrenMap.get(s.user_id) ?? []
-        ),
-        submittedAt: s.submitted_at,
+        userDisplayName: displayName,
         status: s.status,
+        submittedAt: s.submitted_at,
+        photoUrls,
+        text,
       });
-      if (out.length >= 120) break; // 위젯 안에서 스크롤로 다 노출됨
+
+      // 사진월 — 사진 kind 의 첫 장만 (기존 동작 유지).
+      // COOP shared_photo_url 은 A/B 두 submission 이 같은 url — 그대로 두 장 표시.
+      const firstUrl = photoUrls[0] ?? null;
+      if (
+        firstUrl &&
+        (PHOTO_BEARING_MISSION_KINDS as string[]).includes(mission.kind) &&
+        out.length < 400 // 위젯은 페이지네이션/스크롤 — 캡이 작으면 일부 가족 사진이 누락됨
+      ) {
+        out.push({
+          submissionId: s.id,
+          missionId: s.org_mission_id,
+          missionKind: mission.kind,
+          missionDisplayOrder: mission.display_order ?? 0,
+          url: firstUrl,
+          missionTitle: mission.title,
+          missionIcon: mission.icon ?? null,
+          userId: s.user_id,
+          userDisplayName: displayName,
+          submittedAt: s.submitted_at,
+          status: s.status,
+        });
+      }
     }
 
     // 5) 사설 버킷 signed URL 은 24시간 후 만료 → admin client 로 재서명.
@@ -2106,21 +2157,33 @@ async function loadPhotoWall(
     try {
       const SUBMISSION_BUCKET = "submission-photos";
       const marker = `/storage/v1/object/sign/${SUBMISSION_BUCKET}/`;
-      type Plan = { idx: number; path: string };
+      type Plan = { path: string; assign: (fresh: string) => void };
       const plans: Plan[] = [];
-      for (let i = 0; i < out.length; i++) {
-        const u = out[i].url;
+      const planFor = (u: string, assign: (fresh: string) => void) => {
         try {
           const parsed = new URL(u);
           const at = parsed.pathname.indexOf(marker);
-          if (at < 0) continue; // 비 Supabase URL — 원본 유지
+          if (at < 0) return; // 비 Supabase URL — 원본 유지
           const path = decodeURIComponent(
             parsed.pathname.slice(at + marker.length)
           );
-          if (path) plans.push({ idx: i, path });
+          if (path) plans.push({ path, assign });
         } catch {
           /* invalid URL — skip */
         }
+      };
+      for (const item of out) {
+        planFor(item.url, (fresh) => {
+          item.url = fresh;
+        });
+      }
+      // 피드 사진들도 같이 재서명 (photoWall 첫 장 외의 나머지 장 포함).
+      for (const f of feed) {
+        f.photoUrls.forEach((u, i) => {
+          planFor(u, (fresh) => {
+            f.photoUrls[i] = fresh;
+          });
+        });
       }
       if (plans.length > 0) {
         const admin = createAdminClient();
@@ -2137,7 +2200,7 @@ async function loadPhotoWall(
         }>;
         for (let i = 0; i < plans.length; i++) {
           const fresh = signedArr[i]?.signedUrl;
-          if (fresh) out[plans[i].idx].url = fresh;
+          if (fresh) plans[i].assign(fresh);
         }
       }
     } catch (e) {
@@ -2145,10 +2208,10 @@ async function loadPhotoWall(
       // 재서명 실패해도 원본 URL 그대로 — 만료된 경우 broken image 로 표시.
     }
 
-    return out;
+    return { photoWall: out, submissionFeed: feed };
   } catch (e) {
     console.error("[control-room/loadPhotoWall] throw", e);
-    return [];
+    return EMPTY_SUBMISSIONS_BUNDLE;
   }
 }
 
@@ -2374,6 +2437,7 @@ async function loadFamilyGrid(
 
     // 2) 모든 제출 조회 (org × active missions × all participants)
     type SubRow = {
+      id: string;
       org_mission_id: string;
       user_id: string;
       status: string;
@@ -2391,7 +2455,7 @@ async function loadFamilyGrid(
         };
       }
     )
-      .select("org_mission_id, user_id, status, awarded_acorns")
+      .select("id, org_mission_id, user_id, status, awarded_acorns")
       .in("org_mission_id", missionIds)
       .in("user_id", participantUserIds)) as SbResp<SubRow>;
 
@@ -2402,6 +2466,8 @@ async function loadFamilyGrid(
 
     // 3) (userId, missionId) → 셀 상태 (우선순위: DONE > REJECTED > WAITING)
     const stateMap = new Map<string, FamilyMissionCellState>();
+    // WAITING 칸에서 바로 검수를 열 수 있도록 제출 id 를 같이 들고 간다.
+    const waitingIdMap = new Map<string, string>();
     const acornsMap = new Map<string, number>();
     const key = (uid: string, mid: string) => `${uid}::${mid}`;
     const priority = (s: FamilyMissionCellState): number => {
@@ -2419,6 +2485,8 @@ async function loadFamilyGrid(
       const k = key(s.user_id, s.org_mission_id);
       const prev = stateMap.get(k) ?? null;
       if (priority(next) > priority(prev)) stateMap.set(k, next);
+      // 같은 칸에 여러 제출이 있으면 먼저 낸 것부터 검수한다.
+      if (next === "WAITING" && !waitingIdMap.has(k)) waitingIdMap.set(k, s.id);
       if (next === "DONE" && (s.awarded_acorns ?? 0) > 0) {
         acornsMap.set(s.user_id, (acornsMap.get(s.user_id) ?? 0) + s.awarded_acorns!);
       }
@@ -2522,11 +2590,17 @@ async function loadFamilyGrid(
     // 5) 행 구성. 완료 수 많은 순 → 도토리 많은 순으로 정렬.
     const rows: ControlRoomFamilyRow[] = participantUserIds.map((uid) => {
       const perMission: Record<string, FamilyMissionCellState> = {};
+      const waitingSubmissionId: Record<string, string> = {};
       let doneCount = 0;
       for (const m of missions) {
-        const state = stateMap.get(key(uid, m.id)) ?? null;
+        const k = key(uid, m.id);
+        const state = stateMap.get(k) ?? null;
         perMission[m.id] = state;
         if (state === "DONE") doneCount += 1;
+        if (state === "WAITING") {
+          const sid = waitingIdMap.get(k);
+          if (sid) waitingSubmissionId[m.id] = sid;
+        }
       }
       const parentName = nameMap.get(uid) || "보호자";
       return {
@@ -2539,6 +2613,7 @@ async function loadFamilyGrid(
         totalAcorns: acornsMap.get(uid) ?? 0,
         doneCount,
         perMission,
+        waitingSubmissionId,
         classNames: Array.from(classNamesMap.get(uid) ?? new Set<string>()),
         children: childrenMetaMap.get(uid) ?? [],
         parentName,

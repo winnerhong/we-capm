@@ -34,6 +34,7 @@ import {
   type OrgEventApplicationRow,
 } from "@/lib/org-events/types";
 import { ApplicationSettings } from "./application-settings";
+import { ApplicationStatsPanel } from "./application-stats-panel";
 import { ConsentEditor } from "./consent-editor";
 
 type FilterKey =
@@ -91,6 +92,10 @@ export function ApplicationsTab({
   const router = useRouter();
   const [filter, setFilter] = useState<FilterKey>("PENDING");
   const [query, setQuery] = useState("");
+  // 📊 승인 통계 패널 펼침 여부.
+  const [showStats, setShowStats] = useState(false);
+  // ⚙️ 접수 설정(접수 받기 + 동의 문구) 펼침 — 평소엔 접어서 목록을 위로.
+  const [showSettings, setShowSettings] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busyId, setBusyId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -286,21 +291,53 @@ export function ApplicationsTab({
 
   return (
     <div className="space-y-4">
-      <ApplicationSettings
-        orgId={orgId}
-        eventId={eventId}
-        initialEnabled={enabled}
-        initialCloseAtLocal={closeAtLocal}
-        initialCapacity={capacity}
-        counts={counts}
-        invitationPublished={invitationPublished}
-        defaultCloseLabel={defaultCloseLabel}
-        closedNow={closedNow}
-        closedAtLabel={closedAtLabel}
-      />
+      {/* ⚙️ 접수 설정 — 행사 초반에 한 번 만지는 카드들이라 접어둔다.
+          접힌 줄의 요약만으로 지금 상태(접수중/마감·정원·승인)를 알 수 있게. */}
+      <button
+        type="button"
+        onClick={() => setShowSettings((v) => !v)}
+        aria-expanded={showSettings}
+        className="flex w-full flex-wrap items-center gap-x-3 gap-y-1 rounded-2xl border border-[#E5D3B8] bg-[#FFF8F0] px-4 py-3 text-left text-xs shadow-sm transition hover:border-[#2D5A3D]/40"
+      >
+        <span className="font-bold text-[#6B4423]">⚙️ 접수 설정</span>
+        <span
+          className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+            !enabled
+              ? "bg-[#EFEBE4] text-[#8B7F75]"
+              : closedNow
+                ? "bg-rose-50 text-rose-700"
+                : "bg-emerald-50 text-emerald-700"
+          }`}
+        >
+          {!enabled ? "꺼짐" : closedNow ? "마감됨" : "접수 중"}
+        </span>
+        <span className="text-[#6B6560]">
+          정원 {capacity.trim() ? `${capacity}명` : "무제한"} · ✅ 승인{" "}
+          {counts.approved_count} · ⏳ 대기 {counts.pending_count}
+          {enabled && closedAtLabel ? ` · 마감 ${closedAtLabel}` : ""}
+        </span>
+        <span className="ml-auto shrink-0 font-bold text-[#6B4423]">
+          {showSettings ? "▲ 접기" : "▼ 펼치기"}
+        </span>
+      </button>
+
+      {showSettings && (
+        <ApplicationSettings
+          orgId={orgId}
+          eventId={eventId}
+          initialEnabled={enabled}
+          initialCloseAtLocal={closeAtLocal}
+          initialCapacity={capacity}
+          counts={counts}
+          invitationPublished={invitationPublished}
+          defaultCloseLabel={defaultCloseLabel}
+          closedNow={closedNow}
+          closedAtLabel={closedAtLabel}
+        />
+      )}
 
       {/* 접수를 켠 행사에서만 — 신청서가 없으면 동의문도 뜰 일이 없다. */}
-      {enabled && (
+      {showSettings && enabled && (
         <ConsentEditor
           orgId={orgId}
           orgName={consent.orgName}
@@ -324,8 +361,8 @@ export function ApplicationsTab({
         </p>
       )}
 
-      {/* 필터 + 검색 */}
-      <div className="flex flex-wrap items-center gap-2">
+      {/* 필터 + 검색 — 긴 목록을 내려가도 따라오게 상단 고정 */}
+      <div className="sticky top-0 z-20 flex flex-wrap items-center gap-2 rounded-2xl border border-[#EDE6D8] bg-white/95 px-2.5 py-2 shadow-sm backdrop-blur">
         {FILTERS.map((f) => (
           <button
             key={f.key}
@@ -340,6 +377,19 @@ export function ApplicationsTab({
             {f.label} {f.count}
           </button>
         ))}
+        <button
+          type="button"
+          onClick={() => setShowStats((v) => !v)}
+          aria-expanded={showStats}
+          title="승인된 가족의 반별·구성원 통계와 엑셀 다운로드"
+          className={`rounded-full border px-3 py-1.5 text-xs font-bold transition ${
+            showStats
+              ? "border-[#6B4423] bg-[#6B4423] text-white"
+              : "border-[#E5D3B8] bg-[#FFFDF8] text-[#6B4423] hover:bg-[#F5EEDD]"
+          }`}
+        >
+          📊 통계 {showStats ? "접기" : "보기"}
+        </button>
         <input
           type="search"
           value={query}
@@ -348,6 +398,16 @@ export function ApplicationsTab({
           className="ml-auto min-w-[10rem] flex-1 rounded-full border border-[#D4E4BC] bg-white px-4 py-1.5 text-xs text-[#2D5A3D] outline-none focus:border-[#3A7A52] sm:flex-none sm:basis-56"
         />
       </div>
+
+      {/* 📊 승인 통계 — 반별 현황·동반 구성·추이 + 엑셀 */}
+      {showStats && (
+        <ApplicationStatsPanel
+          orgId={orgId}
+          eventId={eventId}
+          applications={applications}
+          capacity={capacity}
+        />
+      )}
 
       {/* 일괄 수락 바 */}
       {selectablePending.length > 0 && (
@@ -481,19 +541,20 @@ function ApplicationRow({
   }
 
   return (
-    <li className="rounded-2xl border border-[#D4E4BC] bg-white p-3 shadow-sm">
-      <div className="flex items-start gap-3">
+    <li className="rounded-xl border border-[#D4E4BC] bg-white px-3 py-2 shadow-sm">
+      <div className="flex items-center gap-3">
         {isPending && (
           <input
             type="checkbox"
             checked={selected}
             onChange={onToggle}
             aria-label="선택"
-            className="mt-1 h-4 w-4 shrink-0 accent-[#2D5A3D]"
+            className="h-4 w-4 shrink-0 accent-[#2D5A3D]"
           />
         )}
 
-        <div className="min-w-0 flex-1">
+        {/* 넓은 화면에선 칩·연락처·인원·동반이 한 줄로 흐른다 — 행 높이 1/3. */}
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1">
           {/* 아이 칩들 */}
           <div className="flex flex-wrap items-center gap-1.5">
             {a.children.map((c, i) => (
@@ -524,7 +585,7 @@ function ApplicationRow({
             )}
           </div>
 
-          <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-[#6B6560]">
+          <p className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[11px] text-[#6B6560]">
             <span className="font-semibold tabular-nums text-[#4A4340]">
               📞 {formatPhoneDisplay(a.phone)}
             </span>
@@ -546,12 +607,12 @@ function ApplicationRow({
           </p>
 
           {proofState === "error" && (
-            <p className="mt-2 text-[11px] font-semibold text-rose-700">
+            <p className="w-full text-[11px] font-semibold text-rose-700">
               동의 기록을 불러오지 못했어요
             </p>
           )}
           {proofState === "open" && proof && (
-            <div className="mt-2 space-y-2">
+            <div className="w-full space-y-2">
               <ConsentProof
                 label="[필수] 개인정보 수집·이용"
                 at={a.consent_agreed_at}
@@ -573,7 +634,7 @@ function ApplicationRow({
 
           {/* 누가 오는지 한눈에 — 유형 칩 */}
           {a.companions.length > 0 && (
-            <p className="mt-1 flex flex-wrap items-center gap-1">
+            <p className="flex flex-wrap items-center gap-1">
               {a.companions.map((c, i) => (
                 <span
                   key={`${c.label}-${i}`}
@@ -593,32 +654,32 @@ function ApplicationRow({
           )}
 
           {alreadyParticipant && a.status !== "APPROVED" && (
-            <p className="mt-1 text-[11px] font-semibold text-amber-700">
+            <p className="w-full text-[11px] font-semibold text-amber-700">
               ⚠️ 이미 이 행사에 참가 중인 연락처예요
             </p>
           )}
           {a.status === "REJECTED" && a.note && (
-            <p className="mt-1 text-[11px] text-[#8B7F75]">
+            <p className="w-full text-[11px] text-[#8B7F75]">
               기관 메모: {a.note}
             </p>
           )}
           {a.status === "CANCELED" && (
-            <p className="mt-1 text-[11px] font-semibold text-rose-700">
+            <p className="w-full text-[11px] font-semibold text-rose-700">
               🚫 {a.canceled_at ? fmtDateTimeKst(a.canceled_at) : ""} 취소
               {a.cancel_reason ? ` · 사유: ${a.cancel_reason}` : ""}
             </p>
           )}
         </div>
 
-        {/* 작업 */}
-        <div className="flex shrink-0 flex-col gap-1.5">
+        {/* 작업 — 가로 한 줄. 수락만 글자, 나머지는 아이콘+툴팁으로 압축. */}
+        <div className="flex shrink-0 items-center gap-1">
           {isPending && (
             <>
               <button
                 type="button"
                 disabled={disabled}
                 onClick={onApprove}
-                className="rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white disabled:opacity-40"
+                className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-500 disabled:opacity-40"
               >
                 {busy ? "처리 중" : "✅ 수락"}
               </button>
@@ -626,9 +687,11 @@ function ApplicationRow({
                 type="button"
                 disabled={disabled}
                 onClick={onReject}
-                className="rounded-xl border border-[#D4E4BC] bg-white px-3 py-1.5 text-xs font-bold text-[#8B7F75] hover:text-rose-700 disabled:opacity-40"
+                title="거절"
+                aria-label="거절"
+                className="rounded-lg border border-[#D4E4BC] bg-white px-2 py-1.5 text-xs font-bold text-[#8B7F75] hover:border-rose-300 hover:text-rose-700 disabled:opacity-40"
               >
-                ❌ 거절
+                ❌
               </button>
             </>
           )}
@@ -637,13 +700,10 @@ function ApplicationRow({
               type="button"
               disabled={disabled}
               onClick={onRevert}
-              className="rounded-xl border border-[#D4E4BC] bg-white px-3 py-1.5 text-xs font-bold text-[#6B6560] hover:bg-[#F5F1E8] disabled:opacity-40"
+              title={a.status === "CANCELED" ? "취소를 되돌려 대기 상태로" : undefined}
+              className="whitespace-nowrap rounded-lg border border-[#D4E4BC] bg-white px-2.5 py-1.5 text-xs font-bold text-[#6B6560] hover:bg-[#F5F1E8] disabled:opacity-40"
             >
-              {a.status === "APPROVED"
-                ? "승인 취소"
-                : a.status === "CANCELED"
-                  ? "대기로 되돌리기"
-                  : "대기로"}
+              {a.status === "APPROVED" ? "승인 취소" : "대기로"}
             </button>
           )}
           {/* 취소된 건만 최종 정리를 열어준다 — 삭제는 2단계(취소 → 삭제)다. */}
@@ -652,10 +712,11 @@ function ApplicationRow({
               type="button"
               disabled={disabled}
               onClick={onPurge}
-              title="취소 목록에서도 완전히 지웁니다 (되돌릴 수 없어요)"
-              className="rounded-xl border border-rose-300 bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 disabled:opacity-40"
+              title="완전 삭제 — 취소 목록에서도 지웁니다 (되돌릴 수 없어요)"
+              aria-label="완전 삭제"
+              className="rounded-lg border border-rose-300 bg-rose-50 px-2 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 disabled:opacity-40"
             >
-              🗑 완전 삭제
+              🗑
             </button>
           )}
           {/* 전화로 취소 통보를 받는 경우가 잦아 관리자도 대행할 수 있게. */}
@@ -664,9 +725,11 @@ function ApplicationRow({
               type="button"
               disabled={disabled}
               onClick={onCancel}
-              className="rounded-xl border border-rose-200 bg-white px-3 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-50 disabled:opacity-40"
+              title="취소 처리"
+              aria-label="취소 처리"
+              className="rounded-lg border border-rose-200 bg-white px-2 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-50 disabled:opacity-40"
             >
-              🚫 취소 처리
+              🚫
             </button>
           )}
         </div>
