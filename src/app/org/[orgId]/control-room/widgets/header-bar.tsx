@@ -52,11 +52,11 @@ export function HeaderBar({
 
       <div className="flex flex-wrap items-center gap-3">
         {/* 대표 행사 상태 토글 — 예정/진행중/종료/보관 을 관제실에서 바로.
-            토글 컴포넌트는 라이트 테마라 크림색 카드에 얹어 그대로 재사용. */}
+            다크 헤더에 맞게 칩만(bare) — 흰 카드·회색 안내문은 여기선 겉돈다. */}
         {!isTvMode && currentEvent && (
-          <div className="flex items-center gap-3 rounded-xl bg-[#FDFBF7] px-3 py-1.5 shadow-md">
+          <div className="flex items-center gap-2.5 rounded-xl border border-[#1a2a52] bg-[#0a1839] py-1.5 pl-3 pr-1.5">
             <span
-              className="max-w-[180px] truncate text-xs font-bold text-[#3d3835]"
+              className="max-w-[180px] truncate text-xs font-semibold text-[#e5e5e5]"
               title={currentEvent.name}
             >
               📅 {currentEvent.name}
@@ -66,7 +66,7 @@ export function HeaderBar({
               initialStatus={currentEvent.status}
               startsAt={currentEvent.startsAt}
               endsAt={currentEvent.endsAt}
-              variant="inline"
+              variant="bare"
             />
           </div>
         )}

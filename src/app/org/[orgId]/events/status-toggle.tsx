@@ -27,8 +27,10 @@ interface Props {
    * "stacked" — 라벨을 위에 두고 칩이 가로를 꽉 채운다 (행사 목록 카드).
    * "inline"  — 라벨과 칩이 한 줄. 옆의 액션 버튼들과 높이가 맞는다
    *             (행사 상세 헤더). 기본은 stacked.
+   * "bare"    — 칩만. 라벨·안내문 없이 — 관제실처럼 어두운 화면에 얹을 때.
+   *             (안내문의 회색 글자는 다크 배경에서 안 읽힌다)
    */
-  variant?: "stacked" | "inline";
+  variant?: "stacked" | "inline" | "bare";
 }
 
 /**
@@ -107,7 +109,7 @@ export function EventStatusToggle({
     });
   };
 
-  const inline = variant === "inline";
+  const inline = variant === "inline" || variant === "bare";
 
   // inline 은 옆 액션 버튼(px-3.5 py-2 text-xs rounded-xl)과 높이를 맞춘다.
   const chipCls = inline
@@ -161,6 +163,19 @@ export function EventStatusToggle({
       {EFFECT[status]}
     </p>
   );
+
+  if (variant === "bare") {
+    return (
+      <div className="flex flex-col gap-1">
+        {chips}
+        {err && (
+          <p role="alert" className="text-[10px] font-semibold text-rose-300">
+            {err}
+          </p>
+        )}
+      </div>
+    );
+  }
 
   if (inline) {
     /* 세로 정렬은 items-start 다 — 칩의 **윗변**이 옆 액션 버튼과 맞아야 한 줄로
