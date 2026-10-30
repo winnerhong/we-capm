@@ -877,6 +877,8 @@ export function EditEventForm({
                           onChange={(e) =>
                             updateParking(idx, { name: e.target.value })
                           }
+                          onFocus={() => focusPreview(`parking-${idx}`)}
+                          onBlur={() => focusPreview("")}
                           placeholder="주차장 이름 (예: 침산공원주차장1입구)"
                           className={`${INPUT_CLS} mt-2`}
                         />
@@ -887,6 +889,8 @@ export function EditEventForm({
                           onChange={(e) =>
                             updateParking(idx, { address: e.target.value })
                           }
+                          onFocus={() => focusPreview(`parking-${idx}`)}
+                          onBlur={() => focusPreview("")}
                           placeholder="주소 (예: 대구 북구 침산동 1129-1)"
                           className={`${INPUT_CLS} mt-1.5`}
                         />

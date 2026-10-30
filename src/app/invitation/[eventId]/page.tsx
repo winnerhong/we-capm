@@ -655,6 +655,9 @@ export default async function EventInvitationPage({
                 return (
                   <div
                     key={idx}
+                    // 편집 폼에서 N번째 주차장 칸에 커서를 두면 이 카드로 스크롤.
+                    // 텍스트 치환 키가 아니라 위치 표시용 — apply() 는 모르는 키를 건너뛴다.
+                    {...pv(`parking-${idx}`)}
                     className="rounded-2xl border border-[#E5D3B8] bg-[#FFF8F0] p-4 shadow-sm"
                   >
                     <div className="flex items-center justify-between gap-2">
