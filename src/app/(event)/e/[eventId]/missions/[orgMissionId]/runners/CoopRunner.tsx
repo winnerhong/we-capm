@@ -836,6 +836,7 @@ function extractPairCode(text: string): string | null {
  */
 function PairQr({ code }: { code: string }) {
   const [src, setSrc] = useState<string | null>(null);
+  const [zoomed, setZoomed] = useState(false);
   useEffect(() => {
     let alive = true;
     const url = `${window.location.origin}${window.location.pathname}?pair=${code}`;
@@ -857,15 +858,46 @@ function PairQr({ code }: { code: string }) {
   if (!src) return null;
   return (
     <div className="mt-3 flex flex-col items-center">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={src}
-        alt={`짝꿍 코드 ${code} QR`}
-        className="h-44 w-44 rounded-2xl border border-current/15 bg-white p-2 shadow-sm"
-      />
+      {/* 탭하면 전체 화면으로 — 멀리서도 찍기 쉽게 크게 띄운다 */}
+      <button
+        type="button"
+        onClick={() => setZoomed(true)}
+        aria-label="QR 크게 보기"
+        className="transition active:scale-[0.98]"
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={src}
+          alt={`짝꿍 코드 ${code} QR`}
+          className="h-44 w-44 rounded-2xl border border-current/15 bg-white p-2 shadow-sm"
+        />
+      </button>
       <p className="mt-1.5 text-center text-[11px] font-semibold opacity-80">
-        짝꿍이 카메라로 찍으면 돼요
+        짝꿍이 카메라로 찍으면 돼요 · 누르면 크게
       </p>
+
+      {zoomed && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="짝꿍 QR 크게 보기"
+          onClick={() => setZoomed(false)}
+          className="fixed inset-0 z-[80] flex flex-col items-center justify-center gap-5 bg-white p-6"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={src}
+            alt={`짝꿍 코드 ${code} QR`}
+            className="aspect-square w-full max-w-[min(85vw,60vh)]"
+          />
+          <p className="font-mono text-4xl font-bold tracking-[0.3em] text-[#2D5A3D]">
+            {code}
+          </p>
+          <p className="text-sm font-semibold text-[#8B7F75]">
+            화면을 누르면 닫혀요
+          </p>
+        </div>
+      )}
     </div>
   );
 }
