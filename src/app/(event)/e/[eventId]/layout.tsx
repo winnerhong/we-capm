@@ -65,7 +65,10 @@ export default async function EventLayout({
   //   자리를 지키라는 뜻이 아니다. 안 쓰는 기능은 어제도 오늘도 없다.
   const tabs: ShellTab[] = [
     { href: ctx.href(), label: "행사홈", icon: "🎪" },
-    { href: ctx.href("/schedule"), label: "일정", icon: "📅" },
+    // 기관이 일정표를 끈 행사는 탭째 숨긴다 — 안 쓰는 기능은 어제도 오늘도 없다.
+    ...(ctx.event.timeline_enabled !== false
+      ? [{ href: ctx.href("/schedule"), label: "일정", icon: "📅" }]
+      : []),
     ...(ctx.hasFeature(F.STAMPBOOK)
       ? [
           {
