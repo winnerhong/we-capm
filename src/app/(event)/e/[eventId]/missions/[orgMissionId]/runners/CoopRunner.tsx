@@ -1,7 +1,16 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState, useTransition } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
 import { useRouter } from "next/navigation";
+import QRCode from "qrcode";
+import { QrScanner } from "@/components/qr-scanner";
 import { compressImage } from "@/lib/image-compress";
 import type {
   CoopMissionConfig,
@@ -33,6 +42,8 @@ interface Props {
   currentUserId: string;
   kids: KidOption[];
   partnerName?: string | null;
+  /** QR 딥링크(?pair=1234)로 들어온 경우 — 코드 입력칸에 미리 채운다. */
+  initialPairCode?: string;
 }
 
 export function CoopRunner({
@@ -42,11 +53,16 @@ export function CoopRunner({
   currentUserId,
   kids,
   partnerName,
+  initialPairCode = "",
 }: Props) {
   const router = useRouter();
-  const [pairCodeInput, setPairCodeInput] = useState("");
+  // QR 딥링크로 들어왔으면 코드가 미리 채워진 채 시작한다 — 버튼 한 번이면 합류.
+  const prefill = /^\d{4}$/.test(initialPairCode) ? initialPairCode : "";
+  const [pairCodeInput, setPairCodeInput] = useState(prefill);
   // A 가 WAITING_RECIPROCAL 단계에서 B 가 발급한 코드를 입력하는 칸.
-  const [partnerCodeInput, setPartnerCodeInput] = useState("");
+  const [partnerCodeInput, setPartnerCodeInput] = useState(prefill);
+  // 📷 QR 스캔 카메라 열림 여부 (합류 입력칸 / 상호확정 입력칸 공용).
+  const [scanOpen, setScanOpen] = useState(false);
   const [selectedChildId, setSelectedChildId] = useState<string>(
     kids[0]?.id ?? ""
   );
@@ -97,9 +113,9 @@ export function CoopRunner({
     });
   };
 
-  const handleJoin = () => {
+  const handleJoin = (codeOverride?: string) => {
     // 4자리 숫자 페어 코드 — 입력은 숫자만 추출 후 길이 확인.
-    const code = pairCodeInput.replace(/\D/g, "").slice(0, 4);
+    const code = (codeOverride ?? pairCodeInput).replace(/\D/g, "").slice(0, 4);
     if (code.length !== 4) {
       setErrorMsg("짝꿍 코드 4자리 숫자를 입력해 주세요");
       return;
@@ -134,9 +150,11 @@ export function CoopRunner({
   };
 
   // A 가 B 의 코드를 입력해 짝꿍 성립을 확정.
-  const handleConfirmPartnerCode = () => {
+  const handleConfirmPartnerCode = (codeOverride?: string) => {
     if (!session) return;
-    const code = partnerCodeInput.replace(/\D/g, "").slice(0, 4);
+    const code = (codeOverride ?? partnerCodeInput)
+      .replace(/\D/g, "")
+      .slice(0, 4);
     if (code.length !== 4) {
       setErrorMsg("짝꿍 코드 4자리 숫자를 입력해 주세요");
       return;
@@ -288,11 +306,46 @@ export function CoopRunner({
           </div>
 
           <div>
+            {/* 📷 QR 합류 — 짝꿍 폰의 QR 을 찍으면 코드 입력 없이 바로 합류 */}
+            {scanOpen ? (
+              <div className="space-y-2">
+                <QrScanner
+                  autoStart
+                  onScan={(text) => {
+                    const code = extractPairCode(text);
+                    if (!code) {
+                      setErrorMsg("짝꿍 QR 이 아니에요. 코드를 직접 입력해 주세요");
+                      setScanOpen(false);
+                      return;
+                    }
+                    setScanOpen(false);
+                    setPairCodeInput(code);
+                    handleJoin(code);
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setScanOpen(false)}
+                  className="min-h-[44px] w-full rounded-2xl border border-[#D4E4BC] bg-white px-4 py-2 text-sm font-bold text-[#8B7F75] hover:bg-[#F5F1E8]"
+                >
+                  ✕ 카메라 닫기
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setScanOpen(true)}
+                className="min-h-[48px] w-full rounded-2xl border-2 border-[#2D5A3D] bg-white px-4 py-3 text-sm font-bold text-[#2D5A3D] transition hover:bg-[#F5F1E8]"
+              >
+                📷 짝꿍 QR 찍고 바로 합류
+              </button>
+            )}
+
             <label
               htmlFor="coop-code"
-              className="block text-sm font-bold text-[#2D5A3D]"
+              className="mt-3 block text-sm font-bold text-[#2D5A3D]"
             >
-              🔑 받은 짝꿍 코드 입력
+              🔑 또는 받은 짝꿍 코드 입력
             </label>
             <input
               id="coop-code"
@@ -311,7 +364,7 @@ export function CoopRunner({
             />
             <button
               type="button"
-              onClick={handleJoin}
+              onClick={() => handleJoin()}
               disabled={
                 isPending ||
                 pairCodeInput.replace(/\D/g, "").length !== 4
@@ -352,6 +405,7 @@ export function CoopRunner({
             </p>
             <Countdown expiresAt={session.expires_at} urgentSec={60} />
           </div>
+          <PairQr code={session.pair_code} />
           <p className="mt-3 text-center text-[11px] font-semibold uppercase tracking-widest opacity-80">
             짝꿍 코드
           </p>
@@ -377,8 +431,8 @@ export function CoopRunner({
 
         <section className="rounded-3xl border border-[#D4E4BC] bg-white p-4 shadow-sm">
           <p className="text-sm text-[#6B6560]">
-            다른 가족에게 위 코드를 공유해 주세요. 짝꿍이 코드를 입력하면
-            자동으로 시작돼요.
+            짝꿍 가족이 <b>카메라로 QR을 찍으면</b> 바로 합류 화면이 열려요.
+            QR이 어려우면 아래 4자리 코드를 불러줘도 돼요.
           </p>
         </section>
 
@@ -427,11 +481,46 @@ export function CoopRunner({
                 ✓ 짝꿍이 합류했어요! 짝꿍이 발급받은 4자리 코드를 입력하면
                 짝꿍 성립이 끝나요.
               </p>
+              {scanOpen ? (
+                <div className="mt-4 space-y-2">
+                  <QrScanner
+                    autoStart
+                    onScan={(text) => {
+                      const code = extractPairCode(text);
+                      if (!code) {
+                        setErrorMsg(
+                          "짝꿍 QR 이 아니에요. 코드를 직접 입력해 주세요"
+                        );
+                        setScanOpen(false);
+                        return;
+                      }
+                      setScanOpen(false);
+                      setPartnerCodeInput(code);
+                      handleConfirmPartnerCode(code);
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setScanOpen(false)}
+                    className="min-h-[44px] w-full rounded-2xl border border-current/20 bg-white/70 px-4 py-2 text-sm font-bold hover:bg-white"
+                  >
+                    ✕ 카메라 닫기
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setScanOpen(true)}
+                  className="mt-4 min-h-[48px] w-full rounded-2xl border-2 border-current/40 bg-white/70 px-4 py-3 text-sm font-bold transition hover:bg-white"
+                >
+                  📷 짝꿍 QR 찍고 바로 성립
+                </button>
+              )}
               <label
                 htmlFor="partner-code"
                 className="mt-4 block text-[11px] font-bold uppercase tracking-widest opacity-80"
               >
-                짝꿍이 보내준 코드
+                또는 짝꿍이 보내준 코드 입력
               </label>
               <input
                 id="partner-code"
@@ -451,7 +540,7 @@ export function CoopRunner({
               />
               <button
                 type="button"
-                onClick={handleConfirmPartnerCode}
+                onClick={() => handleConfirmPartnerCode()}
                 disabled={isPending || partnerCodeInput.length !== 4}
                 className="mt-3 min-h-[48px] w-full rounded-2xl bg-[#2D5A3D] px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-[#3A7A52] disabled:opacity-50"
               >
@@ -461,6 +550,9 @@ export function CoopRunner({
           ) : (
             // B 화면 — 본인 코드 노출 + 안내
             <>
+              {session.partner_pair_code && (
+                <PairQr code={session.partner_pair_code} />
+              )}
               <p className="mt-3 text-center text-[11px] font-semibold uppercase tracking-widest opacity-80">
                 내 코드
               </p>
@@ -767,3 +859,61 @@ export function CoopRunner({
     </div>
   );
 }
+
+/* ────────────────────────── QR 짝꿍 합류 ────────────────────────── */
+
+/**
+ * 스캔 결과에서 4자리 짝꿍 코드 추출.
+ * 딥링크(...?pair=1234)가 정석이고, 혹시 코드만 담긴 QR 이어도 받아준다.
+ */
+function extractPairCode(text: string): string | null {
+  try {
+    const pair = new URL(text).searchParams.get("pair");
+    if (pair && /^\d{4}$/.test(pair)) return pair;
+  } catch {
+    /* URL 이 아니면 아래 폴백 */
+  }
+  const m = text.match(/\d{4}/g);
+  return m ? m[m.length - 1] : null;
+}
+
+/**
+ * 짝꿍 코드 QR — 내용은 이 미션 화면의 딥링크(?pair=코드).
+ * 일반 카메라 앱으로 찍어도 미션 화면이 열리고 코드가 미리 채워진다.
+ */
+function PairQr({ code }: { code: string }) {
+  const [src, setSrc] = useState<string | null>(null);
+  useEffect(() => {
+    let alive = true;
+    const url = `${window.location.origin}${window.location.pathname}?pair=${code}`;
+    QRCode.toDataURL(url, {
+      width: 360,
+      margin: 1,
+      color: { dark: "#2D5A3D", light: "#FFFFFF" },
+    })
+      .then((dataUrl) => {
+        if (alive) setSrc(dataUrl);
+      })
+      .catch(() => {
+        /* QR 생성 실패 — 코드 입력 경로는 그대로 살아 있다 */
+      });
+    return () => {
+      alive = false;
+    };
+  }, [code]);
+  if (!src) return null;
+  return (
+    <div className="mt-3 flex flex-col items-center">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src}
+        alt={`짝꿍 코드 ${code} QR`}
+        className="h-44 w-44 rounded-2xl border border-current/15 bg-white p-2 shadow-sm"
+      />
+      <p className="mt-1.5 text-center text-[11px] font-semibold opacity-80">
+        📷 짝꿍이 폰 카메라로 찍으면 바로 열려요
+      </p>
+    </div>
+  );
+}
+

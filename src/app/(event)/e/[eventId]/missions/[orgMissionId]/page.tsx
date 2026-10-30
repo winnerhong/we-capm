@@ -80,10 +80,15 @@ function formatDateTime(iso: string): string {
 
 export default async function MissionRunnerPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ eventId: string; orgMissionId: string }>;
+  searchParams: Promise<{ pair?: string }>;
 }) {
   const { eventId, orgMissionId } = await params;
+  // 짝꿍 QR 딥링크(?pair=1234) — CoopRunner 가 코드 입력칸에 미리 채운다.
+  const rawPair = (await searchParams)?.pair ?? "";
+  const pairFromQr = /^\d{4}$/.test(rawPair) ? rawPair : "";
   const ctx = await requireEventContext(eventId);
   const user = ctx.user;
   // 행사 시작 전(예정)에는 미션이 열리지 않는다.
@@ -739,6 +744,7 @@ export default async function MissionRunnerPage({
           currentUserId={user.id}
           kids={children.map((c) => ({ id: c.id, name: c.name }))}
           partnerName={partnerName}
+          initialPairCode={pairFromQr}
         />
         {session && <CoopRefresher sessionId={session.id} />}
       </>

@@ -429,13 +429,24 @@ export function CoopOrgMissionEditor({ mission, siblings }: Props) {
               </div>
               <div className="mt-3 rounded-lg border border-[#D4E4BC] bg-[#FFF8F0] p-2">
                 <p className="text-[10px] font-semibold text-[#8B6F47]">
-                  페어 코드
+                  짝꿍 QR + 페어 코드
                 </p>
-                <p className="mt-0.5 font-mono text-2xl font-bold tabular-nums tracking-[0.3em] text-[#2D5A3D]">
+                {/* 실제 화면엔 진짜 QR 이 뜬다 — 미리보기는 모양만. */}
+                <div
+                  aria-hidden
+                  className="mx-auto mt-1.5 flex h-16 w-16 items-center justify-center rounded-lg border border-[#D4E4BC] bg-white text-3xl"
+                >
+                  ▦
+                </div>
+                <p className="mt-1 text-center text-[9px] text-[#6B6560]">
+                  📷 짝꿍이 카메라로 찍으면 바로 열려요
+                </p>
+                <p className="mt-1.5 text-center font-mono text-2xl font-bold tabular-nums tracking-[0.3em] text-[#2D5A3D]">
                   1234
                 </p>
-                <p className="mt-1 text-[10px] text-[#6B6560]">
-                  유효 시간 {matchWindow || DEFAULT_WINDOW}분
+                <p className="mt-1 text-center text-[10px] text-[#6B6560]">
+                  유효 시간 {matchWindow || DEFAULT_WINDOW}분 · QR을 찍거나
+                  코드를 입력해 합류
                 </p>
               </div>
               <div className="mt-2 rounded-lg border border-[#D4E4BC] bg-[#FFF8F0] p-2">
