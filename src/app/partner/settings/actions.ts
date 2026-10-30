@@ -1,6 +1,6 @@
 "use server";
 
-import { seal } from "@/lib/session-cookie";
+import { seal, openSession } from "@/lib/session-cookie";
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -18,14 +18,10 @@ type PartnerRow = {
 
 async function getCurrentPartnerId(): Promise<string | null> {
   const cookieStore = await cookies();
-  const raw = cookieStore.get("campnic_partner")?.value;
-  if (!raw) return null;
-  try {
-    const parsed = JSON.parse(raw) as { id?: string };
-    return parsed.id ?? null;
-  } catch {
-    return null;
-  }
+  const parsed = await openSession<{ id?: string }>(
+    cookieStore.get("campnic_partner")?.value
+  );
+  return parsed?.id ?? null;
 }
 
 async function refreshCookie(partner: {

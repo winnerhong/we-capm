@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { AcornIcon } from "@/components/acorn-icon";
+import { openSession } from "@/lib/session-cookie";
 
 export default async function ManagerLayout({
   children,
@@ -15,18 +16,14 @@ export default async function ManagerLayout({
   const cookieStore = await cookies();
   const managerCookie = cookieStore.get("campnic_manager");
 
-  if (!managerCookie?.value) redirect("/manager");
-
-  let eventName = "행사";
-  let managerId = "";
-  try {
-    const data = JSON.parse(managerCookie.value);
-    if (data.eventId !== eventId) redirect("/manager");
-    eventName = data.eventName ?? "행사";
-    managerId = data.managerId ?? "";
-  } catch {
-    redirect("/manager");
-  }
+  const data = await openSession<{
+    eventId?: string;
+    eventName?: string;
+    managerId?: string;
+  }>(managerCookie?.value);
+  if (!data || data.eventId !== eventId) redirect("/manager");
+  const eventName = data.eventName ?? "행사";
+  const managerId = data.managerId ?? "";
 
   // 도토리 잔액 (events.acorn_balance 가 없는 스키마에서는 0)
   let acornBalance = 0;

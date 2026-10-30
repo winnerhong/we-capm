@@ -1,7 +1,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireOrg } from "@/lib/org-auth-guard";
 import { toIsoKstFromLocalInput, fmtFullDateKst } from "@/lib/datetime/kst";
@@ -191,7 +190,7 @@ async function countMissionsInPack(
 export async function copyToOrgAction(
   partnerMissionId: string,
   questPackId?: string
-): Promise<void> {
+): Promise<string> {
   const session = await requireOrg();
   const supabase = await createClient();
 
@@ -281,7 +280,11 @@ export async function copyToOrgAction(
   if (packForInsert) {
     revalidatePath(`/org/${session.orgId}/quest-packs/${packForInsert}/edit`);
   }
-  redirect(`/org/${session.orgId}/missions/${data.id}/edit`);
+  // ⚠ 서버 액션 안에서 redirect() 를 부르면 안 된다 — Next 16 이 redirect 대상을
+  // 내부 fetch 로 다시 그리는데, 미들웨어가 평문으로 풀어둔 세션 쿠키(한글 포함
+  // JSON)가 그 재직렬화에서 탈락해 로그인 화면으로 튕긴다. URL 을 돌려주고
+  // 클라이언트가 router.push 한다. (아래 createQuestPackAction 등 동일)
+  return `/org/${session.orgId}/missions/${data.id}/edit`;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -754,10 +757,10 @@ async function linkPackToEvent(
 export async function createQuestPackAction(
   orgId: string,
   formData: FormData
-): Promise<void> {
+): Promise<{ ok: true; redirectTo: string } | { ok: false; message: string }> {
   const session = await requireOrg();
   if (session.orgId !== orgId) {
-    throw new Error("다른 기관의 스탬프북을 만들 수 없어요");
+    return { ok: false, message: "다른 기관의 스탬프북을 만들 수 없어요" };
   }
   const supabase = await createClient();
 
@@ -795,14 +798,21 @@ export async function createQuestPackAction(
     .single();
 
   if (error || !data) {
-    throw new Error(`스탬프북 생성 실패: ${error?.message ?? "unknown"}`);
+    return {
+      ok: false,
+      message: `스탬프북 생성 실패: ${error?.message ?? "unknown"}`,
+    };
   }
 
   const eventId = str(formData.get("event_id"));
   await linkPackToEvent(supabase, eventId, session.orgId, data.id);
 
   revalidatePath(`/org/${session.orgId}/quest-packs`);
-  redirect(`/org/${session.orgId}/quest-packs/${data.id}/edit`);
+  // redirect() 금지 — copyToOrgAction 주석 참고. 클라이언트가 push 한다.
+  return {
+    ok: true,
+    redirectTo: `/org/${session.orgId}/quest-packs/${data.id}/edit`,
+  };
 }
 
 export async function updateQuestPackAction(
@@ -993,7 +1003,7 @@ export async function createPackFromPresetAction(
   orgId: string,
   presetId: string,
   eventId?: string
-): Promise<void> {
+): Promise<string> {
   const session = await requireOrg();
   if (session.orgId !== orgId) {
     throw new Error("다른 기관의 스탬프북은 만들 수 없어요");
@@ -1170,5 +1180,6 @@ export async function createPackFromPresetAction(
 
   revalidatePath(`/org/${session.orgId}/quest-packs`);
   revalidatePath(`/org/${session.orgId}/quest-packs/${newPackId}/edit`);
-  redirect(`/org/${session.orgId}/quest-packs/${newPackId}/edit`);
+  // redirect() 금지 — copyToOrgAction 주석 참고. 클라이언트가 push 한다.
+  return `/org/${session.orgId}/quest-packs/${newPackId}/edit`;
 }

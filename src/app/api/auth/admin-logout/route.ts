@@ -9,6 +9,7 @@ import {
   tooManyRequests,
   maybeGcBuckets,
 } from "@/lib/rate-limit";
+import { openSession } from "@/lib/session-cookie";
 
 export async function POST(request: Request) {
   // Rate limit: IP 당 분당 20회. logout DoS 방지.
@@ -25,11 +26,7 @@ export async function POST(request: Request) {
   const adminRaw = cookieStore.get("campnic_admin")?.value;
   let adminId: string | undefined;
   if (adminRaw) {
-    try {
-      adminId = JSON.parse(adminRaw)?.id;
-    } catch {
-      // ignore
-    }
+    adminId = (await openSession<{ id?: string }>(adminRaw))?.id;
   }
 
   cookieStore.delete("campnic_admin");

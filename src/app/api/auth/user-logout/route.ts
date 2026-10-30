@@ -9,6 +9,7 @@ import {
   tooManyRequests,
   maybeGcBuckets,
 } from "@/lib/rate-limit";
+import { openSession } from "@/lib/session-cookie";
 
 /**
  * ?redirect=... 상대 경로 검증 — user-login 과 동일 규칙.
@@ -40,27 +41,23 @@ export async function POST(request: Request) {
   let phoneTail: string | undefined;
   let userOrgId: string | undefined;
   if (raw) {
-    try {
-      const parsed = JSON.parse(raw) as {
-        id?: string;
-        phone?: string;
-        orgId?: string;
-      };
-      userId = parsed?.id;
-      if (parsed?.phone) {
-        const digits = String(parsed.phone).replace(/\D/g, "");
-        if (digits) phoneTail = digits.slice(-4);
-      }
-      // 홈 기관 id 보존 → 로그아웃 후에도 그 기관 LIVE 행사만 노출 (타 기관 행사
-      // 정보가 새지 않도록).
-      if (
-        typeof parsed?.orgId === "string" &&
-        /^[0-9a-fA-F-]{8,}$/.test(parsed.orgId)
-      ) {
-        userOrgId = parsed.orgId;
-      }
-    } catch {
-      // ignore
+    const parsed = await openSession<{
+      id?: string;
+      phone?: string;
+      orgId?: string;
+    }>(raw);
+    userId = parsed?.id;
+    if (parsed?.phone) {
+      const digits = String(parsed.phone).replace(/\D/g, "");
+      if (digits) phoneTail = digits.slice(-4);
+    }
+    // 홈 기관 id 보존 → 로그아웃 후에도 그 기관 LIVE 행사만 노출 (타 기관 행사
+    // 정보가 새지 않도록).
+    if (
+      typeof parsed?.orgId === "string" &&
+      /^[0-9a-fA-F-]{8,}$/.test(parsed.orgId)
+    ) {
+      userOrgId = parsed.orgId;
     }
   }
 

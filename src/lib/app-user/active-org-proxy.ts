@@ -16,6 +16,7 @@
 // 읽기 전용이고 RLS 가 permissive 라 publishable(anon) 키로 충분하다.
 
 import type { NextRequest } from "next/server";
+import { openSession } from "@/lib/session-cookie";
 
 const USER_COOKIE = "campnic_user";
 
@@ -94,15 +95,10 @@ export async function resolveActiveOrgPatch(
   const eventId = request.nextUrl.searchParams.get("event_id");
   if (!eventId || !UUID_RE.test(eventId)) return null;
 
-  const raw = request.cookies.get(USER_COOKIE)?.value;
-  if (!raw) return null;
-
-  let session: Record<string, unknown>;
-  try {
-    session = JSON.parse(raw) as Record<string, unknown>;
-  } catch {
-    return null;
-  }
+  const session = await openSession<Record<string, unknown>>(
+    request.cookies.get(USER_COOKIE)?.value
+  );
+  if (!session) return null;
   const userId = typeof session.id === "string" ? session.id : "";
   const currentOrgId =
     typeof session.orgId === "string" ? session.orgId : "";

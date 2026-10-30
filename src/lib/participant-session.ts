@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
+import { openSession } from "@/lib/session-cookie";
 
 export interface ParticipantSession {
   eventId: string;
@@ -11,21 +12,18 @@ export interface ParticipantSession {
 
 export async function getParticipant(eventId: string): Promise<ParticipantSession | null> {
   const cookieStore = await cookies();
-  const raw = cookieStore.get("campnic_participant")?.value;
-  if (!raw) return null;
-
-  try {
-    const data = JSON.parse(raw);
-    if (data.eventId === eventId && data.name && data.phone) {
-      return {
-        eventId: data.eventId,
-        name: data.name,
-        phone: data.phone,
-        participantId: data.participantId,
-        registrationId: data.registrationId,
-      };
-    }
-  } catch {}
+  const data = await openSession<ParticipantSession & Record<string, unknown>>(
+    cookieStore.get("campnic_participant")?.value
+  );
+  if (data && data.eventId === eventId && data.name && data.phone) {
+    return {
+      eventId: data.eventId,
+      name: data.name,
+      phone: data.phone,
+      participantId: data.participantId,
+      registrationId: data.registrationId,
+    };
+  }
 
   return null;
 }

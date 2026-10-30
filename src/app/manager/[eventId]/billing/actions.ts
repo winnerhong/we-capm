@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireAdminOrManager } from "@/lib/auth-guard";
 import { createInvoice } from "@/lib/billing/invoice";
 import { formatKorean } from "@/lib/phone";
+import { openSession } from "@/lib/session-cookie";
 
 type ManagerCookie = {
   eventId: string;
@@ -16,14 +17,10 @@ type ManagerCookie = {
 
 async function getManagerForEvent(eventId: string): Promise<ManagerCookie> {
   const cookieStore = await cookies();
-  const raw = cookieStore.get("campnic_manager")?.value;
-  if (!raw) throw new Error("unauthorized");
-  let data: ManagerCookie;
-  try {
-    data = JSON.parse(raw) as ManagerCookie;
-  } catch {
-    throw new Error("unauthorized");
-  }
+  const data = await openSession<ManagerCookie>(
+    cookieStore.get("campnic_manager")?.value
+  );
+  if (!data) throw new Error("unauthorized");
   if (data.eventId !== eventId) throw new Error("invalid event");
   return data;
 }

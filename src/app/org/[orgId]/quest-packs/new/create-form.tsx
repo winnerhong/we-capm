@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { createQuestPackAction } from "../../missions/actions";
 import type { LayoutMode, StampIconSet } from "@/lib/missions/types";
 import { CoverImagePicker } from "@/components/cover-image-picker";
@@ -52,6 +53,7 @@ export function CreateQuestPackForm({ orgId, eventId }: Props) {
   const [isPending, startTransition] = useTransition();
   const [err, setErr] = useState<string | null>(null);
 
+  const router = useRouter();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [startsAt, setStartsAt] = useState("");
@@ -85,9 +87,14 @@ export function CreateQuestPackForm({ orgId, eventId }: Props) {
 
     startTransition(async () => {
       try {
-        await createQuestPackAction(orgId, fd);
-      } catch (e) {
-        setErr(e instanceof Error ? e.message : "생성 실패");
+        const res = await createQuestPackAction(orgId, fd);
+        if (!res.ok) {
+          setErr(res.message);
+          return;
+        }
+        router.push(res.redirectTo);
+      } catch {
+        setErr("생성에 실패했어요. 잠시 후 다시 시도해 주세요.");
       }
     });
   }

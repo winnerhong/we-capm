@@ -4,7 +4,7 @@ import {
   resolveActiveOrgPatch,
   ACTIVE_ORG_COOKIE_OPTS,
 } from "@/lib/app-user/active-org-proxy";
-import { seal, unseal } from "@/lib/session-cookie";
+import { openSession, seal, unseal } from "@/lib/session-cookie";
 
 /**
  * 세션 쿠키 서명 검문소 — 요청마다 딱 한 번, 다른 무엇보다 먼저.
@@ -25,7 +25,11 @@ async function unsealSessionCookies(request: NextRequest) {
     if (!c.name.startsWith("campnic_")) continue;
     const plain = await unseal(c.value);
     if (plain === null) request.cookies.delete(c.name);
-    else request.cookies.set(c.name, plain);
+    // ⚠ 검증 통과한 쿠키는 **서명본 그대로** 둔다 — 평문 JSON 으로 바꿔치지 않는다.
+    //   Next 16 이 서버 액션의 redirect() 대상을 내부 fetch 로 다시 그릴 때 요청
+    //   쿠키를 재직렬화하는데, 평문 JSON(따옴표·쉼표·한글)은 쿠키 값으로 부적합해
+    //   전부 탈락했다 → 액션 후 리다이렉트마다 로그인으로 튕기던 버그.
+    //   읽는 쪽은 session-cookie.ts 의 openSession() 으로 직접 풀어 읽는다.
   }
 }
 
@@ -38,7 +42,7 @@ async function unsealSessionCookies(request: NextRequest) {
  *   → requireOrg() 등 기존 코드는 그대로 `campnic_org` 만 읽으면 된다.
  *   → request 쿠키만 수정하므로 브라우저의 실제 쿠키는 바뀌지 않는다 (탭별 독립).
  */
-function injectOrgSession(request: NextRequest) {
+async function injectOrgSession(request: NextRequest) {
   // 1) URL path 가 /org/<orgId>/... → 그 기관 쿠키 사용.
   // 2) 그 외 경로 (예: /api/org/impersonate-user) 는 ?org=<orgId> 쿼리로
   //    어느 기관에서 호출됐는지 지정 — 그 기관 쿠키를 주입.
@@ -64,19 +68,15 @@ function injectOrgSession(request: NextRequest) {
   //   (다른 기관 세션으로 오인되는 것 방지).
   const legacy = request.cookies.get("campnic_org")?.value;
   if (!legacy) return;
-  try {
-    const parsed = JSON.parse(legacy) as { orgId?: string };
-    if (parsed?.orgId === orgId) return;
-  } catch {
-    /* ignore */
-  }
+  const parsed = await openSession<{ orgId?: string }>(legacy);
+  if (parsed?.orgId === orgId) return;
   request.cookies.delete("campnic_org");
 }
 
 export async function proxy(request: NextRequest) {
   // 서명 검문이 가장 먼저 — 아래 로직은 전부 '검증된 평문'을 전제로 돈다.
   await unsealSessionCookies(request);
-  injectOrgSession(request);
+  await injectOrgSession(request);
 
   // 참가자 활성 기관 동기화 — URL 의 event_id 와 세션의 orgId 가 어긋나면 교정.
   //   요청 쿠키는 여기서 이미 바뀌므로(updateSession 의 NextResponse.next({request})

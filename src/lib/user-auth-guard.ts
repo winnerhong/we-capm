@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { hasOrgAccess } from "@/lib/app-user/orgs";
+import { openSession } from "@/lib/session-cookie";
 
 export interface AppUserSession {
   id: string;
@@ -40,14 +41,11 @@ function normalizeAppUserSession(
 
 async function readAppUserCookie(): Promise<AppUserSession | null> {
   const cookieStore = await cookies();
-  const raw = cookieStore.get("campnic_user")?.value;
-  if (!raw) return null;
-  try {
-    const parsed = JSON.parse(raw) as RawAppUserCookie;
-    return normalizeAppUserSession(parsed);
-  } catch {
-    return null;
-  }
+  const parsed = await openSession<RawAppUserCookie>(
+    cookieStore.get("campnic_user")?.value
+  );
+  if (!parsed) return null;
+  return normalizeAppUserSession(parsed);
 }
 
 /**

@@ -4,7 +4,7 @@ import {
   loadAccessiblePresetsForOrg,
   loadAvailableMissionsForOrg,
 } from "@/lib/missions/queries";
-import { createPackFromPresetAction } from "../../missions/actions";
+import { CreateFromPresetButton } from "./create-from-preset-button";
 import { loadOrgEventById } from "@/lib/org-events/queries";
 import type { PartnerStampbookPresetRow } from "@/lib/missions/types";
 
@@ -132,12 +132,6 @@ function PresetCard({
   totalCount: number;
   fullyAvailable: boolean;
 }) {
-  const createBound = createPackFromPresetAction.bind(
-    null,
-    orgId,
-    preset.id,
-    eventId
-  );
   return (
     <li className="flex flex-col overflow-hidden rounded-2xl border border-[#D4E4BC] bg-white shadow-sm transition hover:border-[#2D5A3D] hover:shadow-md">
       {preset.cover_image_url ? (
@@ -185,21 +179,13 @@ function PresetCard({
         )}
 
         <div className="mt-auto pt-3">
-          <form action={createBound}>
-            <button
-              type="submit"
-              disabled={!fullyAvailable}
-              className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-violet-600 px-3 py-2.5 text-xs font-bold text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:bg-zinc-300"
-              title={
-                fullyAvailable
-                  ? undefined
-                  : "이 프리셋의 일부 미션이 아직 우리 기관에 배포되지 않았어요"
-              }
-            >
-              <span aria-hidden>✨</span>
-              <span>이 프리셋으로 스탬프북 만들기</span>
-            </button>
-          </form>
+          <CreateFromPresetButton
+            orgId={orgId}
+            presetId={preset.id}
+            eventId={eventId}
+            disabled={!fullyAvailable}
+            disabledTitle="이 프리셋의 일부 미션이 아직 우리 기관에 배포되지 않았어요"
+          />
           {!fullyAvailable && (
             <p className="mt-1 text-[10px] text-amber-700">
               일부 미션이 배포되지 않아 생성이 제한돼요.

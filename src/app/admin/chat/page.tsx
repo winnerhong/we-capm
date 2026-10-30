@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
 import { WinnerTalkIcon } from "@/components/winner-talk-icon";
 import { AcornIcon } from "@/components/acorn-icon";
+import { openSession } from "@/lib/session-cookie";
 
 export const dynamic = "force-dynamic";
 
@@ -19,10 +20,8 @@ export default async function AdminChatPage() {
     const { data } = await supabase.from("events").select("id").order("created_at", { ascending: false });
     eventIds = (data ?? []).map((e) => e.id);
   } else if (managerCookie) {
-    try {
-      const { eventId } = JSON.parse(managerCookie);
-      eventIds = [eventId];
-    } catch {}
+    const parsed = await openSession<{ eventId?: string }>(managerCookie);
+    if (parsed?.eventId) eventIds = [parsed.eventId];
   }
 
   // 각 행사의 정보 + 톡방 수 + 마지막 메시지

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
 import { EventChatView } from "./event-chat-view";
+import { openSession } from "@/lib/session-cookie";
 
 export const dynamic = "force-dynamic";
 
@@ -53,7 +54,8 @@ export default async function AdminEventChatPage({ params }: { params: Promise<{
   // 기관 이름
   let myName = "[기관] 관리자";
   if (managerCookie) {
-    try { myName = `[기관] ${JSON.parse(managerCookie).managerId}`; } catch {}
+    const parsed = await openSession<{ managerId?: string }>(managerCookie);
+    if (parsed?.managerId) myName = `[기관] ${parsed.managerId}`;
   }
 
   // 기관을 멤버로 자동 추가 (모든 방)

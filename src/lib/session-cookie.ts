@@ -101,3 +101,33 @@ export async function unseal(raw: string | undefined | null): Promise<string | n
     return null;
   }
 }
+
+/**
+ * 요청 쿠키의 세션 값을 읽는 단일 입구 — 서명 검증 + JSON.parse.
+ *
+ * 왜 생겼나: 예전엔 미들웨어가 검증 후 쿠키 값을 **평문 JSON 으로 바꿔치기**
+ * 했고 읽는 쪽은 JSON.parse 만 했다. 그런데 Next 16 이 서버 액션의 redirect()
+ * 를 처리할 때 요청 쿠키를 내부 fetch 로 재직렬화하는데, 평문 JSON(따옴표·
+ * 쉼표·한글)은 쿠키 값으로 부적합해 **그 과정에서 통째로 탈락**했다 — 액션
+ * 후 리다이렉트마다 세션이 풀린 것처럼 로그인으로 튕기던 원인.
+ * 이제 미들웨어는 서명이 깨진 쿠키를 지우기만 하고 값은 서명본(ASCII) 그대로
+ * 둔다. 읽는 쪽이 전부 이 함수를 거친다.
+ *
+ * 과도기 호환: 값이 "{" 로 시작하면 미들웨어가 평문으로 되돌려 둔 요청이다
+ * (구버전 미들웨어가 떠 있는 배포 창) — 서명 검증은 미들웨어가 이미 했으므로
+ * 그대로 파싱한다. 브라우저가 직접 평문을 보내는 위조는 신·구 미들웨어 모두
+ * 서명 없는 쿠키를 지우므로 여기까지 오지 않는다.
+ */
+export async function openSession<T>(
+  raw: string | undefined | null
+): Promise<T | null> {
+  if (!raw) return null;
+  try {
+    if (raw.startsWith("{")) return JSON.parse(raw) as T;
+    const plain = await unseal(raw);
+    if (plain === null) return null;
+    return JSON.parse(plain) as T;
+  } catch {
+    return null;
+  }
+}

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
+import { openSession } from "@/lib/session-cookie";
 import type {
   FaqItem,
   ProgramVisibility,
@@ -36,14 +37,8 @@ async function resolvePartnerId(): Promise<string | null> {
   const cookieStore = await cookies();
   const fromCookie = cookieStore.get("campnic_partner")?.value;
   if (fromCookie) {
-    try {
-      const parsed = JSON.parse(fromCookie);
-      if (parsed && typeof parsed === "object" && typeof parsed.id === "string") {
-        return parsed.id;
-      }
-    } catch {
-      return fromCookie;
-    }
+    const parsed = await openSession<{ id?: unknown }>(fromCookie);
+    if (parsed && typeof parsed.id === "string") return parsed.id;
   }
 
   const supabase = await createClient();

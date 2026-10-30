@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import type { TeamRole } from "@/lib/team/types";
+import { openSession } from "@/lib/session-cookie";
 
 export type PartnerSession = {
   id: string;
@@ -62,24 +63,20 @@ export function partnerDisplayName(session: PartnerSession | null): string {
 
 export async function requirePartner(): Promise<PartnerSession> {
   const cookieStore = await cookies();
-  const partnerCookie = cookieStore.get("campnic_partner")?.value;
-  if (!partnerCookie) redirect("/partner");
-  try {
-    return normalizePartnerSession(JSON.parse(partnerCookie) as RawPartnerCookie);
-  } catch {
-    redirect("/partner");
-  }
+  const parsed = await openSession<RawPartnerCookie>(
+    cookieStore.get("campnic_partner")?.value
+  );
+  if (!parsed) redirect("/partner");
+  return normalizePartnerSession(parsed);
 }
 
 export async function getPartner(): Promise<PartnerSession | null> {
   const cookieStore = await cookies();
-  const partnerCookie = cookieStore.get("campnic_partner")?.value;
-  if (!partnerCookie) return null;
-  try {
-    return normalizePartnerSession(JSON.parse(partnerCookie) as RawPartnerCookie);
-  } catch {
-    return null;
-  }
+  const parsed = await openSession<RawPartnerCookie>(
+    cookieStore.get("campnic_partner")?.value
+  );
+  if (!parsed) return null;
+  return normalizePartnerSession(parsed);
 }
 
 export async function requirePartnerWithRole(
@@ -94,20 +91,24 @@ export async function requirePartnerWithRole(
 
 export async function requireAdmin() {
   const cookieStore = await cookies();
-  const admin = cookieStore.get("campnic_admin")?.value;
+  const admin = await openSession<{ id?: string } & Record<string, unknown>>(
+    cookieStore.get("campnic_admin")?.value
+  );
   if (!admin) throw new Error("관리자 권한이 필요합니다");
-  return JSON.parse(admin);
+  return admin;
 }
 
 export async function requireAdminOrManager(eventId?: string) {
   const cookieStore = await cookies();
-  const admin = cookieStore.get("campnic_admin")?.value;
-  if (admin) return { role: "admin" as const, ...JSON.parse(admin) };
+  const admin = await openSession<Record<string, unknown>>(
+    cookieStore.get("campnic_admin")?.value
+  );
+  if (admin) return { role: "admin" as const, ...admin };
 
-  const manager = cookieStore.get("campnic_manager")?.value;
-  if (!manager) throw new Error("로그인이 필요합니다");
-
-  const data = JSON.parse(manager);
+  const data = await openSession<{ eventId?: string }>(
+    cookieStore.get("campnic_manager")?.value
+  );
+  if (!data) throw new Error("로그인이 필요합니다");
   if (eventId && data.eventId !== eventId) {
     throw new Error("이 행사에 대한 권한이 없습니다");
   }

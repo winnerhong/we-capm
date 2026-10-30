@@ -12,7 +12,7 @@
 //
 // 읽기는 @/lib/user-auth-guard 의 getAppUser / requireAppUser 를 쓸 것.
 
-import { seal } from "@/lib/session-cookie";
+import { openSession, seal } from "@/lib/session-cookie";
 import "server-only";
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
@@ -107,20 +107,13 @@ export async function switchActiveOrg(orgId: string): Promise<boolean> {
   if (!orgId) return false;
 
   const cookieStore = await cookies();
-  const raw = cookieStore.get(USER_COOKIE)?.value;
-  if (!raw) return false;
-
-  let parsed: {
+  const parsed = await openSession<{
     id?: string;
     phone?: string;
     parentName?: string;
     orgId?: string;
-  };
-  try {
-    parsed = JSON.parse(raw) as typeof parsed;
-  } catch {
-    return false;
-  }
+  }>(cookieStore.get(USER_COOKIE)?.value);
+  if (!parsed) return false;
 
   const id = String(parsed.id ?? "");
   if (!id) return false;

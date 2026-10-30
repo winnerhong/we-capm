@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { openSession } from "@/lib/session-cookie";
 
 export interface OrgSession {
   orgId: string;
@@ -13,13 +14,11 @@ export interface OrgSession {
  */
 export async function requireOrg(): Promise<OrgSession> {
   const cookieStore = await cookies();
-  const raw = cookieStore.get("campnic_org")?.value;
-  if (!raw) redirect("/manager");
-  try {
-    return JSON.parse(raw) as OrgSession;
-  } catch {
-    redirect("/manager");
-  }
+  const session = await openSession<OrgSession>(
+    cookieStore.get("campnic_org")?.value
+  );
+  if (!session) redirect("/manager");
+  return session;
 }
 
 /**
@@ -27,11 +26,5 @@ export async function requireOrg(): Promise<OrgSession> {
  */
 export async function getOrg(): Promise<OrgSession | null> {
   const cookieStore = await cookies();
-  const raw = cookieStore.get("campnic_org")?.value;
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw) as OrgSession;
-  } catch {
-    return null;
-  }
+  return openSession<OrgSession>(cookieStore.get("campnic_org")?.value);
 }

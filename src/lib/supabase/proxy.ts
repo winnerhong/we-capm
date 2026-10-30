@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { openSession } from "@/lib/session-cookie";
 
 export async function updateSession(request: NextRequest) {
   const response = NextResponse.next({ request });
@@ -42,8 +43,10 @@ export async function updateSession(request: NextRequest) {
 
     // 매니저 → 자기 행사만 접근 가능
     if (managerCookie?.value) {
-      try {
-        const data = JSON.parse(managerCookie.value);
+      const data = await openSession<{ eventId?: string }>(
+        managerCookie.value
+      );
+      if (data) {
         const managerEventId = data.eventId ?? "";
 
         // 매니저 차단: 행사 목록, 전체 통계, 새 행사 생성
@@ -61,9 +64,8 @@ export async function updateSession(request: NextRequest) {
         }
 
         return response;
-      } catch {
-        return NextResponse.redirect(new URL("/manager", request.url));
       }
+      return NextResponse.redirect(new URL("/manager", request.url));
     }
 
     return NextResponse.redirect(new URL("/login", request.url));

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { copyToOrgAction } from "../actions";
 
 type Props = {
@@ -14,6 +15,7 @@ export function CopyToOrgButton({
   questPackId,
   alreadyInPack,
 }: Props) {
+  const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [err, setErr] = useState<string | null>(null);
 
@@ -21,10 +23,11 @@ export function CopyToOrgButton({
     setErr(null);
     startTransition(async () => {
       try {
-        await copyToOrgAction(partnerMissionId, questPackId);
+        // 액션은 편집 화면 URL 을 돌려준다 — 서버 redirect() 는 세션이 풀리는
+        // 버그가 있어 클라이언트에서 이동한다 (missions/actions.ts 주석 참고).
+        const url = await copyToOrgAction(partnerMissionId, questPackId);
+        router.push(url);
       } catch (e) {
-        // Next.js redirect 는 특수 에러를 throw 하므로 그건 그대로 재throw 하게 둠
-        // (next/navigation redirect 는 NEXT_REDIRECT 로 인식해 내부적으로 처리됨)
         setErr(e instanceof Error ? e.message : "복사 실패");
       }
     });

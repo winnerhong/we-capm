@@ -1,6 +1,6 @@
 "use server";
 
-import { seal } from "@/lib/session-cookie";
+import { seal, openSession } from "@/lib/session-cookie";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
@@ -256,11 +256,8 @@ export async function partnerLogoutAction() {
   const raw = cookieStore.get("campnic_partner")?.value;
   let partnerInfo: { id?: string; username?: string } = {};
   if (raw) {
-    try {
-      partnerInfo = JSON.parse(raw);
-    } catch {
-      // ignore
-    }
+    partnerInfo =
+      (await openSession<{ id?: string; username?: string }>(raw)) ?? {};
   }
 
   cookieStore.delete("campnic_partner");

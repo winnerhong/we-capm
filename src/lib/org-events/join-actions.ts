@@ -16,6 +16,7 @@
 //       감싸지 않는다 (감싸면 redirect 가 에러로 취급됨).
 
 import { revalidatePath } from "next/cache";
+import { openSession } from "@/lib/session-cookie";
 import { redirect } from "next/navigation";
 import { resolveEventAccess } from "@/lib/org-events/event-access";
 import { isEventParticipant } from "@/lib/org-events/queries";
@@ -42,17 +43,14 @@ type UserSession = { id: string; orgId: string };
  */
 async function loadUserSessionFromCookie(): Promise<UserSession | null> {
   const cookieStore = await cookies();
-  const raw = cookieStore.get("campnic_user")?.value;
-  if (!raw) return null;
-  try {
-    const parsed = JSON.parse(raw) as { id?: unknown; orgId?: unknown };
-    const id = typeof parsed.id === "string" ? parsed.id : "";
-    const orgId = typeof parsed.orgId === "string" ? parsed.orgId : "";
-    if (!id || !orgId) return null;
-    return { id, orgId };
-  } catch {
-    return null;
-  }
+  const parsed = await openSession<{ id?: unknown; orgId?: unknown }>(
+    cookieStore.get("campnic_user")?.value
+  );
+  if (!parsed) return null;
+  const id = typeof parsed.id === "string" ? parsed.id : "";
+  const orgId = typeof parsed.orgId === "string" ? parsed.orgId : "";
+  if (!id || !orgId) return null;
+  return { id, orgId };
 }
 
 /**
