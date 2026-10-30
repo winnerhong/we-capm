@@ -137,6 +137,32 @@ const LINK_SECTIONS: LinkSection[] = [
       { label: "사이트맵", icon: "🗺", href: "/sitemap.xml" },
     ],
   },
+  {
+    heading: "개발 도구",
+    items: [
+      // 마이그레이션 SQL 붙여넣고 Run 하는 곳 — 매번 대시보드에서 찾아 들어가지 않게.
+      {
+        label: "Supabase SQL",
+        icon: "🗄",
+        href: "https://supabase.com/dashboard/project/arjzybmgqyxymqtaaqtb/sql/new",
+      },
+      {
+        label: "Supabase 테이블",
+        icon: "📋",
+        href: "https://supabase.com/dashboard/project/arjzybmgqyxymqtaaqtb/editor",
+      },
+      {
+        label: "Vercel 배포",
+        icon: "▲",
+        href: "https://vercel.com/winnerhongs-projects/we-capm/deployments",
+      },
+      {
+        label: "GitHub",
+        icon: "🐙",
+        href: "https://github.com/winnerhong/we-capm",
+      },
+    ],
+  },
 ];
 
 // 🌱 테스트 데이터 시드 액션 — 새 시드 엔드포인트 추가하면 여기 추가.
@@ -235,6 +261,11 @@ export function DevNav() {
                   <a
                     key={l.href}
                     href={l.href}
+                    // 외부 도구(Supabase·Vercel·GitHub)는 새 탭 — 앱 상태 유지.
+                    target={l.href.startsWith("http") ? "_blank" : undefined}
+                    rel={
+                      l.href.startsWith("http") ? "noopener noreferrer" : undefined
+                    }
                     onClick={() => setMenuOpen(false)}
                     className="flex items-center gap-2 whitespace-nowrap rounded px-2 py-1.5 text-white hover:bg-neutral-700"
                   >
