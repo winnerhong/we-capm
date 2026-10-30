@@ -24,6 +24,7 @@
 import { useEffect } from "react";
 import {
   INVITATION_PREVIEW_FIELDS,
+  INVITATION_PREVIEW_FOCUS,
   INVITATION_PREVIEW_MESSAGE,
   INVITATION_PREVIEW_READY,
   isPreviewBlockVisible,
@@ -54,9 +55,36 @@ export function InvitationPreviewBridge() {
         });
     };
 
+    // 편집 중인 칸의 자리로 스크롤 + 잠깐 하이라이트.
+    // 안내문처럼 화면 아래쪽에 있는 덩어리를 고칠 때 폰을 손으로 내리지 않아도 된다.
+    let highlightTimer: ReturnType<typeof setTimeout> | null = null;
+    const focusField = (key: string) => {
+      const el = document.querySelector<HTMLElement>(`[data-inv="${key}"]`);
+      if (!el) return;
+      // 숨겨진 덩어리(값이 비어 display:none) 는 스크롤할 자리가 없다.
+      if (el.offsetParent === null) return;
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      // 어디를 보라는 건지 — 연두 테두리가 잠깐 들어왔다 나간다.
+      el.style.transition = "box-shadow 0.25s ease";
+      el.style.borderRadius = el.style.borderRadius || "8px";
+      el.style.boxShadow = "0 0 0 3px rgba(127, 176, 105, 0.8)";
+      if (highlightTimer) clearTimeout(highlightTimer);
+      highlightTimer = setTimeout(() => {
+        el.style.boxShadow = "";
+      }, 1400);
+    };
+
     const onMessage = (e: MessageEvent) => {
       if (e.origin !== origin) return;
-      const data = e.data as { type?: string; fields?: Record<string, unknown> };
+      const data = e.data as {
+        type?: string;
+        fields?: Record<string, unknown>;
+        field?: string;
+      };
+      if (data?.type === INVITATION_PREVIEW_FOCUS) {
+        if (typeof data.field === "string") focusField(data.field);
+        return;
+      }
       if (data?.type !== INVITATION_PREVIEW_MESSAGE) return;
       if (!data.fields || typeof data.fields !== "object") return;
       apply(data.fields);
@@ -83,6 +111,7 @@ export function InvitationPreviewBridge() {
     window.parent?.postMessage({ type: INVITATION_PREVIEW_READY }, origin);
 
     return () => {
+      if (highlightTimer) clearTimeout(highlightTimer);
       window.removeEventListener("message", onMessage);
       document.removeEventListener("click", block, true);
       document.removeEventListener("submit", block, true);

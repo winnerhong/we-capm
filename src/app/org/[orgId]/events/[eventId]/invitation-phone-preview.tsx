@@ -16,6 +16,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
+  INVITATION_PREVIEW_FOCUS,
   INVITATION_PREVIEW_MESSAGE,
   INVITATION_PREVIEW_READY,
   type InvitationPreviewFields,
@@ -44,15 +45,32 @@ const PHONE_H = "min(680px, calc(100dvh - 11rem))";
 /** 테두리 두께 — 바깥 반경에서 이만큼 뺀 값이 안쪽 반경이다. */
 const BEZEL = 6;
 
+export type InvitationPreviewFocus = {
+  /** data-inv 키 — message/body/dress/location/address. */
+  field: string;
+  /** 같은 칸을 다시 눌러도 다시 스크롤되게 하는 증가값. */
+  n: number;
+};
+
 export function InvitationPhonePreview({
   eventId,
+  orgId,
   fields,
   reloadKey = 0,
+  focus = null,
 }: {
   eventId: string;
+  /**
+   * 미리보기 iframe 인증용 — /invitation 은 /org 경로 밖이라 미들웨어가
+   * ?org= 쿼리로 기관 세션을 주입한다. 없으면 구식 단일 쿠키에 기대는데,
+   * 새로 로그인한 세션엔 그 쿠키가 없어 미리보기 실시간 반영이 죽는다.
+   */
+  orgId: string;
   fields: InvitationPreviewFields;
   /** 값이 바뀌면 폰을 다시 불러온다 — 저장 직후 사진·주차장을 반영하는 용도. */
   reloadKey?: number;
+  /** 지금 편집 중인 칸 — 미리보기가 그 자리로 스크롤한다. */
+  focus?: InvitationPreviewFocus | null;
 }) {
   const [wide, setWide] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -91,9 +109,11 @@ export function InvitationPhonePreview({
       <aside className="sticky top-16 hidden w-[402px] shrink-0 xl:block">
         <Frame
           eventId={eventId}
+          orgId={orgId}
           fields={fields}
           reloadKey={reloadKey}
           live={wide}
+          focus={focus}
         />
       </aside>
 
@@ -134,6 +154,7 @@ export function InvitationPhonePreview({
             <Live
               key={reloadKey}
               eventId={eventId}
+              orgId={orgId}
               fields={fields}
               className="h-full w-full"
             />
@@ -148,15 +169,19 @@ export function InvitationPhonePreview({
 
 function Frame({
   eventId,
+  orgId,
   fields,
   reloadKey,
   live,
+  focus,
 }: {
   eventId: string;
+  orgId: string;
   fields: InvitationPreviewFields;
   reloadKey: number;
   /** 틀은 늘 그리되, 실제 화면은 이 창이 넓을 때만 불러온다. */
   live: boolean;
+  focus: InvitationPreviewFocus | null;
 }) {
   const [nonce, setNonce] = useState(0);
 
@@ -196,7 +221,9 @@ function Frame({
             <Live
               key={`${reloadKey}-${nonce}`}
               eventId={eventId}
+              orgId={orgId}
               fields={fields}
+              focus={focus}
               style={{ width: PHONE_W, height: "100%" }}
             />
           )}
@@ -214,12 +241,16 @@ function Frame({
 
 function Live({
   eventId,
+  orgId,
   fields,
+  focus = null,
   className,
   style,
 }: {
   eventId: string;
+  orgId: string;
   fields: InvitationPreviewFields;
+  focus?: InvitationPreviewFocus | null;
   className?: string;
   style?: React.CSSProperties;
 }) {
@@ -252,10 +283,19 @@ function Live({
     );
   }, [ready, name, message, body, dress, location, address]);
 
+  // 편집 중인 칸으로 미리보기 스크롤 — 같은 칸 재클릭(n 증가)에도 다시 보낸다.
+  useEffect(() => {
+    if (!ready || !focus) return;
+    ref.current?.contentWindow?.postMessage(
+      { type: INVITATION_PREVIEW_FOCUS, field: focus.field },
+      window.location.origin
+    );
+  }, [ready, focus]);
+
   return (
     <iframe
       ref={ref}
-      src={`/invitation/${eventId}?preview=1`}
+      src={`/invitation/${eventId}?preview=1&org=${orgId}`}
       title="초대장 미리보기"
       loading="lazy"
       // iframe 은 기본이 inline 이라 글자 기준선 몫만큼 아래에 흰 틈이 생긴다.

@@ -43,6 +43,7 @@ export async function InvitationStep({
       <div className="space-y-3 xl:flex xl:items-start xl:gap-5 xl:space-y-0">
         <InvitationPhonePreview
           eventId={eventId}
+          orgId={orgId}
           fields={{
             name: resolveInvitationTitle(event.name),
             message: resolveInvitationMessage(event.invitation_message),

@@ -7,7 +7,10 @@ import {
   resolveInvitationMessage,
   resolveInvitationTitle,
 } from "@/lib/org-events/invitation-copy";
-import { InvitationPhonePreview } from "../invitation-phone-preview";
+import {
+  InvitationPhonePreview,
+  type InvitationPreviewFocus,
+} from "../invitation-phone-preview";
 import { EventScheduleFields } from "@/components/event-schedule-fields";
 import {
   DEFAULT_DURATION,
@@ -202,6 +205,11 @@ export function EditEventForm({
   // 초대장
   const [invMessage, setInvMessage] = useState(initial.invitation_message);
   const [invBody, setInvBody] = useState(initial.invitation_body);
+  // 지금 편집 중인 초대장 칸 — 미리보기가 그 자리로 스크롤한다.
+  const [previewFocus, setPreviewFocus] =
+    useState<InvitationPreviewFocus | null>(null);
+  const focusPreview = (field: string) =>
+    setPreviewFocus((p) => ({ field, n: (p?.n ?? 0) + 1 }));
   const [invLocation, setInvLocation] = useState(initial.invitation_location);
   const [invAddress, setInvAddress] = useState(initial.invitation_address);
   const [invLocationImage, setInvLocationImage] = useState(
@@ -408,8 +416,10 @@ export function EditEventForm({
       {mode === "invitation" && (
         <InvitationPhonePreview
           eventId={eventId}
+          orgId={orgId}
           fields={previewFields}
           reloadKey={previewReload}
+          focus={previewFocus}
         />
       )}
       <form
@@ -607,6 +617,7 @@ export function EditEventForm({
                   maxLength={500}
                   value={invMessage}
                   onChange={(e) => setInvMessage(e.target.value)}
+                  onFocus={() => focusPreview("message")}
                   placeholder="예) 함께 즐거운 시간을 만들어요"
                   className={INPUT_CLS}
                 />
@@ -641,6 +652,7 @@ export function EditEventForm({
                   maxLength={3000}
                   value={invBody}
                   onChange={(e) => setInvBody(e.target.value)}
+                  onFocus={() => focusPreview("body")}
                   placeholder={
                     "예)\n안녕하세요! 참좋은어린이집 가족 여러분 🎉\n\n26년 봄 미션 트레일에 초대합니다.\n\n📅 일시: 2026년 5월 16일 토요일 오전 10:00\n📍 장소: 침산공원\n\n즐거운 시간 함께해요! ✊"
                   }
@@ -706,6 +718,7 @@ export function EditEventForm({
                   maxLength={200}
                   value={invLocation}
                   onChange={(e) => setInvLocation(e.target.value)}
+                  onFocus={() => focusPreview("location")}
                   placeholder="예) 침산공원 / 참좋은어린이집 운동장"
                   className={INPUT_CLS}
                 />
@@ -724,6 +737,7 @@ export function EditEventForm({
                   maxLength={300}
                   value={invAddress}
                   onChange={(e) => setInvAddress(e.target.value)}
+                  onFocus={() => focusPreview("address")}
                   placeholder="예) 대구 북구 침산동 1344-1"
                   className={INPUT_CLS}
                 />
@@ -761,6 +775,7 @@ export function EditEventForm({
                   maxLength={500}
                   value={invDressCode}
                   onChange={(e) => setInvDressCode(e.target.value)}
+                  onFocus={() => focusPreview("dress")}
                   placeholder={
                     "예)\n- 운동화 (굽 없는 편한 신발)\n- 개인 물병\n- 모자 (야외 시)\n- 여벌옷"
                   }

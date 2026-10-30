@@ -71,5 +71,11 @@ export function isPreviewBlockVisible(
 
 /** 부모(편집 폼) → iframe 으로 보내는 메시지. */
 export const INVITATION_PREVIEW_MESSAGE = "inv-preview";
+/**
+ * 부모 → iframe. "지금 이 칸을 편집 중이다" — 미리보기가 그 자리로 스크롤하고
+ * 잠깐 하이라이트한다. 긴 초대장에서 안내문을 고치는데 미리보기는 히어로만
+ * 보여주면, 결과를 보려고 폰을 손으로 내려야 했다.
+ */
+export const INVITATION_PREVIEW_FOCUS = "inv-preview-focus";
 /** iframe → 부모. "이제 받을 준비가 됐다" (로드 타이밍을 부모가 못 맞춰도 된다). */
 export const INVITATION_PREVIEW_READY = "inv-preview-ready";
