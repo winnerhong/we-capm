@@ -13,6 +13,7 @@
 // 뜨는 일이 있었다. 이제 어느 기관인지는 호출하는 쪽이 정한다.
 
 import Link from "next/link";
+import { ParticipantTabBar } from "@/components/participant-tab-bar";
 import { AcornIcon } from "@/components/acorn-icon";
 import { HomepageBannerDisplay } from "@/components/homepage-banner-display";
 import { OrgPresenceTracker } from "@/components/presence/org-presence-tracker";
@@ -163,36 +164,9 @@ export async function ParticipantShell({
         className="fixed inset-x-0 bottom-0 z-40 border-t border-[#D4E4BC]/60 bg-white/95 backdrop-blur-md"
         aria-label="주요 메뉴"
       >
-        <ul className="mx-auto flex max-w-md items-stretch">
-          {tabs.map((t) => (
-            <TabItem key={t.href} href={t.href} label={t.label} icon={t.icon} />
-          ))}
-        </ul>
+        {/* 지금 탭 표시 + 누른 즉시 반응(클라이언트 부품) — 사용자 2026-10-30 "스탬프 눌러도 변화가 없다" */}
+        <ParticipantTabBar tabs={tabs} />
       </nav>
     </div>
-  );
-}
-
-function TabItem({
-  href,
-  label,
-  icon,
-}: {
-  href: string;
-  label: string;
-  icon: React.ReactNode;
-}) {
-  return (
-    <li className="flex-1">
-      <Link
-        href={href}
-        className="flex min-h-[56px] flex-col items-center justify-center gap-0.5 py-2 text-[11px] font-semibold text-[#6B6560] transition hover:bg-[#F5F1E8] hover:text-[#2D5A3D]"
-      >
-        <span className="text-xl leading-none" aria-hidden>
-          {icon}
-        </span>
-        <span>{label}</span>
-      </Link>
-    </li>
   );
 }

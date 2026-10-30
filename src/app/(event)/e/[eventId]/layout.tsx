@@ -72,7 +72,8 @@ export default async function EventLayout({
     ...(ctx.hasFeature(F.STAMPBOOK)
       ? [
           {
-            href: ctx.href("/stamps"),
+            // 스탬프북으로 바로 — /stamps 는 /stampbook 으로 다시 보내는 한 번 더 도는 길이었다(옛 주소는 그대로 살아 있음)
+            href: ctx.href("/stampbook"),
             label: "스탬프",
             icon: <AcornIcon size={20} />,
           },
