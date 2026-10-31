@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireOrg } from "@/lib/org-auth-guard";
 import { DocFileUploader } from "@/components/doc-file-uploader";
+import { DateField } from "@/components/date-time";
 import {
   ORG_DOC_META,
   ORG_DOC_TYPE_KEYS,
@@ -133,13 +134,12 @@ export default async function OrgUploadDocumentPage({
             >
               유효기간 만료일 <span className="text-rose-500">*</span>
             </label>
-            <input
-              id="expires_at"
+            <DateField
               name="expires_at"
-              type="date"
               required
               min={new Date().toISOString().split("T")[0]}
-              className="w-full rounded-xl border border-[#D4E4BC] bg-[#FFF8F0] px-3 py-2.5 text-sm text-[#2C2C2C] focus:border-[#2D5A3D] focus:outline-none focus:ring-2 focus:ring-[#3A7A52]/30 md:max-w-xs"
+              aria-label="유효기간 만료일"
+              className="md:max-w-xs"
             />
             <p className="mt-1 text-[11px] text-[#8B7F75]">
               서류 원본에 기재된 만료일을 입력해 주세요

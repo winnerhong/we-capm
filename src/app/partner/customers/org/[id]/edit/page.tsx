@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requirePartner } from "@/lib/auth-guard";
 import { createClient } from "@/lib/supabase/server";
+import { DateField } from "@/components/date-time";
 import { updateOrgAction, regenerateOrgAccountAction } from "../../actions";
 import { ORG_TYPE_OPTIONS, type OrgRow } from "../../meta";
 
@@ -342,24 +343,20 @@ export default async function EditOrgPage({
               <label htmlFor="contract_start" className={LABEL_CLASS}>
                 계약 시작일
               </label>
-              <input
-                id="contract_start"
+              <DateField
                 name="contract_start"
-                type="date"
                 defaultValue={org.contract_start ?? ""}
-                className={INPUT_CLASS}
+                aria-label="계약 시작일"
               />
             </div>
             <div>
               <label htmlFor="contract_end" className={LABEL_CLASS}>
                 계약 종료일
               </label>
-              <input
-                id="contract_end"
+              <DateField
                 name="contract_end"
-                type="date"
                 defaultValue={org.contract_end ?? ""}
-                className={INPUT_CLASS}
+                aria-label="계약 종료일"
               />
             </div>
           </div>

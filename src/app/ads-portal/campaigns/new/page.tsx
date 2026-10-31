@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
+import { DateField } from "@/components/date-time";
 import {
   createCampaignAction,
   type CampaignPlacement,
@@ -669,12 +670,10 @@ export default function NewCampaignWizardPage() {
                 >
                   시작일
                 </label>
-                <input
-                  id="campaign-start"
-                  type="date"
+                <DateField
                   value={state.start_date}
-                  onChange={(e) => setField("start_date", e.target.value)}
-                  className="w-full rounded-lg border border-[#E5D3B8] bg-[#FFF8F0] px-3 py-2.5 text-sm focus:border-[#C4956A] focus:outline-none focus:ring-2 focus:ring-[#C4956A]/30"
+                  onChange={(v) => setField("start_date", v)}
+                  aria-label="시작일"
                 />
               </div>
               <div>
@@ -684,13 +683,11 @@ export default function NewCampaignWizardPage() {
                 >
                   종료일
                 </label>
-                <input
-                  id="campaign-end"
-                  type="date"
+                <DateField
                   value={state.end_date}
-                  onChange={(e) => setField("end_date", e.target.value)}
+                  onChange={(v) => setField("end_date", v)}
                   min={state.start_date}
-                  className="w-full rounded-lg border border-[#E5D3B8] bg-[#FFF8F0] px-3 py-2.5 text-sm focus:border-[#C4956A] focus:outline-none focus:ring-2 focus:ring-[#C4956A]/30"
+                  aria-label="종료일"
                 />
               </div>
             </div>

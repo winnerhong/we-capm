@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { DateField } from "@/components/date-time";
 import {
   addChildAction,
   deleteChildAction,
@@ -408,13 +409,12 @@ export function EditUserForm({
                       </div>
                       {isEditingBirth ? (
                         <div className="mt-1 flex items-center gap-1.5">
-                          <input
-                            type="date"
+                          <DateField
                             value={birthDraft}
-                            onChange={(e) => setBirthDraft(e.target.value)}
+                            onChange={(v) => setBirthDraft(v)}
                             max={new Date().toISOString().slice(0, 10)}
                             disabled={childPending}
-                            className="h-7 rounded-md border border-[#D4E4BC] bg-white px-2 text-[11px] text-[#2D5A3D] focus:border-[#2D5A3D] focus:outline-none focus:ring-1 focus:ring-[#2D5A3D]/40"
+                            aria-label="생년월일"
                           />
                           <button
                             type="button"
@@ -545,12 +545,10 @@ export function EditUserForm({
               >
                 생년월일 (선택)
               </label>
-              <input
-                id="new_child_birth"
-                type="date"
+              <DateField
                 value={newChildBirth}
-                onChange={(e) => setNewChildBirth(e.target.value)}
-                className={INPUT_CLS}
+                onChange={(v) => setNewChildBirth(v)}
+                aria-label="생년월일 (선택)"
               />
             </div>
             <div className="flex items-end">

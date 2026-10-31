@@ -13,6 +13,7 @@
 //  hidden input 방식인 event-time-range-picker 와 계약이 다르다.)
 
 import { useMemo } from "react";
+import { DateField } from "@/components/date-time";
 import {
   DURATION_SCALES,
   addMinutesToLocalInput,
@@ -128,13 +129,10 @@ export function DurationRangePicker({
           )}
         </div>
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto_auto]">
-          <input
-            id={`${idPrefix}_date`}
-            type="date"
+          <DateField
             value={date}
-            onChange={(e) => setDate(e.target.value)}
+            onChange={(v) => setDate(v)}
             aria-label="시작 날짜"
-            className={INPUT_CLS}
           />
           <select
             value={hour}

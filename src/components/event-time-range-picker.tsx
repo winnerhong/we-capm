@@ -6,6 +6,7 @@
 // - 서버 컴포넌트 form 안에서 hidden input 으로 starts_at, ends_at 전송
 
 import { useMemo, useState } from "react";
+import { DateField } from "@/components/date-time";
 
 const INPUT_CLS =
   "w-full rounded-xl border border-[#D4E4BC] bg-[#FFF8F0] px-3 py-2.5 text-sm text-[#2C2C2C] focus:border-[#3A7A52] focus:outline-none focus:ring-2 focus:ring-[#3A7A52]/30";
@@ -132,12 +133,10 @@ export function EventTimeRangePicker({
           ⏰ 시작 일시 (선택, 5분 단위)
         </label>
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto_auto]">
-          <input
-            type="date"
+          <DateField
             value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
+            onChange={(v) => setStartDate(v)}
             aria-label="시작 날짜"
-            className={INPUT_CLS}
           />
           <select
             value={startHour}

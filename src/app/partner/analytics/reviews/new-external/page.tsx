@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requirePartner } from "@/lib/auth-guard";
 import { createClient } from "@/lib/supabase/server";
+import { DateField } from "@/components/date-time";
 import { createExternalReviewAction } from "../actions";
 
 export const dynamic = "force-dynamic";
@@ -210,14 +211,12 @@ export default async function NewExternalReviewPage() {
           >
             작성일 <span className="text-red-500">*</span>
           </label>
-          <input
-            id="published_at"
+          <DateField
             name="published_at"
-            type="date"
             required
             defaultValue={today}
             max={today}
-            className="w-full rounded-xl border border-[#D4E4BC] bg-white px-3 py-2.5 text-sm focus:border-[#2D5A3D] focus:outline-none focus:ring-2 focus:ring-[#2D5A3D]/20"
+            aria-label="작성일"
           />
         </div>
 

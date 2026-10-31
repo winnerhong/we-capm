@@ -16,6 +16,7 @@
 //   행사만 옮기고 입장시간은 그대로 남는 사고가 난다.
 
 import { resolveEntryTime } from "@/lib/org-events/entry-time";
+import { DateField } from "@/components/date-time";
 import {
   DURATION_PRESETS,
   formatDuration,
@@ -75,13 +76,10 @@ export function EventScheduleFields({
           ⏰ 시작 일시 (5분 단위)
         </label>
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto_auto]">
-          <input
-            id="starts_at_date"
-            type="date"
+          <DateField
             value={startDate}
-            onChange={(e) => onStartDate(e.target.value)}
+            onChange={(v) => onStartDate(v)}
             aria-label="시작 날짜"
-            className={INPUT_CLS}
           />
           <select
             value={startHour}
