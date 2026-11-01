@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type MouseEvent, type ReactNode, type RefObject } from "react";
 
 /*
  * 토리로 date and time pickers in the Toss style (gray hierarchy + one forest-green accent).
@@ -219,24 +219,29 @@ export function DateField(props: FieldProps & { min?: string; max?: string }) {
   );
 }
 
-export function TimeField(props: FieldProps & { step?: number }) {
-  const [value, setValue] = useFieldValue(props);
-  const { open, setOpen, root } = usePopover();
-  const coarse = props.step ?? 5;
-  // the sheet edits a draft; 「확인」 writes it to the field
-  const [draft, setDraft] = useState(value || "09:00");
+const toMin = (hhmm: string) => {
+  const [h, m] = hhmm.split(":").map(Number);
+  return h * 60 + m;
+};
+const fromMin = (n: number) => `${pad(Math.floor(n / 60))}:${pad(n % 60)}`;
+
+/** "1시간 30분", "40분", "5시간" */
+export function formatDuration(mins: number) {
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return [h ? `${h}시간` : "", m ? `${m}분` : ""].filter(Boolean).join(" ");
+}
+
+/** The 오전/오후 + 시·분 wheel shared by TimeField and TimeRangeField; edits a draft "HH:MM". */
+function useTimeDraft(open: boolean, seed: string, coarse: number) {
+  const [draft, setDraft] = useState(seed);
   // 5분 by default, 1분 on request (remembered per browser)
   const [fine, setFine] = useState(false);
-  const step = fine ? 1 : coarse;
-  const [h24, min] = draft.split(":").map(Number);
-  const pm = h24 >= 12;
-  const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
-  const minutes = Array.from({ length: Math.ceil(60 / step) }, (_, i) => i * step);
   const lists = useRef<HTMLDivElement>(null);
 
   const centerPicked = () =>
     requestAnimationFrame(() =>
-      lists.current?.querySelectorAll<HTMLElement>('[aria-pressed="true"]').forEach((el) => {
+      lists.current?.querySelectorAll<HTMLElement>('.dt-col [aria-pressed="true"]').forEach((el) => {
         const col = el.parentElement!;
         col.scrollTop = el.offsetTop - col.clientHeight / 2 + el.clientHeight / 2;
       }),
@@ -244,7 +249,6 @@ export function TimeField(props: FieldProps & { step?: number }) {
 
   useEffect(() => {
     if (!open) return;
-    const seed = value || "09:00";
     setDraft(seed);
     let saved = false;
     try {
@@ -273,45 +277,68 @@ export function TimeField(props: FieldProps & { step?: number }) {
       return `${pad((H % 12) + (P ? 12 : 0))}:${pad(M)}`;
     });
 
+  return { draft, set, fine, toggleFine, coarse, listsRef: lists };
+}
+
+function TimeWheel({ t, listsRef }: { t: Omit<ReturnType<typeof useTimeDraft>, "listsRef">; listsRef: RefObject<HTMLDivElement | null> }) {
+  const [h24, min] = t.draft.split(":").map(Number);
+  const pm = h24 >= 12;
+  const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
+  const step = t.fine ? 1 : t.coarse;
+  const minutes = Array.from({ length: Math.ceil(60 / step) }, (_, i) => i * step);
+  return (
+    <div className="dt-wheel" ref={listsRef}>
+      <div className="dt-seg" role="radiogroup" aria-label="오전 오후">
+        {[false, true].map((p) => (
+          <button key={String(p)} type="button" role="radio" aria-checked={pm === p} onClick={() => t.set({ pm: p })}>
+            {p ? "오후" : "오전"}
+          </button>
+        ))}
+      </div>
+      {t.coarse > 1 && (
+        <div className="dt-step" role="radiogroup" aria-label="분 단위">
+          <span>분 단위</span>
+          {[false, true].map((f) => (
+            <button key={String(f)} type="button" role="radio" aria-checked={t.fine === f} onClick={() => t.toggleFine(f)}>
+              {f ? "1분" : `${t.coarse}분`}
+            </button>
+          ))}
+        </div>
+      )}
+      <div className="dt-cols">
+        <div className="dt-col" aria-label="시">
+          {[12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((h) => (
+            <button key={h} type="button" className="dt-opt" aria-pressed={h === h12} onClick={() => t.set({ h12: h })}>
+              {h}시
+            </button>
+          ))}
+        </div>
+        <div className="dt-col" aria-label="분">
+          {minutes.map((mm) => (
+            <button key={mm} type="button" className="dt-opt" aria-pressed={mm === min} onClick={() => t.set({ min: mm })}>
+              {pad(mm)}분
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function TimeField(props: FieldProps & { step?: number; trigger?: (p: { open: boolean; toggle: () => void }) => ReactNode }) {
+  const [value, setValue] = useFieldValue(props);
+  const { open, setOpen, root } = usePopover();
+  // the sheet edits a draft; 「확인」 writes it to the field
+  const { listsRef, ...t } = useTimeDraft(open, value || "09:00", props.step ?? 5);
+  const toggle = () => setOpen((o) => !o);
+
   return (
     <div className={`dt-field ${props.className ?? ""}`} ref={root}>
-      <Trigger icon={<ClockIcon />} label={value ? formatTimeLabel(value) : (props.placeholder ?? "시간 고르기")} empty={!value} open={open} onClick={() => setOpen((o) => !o)} disabled={props.disabled} ariaLabel={props["aria-label"]} />
+      {props.trigger ? props.trigger({ open, toggle }) : <Trigger icon={<ClockIcon />} label={value ? formatTimeLabel(value) : (props.placeholder ?? "시간 고르기")} empty={!value} open={open} onClick={toggle} disabled={props.disabled} ariaLabel={props["aria-label"]} />}
       <Proxy name={props.name} value={value} required={props.required} />
       {open && (
         <Sheet title={props["aria-label"] ?? "시간 선택"} onClose={() => setOpen(false)} className="dt-time">
-          <div className="dt-seg" role="radiogroup" aria-label="오전 오후">
-            {[false, true].map((p) => (
-              <button key={String(p)} type="button" role="radio" aria-checked={pm === p} onClick={() => set({ pm: p })}>
-                {p ? "오후" : "오전"}
-              </button>
-            ))}
-          </div>
-          {coarse > 1 && (
-            <div className="dt-step" role="radiogroup" aria-label="분 단위">
-              <span>분 단위</span>
-              {[false, true].map((f) => (
-                <button key={String(f)} type="button" role="radio" aria-checked={fine === f} onClick={() => toggleFine(f)}>
-                  {f ? "1분" : `${coarse}분`}
-                </button>
-              ))}
-            </div>
-          )}
-          <div className="dt-cols" ref={lists}>
-            <div className="dt-col" aria-label="시">
-              {[12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((h) => (
-                <button key={h} type="button" className="dt-opt" aria-pressed={h === h12} onClick={() => set({ h12: h })}>
-                  {h}시
-                </button>
-              ))}
-            </div>
-            <div className="dt-col" aria-label="분">
-              {minutes.map((mm) => (
-                <button key={mm} type="button" className="dt-opt" aria-pressed={mm === min} onClick={() => set({ min: mm })}>
-                  {pad(mm)}분
-                </button>
-              ))}
-            </div>
-          </div>
+          <TimeWheel t={t} listsRef={listsRef} />
           <div className="dt-foot">
             {!props.required && value && (
               <button
@@ -329,15 +356,273 @@ export function TimeField(props: FieldProps & { step?: number }) {
               type="button"
               className="dt-btn dt-btn-primary"
               onClick={() => {
-                setValue(draft);
+                setValue(t.draft);
                 setOpen(false);
               }}
             >
-              {formatTimeLabel(draft)} 확인
+              {formatTimeLabel(t.draft)} 확인
             </button>
           </div>
         </Sheet>
       )}
+    </div>
+  );
+}
+
+type QuickTime = { id: string; label: string; start_time: string; minutes: number };
+
+const QUICK_MAX = 12;
+const quickKey = (kind: string) => `dt-quick-${kind}`;
+const newId = () => {
+  try {
+    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") return crypto.randomUUID();
+  } catch {}
+  return `q${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
+};
+const isQuick = (q: unknown): q is QuickTime => {
+  if (!q || typeof q !== "object") return false;
+  const o = q as Record<string, unknown>;
+  return typeof o.id === "string" && typeof o.label === "string" && typeof o.start_time === "string" && /^\d{2}:\d{2}$/.test(o.start_time) && typeof o.minutes === "number" && o.minutes > 0;
+};
+const QUICK_EVENT = "dt-quick-change";
+const rawQuick = (kind: string) => {
+  try {
+    return localStorage.getItem(quickKey(kind)) ?? "";
+  } catch {
+    return "";
+  }
+};
+const parseQuick = (raw: string): QuickTime[] => {
+  try {
+    const list: unknown = raw ? JSON.parse(raw) : [];
+    return Array.isArray(list) ? list.filter(isQuick).slice(0, QUICK_MAX) : [];
+  } catch {
+    return [];
+  }
+};
+function writeQuick(kind: string, list: QuickTime[]) {
+  try {
+    localStorage.setItem(quickKey(kind), JSON.stringify(list));
+  } catch {
+    return false;
+  }
+  try {
+    window.dispatchEvent(new Event(QUICK_EVENT));
+  } catch {}
+  return true;
+}
+// other fields on the page (same event) and other tabs ("storage") re-read the list
+const subscribeQuick = (cb: () => void) => {
+  window.addEventListener("storage", cb);
+  window.addEventListener(QUICK_EVENT, cb);
+  return () => {
+    window.removeEventListener("storage", cb);
+    window.removeEventListener(QUICK_EVENT, cb);
+  };
+};
+
+/** This browser's own 퀵타임 for one kind of time (kept in localStorage, per kind; no server). */
+function useQuickTimes(kind?: string) {
+  // the raw string is the snapshot (stable between reads); null on the server and when 퀵타임 is off
+  const raw = useSyncExternalStore(
+    subscribeQuick,
+    () => (kind ? rawQuick(kind) : null),
+    () => null,
+  );
+  const items = useMemo(() => (raw === null ? null : parseQuick(raw)), [raw]);
+  const [error, setError] = useState("");
+  const add = async (label: string, start: string, minutes: number) => {
+    if (!kind) return;
+    setError("");
+    const list = parseQuick(rawQuick(kind));
+    if (list.length >= QUICK_MAX) return setError(`퀵타임은 ${QUICK_MAX}개까지 만들 수 있어요.`);
+    const next = [...list, { id: newId(), label: label.trim().slice(0, 20), start_time: start, minutes }];
+    if (!writeQuick(kind, next)) setError("저장하지 못했어요. 다시 해 주세요.");
+  };
+  const remove = async (id: string) => {
+    if (!kind) return;
+    writeQuick(kind, parseQuick(rawQuick(kind)).filter((q) => q.id !== id));
+  };
+  return { items, add, remove, error };
+}
+
+const shortLen = (m: number) => (m % 60 === 0 ? `${m / 60}h` : m > 60 ? `${Math.floor(m / 60)}h${m % 60}m` : `${m}m`);
+
+/**
+ * 시작~끝 on a day timeline: drag the start handle and the end handle, the time between them is filled in.
+ * Tap a clock tick to move the nearer side, tap the times in the header for an exact pick, or type the 분.
+ * Submits `startName` / `endName` as "HH:MM". Put the date in its own field above.
+ */
+export function TimeRangeField(props: {
+  startName?: string;
+  endName?: string;
+  defaultStart?: string;
+  defaultEnd?: string;
+  /** handle step in minutes (default 10) */
+  step?: number;
+  /** the part of the day the bar shows, in minutes from midnight (default 7:00 ~ 19:00); it widens to fit the value */
+  dayStart?: number;
+  dayEnd?: number;
+  /** turns on 퀵타임 saved for this kind of time */
+  quickKind?: string;
+  required?: boolean;
+  "aria-label"?: string;
+  className?: string;
+}) {
+  const step = props.step ?? 10;
+  const LAST = 23 * 60 + 59;
+  const [start, setStart] = useState(props.defaultStart ?? "");
+  const [end, setEnd] = useState(props.defaultEnd ?? "");
+  const chosen = !!start && !!end && toMin(end) > toMin(start);
+  // until something is chosen the handles rest at 9:00 ~ 11:00 and nothing is submitted
+  const s = chosen ? toMin(start) : start ? toMin(start) : 9 * 60;
+  const e = chosen ? toMin(end) : Math.min(s + 120, LAST);
+  const len = e - s;
+
+  const setRange = (ns: number, ne: number) => {
+    const a = Math.max(0, Math.min(Math.round(ns), LAST - step));
+    const b = Math.max(a + step, Math.min(Math.round(ne), LAST));
+    setStart(fromMin(a));
+    setEnd(fromMin(b));
+  };
+
+  const winStart = Math.min(props.dayStart ?? 7 * 60, Math.floor(s / 60) * 60);
+  const winEnd = Math.max(props.dayEnd ?? 19 * 60, Math.ceil(e / 60) * 60);
+  const span = winEnd - winStart;
+  // where a clock time sits on the rail (range thumbs travel 12px in from each end)
+  const at = (t: number) => `calc(12px + (100% - 24px) * ${(t - winStart) / span})`;
+  const ticks = Array.from({ length: span / 30 + 1 }, (_, i) => winStart + i * 30);
+  // the bar speaks 24-hour (13시, 14:00); the header above keeps 오전/오후
+  const hhmm = (t: number) => `${Math.floor(t / 60) % 24}:${pad(t % 60)}`;
+  const title = props["aria-label"] ?? "시간";
+
+  const quick = useQuickTimes(props.quickKind);
+  const [adding, setAdding] = useState(false);
+  const [newLabel, setNewLabel] = useState("");
+
+  const timeBtn = (label: string, empty: boolean) =>
+    // eslint-disable-next-line react/display-name -- render prop for TimeField
+    ({ open, toggle }: { open: boolean; toggle: () => void }) => (
+      <button type="button" className="dt-r-time" data-empty={empty || undefined} aria-haspopup="dialog" aria-expanded={open} onClick={toggle}>
+        {label}
+      </button>
+    );
+
+  return (
+    <div className={`dt-field dt-range2 ${props.className ?? ""}`} data-unset={!chosen || undefined}>
+      <div className="dt-r-sum">
+        {chosen ? (
+          <>
+            <TimeField value={start} onChange={(v) => v && setRange(toMin(v), toMin(v) + len)} aria-label={`${title} 시작`} trigger={timeBtn(formatTimeLabel(start), false)} />
+            <span aria-hidden="true">~</span>
+            <TimeField value={end} onChange={(v) => v && (toMin(v) > s ? setRange(s, toMin(v)) : setRange(toMin(v) - len, toMin(v)))} aria-label={`${title} 끝`} trigger={timeBtn(formatTimeLabel(end), false)} />
+            <em>(진행 {formatDuration(len)})</em>
+          </>
+        ) : (
+          <TimeField value="" onChange={(v) => v && setRange(toMin(v), toMin(v) + 120)} aria-label={`${title} 시작`} trigger={timeBtn("시간을 정해 주세요", true)} />
+        )}
+      </div>
+      {props.quickKind && quick.items && (
+        <div className="dt-quick">
+          {quick.items.map((q) => {
+            const on = chosen && q.start_time === start && q.minutes === len;
+            const qEnd = fromMin(Math.min(toMin(q.start_time) + q.minutes, LAST));
+            return (
+              <span key={q.id} className="dt-quick-chip" data-on={on || undefined} data-tip={`${formatTimeLabel(q.start_time)}부터 ${formatDuration(q.minutes)} (${formatTimeLabel(qEnd)}까지) · 누르면 이 시간으로 바꿔요`}>
+                <button type="button" aria-pressed={on} onClick={() => setRange(toMin(q.start_time), toMin(q.start_time) + q.minutes)}>
+                  <b>{q.label}</b> {formatTimeLabel(q.start_time)} · {shortLen(q.minutes)}
+                </button>
+                <button type="button" className="dt-quick-x" onClick={() => quick.remove(q.id)} aria-label={`퀵타임 ${q.label} 지우기`}>
+                  ×
+                </button>
+              </span>
+            );
+          })}
+          <button
+            type="button"
+            className="dt-quick-plus"
+            aria-expanded={adding}
+            aria-label="퀵타임 만들기"
+            data-tip={chosen ? `지금 시간(${formatTimeLabel(start)} ~ ${formatTimeLabel(end)})을 퀵타임으로 저장해요` : "시간을 정한 뒤 퀵타임으로 저장할 수 있어요"}
+            onClick={() => setAdding((v) => !v)}
+          >
+            +
+          </button>
+        </div>
+      )}
+      {props.quickKind && adding && (
+        <div className="dt-quick-panel">
+          <div className="dt-quick-add">
+            <input
+              value={newLabel}
+              onChange={(ev) => setNewLabel(ev.target.value)}
+              onKeyDown={(ev) => ev.key === "Enter" && ev.preventDefault()}
+              maxLength={20}
+              placeholder="퀵타임 이름 (예: 오전 소풍)"
+              aria-label="퀵타임 이름"
+              autoFocus
+            />
+            <button
+              type="button"
+              className="dt-btn dt-btn-primary"
+              disabled={!chosen || !newLabel.trim()}
+              onClick={async () => {
+                await quick.add(newLabel, start, len);
+                setNewLabel("");
+                setAdding(false);
+              }}
+            >
+              {chosen ? `${formatTimeLabel(start)} · ${formatDuration(len)} 저장` : "시간을 먼저 정해 주세요"}
+            </button>
+          </div>
+          {quick.error && <p className="dt-quick-err">{quick.error}</p>}
+        </div>
+      )}
+
+
+      <div className="dt-tl">
+        {chosen && (
+          <>
+            <span className="dt-tl-tag dt-tl-tag-start" data-flip={(s - winStart) / span < 0.18 || undefined} data-high={((s - winStart) / span < 0.18 || (winEnd - e) / span < 0.18) && len / span < 0.3 ? true : undefined} style={{ left: at(s) }} aria-hidden="true">
+              {hhmm(s)}
+            </span>
+            <span className="dt-tl-tag dt-tl-tag-end" data-flip={(winEnd - e) / span < 0.18 || undefined} style={{ left: at(e) }} aria-hidden="true">
+              {hhmm(e)}
+            </span>
+          </>
+        )}
+        <div className="dt-tl-rail">
+          <div className="dt-tl-track" aria-hidden="true" />
+          <div className="dt-tl-fill" style={{ left: at(s), width: `calc((100% - 24px) * ${len / span})` }} aria-hidden="true" />
+          {/* the start handle sits on top once it is in the right half, so it can still be pulled back left */}
+          <input
+            type="range"
+            className="dt-tl-a"
+            min={winStart}
+            max={winEnd}
+            step={step}
+            value={s}
+            onChange={(ev) => {
+              const v = Number(ev.target.value);
+              setRange(v, Math.max(e, v + step));
+            }}
+            aria-label={`${title} 시작`}
+            aria-valuetext={formatTimeLabel(fromMin(s))}
+            style={{ zIndex: s > winStart + span / 2 ? 3 : 2 }}
+          />
+          <input type="range" className="dt-tl-b" min={winStart} max={winEnd} step={step} value={e} onChange={(ev) => setRange(s, Number(ev.target.value))} aria-label={`${title} 끝`} aria-valuetext={formatTimeLabel(fromMin(e))} />
+        </div>
+        <div className="dt-ticks" aria-hidden="true">
+          {ticks.map((t) => (
+            <button key={t} type="button" tabIndex={-1} data-in={(t >= s && t <= e) || undefined} data-half={t % 60 !== 0 || undefined} style={{ left: at(t) }} onClick={() => (t <= s ? setRange(t, e) : setRange(s, t))}>
+              {t % 60 === 0 ? `${Math.floor(t / 60) % 24}시` : <i className="dt-tick-dot" />}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <Proxy name={props.startName} value={chosen ? start : ""} required={props.required} />
+      <Proxy name={props.endName} value={chosen ? end : ""} required={props.required} />
     </div>
   );
 }
